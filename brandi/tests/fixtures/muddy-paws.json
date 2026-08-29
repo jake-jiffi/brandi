@@ -1,0 +1,666 @@
+{
+  "$schema": "./brand.schema.json",
+  "brandi": {
+    "version": "1.0.0",
+    "created": "2026-08-29T00:00:00.000Z",
+    "updated": "2026-08-29T00:00:00.000Z",
+    "phase": "publish",
+    "completed": [
+      "recon",
+      "intake",
+      "strategy",
+      "territories",
+      "identity",
+      "voice",
+      "proof"
+    ]
+  },
+  "meta": {
+    "name": "Muddy Paws",
+    "slug": "muddy-paws",
+    "legalName": "Muddy Paws Pty Ltd",
+    "tagline": "The good kind of wet dog",
+    "version": "1.0.0",
+    "effectiveDate": "2026-08-29",
+    "owner": "[OWNER NAME]",
+    "locale": "en-AU",
+    "categories": [
+      "pet services",
+      "self-serve retail"
+    ]
+  },
+  "evidence": [
+    {
+      "id": "e1",
+      "claim": "Two self-serve wash bays and one groom room, open seven days.",
+      "provenance": "supplied",
+      "source": "owner intake, 29 Aug 2026",
+      "field": "strategy.problem",
+      "confidence": "high",
+      "recorded": "2026-08-29T00:00:00.000Z"
+    },
+    {
+      "id": "e2",
+      "claim": "Most customers arrive between 4pm and 6pm on weekdays.",
+      "provenance": "supplied",
+      "source": "owner intake",
+      "field": "strategy.audiences",
+      "confidence": "medium",
+      "recorded": "2026-08-29T00:00:00.000Z"
+    },
+    {
+      "id": "e3",
+      "claim": "The existing sign uses a deep green that customers describe as the shop's colour.",
+      "provenance": "extracted",
+      "source": "photograph of shopfront signage",
+      "field": "identity.colour.primary",
+      "confidence": "high",
+      "recorded": "2026-08-29T00:00:00.000Z"
+    },
+    {
+      "id": "e4",
+      "claim": "Competitors in the area lead on price. Nobody leads on the dog's experience.",
+      "provenance": "assumed",
+      "source": "desk review of three local listings, not verified with customers",
+      "field": "strategy.positioning",
+      "confidence": "low",
+      "recorded": "2026-08-29T00:00:00.000Z"
+    }
+  ],
+  "strategy": {
+    "purpose": "Make washing the dog the best twenty minutes of the walk.",
+    "problem": "Washing a big dog at home wrecks the bathroom, and a full groom costs more and takes longer than most owners want on a Tuesday.",
+    "audiences": [
+      {
+        "name": "The weekday regular",
+        "need": "In and out in twenty minutes on the way home, without wrecking the car.",
+        "context": "Arrives 4pm to 6pm, often still in work clothes."
+      },
+      {
+        "name": "The weekend project",
+        "need": "A proper job on a dog that has found something dreadful.",
+        "context": "Has time, wants the good dryer and someone to ask."
+      },
+      {
+        "name": "The nervous first-timer",
+        "need": "To be shown what to do without being made to feel stupid.",
+        "context": "New puppy, or an old dog that hates the hose."
+      }
+    ],
+    "category": "Self-serve dog wash",
+    "competitors": [
+      {
+        "name": "Coin-op bays at the servo",
+        "owns": "Price and convenience",
+        "gap": "Nothing about it is pleasant for the dog."
+      },
+      {
+        "name": "Full-service groomers",
+        "owns": "Expertise and finish",
+        "gap": "Booked out, expensive, and a whole afternoon."
+      }
+    ],
+    "positioning": "For dog owners who would rather not do it in the bathroom, Muddy Paws is the wash that is built around the dog, not the drain: warm water, a proper dryer, and somebody who will show you how.",
+    "differentiators": [
+      {
+        "claim": "Warm water and a real dryer in every bay, not a hose and a towel."
+      },
+      {
+        "claim": "Staff show first-timers how, at no charge, every time."
+      },
+      {
+        "claim": "Non-slip ramps, so old and anxious dogs can walk in rather than be lifted."
+      }
+    ],
+    "promise": "Your dog walks out happier than it walked in.",
+    "values": [
+      {
+        "name": "The dog decides",
+        "behaviour": "If the dog is frightened, we stop. Nothing is worth a dog that never comes back."
+      },
+      {
+        "name": "Show, do not sell",
+        "behaviour": "We teach the technique for free. People come back to the place that taught them."
+      },
+      {
+        "name": "Clean is the product",
+        "behaviour": "The bay is spotless before the next dog. Every time, not most times."
+      }
+    ],
+    "personality": {
+      "attributes": [
+        {
+          "name": "Practical",
+          "notThis": "clinical",
+          "meaning": "We know what works on a wet labrador at 5pm. We say it plainly."
+        },
+        {
+          "name": "Warm",
+          "notThis": "cutesy",
+          "meaning": "We like dogs. We do not talk to their owners in a baby voice."
+        },
+        {
+          "name": "Unhurried",
+          "notThis": "slow",
+          "meaning": "You get the time you need, and we are quick about the things that should be quick."
+        }
+      ],
+      "archetype": "The Caregiver, with a streak of the Everyman"
+    },
+    "narrative": "Everyone who has washed a big dog at home knows the moment: the shake. Muddy Paws exists because that moment should happen somewhere with a drain, a warm tap, and a dryer that actually dries.",
+    "messaging": {
+      "primary": "The good kind of wet dog.",
+      "pillars": [
+        {
+          "claim": "Built for the dog",
+          "proof": [
+            "Warm water in every bay",
+            "Non-slip walk-in ramps",
+            "Quiet dryers rated for nervous dogs"
+          ]
+        },
+        {
+          "claim": "Twenty minutes, not an afternoon",
+          "proof": [
+            "No booking needed",
+            "Open seven days until 7pm"
+          ]
+        },
+        {
+          "claim": "Somebody will show you how",
+          "proof": [
+            "Free first-timer walkthrough",
+            "Staff on the floor, not behind a counter"
+          ]
+        }
+      ]
+    },
+    "distinctiveAssets": [
+      {
+        "asset": "The shake silhouette",
+        "where": "Signage, window, socials, receipt",
+        "status": "building"
+      },
+      {
+        "asset": "Deep green and warm sand",
+        "where": "Everywhere",
+        "status": "inherited from the existing shopfront"
+      },
+      {
+        "asset": "The phrase \"the good kind of wet dog\"",
+        "where": "Headline position only",
+        "status": "new"
+      }
+    ]
+  },
+  "identity": {
+    "school": "warm-humanist",
+    "schoolRationale": "The category is either clinical (vet-adjacent blues and whites) or novelty (paw prints and comic sans). A warm, humanist direction with real photography is the only one that reads as competent and likeable at once.",
+    "signature": "A dog mid-shake, cropped hard, used at poster scale.",
+    "colour": {
+      "primary": "#1F6F4A",
+      "accents": [
+        "#D4823A"
+      ],
+      "harmony": "explicit",
+      "accentCount": 1,
+      "neutralHue": "#1F6F4A",
+      "neutralChroma": 0.008,
+      "ratio": "62/30/8: green surfaces, sand neutrals, the orange only where an eye needs to land.",
+      "print": {
+        "profile": "FOGRA39 coated for the flyer, uncoated for the laminate",
+        "swatches": [
+          {
+            "role": "brand.solid",
+            "hex": "#1F6F4A",
+            "cmyk": [
+              88,
+              29,
+              78,
+              16
+            ],
+            "pantoneCoated": "PMS 349 C",
+            "pantoneUncoated": "PMS 349 U",
+            "ral": "RAL 6005 moss green",
+            "vinyl": "3M 180mC-77 dark green",
+            "thread": "Madeira Polyneon 1751",
+            "verified": true,
+            "note": "Matched against a coated guide under D50 at the printer, 12 August. The uncoated sits noticeably flatter; that is expected and accepted."
+          },
+          {
+            "role": "accent1.solid",
+            "hex": "#D4823A",
+            "cmyk": null,
+            "pantoneCoated": "PMS 1585 C",
+            "pantoneUncoated": null,
+            "ral": null,
+            "vinyl": null,
+            "thread": null,
+            "verified": false,
+            "note": "Coated match only. Nobody has proofed it uncoated, and the flyer stock is uncoated, so proof before the first run."
+          }
+        ]
+      }
+    },
+    "type": {
+      "display": "Bitter",
+      "body": "Karla",
+      "mono": "JetBrains Mono",
+      "basePx": 16,
+      "baseMaxPx": 17,
+      "ratio": "perfect-fourth",
+      "ratioMax": "perfect-fourth",
+      "measureChars": 64,
+      "licences": [
+        {
+          "family": "Bitter",
+          "source": "Google Fonts",
+          "permits": "SIL Open Font Licence 1.1. Web, print, app, embedding. No separate licence needed."
+        },
+        {
+          "family": "Karla",
+          "source": "Google Fonts",
+          "permits": "SIL Open Font Licence 1.1."
+        },
+        {
+          "family": "JetBrains Mono",
+          "source": "Google Fonts",
+          "permits": "SIL Open Font Licence 1.1."
+        }
+      ]
+    },
+    "shape": "rounded",
+    "motion": "restrained",
+    "spaceBase": 4,
+    "logo": {
+      "files": [
+        {
+          "path": "assets/logos/muddy-paws-primary.svg",
+          "role": "primary"
+        }
+      ],
+      "variants": [
+        {
+          "name": "Primary horizontal",
+          "use": "Signage, website header, anything wider than it is tall.",
+          "file": "muddy-paws-primary.svg"
+        },
+        {
+          "name": "Stacked",
+          "use": "Square and near-square spaces: social avatars, stamps, the van door.",
+          "file": "muddy-paws-stacked.svg"
+        },
+        {
+          "name": "Mark only",
+          "use": "Under 96px wide, and anywhere the name already appears next to it.",
+          "file": "muddy-paws-mark.svg"
+        },
+        {
+          "name": "Reversed",
+          "use": "On the deep green and on photography. Never on the sand.",
+          "file": "muddy-paws-reversed.svg"
+        }
+      ],
+      "clearSpace": "Clear space on every side equals the height of the letter M in the wordmark. At mark-only sizes, use the height of the ear.",
+      "minSize": {
+        "printMm": 18,
+        "screenPx": 72
+      },
+      "misuse": [
+        "stretch or condense it",
+        "rotate it, including by a few degrees for effect",
+        "recolour it outside the four approved variants",
+        "place the full-colour version on a photograph",
+        "add a drop shadow, outline, glow or bevel",
+        "put it inside a box that is not in this book",
+        "reconstruct the wordmark by typing it in Bitter",
+        "crowd it: the clear space is a rule, not a suggestion",
+        "use the mark-only version above 96px when the name is not already present"
+      ],
+      "favicon": "assets/logos/muddy-paws-mark.svg",
+      "minSizes": [
+        {
+          "variant": "Primary horizontal",
+          "printMm": 22,
+          "screenPx": 140,
+          "basis": "The gap between the second and third arc closes at 300dpi below this, and the mark reads as one blob."
+        },
+        {
+          "variant": "Stacked",
+          "printMm": 16,
+          "screenPx": 96,
+          "basis": "The wordmark loses its tracking before the mark loses its droplets."
+        },
+        {
+          "variant": "Mark only",
+          "printMm": 8,
+          "screenPx": 24,
+          "basis": "At 24px the smallest droplet is one pixel, which is the floor for it still reading as water."
+        }
+      ],
+      "placement": "Top left on anything wider than it is tall, aligned to the same optical margin as the body text, never centred. On the shopfront it sits at eye height on the right-hand pane, because that is the side people approach from.",
+      "monochrome": {
+        "rule": "One ink, no tints and no halftone. The arcs stay solid and the droplets become outlines so they do not fill in.",
+        "knockout": "Reversed out of the green, the droplets close up below 30mm. Above that they hold. Below it, use the mark without droplets.",
+        "minStrokeMm": 0.8
+      }
+    },
+    "imagery": {
+      "direction": "Real dogs, mid-action, in the actual bays. Natural light through the roller door. Wet fur, tiled walls, the good mess.",
+      "treatment": "No filters. Slight warm grade to match the sand neutrals. Crop tight enough that you can see the expression.",
+      "dos": [
+        "Shoot in the shop, at 5pm, with real customers who said yes",
+        "Let water and movement blur",
+        "Include hands: this is a place where people do something"
+      ],
+      "donts": [
+        "Stock photography of clean studio dogs",
+        "Anything shot on white seamless",
+        "Dogs in costumes or sunglasses",
+        "A dog looking sad in a bath, which is the thing we are the opposite of"
+      ]
+    },
+    "iconography": {
+      "style": "Single-weight line icons with rounded caps, drawn to match the wordmark's terminals",
+      "grid": 24,
+      "strokePx": 2,
+      "source": "Drawn in-house. Do not mix icon sets."
+    },
+    "signatureMoves": [
+      {
+        "name": "The crop past two edges",
+        "primitive": "Any photograph or the shake mark is placed so it leaves the frame on at least two sides, never fully contained.",
+        "howItWorks": "A contained image reads as a stock photo dropped into a box. Cropping past two edges says somebody chose where to cut, and it makes the frame feel too small for the dog, which is the whole idea.",
+        "useSites": [
+          "Home page hero",
+          "Phone hero",
+          "A4 flyer",
+          "Shopfront decal",
+          "Social square",
+          "Deck title slide",
+          "Bay instruction card",
+          "Van side"
+        ],
+        "brokenConvention": "Local service businesses centre a whole logo and a whole photo in a whole box. This never contains anything."
+      },
+      {
+        "name": "One orange moment",
+        "primitive": "Exactly one element per view is #D4823A, and it is always the thing you are meant to touch or the number you are meant to read.",
+        "howItWorks": "Scarcity is what makes an accent an accent. When two things are orange, neither is.",
+        "useSites": [
+          "Primary button",
+          "Price",
+          "Opening hours on the flyer",
+          "Bay number",
+          "Booking confirmation",
+          "Van phone number",
+          "Social CTA",
+          "Deck page number"
+        ],
+        "brokenConvention": "Most brand systems spread the accent across borders, icons and headings until it is a second brand colour."
+      }
+    ],
+    "motionPrinciple": "Water settles, it does not bounce. Everything decelerates into place and nothing overshoots.",
+    "motionSignature": {
+      "name": "Settle",
+      "description": "Content arrives 8px low and rises into place, opacity and transform together, never scale.",
+      "durationMs": 240,
+      "easing": "cubic-bezier(0.2, 0, 0, 1)"
+    }
+  },
+  "voice": {
+    "attributes": [
+      {
+        "name": "Plain",
+        "notThis": "blunt",
+        "doThis": "Say the thing in the fewest words that still sound like a person. \"Warm water in every bay\", not \"premium thermal amenity\"."
+      },
+      {
+        "name": "Warm",
+        "notThis": "gushing",
+        "doThis": "Address the owner as a competent adult who likes their dog. No exclamation marks in headlines."
+      },
+      {
+        "name": "Useful",
+        "notThis": "instructional",
+        "doThis": "Every sentence either tells them something they can act on or gets out of the way."
+      }
+    ],
+    "tone": [
+      {
+        "situation": "Signage and headlines",
+        "reader": "Walking past, half looking",
+        "sound": "Short, concrete, a little dry. Six words or fewer."
+      },
+      {
+        "situation": "First-timer instructions",
+        "reader": "Slightly anxious, dog already wet",
+        "sound": "Calm and sequential. One instruction per line. Never funny here."
+      },
+      {
+        "situation": "Something went wrong",
+        "reader": "Annoyed, possibly soaked",
+        "sound": "Say what happened, what we are doing, and by when. No apology theatre."
+      },
+      {
+        "situation": "Price and payment",
+        "reader": "Deciding",
+        "sound": "Flat and complete. Every number visible, no asterisks."
+      },
+      {
+        "situation": "Social",
+        "reader": "Scrolling, fond of dogs",
+        "sound": "The dog is the content. We are barely in it."
+      }
+    ],
+    "vocabulary": {
+      "use": [
+        "wash",
+        "bay",
+        "dryer",
+        "your dog",
+        "we",
+        "show you how",
+        "twenty minutes"
+      ],
+      "avoid": [
+        "pampering",
+        "pawfect",
+        "fur baby",
+        "premium",
+        "solutions",
+        "unleash",
+        "spa experience",
+        "revolutionise"
+      ],
+      "hardThings": [
+        {
+          "situation": "A dog is too distressed to continue",
+          "say": "We have stopped. She was not coping and we would rather she comes back another day than remembers this one."
+        },
+        {
+          "situation": "Price has gone up",
+          "say": "The wash is now [PRICE]. Water and power went up in July and we held it as long as we could."
+        }
+      ]
+    },
+    "mechanics": {
+      "contractions": "Yes, always. We write the way we talk.",
+      "sentenceLength": "Short. If a sentence has two ideas in it, it is two sentences.",
+      "oxfordComma": "No, unless it removes a genuine ambiguity.",
+      "headings": "Sentence case everywhere, including buttons.",
+      "buttons": "A verb the person would use. \"Book a groom\", not \"Submit\".",
+      "numerals": "Numerals from one upward in prices and times. Words for numbers inside prose.",
+      "dates": "29 August, not 29th August or 08/29.",
+      "currency": "$18, not AUD 18.00, unless the context is an invoice."
+    },
+    "examples": [
+      {
+        "bad": "Welcome to Muddy Paws, your premium destination for pawfect pet pampering solutions!",
+        "good": "Two wash bays. Warm water. A dryer that actually dries."
+      },
+      {
+        "bad": "An error occurred. Please try again later.",
+        "good": "The card reader dropped out. Try again, or pay at the counter and we will sort it."
+      },
+      {
+        "bad": "Unleash your dog's inner shine with our revolutionary grooming experience.",
+        "good": "Bring the dog. We will show you how."
+      }
+    ],
+    "boilerplate": {
+      "words25": "Muddy Paws is a self-serve dog wash with warm water, a dryer that actually dries, and somebody on hand who will show you how.",
+      "words50": "Muddy Paws is a self-serve dog wash. Two bays, warm water, a real dryer, and towels included. Bring the dog in muddy and take it home clean, without wrecking your bathroom or waiting a fortnight for a grooming appointment. Somebody is always there to show you how it works.",
+      "words100": "Muddy Paws is a self-serve dog wash for people who would rather do it themselves. Two bays with warm water at the right pressure, a dryer that actually dries rather than blowing cold air around, and towels included so you are not bringing your own. Nobody books you in for a fortnight's time and nobody upsells you a package. You walk in, you wash your dog, you walk out with a dry one, and your bathroom stays clean. If it is your first time, somebody will show you how everything works, and they will not make you feel silly for asking."
+    },
+    "elevatorPitch": "It is a place to wash your own dog properly. Warm water, a real dryer, towels included, and somebody who will show you how the first time.",
+    "keyMessages": [
+      {
+        "audience": "Dog owners nearby",
+        "message": "Wash the dog without wrecking the bathroom.",
+        "proof": "Two bays, warm water and a dryer, and the towels are included."
+      },
+      {
+        "audience": "Tradespeople with utes",
+        "message": "In and out before the shops shut.",
+        "proof": "Open seven days until 7pm, no booking."
+      },
+      {
+        "audience": "People whose groomer is booked out",
+        "message": "You do not need an appointment to get a clean dog.",
+        "proof": "Walk in any day. The bays are first come, first served."
+      }
+    ],
+    "tagline": {
+      "line": "The good kind of wet dog.",
+      "usage": "Headline position only, and once per surface. It is not a strapline that sits under the logo, and it never appears in body copy.",
+      "lockup": "Never locked to the mark. It works because it reads as a sentence somebody said, not as a slogan attached to a logo."
+    }
+  },
+  "applications": [
+    {
+      "name": "Home page",
+      "surface": "web",
+      "frame": "1440x1600",
+      "file": "Main.dc.html",
+      "purpose": "Answer four questions in twenty seconds: what it is, what it costs, when it is open, where it is.",
+      "notes": "One primary action, repeated. The hero photograph is the only image above the fold."
+    },
+    {
+      "name": "Phone",
+      "surface": "web",
+      "frame": "390x844",
+      "file": "Mobile.dc.html",
+      "purpose": "The same four answers, thumb-first, for someone standing outside with a wet dog.",
+      "notes": "Targets at 52px. No fake status bar."
+    },
+    {
+      "name": "A4 flyer",
+      "surface": "print",
+      "frame": "794x1123",
+      "file": "Print.dc.html",
+      "purpose": "Read across a car park in three seconds.",
+      "notes": "Checked in greyscale. Body type at 12pt. No flood fills that drink ink."
+    },
+    {
+      "name": "Bay instructions",
+      "surface": "signage",
+      "frame": "A3 portrait",
+      "purpose": "Talk a first-timer through the wash without anyone having to stand there.",
+      "notes": "Numbered, because this genuinely is a sequence. Laminated, so no fine detail."
+    },
+    {
+      "name": "Shopfront",
+      "surface": "environment",
+      "purpose": "Say what the place is from the far side of the road.",
+      "notes": "Wordmark at 400mm cap height minimum. Reversed on the green."
+    }
+  ],
+  "governance": {
+    "decisions": [
+      {
+        "id": "d1",
+        "date": "2026-08-29",
+        "decision": "Keep the existing shopfront green as the primary colour.",
+        "rationale": "Customers already describe it as the shop's colour. Throwing away recognition that has been accumulating for years to get a slightly better green is a bad trade.",
+        "alternatives": [
+          "A brighter, more digital-native green",
+          "A full repositioning onto the sand tone"
+        ],
+        "owner": "[OWNER NAME]"
+      },
+      {
+        "id": "d2",
+        "date": "2026-08-29",
+        "decision": "Orange is an accent only, never a surface.",
+        "rationale": "At surface scale it fights the green and the room already has a lot of colour in it. Held back, it is the only thing that draws the eye, which is what an accent is for.",
+        "alternatives": [
+          "A two-colour brand with equal weight"
+        ],
+        "owner": "[OWNER NAME]"
+      },
+      {
+        "id": "d3",
+        "date": "2026-08-29",
+        "decision": "Restrained motion, not fluid.",
+        "rationale": "The website exists to answer four questions and give directions. Motion that draws attention to itself would be working against that.",
+        "alternatives": [
+          "Fluid"
+        ],
+        "owner": "[OWNER NAME]"
+      }
+    ],
+    "openQuestions": [
+      {
+        "id": "q1",
+        "question": "Is the 4pm to 6pm weekday peak real, or is it just when the owner is on the floor?",
+        "whyItMatters": "It decides whether the site leads with speed or with the groom room, and what the signage says.",
+        "assumedMeanwhile": "Treated as real, so speed leads.",
+        "whoCanAnswer": "Two weeks of till data",
+        "changesIf": "If weekends dominate, the whole site leads with the full groom instead.",
+        "status": "open"
+      },
+      {
+        "id": "q2",
+        "question": "Do we have written permission from the customers in the shopfront photographs?",
+        "whyItMatters": "Nothing can be published without it, and the imagery direction depends entirely on real customers.",
+        "assumedMeanwhile": "Assumed not. All photography is marked as placeholder until confirmed.",
+        "whoCanAnswer": "[OWNER NAME]",
+        "changesIf": "If not, the launch shoot has to be booked before anything ships.",
+        "status": "open"
+      }
+    ],
+    "nonGoals": [
+      "This is not a franchise system. Nothing here is designed to survive being applied by someone who has never seen the shop.",
+      "This is not a product brand. There is no packaging, and adding some would need a fresh look at the whole colour system.",
+      "This does not cover vehicle livery. The van needs its own sheet."
+    ],
+    "changeLog": [
+      {
+        "version": "1.0.0",
+        "date": "2026-08-29",
+        "summary": "First complete system. Colour inherited from the shopfront, everything else new."
+      }
+    ],
+    "trademark": {
+      "status": "unregistered",
+      "marks": [
+        {
+          "mark": "Muddy Paws",
+          "status": "not searched",
+          "jurisdiction": "AU",
+          "number": null,
+          "classes": []
+        }
+      ],
+      "notice": "No symbol until a search comes back. Using an R symbol on an unregistered mark is an offence under the Trade Marks Act, and TM on a name nobody has searched is a claim about a name that may already belong to somebody.",
+      "usage": "Third parties may use the name in plain text to refer to the business. They may not use the mark."
+    },
+    "colophon": {
+      "madeBy": "Built with Brandi",
+      "contact": "[WHO TO ASK WHEN THIS BOOK DOES NOT ANSWER THE QUESTION]",
+      "approvedBy": null,
+      "reviewDate": null
+    }
+  }
+}

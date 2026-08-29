@@ -1,0 +1,1430 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brandi.design/brand.schema.json",
+  "title": "Brandi brand file",
+  "description": "The durable source of truth for a brand system. The brand book, the design tokens and the enforcement skill are all generated views of this file. Edit this; never edit what it generates.",
+  "type": "object",
+  "required": [
+    "brandi",
+    "meta",
+    "evidence",
+    "strategy",
+    "identity",
+    "voice",
+    "governance"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "brandi": {
+      "type": "object",
+      "description": "Where the journey is up to. Managed by the tool.",
+      "required": [
+        "version",
+        "phase"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "Brand file format version."
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "phase": {
+          "type": "string",
+          "enum": [
+            "recon",
+            "intake",
+            "strategy",
+            "territories",
+            "identity",
+            "voice",
+            "proof",
+            "publish"
+          ]
+        },
+        "completed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slug": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "legalName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tagline": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "description": "Bump when the system changes. Semver."
+        },
+        "effectiveDate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Who holds the brand and approves changes."
+        },
+        "locale": {
+          "type": "string",
+          "default": "en-AU"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Where every statement came from. Nothing enters a deliverable without one of these.",
+      "items": {
+        "type": "object",
+        "required": [
+          "claim",
+          "provenance"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "claim": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provenance": {
+            "type": "string",
+            "enum": [
+              "supplied",
+              "extracted",
+              "published",
+              "decided",
+              "assumed",
+              "open"
+            ],
+            "description": "supplied: the client said it. extracted: measured from a real artefact. published: from their own channels. decided: chosen here, on a date. assumed: a working assumption, and it must read as one. open: unresolved."
+          },
+          "source": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "field": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The brand.json path this supports."
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "recorded": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "strategy": {
+      "type": "object",
+      "properties": {
+        "purpose": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "One sentence. The single load-bearing decision. It must survive stripping everything else away."
+        },
+        "problem": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "audiences": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "need": {
+                "type": "string"
+              },
+              "context": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "competitors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "owns": {
+                "type": "string"
+              },
+              "gap": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "positioning": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "differentiators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "claim": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "promise": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "behaviour": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "personality": {
+          "type": "object",
+          "properties": {
+            "attributes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "notThis": {
+                    "type": "string",
+                    "description": "The opposite nobody would claim. An attribute without one says nothing."
+                  },
+                  "meaning": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "archetype": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "A generative prompt, not a validated model. Treat it as such."
+            }
+          }
+        },
+        "narrative": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "messaging": {
+          "type": "object",
+          "properties": {
+            "primary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "pillars": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "claim": {
+                    "type": "string"
+                  },
+                  "proof": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "A pillar with no proof is a slogan. Find evidence or make it an open question."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "distinctiveAssets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "asset"
+            ],
+            "properties": {
+              "asset": {
+                "type": "string"
+              },
+              "where": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "school": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The visual direction, from references/03-design-schools.md."
+        },
+        "schoolRationale": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "signature": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The one element this brand is remembered by."
+        },
+        "colour": {
+          "type": "object",
+          "properties": {
+            "primary": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+            },
+            "accents": {
+              "type": "array",
+              "maxItems": 2,
+              "items": {
+                "type": "string",
+                "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+              }
+            },
+            "harmony": {
+              "type": "string",
+              "enum": [
+                "complementary",
+                "analogous",
+                "split-complementary",
+                "triadic",
+                "tetradic",
+                "explicit"
+              ]
+            },
+            "accentCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "neutralHue": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "neutralChroma": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 0.05,
+              "description": "How far the greys are tinted toward the brand hue. Above 0.05 they stop being neutral."
+            },
+            "ratio": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "How much of each colour, in prose. Proportion is as much of the brand as the values are."
+            },
+            "print": {
+              "type": "object",
+              "description": "Colour for surfaces that are not screens. CMYK is computed if absent; Pantone is never computed, because a match is a decision made against a physical guide under controlled light.",
+              "properties": {
+                "profile": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The separation these CMYK values assume, e.g. FOGRA39 coated, SWOP uncoated. Without it the numbers mean nothing."
+                },
+                "swatches": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "role": {
+                        "type": "string",
+                        "description": "Which brand colour this is, e.g. brand.solid, accent.solid."
+                      },
+                      "hex": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+                      },
+                      "cmyk": {
+                        "type": [
+                          "array",
+                          "null"
+                        ],
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "items": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      },
+                      "pantoneCoated": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "pantoneUncoated": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "ral": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "For signage, powder coat and paint."
+                      },
+                      "vinyl": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Cut-vinyl reference for a signwriter, e.g. 3M 180mC-127."
+                      },
+                      "thread": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "Embroidery thread, e.g. Madeira Polyneon 1751."
+                      },
+                      "verified": {
+                        "type": "boolean",
+                        "description": "True only when someone held a printed proof next to a guide."
+                      },
+                      "note": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "dataViz": {
+              "type": "object",
+              "description": "Chart colour. A brand palette is built for hierarchy and a chart palette is built for discrimination, so they are not the same set.",
+              "properties": {
+                "categorical": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+                  },
+                  "description": "Distinguishable at a glance, and still distinguishable under deuteranopia."
+                },
+                "sequential": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+                  }
+                },
+                "diverging": {
+                  "type": "array",
+                  "items": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "type": {
+          "type": "object",
+          "properties": {
+            "display": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "body": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mono": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "basePx": {
+              "type": "number",
+              "minimum": 12,
+              "description": "16 is the browser default and the practical floor."
+            },
+            "baseMaxPx": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "ratio": {
+              "type": [
+                "string",
+                "number"
+              ],
+              "description": "A named modular scale ratio, or a raw number above 1."
+            },
+            "ratioMax": {
+              "type": [
+                "string",
+                "number",
+                "null"
+              ]
+            },
+            "measureChars": {
+              "type": "integer",
+              "minimum": 20,
+              "maximum": 200
+            },
+            "licences": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "family": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "permits": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "shape": {
+          "type": "string",
+          "enum": [
+            "sharp",
+            "crisp",
+            "soft",
+            "rounded",
+            "pill"
+          ]
+        },
+        "motion": {
+          "type": "string",
+          "enum": [
+            "still",
+            "restrained",
+            "fluid",
+            "lively"
+          ]
+        },
+        "spaceBase": {
+          "type": "integer",
+          "enum": [
+            4,
+            8
+          ]
+        },
+        "logo": {
+          "type": "object",
+          "properties": {
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "variants": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "use": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "clearSpace": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Expressed as a ratio of an element of the mark, so it scales."
+            },
+            "minSize": {
+              "type": "object",
+              "properties": {
+                "printMm": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "screenPx": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            },
+            "misuse": {
+              "type": "array",
+              "description": "At least six, or people invent their own. A string still works; an object says why, and where the rule came from.",
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "what"
+                    ],
+                    "properties": {
+                      "what": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "A prohibition without a reason is one people route around."
+                      },
+                      "source": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "real",
+                          "standard",
+                          null
+                        ],
+                        "description": "real: it happened to this brand. standard: it is a general rule."
+                      },
+                      "image": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "A path to a drawing of the misuse. Drawn beats described."
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "favicon": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "minSizes": {
+              "type": "array",
+              "description": "Per variant, with the basis. A minimum with no basis is a number somebody guessed.",
+              "items": {
+                "type": "object",
+                "required": [
+                  "variant"
+                ],
+                "properties": {
+                  "variant": {
+                    "type": "string"
+                  },
+                  "printMm": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "screenPx": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "basis": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "What fails first below this, e.g. the counters in the a fill at 300dpi."
+                  }
+                }
+              }
+            },
+            "placement": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Where it sits and what it aligns to, on each surface it appears on."
+            },
+            "monochrome": {
+              "type": "object",
+              "description": "One-colour behaviour, which is what embroidery, foil, etching and a fax get.",
+              "properties": {
+                "rule": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "knockout": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "What happens to the counters when it is reversed out."
+                },
+                "minStrokeMm": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "imagery": {
+          "type": "object",
+          "properties": {
+            "direction": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "treatment": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "dos": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "donts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "shotList": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "shot": {
+                    "type": "string"
+                  },
+                  "why": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "surface": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Where this one is destined, which sets its crop and orientation."
+                  }
+                }
+              },
+              "description": "What to actually go and photograph. Generated from the direction when absent."
+            },
+            "rights": {
+              "type": "object",
+              "properties": {
+                "ownership": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "modelReleases": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "licenceExpiry": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "stockPolicy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "iconography": {
+          "type": "object",
+          "properties": {
+            "style": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "grid": {
+              "type": "integer"
+            },
+            "strokePx": {
+              "type": "number"
+            },
+            "source": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "starterSet": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The licensed set the first icons come from, and its licence, until bespoke ones exist."
+            }
+          }
+        },
+        "signatureMoves": {
+          "type": "array",
+          "description": "The two or three things that make work recognisable with the wordmark covered. Each needs a primitive somebody can build, and the sites it appears on.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "primitive": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The buildable thing: a shape, a crop rule, a grid behaviour, a motion."
+              },
+              "howItWorks": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "useSites": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Eight or more, or it is a flourish rather than a system."
+              },
+              "brokenConvention": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The rule it deliberately breaks. A move that breaks nothing is a decoration."
+              }
+            }
+          }
+        },
+        "motionPrinciple": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "What motion means here, in one sentence, beyond the stance enum."
+        },
+        "motionSignature": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "description": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "durationMs": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "easing": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "properties": {
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "notThis": {
+                "type": "string",
+                "description": "Required in practice. Warm means nothing; warm, not gushing, means something."
+              },
+              "doThis": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "tone": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "situation": {
+                "type": "string"
+              },
+              "reader": {
+                "type": "string",
+                "description": "What the reader is feeling. Tone follows this, not the channel."
+              },
+              "sound": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "vocabulary": {
+          "type": "object",
+          "properties": {
+            "use": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "avoid": {
+              "description": "The guardian greps for these in real source files.",
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "object"
+                ]
+              }
+            },
+            "hardThings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "situation": {
+                    "type": "string"
+                  },
+                  "say": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "mechanics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "examples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "bad": {
+                "type": "string"
+              },
+              "good": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "boilerplate": {
+          "type": "object",
+          "description": "The same thing said at three lengths, because a directory listing, a press release and an about page all need it and none of them will write their own.",
+          "properties": {
+            "words25": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "words50": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "words100": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "elevatorPitch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Said out loud, in one breath, by someone who works there."
+        },
+        "keyMessages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "audience",
+              "message"
+            ],
+            "properties": {
+              "audience": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "proof": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "What makes it believable. A message with no proof is a claim."
+              }
+            }
+          }
+        },
+        "tagline": {
+          "type": "object",
+          "properties": {
+            "line": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "usage": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Where it may appear, and where it may not."
+            },
+            "lockup": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Whether it locks to the mark, and at what relationship."
+            },
+            "translations": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "applications": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "governance": {
+      "type": "object",
+      "properties": {
+        "decisions": {
+          "description": "What makes this document durable. Without it nobody can tell which rules are load-bearing.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "decision",
+              "rationale"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "decision": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "alternatives": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "owner": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "openQuestions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "question",
+              "whyItMatters"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "question": {
+                "type": "string"
+              },
+              "whyItMatters": {
+                "type": "string"
+              },
+              "assumedMeanwhile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "whoCanAnswer": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "changesIf": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "open",
+                  "answered",
+                  "dropped"
+                ]
+              }
+            }
+          }
+        },
+        "nonGoals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "What this system deliberately does not cover."
+        },
+        "changeLog": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "trademark": {
+          "type": "object",
+          "description": "Status, not advice. The search is a lawyer's job and this records what they found.",
+          "properties": {
+            "status": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "unregistered",
+                "pending",
+                "registered",
+                "unknown",
+                null
+              ]
+            },
+            "marks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "mark": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "jurisdiction": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "number": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "classes": {
+                    "type": "array",
+                    "items": {
+                      "type": [
+                        "string",
+                        "number"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            "notice": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The symbol to use and where, e.g. TM on first prominent use."
+            },
+            "usage": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "How third parties may refer to the brand."
+            }
+          }
+        },
+        "colophon": {
+          "type": "object",
+          "properties": {
+            "madeBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "contact": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "Who to ask when this book does not answer the question."
+            },
+            "approvedBy": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "reviewDate": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

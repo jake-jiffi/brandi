@@ -1,0 +1,18 @@
+# Twenty-seven third-party repositories, cloned as reading material during the
+# build. They are 712MB, they are somebody else's work under somebody else's
+# licence, and nothing in Brandi depends on them at runtime. What was learned
+# from them lives in research/findings/, which IS tracked.
+research/benchmarks/
+
+# Generated output. Every one of these is derivable from brand/brand.json by
+# running the tool, so committing them would be committing a stale copy.
+**/brand/tokens/
+**/brand/canvas/
+**/brand/assets/
+**/brand/brand-book.html
+**/brand/brand-book.pdf
+**/handover/
+
+node_modules/
+.DS_Store
+*.log

@@ -1,0 +1,32 @@
+#!/bin/sh
+# Brandi command line.
+#
+# Claude Code puts every installed plugin's bin directory on PATH, so once the
+# plugin is installed this is simply `brandi <command>`. Running from a clone
+# works too: the script resolves its own location rather than assuming one.
+set -e
+
+self="$0"
+# Follow symlinks so a linked copy still finds the scripts beside it.
+while [ -L "$self" ]; do
+  link=$(readlink "$self")
+  case "$link" in
+    /*) self="$link" ;;
+    *) self="$(dirname "$self")/$link" ;;
+  esac
+done
+root="$(cd "$(dirname "$self")/.." && pwd)"
+
+if [ ! -f "$root/scripts/brandi.mjs" ]; then
+  echo "brandi: cannot find scripts/brandi.mjs next to $root" >&2
+  exit 1
+fi
+
+if command -v node >/dev/null 2>&1; then
+  exec node "$root/scripts/brandi.mjs" "$@"
+elif command -v bun >/dev/null 2>&1; then
+  exec bun "$root/scripts/brandi.mjs" "$@"
+else
+  echo "brandi: needs node 18 or newer (or bun) on PATH" >&2
+  exit 1
+fi

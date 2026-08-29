@@ -1,0 +1,31 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "brandi",
+  "metadata": {
+    "description": "Brandi: an agency-grade brand and design system builder for Claude Code."
+  },
+  "owner": {
+    "name": "Jake Shelley",
+    "email": "jake.s@enviz.co"
+  },
+  "plugins": [
+    {
+      "name": "brandi",
+      "description": "Build a complete brand and design system from a logo and a vague idea, or from nothing. Visual rounds on the /design canvas, a real brand book, DTCG design tokens, and a companion skill that keeps future work on brand.",
+      "version": "1.13.3",
+      "author": {
+        "name": "Jake Shelley",
+        "email": "jake.s@enviz.co"
+      },
+      "source": "./brandi",
+      "category": "design",
+      "tags": [
+        "design",
+        "brand",
+        "design-system",
+        "tokens",
+        "accessibility"
+      ]
+    }
+  ]
+}
