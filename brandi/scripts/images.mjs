@@ -266,6 +266,10 @@ export async function catalogueImages(dir, { slots = SLOTS, prior = {} } = {}) {
       byPrint,
       video: found.video.length,
       vector: found.vector.length,
+      // A browser decodes neither HEIC nor HEIF, so an artboard referencing one
+      // renders a broken image and says nothing about it.
+      browserBlocked: readable.filter(([, a]) => a.format === 'heic').length,
+      rotated: readable.filter(([, a]) => a.rotated).length,
     },
     slotFit,
     slots: slots.map((s) => ({ name: s.name, ratio: +s.ratio.toFixed(3), note: s.note ?? null })),
@@ -287,6 +291,18 @@ export function summarise(doc) {
   lines.push(`  ${c.photos} photographs, ${c.furniture} logo or interface furniture (measured, not judged on crop)`);
   if (c.unreadable) lines.push(`  ${c.unreadable} unreadable, recorded rather than skipped`);
   if (c.video) lines.push(`  ${c.video} video files, which this does not measure and a brand system has to decide about`);
+  if (c.browserBlocked) {
+    lines.push('', `${c.browserBlocked} of these cannot be shown in a browser at all: HEIC is not a format Chrome decodes.`);
+    lines.push('That matters more than the count suggests. The photographs somebody went out and shot on');
+    lines.push('purpose arrive off a phone as HEIC while the archive is JPEG, so these are usually the best');
+    lines.push('images in the set and the only ones that can carry a printed surface. Convert them before');
+    lines.push('any artboard references them, or they are silently absent from every mockup:');
+    lines.push('  sips -s format jpeg -Z 2400 <file>.HEIC --out <file>.jpg      (macOS)');
+    lines.push('  magick <file>.HEIC -resize 2400x2400\\> <file>.jpg            (ImageMagick)');
+  }
+  if (c.rotated) {
+    lines.push('', `${c.rotated} were stored one way round and are meant to be seen another, and are measured as seen.`);
+  }
   if (c.vector) lines.push(`  ${c.vector} vector files, which are logo candidates rather than photography`);
 
   if (c.photos) {

@@ -34,6 +34,66 @@ async function head(file, bytes = HEAD_BYTES) {
   }
 }
 
+/**
+ * A photograph taken on a phone is frequently stored one way and meant to be
+ * seen another. Ignoring that is not a rounding error: a 5712x4284 file with a
+ * 270-degree rotation is a PORTRAIT photograph, and calling it landscape sends
+ * it to a vehicle panel it cannot fill.
+ *
+ * Found by converting a client's HEIC and looking at it: the van was on its
+ * side. The measurement had been confidently wrong and nothing had noticed,
+ * because nothing had looked.
+ *
+ * The two formats disagree about where to put it. JPEG uses EXIF tag 0x0112.
+ * HEIC does not use EXIF for this at all: it carries an ISOBMFF `irot` box, so
+ * a tool that only reads EXIF reports "no rotation" on a rotated HEIC, which is
+ * exactly what `sips -g orientation` does.
+ */
+function applyRotation(size, quarterTurns) {
+  if (!size || !quarterTurns) return size;
+  const swap = quarterTurns % 2 === 1;
+  return swap
+    ? { ...size, width: size.height, height: size.width, rotated: quarterTurns * 90 }
+    : { ...size, rotated: quarterTurns * 90 };
+}
+
+/**
+ * EXIF orientation, as quarter turns. Values 5 to 8 also mirror, which does not
+ * change the shape, so only the turn is taken.
+ */
+const EXIF_TURNS = { 1: 0, 2: 0, 3: 2, 4: 2, 5: 1, 6: 1, 7: 1, 8: 3 };
+
+function exifOrientation(b) {
+  // Find the APP1 Exif segment rather than scanning the whole file for "Exif",
+  // which appears in plenty of unrelated bytes.
+  let i = 2;
+  while (i + 4 < b.length) {
+    if (b[i] !== 0xff) { i++; continue; }
+    const marker = b[i + 1];
+    if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { i += 2; continue; }
+    const len = b.readUInt16BE(i + 2);
+    if (marker === 0xe1 && b.toString('ascii', i + 4, i + 8) === 'Exif') {
+      const tiff = i + 10;
+      if (tiff + 8 > b.length) return 0;
+      const le = b.toString('ascii', tiff, tiff + 2) === 'II';
+      const u16 = (o) => (le ? b.readUInt16LE(o) : b.readUInt16BE(o));
+      const u32 = (o) => (le ? b.readUInt32LE(o) : b.readUInt32BE(o));
+      const ifd = tiff + u32(tiff + 4);
+      if (ifd + 2 > b.length) return 0;
+      const count = u16(ifd);
+      for (let e = 0; e < count; e++) {
+        const entry = ifd + 2 + e * 12;
+        if (entry + 12 > b.length) break;
+        if (u16(entry) === 0x0112) return EXIF_TURNS[u16(entry + 8)] ?? 0;
+      }
+      return 0;
+    }
+    if (len < 2) return 0;
+    i += 2 + len;
+  }
+  return 0;
+}
+
 /** PNG: IHDR is always the first chunk, so width and height sit at a fixed offset. */
 function png(b) {
   if (b.length < 24) return null;
@@ -57,7 +117,10 @@ function jpeg(b) {
     if (marker === 0xd8 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) { i += 2; continue; }
     const len = b.readUInt16BE(i + 2);
     const isSof = marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
-    if (isSof) return { height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7), format: 'jpeg' };
+    if (isSof) {
+      const size = { height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7), format: 'jpeg' };
+      return applyRotation(size, exifOrientation(b));
+    }
     if (len < 2) return null;
     i += 2 + len;
   }
@@ -106,6 +169,17 @@ function isobmff(b) {
   const brand = b.toString('ascii', 8, 12).toLowerCase();
   const format = brand.startsWith('avi') ? 'avif' : 'heic';
 
+  // `irot` carries the rotation in quarter turns anticlockwise. A file can hold
+  // several, one per image item, and the meaningful one belongs to the primary
+  // image; taking the largest non-zero is the pragmatic read, because a
+  // thumbnail that is rotated means the full image is too.
+  let turns = 0;
+  for (let i = 0; i + 5 <= b.length; i++) {
+    if (b[i] === 0x69 && b[i + 1] === 0x72 && b[i + 2] === 0x6f && b[i + 3] === 0x74) {
+      turns = Math.max(turns, b[i + 4] & 3);
+    }
+  }
+
   let best = null;
   // `i + 16 <= length`, not `i + 20 < length`: width and height end at i+16, and
   // the stricter bound silently dropped the LAST ispe in the buffer, which in a
@@ -118,7 +192,7 @@ function isobmff(b) {
     if (width < 1 || height < 1 || width > 100000 || height > 100000) continue;
     if (!best || width * height > best.width * best.height) best = { width, height, format };
   }
-  return best;
+  return applyRotation(best, turns);
 }
 
 const READERS = [png, jpeg, gif, webp, isobmff];

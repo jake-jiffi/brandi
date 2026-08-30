@@ -1,6 +1,6 @@
 # Handoff: Brandi brand system plugin
 
-Last updated: 2026-08-30, session aa2b5aa0. **Built, reviewed, fixed, installed. 1549 tests passing. v1.14.0.**
+Last updated: 2026-08-30, session aa2b5aa0. **Built, reviewed, fixed, installed. 1551 tests passing. v1.14.1.**
 
 ## The goal (verbatim intent)
 
@@ -117,7 +117,7 @@ Zero npm dependencies is a hard constraint. Tests are `node:test`.
 - [x] All 10 reference files (~7,000 lines)
 - [x] Fable adversarial review (`review-01.md`): 18 confirmed findings, 5 suspected.
       ALL addressed, each with a regression test in `tests/regressions.test.mjs`
-- [x] Installed as `brandi@brandi` v1.14.0, user scope. `brandi` is on PATH next session
+- [x] Installed as `brandi@brandi` v1.14.1, user scope. `brandi` is on PATH next session
 - [x] Live canvas published twice through the real Artifact tool
       https://claude.ai/code/artifact/dc48ba49-0d94-4924-b0c1-2257dbd77548
 - [x] Every command re-walked against the INSTALLED plugin at v1.7.3, not just the source tree:
@@ -910,6 +910,39 @@ rather than a catalogue.
 One bug the tests caught: the ISOBMFF bounds check was `i + 20 < length` where the fields end at
 `i + 16`, which silently dropped the LAST `ispe` box in the buffer. In a real HEIC the thumbnail
 comes first and the full-size entry last, so it read every iPhone photograph at thumbnail size.
+
+## v1.14.1: a measurement that was confidently wrong, found by looking
+
+Jake said he was disappointed there were no real-world assets showing how the brand applies. Going
+to look at the live run found three things, and the first is the one that matters.
+
+**Rotation. The measurement was wrong for exactly the photographs that mattered most.** A phone
+stores a portrait photograph as landscape plus a rotation flag. JPEG puts that in EXIF tag 0x0112.
+HEIC does not use EXIF for it at all: it carries an ISOBMFF `irot` box, which is why
+`sips -g orientation` reports `<nil>` on a rotated HEIC and means nothing by it. The catalogue was
+reading the stored dimensions and calling seven 5712x4284 files landscape. With `irot` applied they
+are 4284x5712 and PORTRAIT, and those seven are the only photographs in a 535-file library that can
+be printed at A4. So the only print-capable photography the client has is the wrong shape for the
+shopfront band and the vehicle panel, which are the two surfaces a mobile business most needs. The
+first reading said the opposite.
+
+Found by converting one and looking at it: the van was on its side.
+
+**HEIC cannot go in an artboard at all.** Chrome does not decode it, confirmed by rendering one and
+reading back `naturalWidth`. An artboard referencing a HEIC shows a broken image and says nothing.
+The catalogue now names the count and gives the `sips` and `magick` commands, because the format
+that blocks is also the format the client's best photographs arrive in.
+
+**And the gap Jake actually pointed at.** The application artboards show artwork on flat colour
+fields. `Signage.dc.html` is an orange rectangle with type on it. `Vehicle.dc.html` puts a real
+photograph beside a spec drawing, which documents the van as it exists rather than showing the brand
+applied to it. Nothing in the set composites brand artwork onto a real photograph.
+
+Attempting one by hand demonstrated why that is not a small feature. Artwork placed on coordinates
+estimated from the image landed on grass and a tow bar, and two rotation corrections both went the
+wrong way. Placement on a photograph cannot be computed: it needs the same mechanism as `subject`,
+where somebody looks, records where the panel is, and the record is what gets rendered. That is the
+next piece of work rather than something this version claims.
 
 ## If more work is wanted
 

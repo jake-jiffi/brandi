@@ -77,6 +77,62 @@ describe('reading a header without a dependency', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('a rotated photograph is measured as it is SEEN, not as it is stored', async () => {
+    // Found by converting a client's HEIC and looking at it: the van was on its
+    // side. 5712x4284 with a 270-degree irot is a PORTRAIT photograph, and
+    // calling it landscape sends it to a vehicle panel it cannot fill.
+    const ftyp = Buffer.alloc(12);
+    ftyp.writeUInt32BE(12, 0); ftyp.write('ftyp', 4); ftyp.write('heic', 8);
+    const ispe = Buffer.alloc(20);
+    ispe.writeUInt32BE(20, 0); ispe.write('ispe', 4);
+    ispe.writeUInt32BE(5712, 12); ispe.writeUInt32BE(4284, 16);
+    const irot = Buffer.alloc(9);
+    irot.writeUInt32BE(9, 0); irot.write('irot', 4); irot[8] = 3; // 270 degrees
+
+    const dir = await mkdtemp(path.join(tmpdir(), 'brandi-img-'));
+    await writeFile(path.join(dir, 'r.heic'), Buffer.concat([ftyp, ispe, irot]));
+    const r = await imageSize(path.join(dir, 'r.heic'));
+    assert.equal(r.width, 4284, 'the quarter turn swaps the axes');
+    assert.equal(r.height, 5712);
+    assert.equal(r.rotated, 270, 'and it is recorded, so the swap is visible rather than magic');
+
+    // A half turn does not change the shape.
+    const irot2 = Buffer.from(irot); irot2[8] = 2;
+    await writeFile(path.join(dir, 'h.heic'), Buffer.concat([ftyp, ispe, irot2]));
+    const h = await imageSize(path.join(dir, 'h.heic'));
+    assert.equal(h.width, 5712);
+    assert.equal(h.rotated, 180);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('JPEG orientation comes from EXIF, which is a different place entirely', async () => {
+    // sips reports "orientation: <nil>" on a rotated HEIC because it looks for
+    // EXIF and HEIC does not use it. The two formats need two readers.
+    const tiff = Buffer.alloc(26);
+    tiff.write('II', 0); tiff.writeUInt16LE(42, 2); tiff.writeUInt32LE(8, 4);
+    tiff.writeUInt16LE(1, 8);            // one entry
+    tiff.writeUInt16LE(0x0112, 10);      // orientation
+    tiff.writeUInt16LE(3, 12);           // short
+    tiff.writeUInt32LE(1, 14);
+    tiff.writeUInt16LE(6, 18);           // 6 = one quarter turn
+    const app1 = Buffer.concat([
+      Buffer.from([0xff, 0xe1]),
+      (() => { const l = Buffer.alloc(2); l.writeUInt16BE(2 + 6 + tiff.length, 0); return l; })(),
+      Buffer.from('Exif\0\0', 'binary'), tiff,
+    ]);
+    const sof = Buffer.concat([
+      Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08]),
+      (() => { const b = Buffer.alloc(4); b.writeUInt16BE(3024, 0); b.writeUInt16BE(4032, 2); return b; })(),
+      Buffer.alloc(10),
+    ]);
+    const dir = await mkdtemp(path.join(tmpdir(), 'brandi-img-'));
+    await writeFile(path.join(dir, 'p.jpg'), Buffer.concat([Buffer.from([0xff, 0xd8]), app1, sof]));
+    const r = await imageSize(path.join(dir, 'p.jpg'));
+    assert.equal(r.width, 3024, 'stored 4032 wide, seen 3024 wide');
+    assert.equal(r.rotated, 90);
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('an unreadable file is recorded, never silently dropped', async () => {
     dir = await mkdtemp(path.join(tmpdir(), 'brandi-img-'));
     await writeFile(path.join(dir, 'a.jpg'), 'not an image at all');
