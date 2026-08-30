@@ -1,6 +1,6 @@
 # Handoff: Brandi brand system plugin
 
-Last updated: 2026-08-30, session aa2b5aa0. **Built, reviewed, fixed, installed. 1532 tests passing. v1.13.3.**
+Last updated: 2026-08-30, session aa2b5aa0. **Built, reviewed, fixed, installed. 1549 tests passing. v1.14.0.**
 
 ## The goal (verbatim intent)
 
@@ -117,7 +117,7 @@ Zero npm dependencies is a hard constraint. Tests are `node:test`.
 - [x] All 10 reference files (~7,000 lines)
 - [x] Fable adversarial review (`review-01.md`): 18 confirmed findings, 5 suspected.
       ALL addressed, each with a regression test in `tests/regressions.test.mjs`
-- [x] Installed as `brandi@brandi` v1.13.3, user scope. `brandi` is on PATH next session
+- [x] Installed as `brandi@brandi` v1.14.0, user scope. `brandi` is on PATH next session
 - [x] Live canvas published twice through the real Artifact tool
       https://claude.ai/code/artifact/dc48ba49-0d94-4924-b0c1-2257dbd77548
 - [x] Every command re-walked against the INSTALLED plugin at v1.7.3, not just the source tree:
@@ -871,6 +871,45 @@ recorded files are all colourways is refused with what to record instead.
 The Identity phase in `SKILL.md` runs the forge before any colour is decided, because colour comes
 after the silhouette is right: a weak mark rescued by a good palette is a decision you find out
 about eighteen months later on a one-colour press.
+
+## v1.14.0: measure the photographs before planning what to do with them
+
+Jake pointed at Palate, which solved this first in `skill/scripts/palate-assets.mjs`, and at a live
+engagement where the images were "maybe not being handled as best they could be". Both were right.
+
+Recon read logos, tokens and copy and never measured a photograph, so every decision about how
+photography would be used was made from an assumption about what client photography looks like.
+
+**What the live folder turned out to be**, measured in 0.3 seconds: 528 photographs, of which 269
+portrait, 192 square and 67 landscape. A shopfront band would destroy 487 of them and a vehicle
+panel 462, which are the two surfaces a mobile dog-washing business most needs. Only SEVEN could be
+printed at A4 or larger, and all seven were the HEIC phone photographs shot last week. Of the 521
+JPEGs in the social archive, **zero** can be printed at A4: at 300dpi they are business-card sized.
+
+The HEIC detail is the one worth keeping. The newest and most deliberate photographs, the ones
+somebody went out and shot on purpose, arrive straight off a phone as HEIC while the thousand-file
+archive is JPEG. A tool that reads JPEG and skips HEIC measures the client's history and ignores
+their intent, and would have concluded there was no print-capable photography at all.
+
+**What was taken from Palate**, with credit: the crop arithmetic (`min/max` of the two aspects, so a
+2:3 portrait in a 3:1 band shows 22% of the frame), the photograph-versus-furniture split so a
+favicon is never judged on crop loss, and the `subject: null` / `reviewed: false` mechanism, which is
+the best idea in that file. Pixels cannot tell you where the subject is; a crop that keeps two faces
+and one that slices them measure identically. `--check` exits non-zero while any photograph is
+unreviewed, so "nobody looked" is a visible state rather than a silent default.
+
+**What is different here.** No dependency: Palate uses `sharp`, and Brandi reads PNG, JPEG, GIF,
+WebP, HEIC and AVIF dimensions straight from the header in pure JS, because a brand tool that cannot
+measure a photograph until somebody runs npm is a brand tool that does not measure photographs.
+Slots that are brand surfaces rather than website sections, since a shopfront is 3:1 and a phone
+screen is 0.46:1 and no photograph serves both. Print resolution at 300dpi in millimetres, which is
+the question a website never asks and a flyer, a shopfront and a vehicle wrap all do. And a summary
+that survives five hundred files, because a per-file report of five hundred photographs is a listing
+rather than a catalogue.
+
+One bug the tests caught: the ISOBMFF bounds check was `i + 20 < length` where the fields end at
+`i + 16`, which silently dropped the LAST `ispe` box in the buffer. In a real HEIC the thumbnail
+comes first and the full-size entry last, so it read every iPhone photograph at thumbnail size.
 
 ## If more work is wanted
 

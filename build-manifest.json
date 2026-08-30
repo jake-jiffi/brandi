@@ -1,0 +1,30 @@
+{
+  "schema": 3,
+  "created_at": "2026-08-30T05:01:41.678Z",
+  "project": "/Users/jakeshelley/dev/jiffi-design-branding-skill",
+  "project_resolved_by": "ancestor",
+  "business": null,
+  "signature_move": null,
+  "mcp_calls": [],
+  "mcp_failures": [],
+  "references_surveyed": [],
+  "inner_pages_viewed": [],
+  "layers_read": [],
+  "files_written": [
+    "/Users/jakeshelley/dev/jiffi-design-branding-skill/brandi/scripts/imagesize.mjs",
+    "/Users/jakeshelley/dev/jiffi-design-branding-skill/brandi/scripts/images.mjs"
+  ],
+  "files_written_outside": [],
+  "sections": [],
+  "diverge": null,
+  "converge": null,
+  "commission": null,
+  "variants": [],
+  "explore": null,
+  "visual": null,
+  "novelty": null,
+  "verifier": null,
+  "buildability": null,
+  "architecture": null,
+  "grounding": null
+}

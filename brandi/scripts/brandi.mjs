@@ -18,6 +18,7 @@
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf]               the brand book
  *   brandi logo <plan|wordmark|audit|board|pick|master|status>
+ *   brandi images <dir> [--check]      measure supplied photography before planning
  *   brandi assets [--out <dir>]        derive the asset pack from the master SVG
  *   brandi handoff [--out <dir>]       assemble the package a client is given
  *   brandi guardian                   emit the enforcement skill
@@ -50,6 +51,7 @@ import { renderBrandBook } from './brandbook.mjs';
 import { emitGuardianSkill, checkFiles, checkPromises } from './guardian.mjs';
 import { buildAssetPack } from './assets.mjs';
 import { buildHandoff } from './handoff.mjs';
+import { catalogueImages, summarise } from './images.mjs';
 
 const run = promisify(execFile);
 // fileURLToPath, not url.pathname: pathname percent-encodes spaces, so a
@@ -65,7 +67,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  * reads the path as the value of --json, drops it, and silently checks the
  * whole project instead: the wrong answer, delivered confidently.
  */
-const BOOLEAN_FLAGS = new Set(['json', 'force', 'pdf', 'help', 'strict-dimensions']);
+const BOOLEAN_FLAGS = new Set(['json', 'force', 'pdf', 'help', 'strict-dimensions', 'check']);
 
 function parseArgs(argv) {
   const flags = {};
@@ -1092,6 +1094,46 @@ async function cmdLogo(flags, _positional, rawTail = []) {
   await logoMain(tail);
 }
 
+/**
+ * Catalogue supplied images before anything is planned.
+ *
+ * Recon reads logos, tokens and copy. It never measured a photograph, so every
+ * decision about how photography would be used was made from an assumption
+ * about what client photography looks like. Client photography is handheld
+ * candids at phone ratios and social exports at social resolutions, and that is
+ * knowable in under a second rather than guessable.
+ */
+async function cmdImages(flags, rest) {
+  // `rest` is the tail after the command word, so the directory is rest[0].
+  const dir = path.resolve(flags.dir ?? rest[0] ?? '.');
+  if (!existsSync(dir)) return fail(`No such directory: ${dir}`);
+
+  const outPath = path.resolve(flags.out ?? path.join(path.dirname(brandPath(flags)), 'images.json'));
+  let prior = {};
+  if (existsSync(outPath)) {
+    // A recorded review is preserved across re-runs: re-measuring must never
+    // discard the half that took somebody looking at the picture.
+    try { prior = JSON.parse(await readFile(outPath, 'utf8')).assets ?? {}; } catch { prior = {}; }
+  }
+
+  const doc = await catalogueImages(dir, { prior });
+  if (!doc.counts.images) {
+    return fail(`No images under ${path.relative(process.cwd(), dir) || '.'}. Point this at the folder the client supplied.`);
+  }
+
+  await mkdir(path.dirname(outPath), { recursive: true });
+  await writeFile(outPath, `${JSON.stringify(doc, null, 2)}\n`);
+
+  const lines = [summarise(doc), '', `Written to ${path.relative(process.cwd(), outPath)}`];
+  emit(lines.join('\n'), doc);
+
+  // `--check` makes "nobody looked" a failure rather than a silent default.
+  if (flags.check) {
+    const unreviewed = doc.counts.photos - doc.counts.reviewed;
+    if (unreviewed) process.exitCode = 1;
+  }
+}
+
 async function cmdHandoff(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const brandDir = path.dirname(file);
@@ -1336,6 +1378,7 @@ const COMMANDS = {
   book: cmdBook,
   fonts: cmdFonts,
   logo: cmdLogo,
+  images: cmdImages,
   assets: cmdAssets,
   handoff: cmdHandoff,
   guardian: cmdGuardian,

@@ -78,6 +78,35 @@ Existing usage beats fresh invention. A colour a business has been using for six
 that has been accumulating recognition; replacing it to get a marginally better hue is a bad trade,
 and you should say so.
 
+**If they supplied photographs, measure them before you plan anything.** Run
+`$A images <their folder>`. This is not optional and it is not a formality: every decision about how
+photography gets used is a decision about the SHAPE of a photograph, and none of them can be made
+from a file count.
+
+Measured on a real engagement, in under a second: of 528 photographs a client handed over, 269 were
+portrait and 192 square. Sixty-seven were landscape. A shopfront band would have destroyed 487 of
+them. And only seven could be printed at A4 or larger, all seven being the phone photographs shot
+last week rather than anything in the 521-file social archive, which at 300dpi is business-card
+sized and no bigger.
+
+Read the summary before the plan, not after. Three things it tells you that change what you build:
+
+- **The dominant shape.** "Most of these are portrait" decides the layout, and it decides it before
+  anybody draws anything. A portrait set given a letterbox hero is not a design choice, it is an
+  accident nobody measured.
+- **What can be printed.** A brand meets paper, a shopfront and a vehicle. A 1080px social export is
+  91mm wide at 300dpi, which is a card and not a flyer, and the printer is the wrong place to find
+  that out.
+- **What is missing.** If the surfaces the brand needs are the ones the photography cannot serve,
+  that is a shoot to commission, not a crop to attempt. Say so in the intake rather than discovering
+  it at proof.
+
+What it deliberately does NOT decide is where the subject sits. A crop that keeps two faces and one
+that slices them measure identically, so `subject` and `treatment` stay null until somebody LOOKS at
+the picture. `$A images <dir> --check` exits non-zero while any photograph is unreviewed, so "nobody
+looked" is a visible state rather than a silent default. You are the one who can look: view them,
+then record what you saw.
+
 Log everything you find with `$A evidence`, tagged `extracted` for anything you measured off a real
 artefact and `published` for anything from their own channels. Then `$A complete recon`.
 
