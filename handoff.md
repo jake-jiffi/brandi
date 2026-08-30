@@ -1,6 +1,6 @@
 # Handoff: Brandi brand system plugin
 
-Last updated: 2026-08-30, session aa2b5aa0. **Built, reviewed, fixed, installed. 1551 tests passing. v1.14.1.**
+Last updated: 2026-08-30, session aa2b5aa0. **Built, reviewed, fixed, installed. 1573 tests passing. v1.15.0.**
 
 ## The goal (verbatim intent)
 
@@ -117,7 +117,7 @@ Zero npm dependencies is a hard constraint. Tests are `node:test`.
 - [x] All 10 reference files (~7,000 lines)
 - [x] Fable adversarial review (`review-01.md`): 18 confirmed findings, 5 suspected.
       ALL addressed, each with a regression test in `tests/regressions.test.mjs`
-- [x] Installed as `brandi@brandi` v1.14.1, user scope. `brandi` is on PATH next session
+- [x] Installed as `brandi@brandi` v1.15.0, user scope. `brandi` is on PATH next session
 - [x] Live canvas published twice through the real Artifact tool
       https://claude.ai/code/artifact/dc48ba49-0d94-4924-b0c1-2257dbd77548
 - [x] Every command re-walked against the INSTALLED plugin at v1.7.3, not just the source tree:
@@ -943,6 +943,46 @@ estimated from the image landed on grass and a tow bar, and two rotation correct
 wrong way. Placement on a photograph cannot be computed: it needs the same mechanism as `subject`,
 where somebody looks, records where the panel is, and the record is what gets rendered. That is the
 next piece of work rather than something this version claims.
+
+## v1.15.0: the brand on a real thing
+
+The gap Jake named. Application artboards showed artwork on flat colour fields, which answers what
+the artwork is and never answers what it looks like on the van.
+
+`brandi mockup grid <photo>` renders the photograph under a percentage grid. Somebody reads the four
+corners of the surface off it. `brandi mockup build` maps the artwork onto those corners and writes
+the artboard.
+
+**Two commands with a person in the gap, and that is the design rather than a limitation.** The
+first attempt was one step: artwork placed using percentages estimated from looking at a photograph.
+It landed on the grass beside the trailer, and two separate corrections to the photograph's rotation
+both went the wrong way. Four corners define a projective transform exactly, so everything after the
+looking is arithmetic and everything before it is looking.
+
+The transform is a homography, which is the correct one rather than an approximation: a flat panel
+photographed from an angle IS a projective image of a rectangle, and no combination of `skew` and
+`rotate` can express it, which is why hand-tuned CSS never quite sits down on the surface. Eight
+unknowns from four point pairs, solved by Gaussian elimination with partial pivoting, emitted as a
+CSS `matrix3d`. Verified landing on its corners to 6e-14, and verified in a browser against markers
+before anything was built on it.
+
+Four things that went wrong on the way, each now a test:
+
+- **Partial pivoting is load-bearing.** A surface with a horizontal top edge, which is most
+  shopfronts, puts a zero on the diagonal and a naive solve divides by it.
+- **CSS applies transforms right to left.** Written the natural way round, it scaled a 1000px box and
+  then projected it, putting one corner of the artwork across the entire frame.
+- **An artboard must not inherit the source's dimensions.** A phone photograph is 5712px wide and a
+  5712px frame is one nobody can see at a useful zoom. Corners are percentages, so the frame is
+  capped and the placement does not move when a higher-resolution copy is swapped in.
+- **A header reader and a browser can disagree about orientation.** Explicit dimensions force one
+  opinion and distort silently when it is wrong. The photograph is `object-fit: contain` in a frame
+  of its own aspect, so a disagreement shows as letterboxing, which somebody can see.
+
+Bad corners are refused rather than drawn: three points, one point four times, collinear, NaN, and a
+bow tie, which is a real thing to type and renders as something that looks deliberate. `reviewed` is
+false until somebody has rendered it and looked, because corners nobody checked are corners somebody
+typed.
 
 ## If more work is wanted
 

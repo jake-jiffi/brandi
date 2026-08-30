@@ -257,6 +257,27 @@ A physical business that gets no signage artboard has not been proven, and `$A v
 every application named in `brand.json` is checked against the canvas, whether or not it names a file.
 So the list in `applications` and the artboards you author have to agree.
 
+**Put the brand on a real thing.** An artboard showing artwork on a flat colour field answers "what
+is the artwork" and never answers "what does this look like on the van", which is the question a
+client asks in the first minute. If they supplied a photograph of a vehicle, a shopfront, a window or
+a garment, composite the brand onto it:
+
+1. `$A mockup grid <photo>` writes a page showing the photograph under a percentage grid.
+2. **Open it and look.** Read the four corners of the surface the artwork goes on, clockwise from its
+   top left, as x,y percentages.
+3. Record them under `identity.mockups` in `brand.json`, with the artwork.
+4. `$A mockup build` maps the artwork onto those corners and writes the artboard.
+
+The middle step is a person and cannot be automated. Four corners define the projective transform
+exactly, so everything after step 2 is arithmetic; everything before it is looking. The first attempt
+at this skipped the looking and placed a wordmark using percentages estimated from a description of
+the photograph. It landed on the grass beside the trailer. Set `reviewed: true` on a surface only
+after you have rendered it and looked at the result.
+
+Use `multiply` for a wrap, a painted sign or anything printed, so it takes the surface's own shading
+and highlights. Use `normal` for a sticker or a backlit sign, which sit on top of it. A HEIC will not
+work: no browser decodes it, and `$A images` names the ones that need converting.
+
 `references/05-canvas-recipes.md` has the recipes, the frame sizes and the format traps.
 
 Write real copy in the brand voice. Never lorem ipsum, never "Welcome to our website", never an

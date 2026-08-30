@@ -1,7 +1,7 @@
 {
   "name": "brandi",
   "description": "Build a complete brand and design system from a logo and a vague idea, or from nothing. Visual rounds on the /design canvas, a real brand book, DTCG design tokens, and a companion skill that keeps future work on brand.",
-  "version": "1.14.1",
+  "version": "1.15.0",
   "author": {
     "name": "Jake Shelley",
     "email": "jake.s@enviz.co"

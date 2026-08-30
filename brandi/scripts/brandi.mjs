@@ -19,6 +19,8 @@
  *   brandi book [--pdf]               the brand book
  *   brandi logo <plan|wordmark|audit|board|pick|master|status>
  *   brandi images <dir> [--check]      measure supplied photography before planning
+ *   brandi mockup grid <photo>         read a surface's corners off a real photograph
+ *   brandi mockup build                composite the brand onto the recorded surfaces
  *   brandi assets [--out <dir>]        derive the asset pack from the master SVG
  *   brandi handoff [--out <dir>]       assemble the package a client is given
  *   brandi guardian                   emit the enforcement skill
@@ -44,6 +46,7 @@ import {
 import { buildSystem, assertPublishable } from './system.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
+import { artboard as artboardOf } from './canvas.mjs';
 import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES } from './canvas.mjs';
 import { extractColors } from './color.mjs';
 import { locateDesignHelper, NOT_FOUND_MESSAGE } from './design-locate.mjs';
@@ -52,6 +55,8 @@ import { emitGuardianSkill, checkFiles, checkPromises } from './guardian.mjs';
 import { buildAssetPack } from './assets.mjs';
 import { buildHandoff } from './handoff.mjs';
 import { catalogueImages, summarise } from './images.mjs';
+import { gridPage, mockupBody, validateCorners } from './mockup.mjs';
+import { imageSize } from './imagesize.mjs';
 
 const run = promisify(execFile);
 // fileURLToPath, not url.pathname: pathname percent-encodes spaces, so a
@@ -1134,6 +1139,130 @@ async function cmdImages(flags, rest) {
   }
 }
 
+/**
+ * `brandi mockup grid <photo>` and `brandi mockup build`.
+ *
+ * Two steps on purpose, and the gap between them is a person. The grid renders
+ * the photograph under percentage rules so the four corners of a surface can be
+ * READ off it; the build maps artwork onto the corners that were recorded. The
+ * first attempt at this skipped the middle step and put a wordmark on the grass
+ * beside a trailer, which is why it is not one command.
+ */
+async function cmdMockup(flags, rest) {
+  const sub = rest[0] ?? 'build';
+
+  if (sub === 'grid') {
+    const photo = rest[1] ?? flags.photo;
+    if (!photo) return fail('usage: brandi mockup grid <photo> [--rotate 0|90|180|270]');
+    const full = path.resolve(photo);
+    if (!existsSync(full)) return fail(`No such photograph: ${photo}`);
+
+    const size = await imageSize(full);
+    if (size.error) return fail(`Cannot measure ${photo}: ${size.error}`);
+    if (size.format === 'heic') {
+      return fail(
+        `${photo} is HEIC, which no browser decodes, so it cannot appear in a mockup at all.\n`
+        + 'Convert it first:\n'
+        + `  sips -s format jpeg -Z 2400 "${photo}" --out "${photo.replace(/\.[^.]+$/, '')}.jpg"`,
+      );
+    }
+
+    const out = path.resolve(flags.out ?? `${full.replace(/\.[^.]+$/, '')}-grid.html`);
+    // The grid references the photograph by basename, so the page has to sit
+    // beside it. Anything else renders a broken image and shows a grid over
+    // nothing, which looks like the photograph is the problem.
+    if (path.dirname(out) !== path.dirname(full)) {
+      return fail(`The grid must be written beside the photograph, so it can reference it.\nTry --out ${path.join(path.dirname(full), 'grid.html')}`);
+    }
+    const rotate = Number(flags.rotate ?? 0);
+    await writeFile(out, gridPage({
+      photo: path.basename(full), width: size.width, height: size.height, rotate,
+    }));
+    emit([
+      `Wrote ${path.relative(process.cwd(), out)}`,
+      '',
+      'Open it, and read the FOUR CORNERS of the surface the artwork goes on, clockwise from its',
+      'top left, as x,y percentages. Then record them under identity.mockups in brand.json.',
+      '',
+      'If the photograph is on its side, pass --rotate 90, 180 or 270 and read the corners again:',
+      'they have to be read from the picture as it will be composited.',
+    ].join('\n'), { ok: true, out: path.relative(process.cwd(), out), width: size.width, height: size.height, rotate });
+    return;
+  }
+
+  if (sub !== 'build') return fail(`Unknown subcommand "${sub}". Use grid or build.`);
+
+  const { file, brand } = await resolveSystem(flags);
+  const mockups = brand.identity?.mockups ?? [];
+  if (!mockups.length) {
+    return fail(
+      'No mockups recorded. A mockup is a photograph plus four corners somebody read off it.\n'
+      + 'Run `brandi mockup grid <photo>`, read the corners, and record them under identity.mockups.',
+    );
+  }
+
+  const canvasDir = path.resolve(flags.dir ?? path.join(path.dirname(file), 'canvas'));
+  await mkdir(canvasDir, { recursive: true });
+  const projectRoot = path.resolve(path.dirname(file), '..');
+  const written = [];
+  const problems = [];
+
+  for (const m of mockups) {
+    const name = (m.name ?? 'Mockup').replace(/[^A-Za-z0-9]/g, '');
+    const src = path.resolve(projectRoot, m.photo);
+    if (!existsSync(src)) { problems.push(`${m.name ?? m.photo}: the photograph is not on disk.`); continue; }
+    const size = await imageSize(src);
+    if (size.error) { problems.push(`${m.name ?? m.photo}: ${size.error}`); continue; }
+    if (size.format === 'heic') { problems.push(`${m.name ?? m.photo}: HEIC, which no browser decodes. Convert it.`); continue; }
+
+    // Every surface is checked before anything renders, because a bow tie or a
+    // repeated corner draws something that looks deliberate.
+    let bad = false;
+    for (const s of m.surfaces ?? []) {
+      const check = validateCorners((s.corners ?? []).map((c) => [c[0], c[1]]));
+      if (!check.ok) { problems.push(`${m.name ?? m.photo} / ${s.name ?? 'surface'}: ${check.reason}`); bad = true; }
+    }
+    if (bad) continue;
+
+    // The photograph travels with the artboard: the canvas has no network and
+    // a relative path out of the canvas directory does not survive seeding.
+    const localPhoto = `${name.toLowerCase()}-${path.basename(src)}`;
+    await copyFile(src, path.join(canvasDir, localPhoto));
+
+    const body = mockupBody({
+      photo: localPhoto,
+      width: size.width,
+      height: size.height,
+      rotate: m.rotate ?? 0,
+      caption: m.caption ?? null,
+      surfaces: m.surfaces ?? [],
+    });
+    const unreviewed = (m.surfaces ?? []).filter((s) => !s.reviewed).length;
+    const file2 = path.join(canvasDir, `Mockup${name}.dc.html`);
+    await writeFile(file2, artboardOf({
+      name: `Mockup${name}`,
+      body,
+      systemNote: unreviewed
+        ? `Composited from recorded corners. ${plural(unreviewed, 'surface')} not yet checked by looking at the render.`
+        : 'Composited from corners read off the photograph and checked in the render.',
+    }));
+    written.push({ file: file2, photo: m.photo, surfaces: (m.surfaces ?? []).length, unreviewed });
+  }
+
+  const rel = (f) => path.relative(process.cwd(), f);
+  const lines = [`Composited ${plural(written.length, 'mockup')} into ${rel(canvasDir)}`];
+  for (const w of written) {
+    lines.push(`  ${path.basename(w.file).padEnd(28)} ${plural(w.surfaces, 'surface')} on ${w.photo}`);
+    if (w.unreviewed) lines.push(`      ${plural(w.unreviewed, 'surface')} never checked in the render. Corners nobody looked at are corners somebody typed.`);
+  }
+  if (problems.length) {
+    lines.push('', 'Not composited:');
+    for (const p2 of problems) lines.push(`  ${p2}`);
+  }
+  emit(lines.join('\n'), { ok: problems.length === 0, written: written.map((w) => ({ ...w, file: rel(w.file) })), problems });
+  if (problems.length) process.exitCode = 1;
+}
+
 async function cmdHandoff(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const brandDir = path.dirname(file);
@@ -1379,6 +1508,7 @@ const COMMANDS = {
   fonts: cmdFonts,
   logo: cmdLogo,
   images: cmdImages,
+  mockup: cmdMockup,
   assets: cmdAssets,
   handoff: cmdHandoff,
   guardian: cmdGuardian,

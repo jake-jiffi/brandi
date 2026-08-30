@@ -2,7 +2,7 @@
   "schema": 3,
   "created_at": "2026-08-30T05:01:41.678Z",
   "project": "/Users/jakeshelley/dev/jiffi-design-branding-skill",
-  "project_resolved_by": "ancestor",
+  "project_resolved_by": "fallback",
   "business": null,
   "signature_move": null,
   "mcp_calls": [],
@@ -12,7 +12,8 @@
   "layers_read": [],
   "files_written": [
     "/Users/jakeshelley/dev/jiffi-design-branding-skill/brandi/scripts/imagesize.mjs",
-    "/Users/jakeshelley/dev/jiffi-design-branding-skill/brandi/scripts/images.mjs"
+    "/Users/jakeshelley/dev/jiffi-design-branding-skill/brandi/scripts/images.mjs",
+    "/Users/jakeshelley/dev/jiffi-design-branding-skill/brandi/scripts/mockup.mjs"
   ],
   "files_written_outside": [],
   "sections": [],
@@ -29,7 +30,7 @@
   "grounding": {
     "state": "ungrounded",
     "mcp_calls": 0,
-    "checked_at": "2026-08-30T05:09:08.177Z",
+    "checked_at": "2026-08-30T07:19:50.207Z",
     "note": "MCP-depth gate UNGROUNDED: no Palate MCP calls recorded, so this build carries no Palate taste layer (the MCP is not connected or was renamed, or the survey ran in a subagent whose calls never reached this manifest). Connect it with: claude mcp add --scope user --transport http palate https://mcp.palatemcp.com/api/mcp"
   }
 }

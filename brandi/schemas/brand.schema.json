@@ -1020,6 +1020,115 @@
               ]
             }
           }
+        },
+        "mockups": {
+          "type": "array",
+          "description": "Brand artwork composited onto real photographs. Placement is READ off a grid by somebody looking at the picture, never computed: artwork placed on estimated coordinates lands on the grass beside the thing.",
+          "items": {
+            "type": "object",
+            "required": [
+              "photo",
+              "surfaces"
+            ],
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "What this shows, e.g. the trailer, the shopfront."
+              },
+              "photo": {
+                "type": "string",
+                "description": "Path to the photograph, relative to the project. Must be a format a browser decodes: HEIC is not."
+              },
+              "rotate": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "enum": [
+                  0,
+                  90,
+                  180,
+                  270,
+                  null
+                ],
+                "description": "Applied before the corners are read, because a phone stores a photograph one way round and means another."
+              },
+              "caption": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "surfaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "corners"
+                  ],
+                  "properties": {
+                    "name": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "corners": {
+                      "type": "array",
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "items": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "items": {
+                          "type": "number",
+                          "minimum": -50,
+                          "maximum": 150
+                        }
+                      },
+                      "description": "Four x,y percentages, clockwise from the surface's top left, read off the grid."
+                    },
+                    "aspect": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "description": "Height over width of the artwork box. The panel's real proportions."
+                    },
+                    "blend": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "enum": [
+                        "multiply",
+                        "normal",
+                        "screen",
+                        null
+                      ],
+                      "description": "multiply for a wrap, a painted sign or print, which take the surface's shading. normal for a sticker or a backlit sign, which sit on top."
+                    },
+                    "opacity": {
+                      "type": [
+                        "number",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "reviewed": {
+                      "type": "boolean",
+                      "description": "True only when somebody rendered it and looked. Corners that have never been checked are corners somebody typed."
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     },
