@@ -107,6 +107,11 @@ Zero npm dependencies is a hard constraint. Tests are `node:test`.
 
 ## Status: done
 
+> The three canvas links below no longer resolve: as of 31 August the artifacts are gone from the
+> account. They were genuinely published and verified at the time, and the seeding path is covered by
+> tests, so this is a dead link rather than a dead capability. Re-publish with `brandi canvas` and
+> the Artifact tool if a live one is wanted again.
+
 - [x] Research read, 15 benchmark repos cloned, 5 findings files written
 - [x] `/design` canvas contract captured and encoded in a validator
 - [x] Every module built: colour, type, system, tokens, canvas, artboards, brandfile,
@@ -118,7 +123,8 @@ Zero npm dependencies is a hard constraint. Tests are `node:test`.
 - [x] Fable adversarial review (`review-01.md`): 18 confirmed findings, 5 suspected.
       ALL addressed, each with a regression test in `tests/regressions.test.mjs`
 - [x] Installed as `brandi@brandi` v1.15.0, user scope. `brandi` is on PATH next session
-- [x] Live canvas published twice through the real Artifact tool
+- [x] Live canvas published twice through the real Artifact tool. The link below is dead as of
+      31 August: the artifact was removed from the account after the fact.
       https://claude.ai/code/artifact/dc48ba49-0d94-4924-b0c1-2257dbd77548
 - [x] Every command re-walked against the INSTALLED plugin at v1.7.3, not just the source tree:
       init, status, system, tokens, sheets, validate, book, book --pdf (23 pages), fonts,

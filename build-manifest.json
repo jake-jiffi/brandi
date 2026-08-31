@@ -30,7 +30,7 @@
   "grounding": {
     "state": "ungrounded",
     "mcp_calls": 0,
-    "checked_at": "2026-08-30T07:19:50.207Z",
+    "checked_at": "2026-08-30T09:16:12.765Z",
     "note": "MCP-depth gate UNGROUNDED: no Palate MCP calls recorded, so this build carries no Palate taste layer (the MCP is not connected or was renamed, or the survey ran in a subagent whose calls never reached this manifest). Connect it with: claude mcp add --scope user --transport http palate https://mcp.palatemcp.com/api/mcp"
   }
 }
