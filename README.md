@@ -9,12 +9,46 @@ a brand book, DTCG design tokens, and a companion skill that keeps every future 
 
 ## Install
 
+You need [Claude Code](https://claude.com/claude-code). Everything else is built in: Brandi has no
+npm dependencies at all.
+
+**1. Clone it,** in a terminal:
+
 ```bash
 git clone https://github.com/jake-jiffi/brandi.git
 cd brandi
+```
+
+**2. Start Claude Code in that folder** and add it as a plugin. These two are typed INSIDE Claude
+Code, at its prompt, not in a terminal:
+
+```
 /plugin marketplace add .
 /plugin install brandi@brandi
 ```
+
+**3. Restart Claude Code.** Plugins register their commands on the next start.
+
+**4. Go to the project you actually want a brand for**, start Claude Code there, and run:
+
+```
+/brandi:brand
+```
+
+It writes into `brand/` in whatever directory you started it in, so start it where you want the
+brand to live.
+
+### Checking it worked
+
+`/brandi:brand-status` should tell you which phase you are in. If the command is not offered,
+Claude Code has not picked the plugin up: check `/plugin list` shows `brandi@brandi`, and restart.
+
+### Optional
+
+A Chromium-family browser (Chrome, Chromium, Edge, Brave) is used for the PDF, the asset pack and
+artboard previews. Everything else works without one, and Brandi says plainly which outputs it could
+not produce rather than reporting a complete set. Set `CHROME_PATH` if yours lives somewhere unusual.
+
 
 Then, in any project:
 
