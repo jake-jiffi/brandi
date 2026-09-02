@@ -16,3 +16,6 @@ research/benchmarks/
 node_modules/
 .DS_Store
 *.log
+
+# Scaffolding written by other tooling that runs in this directory.
+build-manifest.json

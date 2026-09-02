@@ -33,7 +33,7 @@ Anthropic's own repo ([anthropics/skills](https://github.com/anthropics/skills),
 
 Look at the two low-star ones first, since they're the only ones that produce a document a client would recognise as brand guidelines. Both ship example output in the repo, so you can judge the visual quality in about two minutes without installing anything. The Terra example deck in particular is the honest test of whether the output is client-presentable.
 
-For You Dirty Dog specifically, the shape fits well: there's an existing logo and a Facebook/Instagram back catalogue to feed in as source material, and the brand book output would then drive the site build rather than being a separate exercise.
+For the client engagement in question the shape fits well: there's an existing logo and a social back catalogue to feed in as source material, and the brand book output would then drive the site build rather than being a separate exercise.
 
 - `brand-identity-generator` gives you the deck to hand over.
 - `hue` gives you the tokens the site is actually built from.
