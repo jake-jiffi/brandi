@@ -6,7 +6,7 @@
   },
   "owner": {
     "name": "Jake Shelley",
-    "email": "jake.s@enviz.co"
+    "email": "jake@jiffi.co"
   },
   "plugins": [
     {
@@ -15,7 +15,7 @@
       "version": "1.17.0",
       "author": {
         "name": "Jake Shelley",
-        "email": "jake.s@enviz.co"
+        "email": "jake@jiffi.co"
       },
       "source": "./brandi",
       "category": "design",
