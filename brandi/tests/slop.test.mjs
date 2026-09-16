@@ -273,3 +273,52 @@ describe('the rule summary a brand carries away', () => {
     for (const r of summary) assert.ok(r.patterns > 0 || r.note, `${r.rule} has nothing behind it`);
   });
 });
+
+/**
+ * The contract is read while `canvas.mjs` is still being evaluated, to build
+ * BANNED_FONTS, which is long before any command has started. An install with
+ * `skills/` missing therefore reported a raw ENOENT and six frames of node
+ * internals: a path inside the plugin, and nothing anybody can act on.
+ */
+describe('an install with the contract file missing', () => {
+  test('says which file is gone and what to reinstall, rather than throwing a trace', async () => {
+    const { mkdtemp, mkdir, cp, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const path = (await import('node:path')).default;
+    const run = promisify(execFile);
+    const root = path.join(import.meta.dirname, '..');
+
+    const scratch = await mkdtemp(path.join(tmpdir(), 'brandi-noskills-'));
+    try {
+      // Everything an install has except the skills the references live in.
+      for (const d of ['scripts', 'schemas']) {
+        await cp(path.join(root, d), path.join(scratch, d), { recursive: true });
+      }
+      const project = path.join(scratch, 'project');
+      await mkdir(project);
+      const e = await run(process.execPath, [path.join(scratch, 'scripts', 'brandi.mjs'), 'status'], { cwd: project, timeout: 90000 })
+        .then(() => null, (err) => err);
+      assert.ok(e, 'a broken install must not report success');
+      assert.equal(e.code, 1, 'the same exit code every other failure in this tool uses');
+      assert.match(e.stderr, /The anti-slop contract is missing/);
+      assert.match(e.stderr, /anti-slop\.contract\.md/, 'it has to name the file');
+      assert.match(e.stderr, /Reinstall the plugin/, 'and what to do about it');
+      assert.equal(/ENOENT|at loadContract|node:internal|Node\.js v/.test(e.stderr), false, `a stack trace is not a message:\n${e.stderr}`);
+      assert.equal(e.stdout, '', 'nothing half-done on stdout');
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test('a caller that named its own missing file gets the error to handle', async () => {
+    const path = (await import('node:path')).default;
+    const { tmpdir } = await import('node:os');
+    const absent = path.join(tmpdir(), 'brandi-no-such-contract.md');
+    await assert.rejects(() => loadContract(absent), /The anti-slop contract is missing/);
+    assert.throws(() => loadContractSync(absent), /The anti-slop contract is missing/);
+    // And the process is still here to run the rest of the suite.
+    assert.equal(typeof (await loadContract()).version, 'number');
+  });
+});

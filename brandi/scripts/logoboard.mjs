@@ -531,8 +531,11 @@ ${colourways.map((c) => {
     ${onGroundCell(c, box, ground, `cw-${c.id}`, `${c.name}`)}
     <div style="background:${greyOf(ground)};min-height:${box + 56}px;display:flex;align-items:center;justify-content:center;padding:28px;border:1px solid #E4E4E4;">${boxed(greyscaleSvg(c.svg), { prefix: `cg-${c.id}`, box, label: `${c.name}, greyscale` })}</div>
     <div style="background:${greyOf(ground) === '#FFFFFF' || relativeLuminance(greyOf(ground)) > 0.3 ? PAPER : INK};min-height:${box + 56}px;display:flex;align-items:center;justify-content:center;padding:28px;border:1px solid #E4E4E4;">${boxed(c.svg, { prefix: `ck-${c.id}`, colour: relativeLuminance(greyOf(ground)) > 0.3 ? INK : '#FFFFFF', box, label: `${c.name}, one ink` })}</div>
-    <div style="display:flex;align-items:center;gap:14px;background:${ground};padding:0 16px;border:1px solid #E4E4E4;">
-${[16, 32, 64].map((px) => `      <span style="flex:none;width:${px}px;height:${px}px;display:block;">${boxed(c.svg, { prefix: `c${px}-${c.id}`, box: px, label: '' })}</span>`).join('\n')}
+    <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+${[16, 32, 64].map((px) => `      <span style="flex:none;display:inline-flex;flex-direction:column;align-items:center;gap:6px;">
+        <span style="display:inline-flex;align-items:center;justify-content:center;background:${ground};border:1px solid #E4E4E4;padding:8px;"><span style="flex:none;width:${px}px;height:${px}px;display:block;">${boxed(c.svg, { prefix: `c${px}-${c.id}`, box: px, label: `${c.name}, at ${px} pixels` })}</span></span>
+        <span class="cell__id">${px}px</span>
+      </span>`).join('\n')}
     </div>
   </div>`;
 }).join('\n')}

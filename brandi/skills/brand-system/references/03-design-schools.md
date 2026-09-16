@@ -309,7 +309,7 @@ and the rationale block in `nexu_open-design` `design-systems/apple/tokens.css`.
   Processing lineage through Casey Reas and Zach Lieberman.
 - **Typography:** restrained deliberately, because motion is the hero. One geometric or neo-grotesque
   sans in a single weight. Licensed: PP Neue Montreal, Söhne. Free: **Archivo** or **Anybody**
-  (Velvetyne, variable) if you want the axis to animate.
+  (Etcetera Type Company, variable) if you want the axis to animate.
 - **Colour:** either near-monochrome with light as the only chroma, or a genuinely computed palette
   (colours sampled from the simulation, not chosen for it). Whatever you do, avoid the
   indigo-to-magenta default, which is the entire reason this school has a bad reputation.

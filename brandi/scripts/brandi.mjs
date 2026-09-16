@@ -720,7 +720,18 @@ async function cmdSheets(flags) {
   // project whose brand file said otherwise on the line above. The deck then
   // letterboxed all three.
   const recorded = new Map();
+  // Two shapes, because `applications[]` items are free-form and both get
+  // written: "1440x1600" by a person, [1440, 1600] by anything generating JSON.
+  // Reading only the string meant `set applications '[{"frame":[1440,1600]}]'`
+  // was accepted and then reported as "nothing said otherwise", which is the
+  // one thing this must never say about a frame the brand file did record.
+  // Both forms take the same 10 to 99999 range.
   const frameOf = (v) => {
+    if (Array.isArray(v)) {
+      const [w, h] = v.map(Number);
+      const sane = (n) => Number.isInteger(n) && n >= 10 && n <= 99999;
+      return v.length === 2 && sane(w) && sane(h) ? { w, h } : null;
+    }
     const m = /^\s*(\d{2,5})\s*[x\u00d7]\s*(\d{2,5})\s*$/.exec(String(v ?? ''));
     return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
   };
@@ -770,6 +781,18 @@ async function cmdSheets(flags) {
 
   const unsized = entries.filter((e) => e.unsized).map((e) => e.file);
   for (const e of entries) delete e.unsized;
+  // Of those, the ones the brand file DOES record a frame for, in a form
+  // nothing can read: "A3 portrait" is a real answer to a person and is not a
+  // frame. They still default, because half-reading one would be worse, but
+  // telling somebody nothing was said about a line they wrote sends them
+  // looking in the wrong file. This is the same lookup the layout used above,
+  // so the two cannot report different entries when a file is named twice.
+  const frameInBrand = (f) => {
+    const v = (brand.applications ?? []).find((a) => a && a.file === f)?.frame;
+    return v == null || v === '' ? null : v;
+  };
+  const unreadable = unsized.filter((f) => frameInBrand(f) !== null);
+  const guessed = unsized.filter((f) => frameInBrand(f) === null);
   // Which authored artboards took their frame from the brand file rather than
   // from the default, so the person can see it happened and correct it.
   const sized = entries
@@ -827,12 +850,17 @@ async function cmdSheets(flags) {
       (keptMain ? `\n  Main.dc.html             kept as it is. Pass --force to replace it with the generated contents page.` : '') +
       `\n  canvas.json              ${plural(finalManifest.artboards.length, 'artboard')}` +
       (sized.length ? `\n\nSized from the brand file:\n${sized.map((l) => `  ${l}`).join('\n')}` : '') +
-      (unsized.length
-        ? `\n\nSized as ${FRAMES.desktop.w}x${FRAMES.desktop.h} because nothing said otherwise: ${unsized.join(', ')}.\n` +
+      (guessed.length
+        ? `\n\nSized as ${FRAMES.desktop.w}x${FRAMES.desktop.h} because nothing said otherwise: ${guessed.join(', ')}.\n` +
           `A frame smaller than its content clips, and clipping is not recoverable without a re-seed,\n` +
           `so record it as applications[].frame, or set the real size in canvas.json, before publishing.`
+        : '') +
+      (unreadable.length
+        ? `\n\nSized as ${FRAMES.desktop.w}x${FRAMES.desktop.h} because the frame the brand file records is not one a layout can read:\n` +
+          unreadable.map((f) => `  ${f}, where applications[].frame says ${JSON.stringify(frameInBrand(f))}`).join('\n') +
+          `\nWrite it as "1440x1600" or [1440, 1600], or set the real size in canvas.json.`
         : ''),
-    { ok: true, dir, files: sheets.map((s) => s.file), manifest: finalManifest, unsized, sized },
+    { ok: true, dir, files: sheets.map((s) => s.file), manifest: finalManifest, unsized, sized, unreadable },
   );
 }
 

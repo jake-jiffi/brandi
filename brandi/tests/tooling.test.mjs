@@ -318,6 +318,28 @@ describe('the canvas fallback renders each artboard as it is', () => {
       assert.match(html, /body > x-dc \{ width: 500px; min-height: 700px;/);
     });
 
+    // Naming one file used to skip frame resolution entirely and render at the
+    // 1200x2400 default, so `preview.mjs brand/canvas/Mobile.dc.html` came back
+    // at a different size from the same file inside `--dir` over its folder.
+    // Two ways of looking at one artboard have to agree about how big it is.
+    test('one artboard named on its own is framed exactly as it is inside --dir', async () => {
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const run = promisify(execFile);
+      const cli = path.join(import.meta.dirname, '..', 'scripts', 'preview.mjs');
+      const one = async (stem, extra = []) => {
+        const spare = path.join(out, `single-${stem}${extra.length ? '-sized' : ''}`);
+        await run(process.execPath, [cli, path.join(src, `${stem}.dc.html`), '--out', spare, '--png', 'false', ...extra], { timeout: 300000 });
+        const html = await readFile(path.join(spare, `${stem}.preview.html`), 'utf8');
+        const m = /body > x-dc \{ width: (\d+)px; min-height: (\d+)px;/.exec(html);
+        return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+      };
+      assert.deepEqual(await one('Mobile'), { w: 390, h: 844 }, 'canvas.json sits beside it and records 390x844');
+      assert.deepEqual(await one('Hinted'), { w: 816, h: 1056 }, 'no manifest entry, so its own $preview hint decides');
+      assert.deepEqual(await one('Unknown'), { w: 1200, h: 2400 }, 'neither, so the documented default');
+      assert.deepEqual(await one('Mobile', ['--width', '500', '--height', '700']), { w: 500, h: 700 }, 'a size asked for on the command line still wins');
+    });
+
     test('a preview written elsewhere still resolves the artboard’s relative images', async () => {
       const html = await readFile(path.join(out, 'Photo.preview.html'), 'utf8');
       const m = /<base href="([^"]+)">/.exec(html);

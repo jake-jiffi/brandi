@@ -23,7 +23,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeSync } from 'node:fs';
 import path from 'node:path';
 
 // ---------------------------------------------------------------------------
@@ -233,10 +233,45 @@ export const CONTRACT_PATH = path.join(HERE, '..', 'skills', 'brand-system', 're
 
 let cached = null;
 
+/**
+ * The install's own contract file, gone.
+ *
+ * `canvas.mjs` reads it while it is still being evaluated, to build
+ * `BANNED_FONTS`, which is long before any command has started and long before
+ * `main()` exists to catch anything. An install missing `skills/` therefore
+ * reported `Error: ENOENT ... open '<path inside the plugin>'` and six frames of
+ * node internals, which names the file and nothing a person can act on.
+ *
+ * So this is the one place that reports and exits rather than throwing: a
+ * thrown error here cannot be reported at all, and there is no degraded mode to
+ * offer, because every typeface and phrase rule in the tool is read from this
+ * file. A caller that named its own path gets the error to handle, because that
+ * path is its business rather than the install's.
+ *
+ * `writeSync` rather than `console.error`: on macOS a write to a pipe is
+ * asynchronous, and `process.exit` can truncate it, which would turn the
+ * message back into silence.
+ */
+function contractMissing(file, cause) {
+  const message = `The anti-slop contract is missing: ${file}\n`
+    + 'Brandi reads every banned typeface and every banned phrase from that file, so no command can run without it.\n'
+    + 'Reinstall the plugin, or restore skills/brand-system/references/anti-slop.contract.md from the repository.';
+  if (file !== CONTRACT_PATH) return new Error(message, { cause });
+  writeSync(2, `${message}\n`);
+  process.exit(1);
+}
+
 /** The contract, parsed, shape-checked and memoised. */
 export async function loadContract(file = CONTRACT_PATH) {
   if (cached && cached.file === file) return cached.contract;
-  const contract = assertContract(extractContract(await readFile(file, 'utf8')));
+  let text;
+  try {
+    text = await readFile(file, 'utf8');
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    throw contractMissing(file, e);
+  }
+  const contract = assertContract(extractContract(text));
   cached = { file, contract };
   return contract;
 }
@@ -247,7 +282,14 @@ export async function loadContract(file = CONTRACT_PATH) {
  */
 export function loadContractSync(file = CONTRACT_PATH) {
   if (cached && cached.file === file) return cached.contract;
-  const contract = assertContract(extractContract(readFileSync(file, 'utf8')));
+  let text;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch (e) {
+    if (e.code !== 'ENOENT') throw e;
+    throw contractMissing(file, e);
+  }
+  const contract = assertContract(extractContract(text));
   cached = { file, contract };
   return contract;
 }

@@ -365,3 +365,90 @@ describe('a mockup recorded by hand, badly', () => {
     assert.equal(existsSync(path.join(p, 'brand', 'canvas', 'MockupWall.dc.html')), false);
   });
 });
+
+/**
+ * `applications[]` items are free-form by design, so a frame arrives written
+ * both ways: "1440x1600" from a person, [1440, 1600] from anything generating
+ * JSON. `set` accepted the list and the layout then ignored it, so a frame the
+ * brand file had recorded was reported as "nothing said otherwise" and the
+ * artboard was given a 1440x900 desktop frame that clipped it.
+ */
+describe('a frame recorded as a list rather than a string', () => {
+  const authored = (w, h, label) => `<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc>
+<div style="width:${w}px;height:${h}px;background:#F4FBF6;padding:24px">${label}</div>
+</x-dc></body></html>`;
+  let p;
+  let canvasDir;
+  const sizeOf = async (file) => {
+    const m = JSON.parse(await readFile(path.join(canvasDir, 'canvas.json'), 'utf8'));
+    const a = m.artboards.find((x) => x.file === file);
+    return a ? `${a.w}x${a.h}` : null;
+  };
+
+  before(async () => {
+    p = path.join(dir, 'list-frames');
+    canvasDir = path.join(p, 'brand', 'canvas');
+    await mkdir(canvasDir, { recursive: true });
+    const fixture = path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json');
+    await writeFile(path.join(p, 'brand', 'brand.json'), await readFile(fixture, 'utf8'));
+    await writeFile(path.join(canvasDir, 'Home.dc.html'), authored(1440, 1600, 'home'));
+    await writeFile(path.join(canvasDir, 'Banner.dc.html'), authored(900, 2400, 'banner'));
+  });
+
+  test('the set is accepted and the frame is then read, not defaulted', async () => {
+    const written = await cli(['set', 'applications',
+      '[{"name":"Home page","file":"Home.dc.html","frame":[1440,1600]},'
+      + '{"name":"Stall banner","file":"Banner.dc.html","frame":"900x2400"}]'], p);
+    assert.equal(written.ok, true, written.error);
+    const r = await cli(['sheets'], p);
+    assert.equal(r.ok, true, r.error);
+    assert.equal(await sizeOf('Home.dc.html'), '1440x1600', 'the list form records a frame just as the string does');
+    assert.equal(await sizeOf('Banner.dc.html'), '900x2400');
+    // The claim that must never be made about a frame the file did record.
+    assert.equal(r.unsized.includes('Home.dc.html'), false, r.unsized.join(', '));
+    assert.ok(r.sized.some((l) => /Home\.dc\.html 1440x1600, because applications\[\]\.frame records/.test(l)), r.sized.join(' | '));
+  });
+
+  test('a list that is not two sensible numbers is still not guessed at', async () => {
+    const q = path.join(dir, 'list-frames-junk');
+    const junkCanvas = path.join(q, 'brand', 'canvas');
+    await mkdir(junkCanvas, { recursive: true });
+    const brand = JSON.parse(await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+    brand.applications = [
+      { name: 'One number', file: 'One.dc.html', frame: [1440] },
+      { name: 'A zero', file: 'Zero.dc.html', frame: [0, 900] },
+      { name: 'Words', file: 'Words.dc.html', frame: ['wide', 'tall'] },
+      { name: 'Three', file: 'Three.dc.html', frame: [1440, 900, 2] },
+    ];
+    await writeFile(path.join(q, 'brand', 'brand.json'), JSON.stringify(brand, null, 2));
+    for (const f of ['One', 'Zero', 'Words', 'Three']) {
+      await writeFile(path.join(junkCanvas, `${f}.dc.html`), authored(600, 600, f));
+    }
+    const r = await cli(['sheets'], q);
+    assert.equal(r.ok, true, r.error);
+    const all = ['One.dc.html', 'Three.dc.html', 'Words.dc.html', 'Zero.dc.html'];
+    assert.deepEqual(r.unsized.sort(), all);
+    assert.deepEqual(r.sized.filter((l) => /One|Zero|Words|Three/.test(l)), []);
+    // Each of these WAS recorded, badly. Defaulting is right; reporting it as
+    // unrecorded sends the person looking in the wrong file.
+    assert.deepEqual(r.unreadable.sort(), all);
+  });
+
+  test('the printed report never says nothing was said about a frame the file records', async () => {
+    const q = path.join(dir, 'unreadable-frames');
+    const junkCanvas = path.join(q, 'brand', 'canvas');
+    await mkdir(junkCanvas, { recursive: true });
+    const brand = JSON.parse(await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+    // One a person can read and a layout cannot, and one nobody recorded at all.
+    brand.applications = [{ name: 'Bay sign', file: 'BaySign.dc.html', frame: 'A3 portrait' }];
+    await writeFile(path.join(q, 'brand', 'brand.json'), JSON.stringify(brand, null, 2));
+    await writeFile(path.join(junkCanvas, 'BaySign.dc.html'), authored(842, 1191, 'bay'));
+    await writeFile(path.join(junkCanvas, 'Sticker.dc.html'), authored(600, 600, 'sticker'));
+    const { stdout } = await run(process.execPath, [CLI, 'sheets'], { cwd: q, timeout: 90000 });
+    const nothingSaid = /nothing said otherwise: ([^\n]*)\./.exec(stdout);
+    assert.ok(nothingSaid, stdout);
+    assert.equal(nothingSaid[1].includes('BaySign'), false, `the brand file records a frame for it:\n${stdout}`);
+    assert.match(nothingSaid[1], /Sticker\.dc\.html/, 'and the one nobody recorded is still named');
+    assert.match(stdout, /BaySign\.dc\.html, where applications\[\]\.frame says "A3 portrait"/);
+  });
+});

@@ -715,9 +715,14 @@ describe('what the approved colourway changes downstream', () => {
     const out = renderBrandDeck({ brand: b, system, assets: { 'assets/logos/muddy-paws-primary.svg': { kind: 'svg', markup: ONE_INK } } });
     const page = /<section class="page"[^>]*id="colourways"[\s\S]*?<\/section>/.exec(out.html)[0];
     const labels = [...page.matchAll(/class="mark" role="img" aria-label="([^"]*)"/g)].map((m) => m[1]);
-    assert.deepEqual(labels, ['Brand on paper', 'Brand on paper, greyscale', 'Brand on paper, at sixteen pixels'],
-      'the board names its three cells apart and the deck has to as well');
-    assert.equal(new Set(labels).size, 3);
+    // The small renders the page actually drew, rather than a number typed
+    // here: a wide mark takes only the sizes that fit on its strip.
+    const WORDS = { 16: 'sixteen', 32: 'thirty-two', 64: 'sixty-four' };
+    const sizes = [...page.matchAll(/class="size-tile" data-px="(\d+)"/g)].map((m) => Number(m[1]));
+    assert.ok(sizes.length >= 1, 'the page draws the mark at its small sizes');
+    assert.deepEqual(labels, ['Brand on paper', 'Brand on paper, greyscale', ...sizes.map((px) => `Brand on paper, at ${WORDS[px]} pixels`)],
+      'the board names its cells apart and the deck has to as well');
+    assert.equal(new Set(labels).size, labels.length, 'no two proofs share a name');
   });
 
   test('a colourway on a dark ground gets a greyscale proof you can see, not a blank cell', needsChrome, async () => {

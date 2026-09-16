@@ -36,6 +36,38 @@ const has = (v) => v != null && v !== '' && (!Array.isArray(v) || v.length > 0);
 /** A bracketed placeholder. It looks unfinished because it is. */
 const todo = (what) => `<span class="todo">[${PLACEHOLDER}: ${esc(what)}]</span>`;
 
+/**
+ * A camelCase key as a sentence-case label: `sentenceLength` reads "Sentence
+ * length", `oxfordComma` reads "Oxford comma".
+ *
+ * The print book imports this rather than keeping its own copy, because a key
+ * that reads one way in the deck and another way in the book is the same
+ * document disagreeing with itself about what the brand decided.
+ */
+export const titleise = (k) => String(k ?? '')
+  .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  .toLowerCase()
+  .replace(/^./, (c) => c.toUpperCase());
+
+/**
+ * An application frame as WxH.
+ *
+ * `applications[].frame` is free-form and both shapes get written: "1440x1600"
+ * by a person, [1440, 1600] by anything generating JSON. Printed straight, the
+ * list read as "1440,1600", which is not a size anybody writes. A pair that is
+ * not two sane numbers is printed as it stands rather than tidied into
+ * something that looks right, because that is bad data and it should look it.
+ *
+ * The print book imports this, so the two documents cannot report a frame
+ * differently.
+ */
+export const frameLabel = (v) => {
+  if (!Array.isArray(v)) return String(v ?? '');
+  const [w, h] = v.map(Number);
+  const sane = (n) => Number.isInteger(n) && n >= 10 && n <= 99999;
+  return v.length === 2 && sane(w) && sane(h) ? `${w}x${h}` : String(v);
+};
+
 const rgbOf = (hex) => {
   try {
     const { r, g, b } = parseHex(hex);
@@ -146,6 +178,12 @@ h3 { font-size: 22px; letter-spacing: -0.01em; }
 p { margin: 0; }
 ul { margin: 0; padding-left: 1.1em; }
 li + li { margin-top: .3em; }
+dl, dd { margin: 0; }
+/* Every recorded writing rule, each under its own key. A value printed with
+   no key ("Yes, always. We write the way we talk.") says nothing about what
+   it is a rule for. */
+.mechanics dt { font-family: var(--display); font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; }
+.mechanics dd { line-height: 1.4; margin-top: .2em; opacity: .92; }
 a { color: inherit; }
 a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 .mono { font-family: var(--mono); font-size: 13px; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
@@ -165,7 +203,21 @@ a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 .rail p { font-size: 19px; line-height: 1.5; max-width: 34ch; }
 .rail p + p { margin-top: -10px; }
 .canvas { padding: 88px 96px 120px 72px; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
-.canvas--centre { justify-content: center; }
+/* A canvas that fills to the foot of the page instead of stranding a short
+   block in the middle of it. The free space goes ABOVE the content, which is
+   how the reference guides compose a page: the title at the top, the content
+   held against the bottom margin. An auto margin absorbs only POSITIVE free
+   space, so a canvas whose content already overruns is left where it is
+   rather than being pushed off the top. */
+.canvas--fill > :first-child { margin-top: auto; }
+/* A specimen stage. The object is centred in a field that runs the height of
+   the canvas, with its caption on the line below. The field is the canvas
+   itself, given its own ground colour and bleeding to the page edge: a
+   bordered box around an object that cannot fill it reads as a box around a
+   tiny mark, which is the fault this is here to avoid. */
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 14px; }
+.stage__ground { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.stage__caption { font-family: var(--mono); font-size: 13px; letter-spacing: 0.02em; color: var(--muted); line-height: 1.5; margin: 0; }
 .full { width: 100%; height: 100%; padding: 96px; display: flex; flex-direction: column; }
 .glyph { display: inline-block; vertical-align: middle; flex: none; }
 /* Off-screen for the eye, present for a screen reader and for the PDF's text
@@ -195,12 +247,14 @@ td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-ali
 .tick { color: ${tokens.pass}; font-weight: 700; }
 .cross { color: ${tokens.fail}; font-weight: 700; }
 .pill { display: inline-flex; align-items: center; border: 1px solid var(--rule); padding: 4px 12px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; border-radius: 999px; }
+/* The contents steps its type down as the deck grows, so a brand that records
+   enough to earn extra pages does not push the last chapter under the footer. */
 .toc { columns: 3; column-gap: 56px; }
-.toc-chapter { break-inside: avoid; page-break-inside: avoid; padding-bottom: 22px; }
-.toc a { display: flex; justify-content: space-between; gap: 16px; text-decoration: none; padding: 4px 0; font-size: 16px; }
-.toc a.chapter { font-family: var(--display); font-weight: 700; font-size: 21px; padding-bottom: 6px; }
-.toc a span:last-child { font-family: var(--mono); font-size: 14px; }
-.toc a.chapter span:last-child { font-family: var(--display); font-size: 21px; }
+.toc-chapter { break-inside: avoid; page-break-inside: avoid; padding-bottom: var(--toc-gap, 22px); }
+.toc a { display: flex; justify-content: space-between; gap: 16px; text-decoration: none; padding: var(--toc-pad, 4px) 0; font-size: var(--toc-entry, 16px); }
+.toc a.chapter { font-family: var(--display); font-weight: 700; font-size: var(--toc-chapter, 21px); padding-bottom: 6px; }
+.toc a span:last-child { font-family: var(--mono); font-size: calc(var(--toc-entry, 16px) - 2px); }
+.toc a.chapter span:last-child { font-family: var(--display); font-size: var(--toc-chapter, 21px); }
 /* A phone reads the pages reflowed, not as thumbnails: the rail stacks above
    the canvas, fixed grids collapse to one column and the type comes back to a
    readable size. Print never matches this query, so the PDF is untouched. */
@@ -287,23 +341,69 @@ function cornerMark(ctx) {
 
 /**
  * Two-panel content page: rail left, canvas right, footer, corner mark. The
- * canvas starts below the corner mark on every page; `centre` composes a
- * short canvas vertically instead of leaving the lower half dead.
+ * canvas starts below the corner mark on every page; `fill` settles a short
+ * canvas against the bottom margin instead of leaving the lower half dead.
  */
-function contentPage(ctx, { id, chapter, title, rail, canvas, n, centre = false }) {
+function contentPage(ctx, { id, chapter, title, rail, canvas, n, fill = false, ground = null }) {
   return `<section class="page" id="${id}">
   <div class="two">
     <div class="rail">
       <h1>${esc(title)}</h1>
       ${rail}
     </div>
-    <div class="canvas${centre ? ' canvas--centre' : ''}">
+    <div class="canvas${fill ? ' canvas--fill' : ''}"${ground ? ` style="background:${ground}"` : ''}>
       ${canvas}
     </div>
   </div>
   ${cornerMark(ctx)}
   ${footer(ctx, chapter, n)}
 </section>`;
+}
+
+/**
+ * A specimen on a stage: the object drawn as large as the ground will hold,
+ * on a ground that runs the height of the canvas, with its caption on the
+ * line below. This is how all three reference guides compose a spec page, and
+ * it is the difference between a page and a small object stranded in the
+ * middle of one.
+ *
+ * `pad` is the breathing room inside the ground; the caller sizes the object
+ * to `stageBox()` using the same number.
+ */
+function stage(inner, { caption = null, align = 'center' } = {}) {
+  return `<div class="stage">
+    <div class="stage__ground" style="align-items:${align}">${inner}</div>
+    ${caption ? `<p class="stage__caption">${caption}</p>` : ''}
+  </div>`;
+}
+
+/**
+ * The room a stage leaves for the object it holds, in page pixels: the canvas
+ * column less its padding and less the caption line. Nothing is measured at
+ * render time, so a page that scales an object to its ground does the
+ * arithmetic the browser would.
+ */
+const CANVAS_W = PAGE_W - 560 - 96 - 72;
+const CANVAS_H = PAGE_H - 88 - 120;
+const STAGE_CAPTION_H = 34;
+const stageBox = ({ caption = true } = {}) => ({ w: CANVAS_W, h: CANVAS_H - (caption ? STAGE_CAPTION_H : 0) });
+
+/**
+ * A table that carries its own name.
+ *
+ * `caption` is not optional and throws when it is missing, because seven of
+ * this deck's eight tables once reached the accessibility tree as an unnamed
+ * grid of cells. The caption is off-screen by default: it is there for a
+ * screen reader and for the PDF's text layer, and the visible page already
+ * carries the heading it sits under.
+ */
+export function table({ caption, head, body, style = '' }) {
+  if (!String(caption ?? '').trim()) throw new TypeError('a deck table needs a caption: it reaches a screen reader as an unnamed grid of cells without one');
+  return `<table${style ? ` style="${style}"` : ''}>
+    <caption class="sr-only">${esc(caption)}</caption>
+    <thead><tr>${head}</tr></thead>
+    <tbody>${body}</tbody>
+  </table>`;
 }
 
 /**
@@ -322,7 +422,7 @@ function cross(colour, size = 22, outline = null) {
 /** A page that is one sentence. */
 function statementPage(ctx, { id, chapter, title, eyebrow, statement, n, ground = 'var(--primary)', colour = 'var(--on-primary)' }) {
   return `<section class="page" id="${id}" style="background:${ground};color:${colour}">
-  <div class="full" style="justify-content:center;align-items:center;text-align:center;gap:48px">
+  <div class="full" style="justify-content:space-between;align-items:center;text-align:center;gap:48px;padding-bottom:132px">
     <h1 class="label" style="color:inherit;opacity:.8;font-family:var(--body);font-size:22px;letter-spacing:0;text-transform:none;font-weight:400">${esc(eyebrow ?? title)}</h1>
     <p class="big" style="font-size:108px;max-width:16ch">${statement}</p>
   </div>
@@ -382,11 +482,16 @@ function logoContext(brand, assets, tokens) {
       /**
        * The mark at a given height in px, held inside maxW when one is given,
        * optionally filtered or recoloured.
+       *
+       * `alt` is what this particular drawing of the mark is: "at 72 pixels
+       * wide", "inside its clear space", "reversed on the brand colour". A
+       * page that draws the mark five times and names all five of them after
+       * the brand has told a screen reader nothing.
        */
-      at: (h, { filter = '', colour = null, maxW = null } = {}) => {
+      at: (h, { filter = '', colour = null, maxW = null, alt = null } = {}) => {
         const aspect = asset.kind === 'svg' ? svgAspect(asset.markup) : 3;
         const height = maxW && h * aspect > maxW ? maxW / aspect : h;
-        return `<span class="mark" role="img" aria-label="${esc(name)}" style="height:${Math.round(height)}px;width:${Math.round(height * aspect)}px;${filter ? `filter:${filter};` : ''}${colour ? `color:${colour};` : ''}">${asset.markup}</span>`;
+        return `<span class="mark" role="img" aria-label="${esc(alt ?? name)}" style="height:${Math.round(height)}px;width:${Math.round(height * aspect)}px;${filter ? `filter:${filter};` : ''}${colour ? `color:${colour};` : ''}">${asset.markup}</span>`;
       },
       /** The mark at a given width in px. */
       atWidth: (w, opts = {}) => {
@@ -399,14 +504,18 @@ function logoContext(brand, assets, tokens) {
     file: null,
     named: files.length,
     embedded: 0,
-    aspect: null,
+    // The typeset wordmark's width over the height `at()` was asked for:
+    // `at(h)` sets the size to 0.9h and a bold display glyph runs about
+    // 0.58em per character. The pages that size a diagram around the mark
+    // need a number here, not null.
+    aspect: Math.max(1.5, name.length * 0.58 * 0.9),
     // A typeset wordmark is about 0.58em per character at bold display
     // weights, so a width bound becomes a font-size bound.
-    at: (h, { colour = null, maxW = null } = {}) => {
+    at: (h, { colour = null, maxW = null, alt = null } = {}) => {
       const size = Math.round(Math.min(h * 0.9, maxW ? maxW / (name.length * 0.58) : Infinity));
-      return `<span class="wordmark" role="img" aria-label="${esc(name)}" style="font-size:${size}px;${colour ? `color:${colour};` : ''}">${esc(name)}</span>`;
+      return `<span class="wordmark" role="img" aria-label="${esc(alt ?? name)}" style="font-size:${size}px;${colour ? `color:${colour};` : ''}">${esc(name)}</span>`;
     },
-    atWidth: (w, opts = {}) => `<span class="wordmark" role="img" aria-label="${esc(name)}" style="font-size:${Math.round(w / (name.length * 0.58))}px;${opts.colour ? `color:${opts.colour};` : ''}">${esc(name)}</span>`,
+    atWidth: (w, opts = {}) => `<span class="wordmark" role="img" aria-label="${esc(opts.alt ?? name)}" style="font-size:${Math.round(w / (name.length * 0.58))}px;${opts.colour ? `color:${opts.colour};` : ''}">${esc(name)}</span>`,
     typesetNote: files.length
       ? `${files.length} logo file${files.length === 1 ? '' : 's'} recorded but not found on disk (${files.map((f) => f.path).join(', ')}), so the typeset wordmark stands in. Regenerate from the project that holds the files.`
       : 'No logo file recorded, so the wordmark below is the name typeset in the display face. It is a real identity as long as the tracking is a decision, and everything on the following pages still applies once a drawn mark arrives.',
@@ -541,6 +650,59 @@ function logoMisuseTiles(ctx, entries) {
   return { html: `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">${cells.join('')}</div>`, count: cells.length };
 }
 
+/**
+ * How the writing pages set the recorded mechanics.
+ *
+ * `voice.mechanics` is an open object, so a brand may record three rules or
+ * thirty, and a rule that takes four lines needs twice the room of one that
+ * takes two. Each page takes as many as it can hold at the densest setting it
+ * needs, and the rest run on to the next: nothing is dropped to make a page
+ * fit, because a rule that reaches no page is a rule the next person guesses
+ * at.
+ *
+ * The heights are estimated, not measured, because nothing here runs in a
+ * browser. The panel figures are deliberately short of the real room.
+ */
+// The left half of the writing page, between its heading and its example, and
+// the full canvas of a continuation page. Each carries the settings it may use:
+// one column while the list is short and the panel is narrow, two once it is
+// not, and the type steps down as the list grows, the way the pillars page
+// does. A continuation page never uses one column, because one column of the
+// full canvas is a measure of a hundred characters.
+const MECHANICS_FIRST = { w: 768, h: 470, settings: [[1, 22], [2, 18], [2, 16]] };
+const MECHANICS_REST = { w: CANVAS_W, h: CANVAS_H - 40, settings: [[2, 22], [2, 19], [3, 17]] };
+function planMechanics(entries) {
+  const pages = [];
+  let rest = entries;
+  let panel = MECHANICS_FIRST;
+  while (rest.length) {
+    let chosen = null;
+    for (const [columns, size] of panel.settings) {
+      const colW = Math.floor(panel.w / columns) - (columns > 1 ? 32 : 0);
+      const perLine = Math.max(8, Math.floor(colW / (size * 0.52)));
+      let height = 0;
+      let count = 0;
+      for (let i = 0; i < rest.length; i += columns) {
+        const row = rest.slice(i, i + columns);
+        const lines = Math.max(...row.map(([, v]) => Math.max(1, Math.ceil(String(v).length / perLine))));
+        const rowH = size * 1.25 + lines * size * 1.4 + size;
+        if (height + rowH > panel.h) break;
+        height += rowH;
+        count += row.length;
+      }
+      chosen = { columns, size, count };
+      if (count === rest.length) break;
+    }
+    // Always take at least one, so a single rule nothing can fit still lands on
+    // a page rather than looping for ever.
+    const take = Math.max(1, chosen.count);
+    pages.push({ columns: chosen.columns, size: chosen.size, entries: rest.slice(0, take) });
+    rest = rest.slice(take);
+    panel = MECHANICS_REST;
+  }
+  return pages;
+}
+
 function railText(...paras) {
   return paras.filter(has).map((p) => `<p>${p}</p>`).join('');
 }
@@ -612,7 +774,7 @@ function planPages(ctx) {
         'The one sentence the brand rests on. Every choice in this document should be traceable back to it.',
         has(st.narrative) ? esc(st.narrative) : null,
       ),
-      canvas: `<div style="display:flex;flex-direction:column;justify-content:center;height:100%;gap:40px">
+      canvas: `<div style="display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:40px">
         <p class="big" style="font-size:72px;max-width:18ch">${has(st.purpose) ? esc(st.purpose) : todo('the one sentence this brand rests on')}</p>
         ${has(st.problem) ? `<div><span class="label">The problem it exists to solve</span><p style="font-size:22px;max-width:50ch;margin-top:8px">${esc(st.problem)}</p></div>` : ''}
       </div>`,
@@ -634,7 +796,7 @@ function planPages(ctx) {
   <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%;height:100%">
     ${cols.map(([t, v, what], i) => `<div style="background:${grounds[i]};color:${colours[i]};padding:88px 64px 120px;display:flex;flex-direction:column;gap:48px">
       ${i === 0 ? `<h1 style="font-size:64px">${t}</h1>` : `<h2 style="font-size:64px">${t}</h2>`}
-      <div style="flex:1;display:flex;align-items:center"><p class="big" style="font-size:${String(v ?? '').length > 120 ? 36 : 44}px;font-weight:400;line-height:1.2;letter-spacing:-0.01em">${has(v) ? esc(v) : todo(what)}</p></div>
+      <div style="flex:1;display:flex;align-items:flex-end"><p class="big" style="font-size:${String(v ?? '').length > 120 ? 36 : 44}px;font-weight:400;line-height:1.2;letter-spacing:-0.01em">${has(v) ? esc(v) : todo(what)}</p></div>
     </div>`).join('')}
   </div>
   ${footer({ ...ctx, footerColour: 'var(--ink)' }, 'Brand framework', n, { left: 'var(--on-primary)', centre: false })}
@@ -646,7 +808,7 @@ function planPages(ctx) {
     chapter: 'framework', id: 'field', title: 'The field',
     ...(competitors.length || has(voice.elevatorPitch) ? {} : absent('The field', 'competitors or an elevator pitch')),
     render: (n) => contentPage(ctx, {
-      id: 'field', chapter: 'Brand framework', title: 'The field', n, centre: true,
+      id: 'field', chapter: 'Brand framework', title: 'The field', n, fill: true,
       rail: railText(
         'Who else the customer could choose, what each of them owns, and the gap this brand stands in. Positioning is only a claim until it is held against the alternatives.',
         has(st.category) ? `<strong>Category.</strong> ${esc(st.category)}` : null,
@@ -672,7 +834,7 @@ function planPages(ctx) {
     render: (n) => `<section class="page" id="pillars" style="background:var(--tint)">
   <div class="full" style="gap:72px;padding-bottom:120px">
     <h1 style="font-size:72px">Pillars</h1>
-    <div style="display:grid;grid-template-columns:repeat(${Math.min(4, Math.max(2, pillars?.length ?? 2))},minmax(0,1fr));gap:0;flex:1;align-items:stretch">
+    <div style="display:grid;grid-template-columns:repeat(${Math.min(4, Math.max(2, pillars?.length ?? 2))},minmax(0,1fr));gap:0;margin-top:auto;align-items:stretch">
       ${(pillars ?? []).map((pil, i) => `<div style="padding:0 40px 0 ${i ? 40 : 0}px;border-left:${i ? '1px solid var(--rule)' : 'none'};display:flex;flex-direction:column;gap:${pillarDense ? 24 : 40}px">
         <h2 style="font-size:${pillarDense ? 40 : 52}px;min-height:2.1em">${esc(pil.claim ?? pil.name ?? '')}</h2>
         <div><span class="label">Why it matters</span><p style="font-size:${pillarDense ? 19 : 23}px;line-height:1.4;margin-top:10px">${has(pil.why) ? esc(pil.why) : todo('why this pillar matters')}</p></div>
@@ -739,7 +901,7 @@ function planPages(ctx) {
     </div>
     <div style="padding:96px 96px 120px 72px;display:flex;flex-direction:column;gap:32px">
       <h2 style="font-size:44px">Voice traits</h2>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:36px 48px">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:36px 48px;flex:1;align-content:space-between">
         ${(traits ?? []).map((a) => `<div class="voice-trait" style="display:flex;flex-direction:column;gap:10px;min-width:0">
           <h3 style="font-size:34px">${esc(a.name ?? a)}${a.notThis ? ` <span style="font-family:var(--body);font-weight:400;font-size:18px;color:var(--muted)">not ${esc(a.notThis)}</span>` : ''}</h3>
           <p style="font-size:19px;line-height:1.45">${has(a.doThis) ? esc(a.doThis) : has(a.meaning) ? esc(a.meaning) : todo('what this trait sounds like')}</p>
@@ -757,17 +919,20 @@ function planPages(ctx) {
     chapter: 'framework', id: 'tone-situations', title: 'Tone by situation',
     ...(situations ? {} : absent('Tone by situation', 'tone by situation (voice.tone)')),
     render: (n) => contentPage(ctx, {
-      id: 'tone-situations', chapter: 'Brand framework', title: 'Tone by situation', n, centre: true,
+      id: 'tone-situations', chapter: 'Brand framework', title: 'Tone by situation', n, fill: true,
       rail: railText(
         'The same voice, dialled to who is reading and what state they are in. When two of these disagree, the reader\'s state wins.',
-        has(voice.mechanics?.sentenceLength) ? `<strong>Always.</strong> ${esc(voice.mechanics.sentenceLength)}` : null,
+        has(voice.mechanics?.sentenceLength) ? `<strong>${esc(titleise('sentenceLength'))}, in every tone.</strong> ${esc(voice.mechanics.sentenceLength)}` : null,
       ),
       // The hard-things lines live HERE, where the brand file puts them: a
       // situation and the sentence said in it. They used to be dealt out on
       // the tone page as though a voice trait had claimed them.
-      canvas: `<table style="font-size:20px"><thead><tr><th style="width:24%">When</th><th style="width:30%">The reader feels</th><th>So we sound</th></tr></thead><tbody>
-        ${(situations ?? []).slice(0, 8).map((t) => `<tr><td style="padding:16px 16px 16px 0"><strong>${esc(t.situation ?? t.when ?? '')}</strong></td><td style="padding:16px 16px 16px 0;color:var(--muted)">${esc(t.reader ?? '')}</td><td style="padding:16px 0">${esc(t.sound ?? t.tone ?? '')}</td></tr>`).join('')}
-      </tbody></table>
+      canvas: `${table({
+        caption: 'The situations this brand writes in, what the reader feels in each, and how the brand sounds in reply',
+        style: 'font-size:20px',
+        head: '<th style="width:24%">When</th><th style="width:30%">The reader feels</th><th>So we sound</th>',
+        body: (situations ?? []).slice(0, 8).map((t) => `<tr><td style="padding:16px 16px 16px 0"><strong>${esc(t.situation ?? t.when ?? '')}</strong></td><td style="padding:16px 16px 16px 0;color:var(--muted)">${esc(t.reader ?? '')}</td><td style="padding:16px 0">${esc(t.sound ?? t.tone ?? '')}</td></tr>`).join(''),
+      })}
       ${has(voice.vocabulary?.hardThings) ? `<div class="hard-things" style="display:flex;flex-direction:column;gap:16px;margin-top:8px">
         <h2 style="font-size:30px">How we say hard things</h2>
         <div style="display:grid;grid-template-columns:repeat(${Math.min(2, voice.vocabulary.hardThings.length)},minmax(0,1fr));gap:20px">
@@ -789,7 +954,7 @@ function planPages(ctx) {
       return `<section class="page" id="key-messaging" style="background:var(--tint)">
   <div class="full" style="gap:72px;padding-bottom:120px">
     <h1 style="font-size:72px">Key messaging</h1>
-    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));flex:1;align-items:stretch">
+    <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin-top:auto;align-items:stretch">
       ${columns.map(([t, lines, what], i) => `<div style="padding:0 32px 0 ${i ? 32 : 0}px;border-left:${i ? '1px solid var(--rule)' : 'none'};display:flex;flex-direction:column;gap:32px">
         <h2 style="font-size:44px">${t}</h2>
         <div style="display:flex;flex-direction:column;gap:16px;font-size:21px;line-height:1.4">${lines.length ? lines.slice(0, 9).map((l) => `<p>${esc(l)}</p>`).join('') : `<p>${todo(what)}</p>`}</div>
@@ -801,11 +966,22 @@ function planPages(ctx) {
 </section>`;
     },
   });
+  // `voice.mechanics` is an open object: a brand may record any rule it keeps.
+  // The deck used to hardcode four keys and print their values with no key at
+  // all, so the fixture's eight recorded rules reached one page as four
+  // anonymous sentences and the print book, which renders every key, disagreed
+  // with the deck about what the brand had decided. Every key is rendered, and
+  // a set too long for one page runs on to the next rather than being cut.
+  const mechanics = Object.entries(voice.mechanics ?? {}).filter(([k, v]) => has(k) && has(v));
+  const mechanicsList = (entries, { size, columns }) => `<dl class="mechanics" style="font-size:${size}px;${columns > 1 ? `display:grid;grid-template-columns:repeat(${columns},minmax(0,1fr));gap:${Math.round(size)}px ${Math.round(size * 1.8)}px` : `display:flex;flex-direction:column;gap:${Math.round(size * 0.7)}px`}">
+        ${entries.map(([k, v]) => `<div><dt>${esc(titleise(k))}</dt><dd>${esc(v)}</dd></div>`).join('')}
+      </dl>`;
+  const mechanicsPages = planMechanics(mechanics);
+  const mechanicsRest = mechanicsPages.slice(1);
   page({
     chapter: 'framework', id: 'writing', title: 'Writing guidance',
     render: (n) => {
-      const mech = voice.mechanics ?? {};
-      const like = [mech.sentenceLength, mech.contractions, mech.headings, mech.buttons].filter(has);
+      const { entries: shown, columns, size } = mechanicsPages[0] ?? { entries: [], columns: 1, size: 22 };
       const useWords = voice.vocabulary?.use ?? [];
       const avoidWords = (voice.vocabulary?.avoid ?? []).map((w) => (typeof w === 'string' ? w : w.word)).filter(Boolean);
       const bad = (voice.examples ?? []).map((e) => e.bad).filter(Boolean)[0];
@@ -814,7 +990,8 @@ function planPages(ctx) {
   <div style="display:grid;grid-template-columns:1fr 1fr;width:100%;height:100%">
     <div style="background:var(--primary);color:var(--on-primary);padding:96px;display:flex;flex-direction:column;gap:40px">
       <h1 style="font-size:64px">Write like this</h1>
-      ${like.length ? `<ul style="font-size:22px;line-height:1.45;max-width:36ch;display:flex;flex-direction:column;gap:12px">${like.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>` : `<p>${todo('voice mechanics: sentence length, contractions, headings, buttons')}</p>`}
+      ${shown.length ? mechanicsList(shown, { size, columns }) : `<p>${todo('voice mechanics: the rules this brand keeps about sentence length, contractions, headings, buttons and anything else (voice.mechanics)')}</p>`}
+      ${mechanicsRest.length ? `<p class="mono" style="opacity:.85">${mechanics.length - shown.length} more recorded ${mechanics.length - shown.length === 1 ? 'rule is' : 'rules are'} on the ${mechanicsRest.length > 1 ? 'pages' : 'page'} that follow${mechanicsRest.length > 1 ? '' : 's'}.</p>` : ''}
       ${useWords.length ? `<p style="font-size:18px;opacity:.9"><span class="label" style="color:inherit;opacity:.8">We say</span><br>${useWords.map(esc).join(' &middot; ')}</p>` : ''}
       ${good ? `<p style="font-size:20px;font-style:italic;max-width:36ch;margin-top:auto">${esc(good)}</p>` : ''}
     </div>
@@ -828,21 +1005,48 @@ function planPages(ctx) {
 </section>`;
     },
   });
+  mechanicsRest.forEach((part, i) => {
+    const id = i ? `writing-mechanics-${i + 1}` : 'writing-mechanics';
+    const title = i ? `Writing guidance, continued (${i + 1})` : 'Writing guidance, continued';
+    page({
+      chapter: 'framework', id, title,
+      render: (n) => contentPage(ctx, {
+        id, chapter: 'Brand framework', title, n, fill: true,
+        rail: railText(
+          `The rest of the recorded rules. ${mechanics.length} are held in the brand file and every one of them is on a page.`,
+          'A rule nobody wrote down is a rule the next person guesses at, which is why the set grows rather than being trimmed to fit a page.',
+        ),
+        canvas: mechanicsList(part.entries, part),
+      }),
+    });
+  });
 
   // --- 2. Logo --------------------------------------------------------------
   const L = ctx.logo;
   page({ chapter: 'logo', divider: true });
   page({
     chapter: 'logo', id: 'our-logo', title: 'Our logo',
-    render: (n) => contentPage(ctx, {
-      id: 'our-logo', chapter: 'Logo', title: 'Our logo', n,
-      rail: railText(
-        has(logo.rationale) ? esc(logo.rationale) : todo('the story behind the mark (identity.logo.rationale)'),
-        L.file ? `${esc(L.file)}${L.role ? ` (${esc(L.role)})` : ''}. ${L.embedded < L.named ? `${L.named - L.embedded} of ${L.named} recorded logo files could not be found on disk.` : 'The artwork is the file, not a picture of it.'}` : `<span class="todo">[${PLACEHOLDER}: the logo artwork. ${esc(L.typesetNote)}]</span>`,
-        has(logo.placement) ? `<strong>Placement.</strong> ${esc(logo.placement)}` : null,
-      ),
-      canvas: `<div style="flex:1;display:flex;align-items:center;justify-content:center">${L.at(320, { maxW: 1150 })}</div>`,
-    }),
+    render: (n) => {
+      // The mark is drawn as large as the specimen field will hold in both
+      // directions, so a wordmark is bounded by the width and a stacked mark
+      // by the height. It used to be a fixed 320px object centred in a page
+      // of nothing.
+      const box = stageBox();
+      return contentPage(ctx, {
+        id: 'our-logo', chapter: 'Logo', title: 'Our logo', n, ground: 'var(--ground)',
+        rail: railText(
+          has(logo.rationale) ? esc(logo.rationale) : todo('the story behind the mark (identity.logo.rationale)'),
+          has(logo.placement) ? `<strong>Placement.</strong> ${esc(logo.placement)}` : null,
+        ),
+        // The provenance line belongs under the specimen, not in the rail: it
+        // is a caption for the thing above it.
+        canvas: stage(L.at(box.h, { maxW: box.w, alt: `${name}, the primary artwork` }), {
+          caption: L.file
+            ? `${esc(L.file)}${L.role ? ` (${esc(L.role)})` : ''}. ${L.embedded < L.named ? `${L.named - L.embedded} of ${L.named} recorded logo files could not be found on disk.` : 'The artwork is the file, not a picture of it.'}`
+            : todo(`the logo artwork. ${L.typesetNote}`),
+        }),
+      });
+    },
   });
   page({
     chapter: 'logo', id: 'variants', title: 'Variants on backgrounds',
@@ -860,7 +1064,7 @@ function planPages(ctx) {
       ];
       const rowH = variants.length > 3 ? 170 : 210;
       return contentPage(ctx, {
-        id: 'variants', chapter: 'Logo', title: 'Variants on backgrounds', n, centre: true,
+        id: 'variants', chapter: 'Logo', title: 'Variants on backgrounds', n, fill: true,
         rail: railText(
           `Each recorded variant on the four grounds it will meet: the page, the brand colour, a dark surface and one colour.`,
           L.file ? 'On the brand colour, on dark and in one colour the artwork is shown as a silhouette made by filter, for reference only. Use the supplied reversed and one-colour artwork in production, never a filter.' : esc(L.typesetNote),
@@ -872,13 +1076,13 @@ function planPages(ctx) {
             const file = v.file && (ctx.assets[v.file] || Object.keys(ctx.assets).find((k) => k.endsWith(`/${v.file}`)));
             const shown = file ? ctx.assets[file === true ? v.file : file] ?? ctx.assets[v.file] : null;
             const reversed = Boolean(shown) && /revers|knock|white|inverse/i.test(String(v.name ?? ''));
-            const draw = (opts) => (shown
-              ? `<span class="mark" role="img" aria-label="${esc(v.name ?? name)}" style="height:${Math.round(Math.min(72, 240 / (shown.kind === 'svg' ? svgAspect(shown.markup) : 3)))}px;width:${Math.round(Math.min(72 * (shown.kind === 'svg' ? svgAspect(shown.markup) : 3), 240))}px;${opts.filter ? `filter:${opts.filter};` : ''}${opts.colour ? `color:${opts.colour};` : ''}">${shown.markup}</span>`
-              : L.at(64, { ...opts, maxW: 180 }));
+            const draw = (opts, groundName) => (shown
+              ? `<span class="mark" role="img" aria-label="${esc(`${v.name ?? name}, on ${groundName}`)}" style="height:${Math.round(Math.min(72, 240 / (shown.kind === 'svg' ? svgAspect(shown.markup) : 3)))}px;width:${Math.round(Math.min(72 * (shown.kind === 'svg' ? svgAspect(shown.markup) : 3), 240))}px;${opts.filter ? `filter:${opts.filter};` : ''}${opts.colour ? `color:${opts.colour};` : ''}">${shown.markup}</span>`
+              : L.at(64, { ...opts, maxW: 180, alt: `${v.name ?? name}, on ${groundName}` }));
             const fallback = !shown && v.file && L.file;
             return `<div style="display:grid;grid-template-columns:200px repeat(4,minmax(0,1fr));gap:0 4px;align-items:stretch">
               <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding-right:16px"><strong style="font-size:16px">${esc(v.name ?? v)}</strong>${v.use ? `<span style="font-size:13px;color:var(--muted);line-height:1.3">${esc(v.use)}</span>` : ''}${fallback ? `<span class="todo" style="font-size:12px">[${PLACEHOLDER}: ${esc(v.file)} not on disk; primary shown]</span>` : ''}</div>
-              ${grounds.map(([, g, optsFor], gi) => `<div data-ground="${['light', 'primary', 'dark', 'mono'][gi]}" style="background:${g};min-height:${rowH}px;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;border:1px solid var(--rule)">${draw(optsFor(reversed))}</div>`).join('')}
+              ${grounds.map(([groundName, g, optsFor], gi) => `<div data-ground="${['light', 'primary', 'dark', 'mono'][gi]}" style="background:${g};min-height:${rowH}px;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;border:1px solid var(--rule)">${draw(optsFor(reversed), String(groundName).toLowerCase())}</div>`).join('')}
             </div>`;
           }).join('')}
         </div>`,
@@ -914,26 +1118,57 @@ function planPages(ctx) {
       // the size of the ones beside it. They are at real size, so a wide mark
       // takes only the sizes that fit rather than being scaled down to fit.
       const STRIP_W = 200;
-      const SIZES = [16, 32, 64].filter((_, i, all) => {
+      // Each small render sits on its own tile: the ground, a hairline and ten
+      // pixels of air. The whole column used to be one cell the height of the
+      // proofs beside it, which drew a 200 pixel box around a 16 pixel mark.
+      const TILE_PAD = 10;
+      const TILE_GAP = 12;
+      const tileW = (px) => Math.round(px * aspect) + TILE_PAD * 2 + 2;
+      const fitting = [16, 32, 64].filter((_, i, all) => {
         const upto = all.slice(0, i + 1);
-        return upto.reduce((w, px) => w + px * aspect, 0) + 14 * i + 32 <= STRIP_W;
+        return upto.reduce((w, px) => w + tileW(px), 0) + TILE_GAP * i <= STRIP_W;
       });
+      const SIZES = fitting.length ? fitting : [16];
       const SIZE_WORDS = ['sixteen', 'thirty-two', 'sixty-four'];
       // The column headings are printed once above the rows, not on every row.
       const HEAD_H = LABEL_H;
       const rowH = Math.floor((BAND_H - spill - HEAD_H - 22 * (rows.length - 1)) / rows.length);
       const cellW = Math.floor((BAND_W - NAME_W - STRIP_W - 14 * 3) / 2);
-      const HERO_H = BAND_H - 70;
-      const heroW = Math.floor((BAND_W - 14) * 0.7);
-      const sideW = BAND_W - 14 - heroW;
-      const boxFor = (w, h) => Math.max(24, Math.round(Math.min(h - 50, (w - 50) / aspect)));
-      const cell = (inner, bg, label, grow = 1) => `<div style="display:flex;flex-direction:column;gap:8px;flex:${grow};min-width:0;min-height:0">
+      // The rows still divide the band, but each proof ground is the height of
+      // the mark it holds plus its air, centred in its row. A wide mark is
+      // bounded by the column width and cannot grow to meet a tall row, so a
+      // stretched cell is a large box drawn around a small object.
+      const rowMark = Math.max(24, Math.round(Math.min(rowH - 50, (cellW - 50) / aspect)));
+      // One treatment, stacked: the mark across the full width at the top, its
+      // greyscale and its small renders beneath. Both grounds are the height of
+      // the mark they hold plus its air, and the bands are spread down the
+      // page, rather than two tall columns with a wide mark adrift in each.
+      const HERO_PAD = 100;
+      const GREY_PAD = 80;
+      const heroMark = Math.max(48, Math.round(Math.min((BAND_W - HERO_PAD) / aspect, BAND_H * 0.52 - HERO_PAD)));
+      const greyW = Math.floor((BAND_W - 14) * 0.66);
+      const greyMark = Math.max(32, Math.round(Math.min((greyW - GREY_PAD) / aspect, BAND_H * 0.3 - GREY_PAD)));
+      // `box` pins the ground to the mark it holds, in BOTH directions. A cell
+      // that stretches to fill its row draws a large panel around a mark that
+      // is bounded the other way and cannot grow to meet it: a wide mark in a
+      // tall cell, a square mark in a wide one.
+      const cell = (inner, bg, label, grow = 1, box = null) => `<div style="display:flex;flex-direction:column;gap:8px;${box ? 'flex:none;' : `flex:${grow};`}min-width:0;min-height:0">
         ${label ? `<span class="label">${esc(label)}</span>` : ''}
-        <div style="background:${bg};border:1px solid var(--rule);flex:1;display:flex;align-items:center;justify-content:center;padding:24px">${inner}</div>
+        <div data-ground-cell="${box ? 'pinned' : 'stretched'}" style="background:${bg};border:1px solid var(--rule);${box ? `width:${box.w}px;height:${box.h}px;` : 'flex:1;'}display:flex;align-items:center;justify-content:center;padding:24px">${inner}</div>
       </div>`;
+      /** The ground a mark of this height needs: the mark plus its air. */
+      const groundFor = (markH, pad, maxW) => ({ w: Math.min(maxW, Math.round(markH * aspect) + pad), h: Math.round(markH) + pad });
+      const rowGround = groundFor(rowMark, 100, cellW);
       const draw = (markup, alt, box) => `<span class="mark" role="img" aria-label="${esc(alt)}" style="height:${box}px;width:${Math.round(box * aspect)}px;max-width:100%">${markup}</span>`;
-      const tiny = (c) => `<span class="mark" role="img" aria-label="${esc(`${c.name}, at sixteen pixels`)}" style="height:16px;width:${Math.round(16 * aspect)}px">${c.markup}</span>`;
-      const strip = (c) => SIZES.map((px, i) => `<span class="mark" role="img" aria-label="${esc(`${c.name}, at ${SIZE_WORDS[i]} pixels`)}" style="flex:none;height:${px}px;width:${Math.round(px * aspect)}px">${c.markup}</span>`).join('');
+      // One tile per size, each the size of the thing it holds, with the
+      // figure under it. A row of these reads as "the mark at 16 and 32
+      // pixels"; a single cell the height of the proofs beside it read as an
+      // empty panel with a speck in the middle of it.
+      const sizeTile = (c, px, i) => `<div class="size-tile" data-px="${px}" style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:none">
+                <span style="display:inline-flex;align-items:center;justify-content:center;background:${c.groundHex ?? 'var(--paper)'};border:1px solid var(--rule);padding:${TILE_PAD}px"><span class="mark" role="img" aria-label="${esc(`${c.name}, at ${SIZE_WORDS[i]} pixels`)}" style="height:${px}px;width:${Math.round(px * aspect)}px">${c.markup}</span></span>
+                <span class="mono" style="font-size:12px;color:var(--muted)">${px}px</span>
+              </div>`;
+      const sizeTiles = (c, sizes = SIZES) => `<div class="size-strip" style="display:flex;align-items:center;justify-content:center;gap:${TILE_GAP}px;flex:1;min-height:0">${sizes.map((px, i) => sizeTile(c, px, i)).join('')}</div>`;
       const sizeLabel = SIZES.length === 1
         ? '16 pixels'
         : `${SIZES.slice(0, -1).join(', ')} and ${SIZES[SIZES.length - 1]} pixels`;
@@ -950,7 +1185,7 @@ function planPages(ctx) {
               <span style="font-size:14px;color:var(--muted)">${esc(c.mapping)}${c.ground ? `, on ${esc(c.ground)}` : ''}</span>
             </div>`;
       return contentPage(ctx, {
-        id: 'colourways', chapter: 'Logo', title: 'Colourways', n, centre: true,
+        id: 'colourways', chapter: 'Logo', title: 'Colourways', n, fill: true,
         rail: railText(
           'A colourway is recorded as a mapping from the inks the mark was drawn in to roles in this palette, never as fixed colours, so every treatment moves when the palette moves.',
           'Colour came after the silhouette was approved, and it may not carry meaning the silhouette cannot carry alone. Each treatment is shown beside its own greyscale and at sixteen pixels for exactly that reason: if the mark stops being the mark as you move right, the colour was doing the shape\'s job.',
@@ -958,25 +1193,26 @@ function planPages(ctx) {
           cw.problems?.length ? `<span class="todo">[${PLACEHOLDER}: ${esc(cw.problems[0])}]</span>` : null,
         ),
         canvas: list.length
-          ? `<div style="display:flex;flex-direction:column;gap:22px;flex:1;min-height:0">
+          ? `<div style="display:flex;flex-direction:column;gap:22px;flex:1;min-height:0${single ? ';justify-content:space-between' : ''}">
 ${single ? '' : `${headRow}\n`}${rows.map((c) => (single
             ? `            ${nameLine(c)}
-            <div style="display:grid;grid-template-columns:7fr 3fr;gap:0 14px;align-items:stretch;flex:1;min-height:0">
-              ${cell(draw(c.markup, c.name, boxFor(heroW, HERO_H - LABEL_H)), c.groundHex ?? 'var(--paper)', 'On its ground')}
-              <div style="min-width:0;display:flex;flex-direction:column;gap:14px">
-                ${cell(draw(c.grey, `${c.name}, greyscale`, boxFor(sideW, (HERO_H - 14) * 0.75 - LABEL_H)), c.greyGroundHex ?? 'var(--paper)', 'Greyscale', 3)}
-                ${cell(tiny(c), c.groundHex ?? 'var(--paper)', '16 pixels', 1)}
+            ${cell(draw(c.markup, c.name, heroMark), c.groundHex ?? 'var(--paper)', 'On its ground', 1, groundFor(heroMark, HERO_PAD, BAND_W))}
+            <div style="display:flex;gap:32px;align-items:flex-end">
+              ${cell(draw(c.grey, `${c.name}, greyscale`, greyMark), c.greyGroundHex ?? 'var(--paper)', 'Greyscale', 1, groundFor(greyMark, GREY_PAD, greyW))}
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span class="label">${esc(sizeLabel)}</span>
+                ${sizeTiles(c)}
               </div>
             </div>`
-            : `            <div style="display:grid;grid-template-columns:${ROW_COLS};gap:0 14px;align-items:stretch;flex:1;min-height:0">
+            : `            <div style="display:grid;grid-template-columns:${ROW_COLS};gap:0 14px;align-items:center;flex:1;min-height:0">
               ${nameCol(c)}
-              ${cell(draw(c.markup, c.name, boxFor(cellW, rowH)), c.groundHex ?? 'var(--paper)', null)}
-              ${cell(draw(c.grey, `${c.name}, greyscale`, boxFor(cellW, rowH)), c.greyGroundHex ?? 'var(--paper)', null)}
-              ${cell(`<div style="display:flex;align-items:center;justify-content:center;gap:14px;width:100%">${strip(c)}</div>`, c.groundHex ?? 'var(--paper)', null)}
+              ${cell(draw(c.markup, c.name, rowMark), c.groundHex ?? 'var(--paper)', null, 1, rowGround)}
+              ${cell(draw(c.grey, `${c.name}, greyscale`, rowMark), c.greyGroundHex ?? 'var(--paper)', null, 1, rowGround)}
+              ${sizeTiles(c)}
             </div>`)).join('\n')}
 ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${list.length - 3} more approved ${list.length - 3 === 1 ? 'treatment is' : 'treatments are'} recorded and not drawn here: ${esc(list.slice(3).map((c) => c.name).join(', '))}. The asset pack carries every one of them.</p>` : ''}
           </div>`
-          : `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:28px;max-width:60ch">
+          : `<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:28px;max-width:60ch">
             <p style="font-size:26px;line-height:1.4">${todo(`an approved colourway; ${esc(cw.why)}`)}</p>
             <p style="font-size:20px;line-height:1.5;color:var(--muted)">Until one is approved the mark is used in the variants on the previous page. Colour is a stage, not a setting: it opens once a person has approved the silhouette, and the treatments are dealt from this palette rather than chosen by eye.</p>
             <p style="font-size:20px;line-height:1.5;color:var(--muted)">Run <span class="mono">brandi logo colour plan</span>, look at the boards, then <span class="mono">brandi logo colour approve &lt;id&gt; --approved-by "name"</span>.</p>
@@ -987,25 +1223,35 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
   page({
     chapter: 'logo', id: 'clear-space', title: 'Clear space',
     render: (n) => {
-      const H = 180;
       const ratio = L.file ? 0.5 : 0.72;
+      const aspect = L.aspect ?? 3;
+      const field = stageBox();
+      // The diagram is the mark's box plus a margin of X on all four sides, so
+      // its height is H(1 + 2X/H) and its width is the mark plus the same. H is
+      // the largest value that fits the specimen field BOTH ways: a wordmark is
+      // bounded by the width, a stacked mark by the height. It was drawn at a
+      // fixed 180px, which left the page 45 per cent empty below it.
+      const PADDING = 34;
+      const H = Math.max(120, Math.floor(Math.min(
+        field.h / (1 + 2 * ratio),
+        (field.w - PADDING) / (0.8 * aspect + 2 * ratio),
+      )));
       const X = Math.round(H * ratio);
       const box = (extra) => `<span style="position:absolute;width:${X}px;height:${X}px;background:${r('control.bg-active')};${extra}"></span>`;
       return contentPage(ctx, {
-        id: 'clear-space', chapter: 'Logo', title: 'Clear space', n,
+        id: 'clear-space', chapter: 'Logo', title: 'Clear space', n, ground: 'var(--ground)',
         rail: railText(
           has(logo.clearSpace) ? esc(logo.clearSpace) : todo('a clear space rule, expressed as an element of the mark so it scales'),
           'Nothing enters the clear space: no type, no rule, no edge of a photograph, no other logo. It is a minimum, and more is always allowed.',
-          `<span class="mono">X is drawn at ${ratio} of the mark height for this diagram${L.file ? '' : ', an approximation of the cap height'}. The rule in words is what binds; measure it against the outlined artwork before it reaches a signwriter.</span>`,
         ),
-        canvas: `<div style="flex:1;display:flex;align-items:center;justify-content:center">
-          <div style="position:relative;display:inline-block;padding:${X}px;border:1px dashed var(--accent)">
+        canvas: stage(`<div style="position:relative;display:inline-block;padding:${X}px;border:1px dashed var(--accent)">
             ${box(`top:0;left:50%;margin-left:-${Math.round(X / 2)}px`)}${box(`bottom:0;left:50%;margin-left:-${Math.round(X / 2)}px`)}${box(`left:0;top:50%;margin-top:-${Math.round(X / 2)}px`)}${box(`right:0;top:50%;margin-top:-${Math.round(X / 2)}px`)}
             <span class="mono" style="position:absolute;top:${Math.round(X / 2) - 8}px;left:50%;margin-left:${Math.round(X / 2) + 10}px;color:var(--muted)">X</span>
             <span class="mono" style="position:absolute;left:${Math.round(X / 2) - 6}px;top:50%;margin-top:${Math.round(X / 2) + 6}px;color:var(--muted)">X</span>
-            <div style="border:1px solid var(--rule);display:inline-flex;align-items:center;justify-content:center;height:${H}px;padding:0 16px">${L.at(H * 0.8, { maxW: 700 })}</div>
-          </div>
-        </div>`,
+            <div style="border:1px solid var(--rule);display:inline-flex;align-items:center;justify-content:center;height:${H}px;padding:0 16px;background:var(--paper)">${L.at(H * 0.8, { maxW: Math.round(H * 0.8 * aspect), alt: `${name}, with the clear space drawn around it` })}</div>
+          </div>`, {
+          caption: `X is drawn at ${ratio} of the mark height for this diagram${L.file ? '' : ', an approximation of the cap height'}. The rule in words is what binds; measure it against the outlined artwork before it reaches a signwriter.`,
+        }),
       });
     },
   });
@@ -1023,10 +1269,10 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       // by its height would be several times the size anyone meant.
       const wide = (L.aspect ?? 3) >= 1.5;
       const side = wide ? 'wide' : 'high';
-      const draw = (px) => (wide ? L.atWidth(Math.min(px, 1100)) : L.at(Math.min(px, 600)));
+      const draw = (px, alt) => (wide ? L.atWidth(Math.min(px, 1100), { alt }) : L.at(Math.min(px, 600), { alt }));
       // Multipliers chosen so a 140px floor runs in one line across the canvas.
       const ladder = floorPx ? [2.5, 1.75, 1.25, 1].map((k) => Math.round(floorPx * k)) : [350, 245, 175, 140];
-      const stepAt = (px) => `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:8px">${draw(px)}<span class="mono" style="color:var(--muted)">${px}px ${side}</span></div>`;
+      const stepAt = (px) => `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:8px">${draw(px, `${name} at ${px} pixels ${side}`)}<span class="mono" style="color:var(--muted)">${px}px ${side}</span></div>`;
       return contentPage(ctx, {
         id: 'minimum-size', chapter: 'Logo', title: 'Minimum size', n,
         rail: railText(
@@ -1035,13 +1281,15 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
           abs ? `<strong>Absolute minimum.</strong> ${abs.mm ? `${esc(abs.mm)}mm` : ''}${abs.mm && abs.px ? ' / ' : ''}${abs.px ? `${esc(abs.px)}px` : ''} ${side}.` : todo('an absolute minimum size (identity.logo.minSize)'),
           sizes.length > 1 ? `<span class="mono">Other variants: ${sizes.filter((m) => m !== preferred).map((m) => `${esc(m.variant)} ${m.printMm ? `${m.printMm}mm` : ''}${m.printMm && m.screenPx ? ' / ' : ''}${m.screenPx ? `${m.screenPx}px` : ''}`).join('; ')}.</span>` : null,
         ),
-        canvas: `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:40px">
-          <div class="ladder" style="display:flex;align-items:flex-end;gap:32px 36px;flex-wrap:wrap">
+        ground: 'var(--ground)',
+        canvas: stage(`<div class="ladder" style="display:flex;align-items:flex-end;gap:32px 36px;flex-wrap:wrap">
             ${ladder.map(stepAt).join('')}
-            ${abs?.px ? `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;border-left:2px solid var(--accent);padding-left:16px">${draw(Number(abs.px))}<span class="mono" style="color:var(--muted)">absolute<br>${abs.px}px${abs.mm ? ` / ${abs.mm}mm` : ''}</span></div>` : ''}
-          </div>
-          ${pref?.px ? `<p class="mono" style="color:var(--muted);border-top:1px solid var(--rule);padding-top:16px">The preferred minimum is the last step of the ladder: ${pref.px}px${pref.mm ? ` / ${pref.mm}mm` : ''}. Nothing is drawn smaller than the absolute minimum, marked in orange.</p>` : ''}
-        </div>`,
+            ${abs?.px ? `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:8px;border-left:2px solid var(--accent);padding-left:16px">${draw(Number(abs.px), `${name} at the absolute minimum, ${abs.px} pixels ${side}`)}<span class="mono" style="color:var(--muted)">absolute<br>${abs.px}px${abs.mm ? ` / ${abs.mm}mm` : ''}</span></div>` : ''}
+          </div>`, {
+          caption: pref?.px
+            ? `The preferred minimum is the last step of the ladder: ${pref.px}px${pref.mm ? ` / ${pref.mm}mm` : ''}. Nothing is drawn smaller than the absolute minimum, marked in orange. Every step here is at actual size.`
+            : 'Every step here is at actual size.',
+        }),
       });
     },
   });
@@ -1051,7 +1299,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     render: (n) => {
       const tiles = logoMisuseTiles(ctx, misuse);
       return contentPage(ctx, {
-        id: 'misuse', chapter: 'Logo', title: 'Logo misuse', n, centre: true,
+        id: 'misuse', chapter: 'Logo', title: 'Logo misuse', n, fill: true,
         rail: railText(
           'Drawn, not described, because a rule somebody has seen broken is a rule they remember.',
           tiles.count ? `${tiles.count} misuses recorded.${tiles.count < 6 ? ` Six is the floor, because below that people invent their own. ${todo('at least six specific misuses')}` : ''}` : todo('at least six specific misuses, because people invent their own otherwise'),
@@ -1073,7 +1321,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       const X = gapPx ? Math.round(Number(gapPx[1])) : Math.round(H * (L.file ? 0.5 : 0.72));
       const align = /baseline|bottom|foot/i.test(String(cob?.alignment ?? '')) ? 'flex-end' : /top|cap/i.test(String(cob?.alignment ?? '')) ? 'flex-start' : 'center';
       return contentPage(ctx, {
-        id: 'cobranding', chapter: 'Logo', title: 'Co-branding', n, centre: true,
+        id: 'cobranding', chapter: 'Logo', title: 'Co-branding', n, fill: true,
         rail: railText(
           has(cob?.rule) ? esc(cob.rule) : todo('a co-branding rule (identity.logo.cobranding.rule): how the mark sits beside a partner logo, what aligns to what, and the gap between them'),
           has(cob?.alignment) ? `<strong>Alignment.</strong> ${esc(cob.alignment)}` : null,
@@ -1082,7 +1330,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
           `<span class="mono">The gap is drawn ${gapPx ? `at the recorded ${X}px` : `at ${L.file ? 0.5 : 0.72} of the mark height, the same X as the clear-space page`}; the rule in words binds.</span>`,
         ),
         canvas: `<div style="display:flex;align-items:${align};gap:0;border:1px dashed var(--accent);padding:${X}px;align-self:flex-start">
-          ${L.at(H, { maxW: 520 })}
+          ${L.at(H, { maxW: 520, alt: `${name}, in a partner lockup` })}
           <span class="cobranding-gap" data-gap="${X}" style="display:inline-flex;flex-direction:column;align-items:center;justify-content:flex-end;width:${X}px;height:${H}px;background:${r('control.bg-active')};flex:none"><span class="mono" style="color:var(--muted);transform:translateY(${X > 40 ? 0 : 28}px)">${gapPx ? `${X}px` : 'X'}</span></span>
           <span style="display:inline-flex;align-items:center;justify-content:center;width:${Math.round(H * 3)}px;height:${H}px;border:1px dashed var(--rule);color:var(--muted)" class="mono">[PARTNER LOGO${has(cob?.partnerMax) ? `, ${esc(cob.partnerMax)}` : ''}]</span>
         </div>
@@ -1100,20 +1348,20 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     chapter: 'logo', id: 'tagline-lockup', title: lockupForbidden ? 'Tagline' : 'Tagline lockup',
     ...(has(tagline) ? {} : absent('Tagline lockup', 'a tagline')),
     render: (n) => contentPage(ctx, {
-      id: 'tagline-lockup', chapter: 'Logo', title: lockupForbidden ? 'Tagline' : 'Tagline lockup', n, centre: true,
+      id: 'tagline-lockup', chapter: 'Logo', title: lockupForbidden ? 'Tagline' : 'Tagline lockup', n, fill: true,
       rail: railText(
         has(voice.tagline?.lockup) ? esc(voice.tagline.lockup) : lockupForbidden ? 'The tagline is never locked to the mark.' : todo('how the tagline locks up with the mark (voice.tagline.lockup)'),
         lockupForbidden ? '<strong>No lockup.</strong> The tagline stands alone in headline position, as shown. Nothing on this page may be reproduced with the mark attached to it.' : null,
         has(voice.tagline?.usage) ? `<strong>Where.</strong> ${esc(voice.tagline.usage)}` : null,
       ),
       canvas: lockupForbidden
-        ? `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:32px">
+        ? `<div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:32px">
         <span class="label">Headline position, alone</span>
         <p class="big" style="font-size:96px;max-width:14ch">${esc(tagline ?? '')}</p>
       </div>`
-        : `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:64px">
-        <div><span class="label">Large format</span><div style="display:flex;flex-direction:column;align-items:flex-start;gap:20px;margin-top:16px">${L.at(120, { maxW: 900 })}<span style="font-family:var(--display);font-size:34px;letter-spacing:-0.01em">${esc(tagline ?? '')}</span></div></div>
-        <div><span class="label">Small format</span><div style="display:flex;align-items:center;gap:32px;margin-top:16px">${L.at(64, { maxW: 420 })}<span style="font-family:var(--display);font-size:24px;letter-spacing:-0.01em;max-width:18ch;line-height:1.15">${esc(tagline ?? '')}</span></div></div>
+        : `<div style="flex:1;display:flex;flex-direction:column;justify-content:space-between;gap:64px">
+        <div><span class="label">Large format</span><div style="display:flex;flex-direction:column;align-items:flex-start;gap:20px;margin-top:16px">${L.at(120, { maxW: 900, alt: `${name} with the tagline beneath it, the large-format lockup` })}<span style="font-family:var(--display);font-size:34px;letter-spacing:-0.01em">${esc(tagline ?? '')}</span></div></div>
+        <div><span class="label">Small format</span><div style="display:flex;align-items:center;gap:32px;margin-top:16px">${L.at(64, { maxW: 420, alt: `${name} with the tagline beside it, the small-format lockup` })}<span style="font-family:var(--display);font-size:24px;letter-spacing:-0.01em;max-width:18ch;line-height:1.15">${esc(tagline ?? '')}</span></div></div>
       </div>`,
     }),
   });
@@ -1123,18 +1371,18 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     ...(favicon || has(logo.favicon) ? {} : absent('Favicon and app icon', 'a favicon file')),
     render: (n) => contentPage(ctx, {
       id: 'favicon', chapter: 'Logo', title: 'Favicon and app icon', n,
-      centre: true,
+      fill: true,
       rail: railText(
         favicon ? `${esc(logo.favicon)}. Shown at 16, 32, 64 and 180 pixels, which are the sizes a browser tab, a bookmark, a dock and a home screen actually use, and once large so the detail can be checked.` : todo(`the favicon artwork; ${esc(logo.favicon ?? 'no path recorded')} is recorded but not on disk`),
       ),
       canvas: `<div style="display:flex;align-items:flex-end;gap:64px">
         <div style="display:flex;flex-direction:column;gap:12px;align-items:center">
-          <span style="width:480px;height:480px;display:inline-flex;overflow:hidden;border-radius:${Math.round(480 * 0.22)}px;background:${favicon ? 'transparent' : 'var(--tint)'};border:1px solid var(--rule)" class="mark">${favicon ? favicon.markup : ''}</span>
+          <span style="width:480px;height:480px;display:inline-flex;overflow:hidden;border-radius:${Math.round(480 * 0.22)}px;background:${favicon ? 'transparent' : 'var(--tint)'};border:1px solid var(--rule)" class="mark"${favicon ? ` role="img" aria-label="${esc(`${name} app icon, drawn at 480 pixels so the detail can be checked`)}"` : ''}>${favicon ? favicon.markup : ''}</span>
           <span class="mono" style="color:var(--muted)">shown at 480px for detail</span>
         </div>
         <div style="display:flex;align-items:flex-end;gap:48px;padding-bottom:36px">
         ${[16, 32, 64, 180].map((px) => `<div style="display:flex;flex-direction:column;gap:10px;align-items:center">
-          <span style="width:${px}px;height:${px}px;display:inline-flex;overflow:hidden;border-radius:${Math.round(px * 0.22)}px;background:${favicon ? 'transparent' : 'var(--tint)'};border:1px solid var(--rule)" class="mark">${favicon ? favicon.markup : ''}</span>
+          <span style="width:${px}px;height:${px}px;display:inline-flex;overflow:hidden;border-radius:${Math.round(px * 0.22)}px;background:${favicon ? 'transparent' : 'var(--tint)'};border:1px solid var(--rule)" class="mark"${favicon ? ` role="img" aria-label="${esc(`${name} app icon at ${px} pixels`)}"` : ''}>${favicon ? favicon.markup : ''}</span>
           <span class="mono" style="color:var(--muted)">${px}px</span>
         </div>`).join('')}
         </div>
@@ -1192,22 +1440,25 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       const cell = (v) => (v ? esc(v) : dash);
       const unverified = print.swatches.filter((w) => !w.verified).map((w) => w.role);
       return contentPage(ctx, {
-        id: 'production', chapter: 'Colour', title: 'Colour off the screen', n, centre: true,
+        id: 'production', chapter: 'Colour', title: 'Colour off the screen', n, fill: true,
         rail: railText(
           'For the printer, the signwriter and the embroiderer. A screen value is a suggestion to them; these are the matches somebody has to have held next to a guide.',
           has(id.colour?.print?.profile) ? `<strong>Separation.</strong> ${esc(id.colour.print.profile)}` : todo('a separation profile (identity.colour.print.profile); ask the printer which one they run'),
           `<span class="mono">${esc(print.caveat)}</span>`,
           unverified.length ? `<strong>Unverified.</strong> ${unverified.map(esc).join(', ')}. Verified means a printed proof was held next to a guide, not that a number was typed in.` : null,
         ),
-        canvas: `<table style="font-size:15px"><thead><tr><th></th><th>Role</th><th>Hex</th><th>CMYK</th><th>Pantone C</th><th>Pantone U</th><th>RAL</th><th>Vinyl</th><th>Thread</th></tr></thead><tbody>
-          ${print.swatches.map((w) => `<tr>
+        canvas: `${table({
+          caption: 'Every brand colour with the matches a printer, a signwriter and an embroiderer work from',
+          style: 'font-size:15px',
+          head: '<th></th><th>Role</th><th>Hex</th><th>CMYK</th><th>Pantone C</th><th>Pantone U</th><th>RAL</th><th>Vinyl</th><th>Thread</th>',
+          body: print.swatches.map((w) => `<tr>
             <td style="width:44px"><span style="display:block;width:32px;height:32px;background:${esc(w.hex)};border:1px solid var(--rule);border-radius:var(--radius)"></span></td>
             <td class="mono">${esc(w.role)}</td><td class="mono">${esc(w.hex)}</td>
             <td class="mono">${esc(w.cmykString)}${w.computed ? ' <span style="color:var(--muted)">computed</span>' : ''}</td>
             <td class="mono">${w.pantoneCoated ? esc(pms(w.pantoneCoated)) : dash}</td><td class="mono">${w.pantoneUncoated ? esc(pms(w.pantoneUncoated)) : dash}</td>
             <td class="mono">${cell(w.ral)}</td><td class="mono">${cell(w.vinyl)}</td><td class="mono">${cell(w.thread)}</td>
-          </tr>`).join('')}
-        </tbody></table>
+          </tr>`).join(''),
+        })}
         ${print.swatches.filter((w) => w.note).map((w) => `<p style="font-size:15px;color:var(--muted)"><span class="mono">${esc(w.role)}</span> ${esc(w.note)}</p>`).join('')}
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:8px">
           <h2 style="font-size:26px">Chart colour</h2>
@@ -1220,7 +1471,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
   page({
     chapter: 'colour', id: 'ramps', title: 'Extended ramps',
     render: (n) => contentPage(ctx, {
-      id: 'ramps', chapter: 'Colour', title: 'Extended ramps', n, centre: true,
+      id: 'ramps', chapter: 'Colour', title: 'Extended ramps', n, fill: true,
       rail: railText(
         'Twelve steps per family. Steps 1 and 2 are backgrounds, 3 to 5 are fills, 6 to 8 are borders, 9 is the colour itself and 10 its hover, 11 and 12 carry text.',
         has(id.colour?.ratio) ? `<strong>Proportion.</strong> ${esc(id.colour.ratio)}` : null,
@@ -1243,7 +1494,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         ['Utility', ['success.solid', 'warning.solid', 'danger.solid', 'info.solid']],
       ];
       return contentPage(ctx, {
-        id: 'colour-usage', chapter: 'Colour', title: 'Colour usage', n, centre: true,
+        id: 'colour-usage', chapter: 'Colour', title: 'Colour usage', n, fill: true,
         rail: railText('By role, from the semantic tokens. Build with these names, never with a raw ramp step: a token can move when the palette moves, a hex cannot.'),
         canvas: `<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:32px">
           ${groups.map(([t, keys]) => `<div style="display:flex;flex-direction:column;gap:18px"><h2 style="font-size:30px">${t}</h2>
@@ -1265,7 +1516,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         : cross(text, 30, contrastRatio(text, bg) < 3 ? bestTextOn(bg).color : null));
       const cellH = Math.max(64, Math.floor(700 / (m.colours.length + 1)));
       return contentPage(ctx, {
-        id: 'pairings', chapter: 'Colour', title: 'Colour pairings', n, centre: true,
+        id: 'pairings', chapter: 'Colour', title: 'Colour pairings', n, fill: true,
         rail: railText(
           'Text colours as rows, backgrounds as columns. A tick means the pair clears WCAG 2.2 AA for normal text (4.5:1), measured when this deck was generated, not asserted.',
           m.neverText.length ? `<strong>${m.neverText.map(esc).join(' and ')} ${m.neverText.length > 1 ? 'are' : 'is'} not to be used for text under any circumstances.</strong>` : 'Every colour here can carry text on at least one background.',
@@ -1345,7 +1596,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
           lic ? `<strong>Licence.</strong> ${esc(lic.source ?? '')}${lic.permits ? `. ${esc(lic.permits)}` : ''}` : todo(`the licence for ${family}`),
           `<span class="mono">Fallback stack: ${esc(fallback)}</span>`,
         ),
-        canvas: `<div style="display:flex;flex-direction:column;gap:36px;justify-content:center;height:100%">
+        canvas: `<div style="display:flex;flex-direction:column;gap:36px;justify-content:space-between;height:100%">
           <p style="font-family:${stack};font-size:200px;line-height:1;letter-spacing:-0.03em;font-weight:${role === 'display' ? 700 : 400}">${esc(family)}</p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start">
             <p style="font-family:${stack};font-size:30px;line-height:1.3;word-break:break-all;font-weight:${role === 'display' ? 700 : 400}">AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz 1234567890</p>
@@ -1376,7 +1627,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
           `<strong>Do.</strong> Keep the main heading dominant, the subheading supportive and the body legible. Set columns in characters, not pixels.`,
           `<strong>Do not.</strong> Mix faces within one level, make two levels look alike, or carry hierarchy with colour alone.`,
         ),
-        canvas: `<div style="display:flex;flex-direction:column;gap:22px;justify-content:center;height:100%">
+        canvas: `<div style="display:flex;flex-direction:column;gap:22px;justify-content:space-between;height:100%">
           ${rows.map(([label, face, stack, px, weight, sample]) => `<div style="display:grid;grid-template-columns:180px minmax(0,1fr);gap:24px;align-items:baseline;border-bottom:1px solid var(--rule);padding-bottom:14px">
             <span class="mono" style="color:var(--muted)">${label}<br>${esc(face ?? '')} ${weight} / ${Math.round(px)}px</span>
             <p style="font-family:${stack};font-size:${Math.min(px, 64)}px;font-weight:${weight};line-height:1.15;letter-spacing:${px > 30 ? '-0.02em' : '0'};overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${has(sample) ? esc(sample) : todo(`copy for the ${label.toLowerCase()} sample`)}</p>
@@ -1395,7 +1646,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       const SAMPLE_CAP = 64;
       const capped = scale.steps.filter((s) => s.maxPx > SAMPLE_CAP);
       return contentPage(ctx, {
-        id: 'type-scale', chapter: 'Typography', title: 'Type scale', n, centre: true,
+        id: 'type-scale', chapter: 'Typography', title: 'Type scale', n, fill: true,
         rail: railText(
           `A ${esc(scale.ratioName ? scale.ratioName.replace(/-/g, ' ') : scale.ratio)} scale from ${scale.basePx}px. Each step is fluid between the mobile and desktop sizes; the print size is the desktop size in points. Each step is set in its own face${capped.length ? '' : ' at its desktop size'}.`,
           capped.length ? `<span class="mono">The sample is shown at its desktop size up to ${SAMPLE_CAP}px. ${capped.map((s) => esc(s.name)).join(' and ')} ${capped.length > 1 ? 'are' : 'is'} larger than that, so ${capped.length > 1 ? 'those samples are' : 'that sample is'} drawn at ${SAMPLE_CAP}px to fit the row. The real size is in the Desktop column.</span>` : null,
@@ -1404,12 +1655,15 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         ),
         // Steps above the body size are display steps and are set in the
         // display face; the rest in the body face, as the hierarchy page does.
-        canvas: `<table style="font-size:15px"><thead><tr><th>Step</th><th style="width:40%">${capped.length ? `Set in its own face, up to ${SAMPLE_CAP}px` : 'Set at its desktop size'}</th><th>Mobile</th><th>Desktop</th><th>Print</th><th>Line height</th><th>Tracking</th><th>Use</th></tr></thead><tbody>
-        ${scale.steps.slice().reverse().map((s) => {
+        canvas: table({
+          caption: 'Every step of the type scale: its sample, its mobile, desktop and print size, its line height, its tracking and what it is for',
+          style: 'font-size:15px',
+          head: `<th>Step</th><th style="width:40%">${capped.length ? `Set in its own face, up to ${SAMPLE_CAP}px` : 'Set at its desktop size'}</th><th>Mobile</th><th>Desktop</th><th>Print</th><th>Line height</th><th>Tracking</th><th>Use</th>`,
+          body: scale.steps.slice().reverse().map((s) => {
     const display = s.maxPx > (scale.byName.base?.maxPx ?? 17);
     return `<tr><td class="mono">${esc(s.name)}</td><td data-sample="${s.name}" data-drawn="${Math.min(s.maxPx, SAMPLE_CAP)}" style="font-family:${display ? tokens.fonts.display : tokens.fonts.body};font-weight:${display ? 700 : 400};font-size:${Math.min(s.maxPx, SAMPLE_CAP)}px;line-height:1.1;white-space:nowrap;padding:6px 12px 6px 0">${esc(name)}</td><td class="mono">${s.px}px</td><td class="mono">${s.maxPx}px</td><td class="mono">${(s.maxPx * 0.75).toFixed(1)}pt</td><td class="mono">${s.lineHeight}</td><td class="mono">${esc(s.letterSpacing)}</td><td style="font-size:14px">${esc(s.use)}</td></tr>`;
-  }).join('')}
-      </tbody></table>`,
+  }).join(''),
+        }),
       });
     },
   });
@@ -1429,7 +1683,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         tile(`<p style="font-family:var(--display);font-size:30px;line-height:1.2">${(voice.examples ?? []).map((e) => e.good).filter(Boolean)[1] ? esc((voice.examples ?? []).map((e) => e.good).filter(Boolean)[1]) : todo('a second voice example')}</p>`),
       ];
       return contentPage(ctx, {
-        id: 'type-examples', chapter: 'Typography', title: 'Typography examples of use', n, centre: true,
+        id: 'type-examples', chapter: 'Typography', title: 'Typography examples of use', n, fill: true,
         rail: railText('Six compositions from real brand copy: a headline, a section intro, a call to action, boilerplate, a data block and a quote. Conceptual, not final artwork.'),
         canvas: `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">${tiles.join('')}</div>`,
       });
@@ -1447,7 +1701,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         .filter((a) => a && (a.surface || a.name))
         .map((a) => ({ shot: `[${String(a.name ?? a.surface).toUpperCase()}: the hero image for this surface]`, why: a.purpose ?? null, surface: a.name ?? a.surface }));
       return contentPage(ctx, {
-        id: 'imagery', chapter: 'Brand assets', title: 'Imagery', n, centre: true,
+        id: 'imagery', chapter: 'Brand assets', title: 'Imagery', n, fill: true,
         rail: railText(
           has(img.direction) ? esc(img.direction) : todo('an imagery direction'),
           has(img.treatment) ? `<strong>Treatment.</strong> ${esc(img.treatment)}` : null,
@@ -1455,7 +1709,12 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         ),
         canvas: `<h2 style="font-size:36px">Shot list</h2>
         <p style="font-size:17px;color:var(--muted);max-width:60ch">${img.shotList?.length ? 'Recorded against the surfaces that need them.' : 'Derived from the applications, because every surface that carries an image needs one that exists. Bracketed because nothing has been shot yet.'}</p>
-        ${shots.length ? `<table style="font-size:18px"><thead><tr><th>Surface</th><th>Shot</th><th>Why</th></tr></thead><tbody>${shots.slice(0, 8).map((sh) => `<tr><td style="padding:14px 16px 14px 0"><strong>${esc(sh.surface ?? '')}</strong></td><td style="padding:14px 16px 14px 0">${esc(sh.shot)}</td><td style="padding:14px 0;color:var(--muted)">${sh.why ? esc(sh.why) : ''}</td></tr>`).join('')}</tbody></table>` : `<p>${todo('a shot list')}</p>`}`,
+        ${shots.length ? table({
+          caption: 'The shot list: every surface that carries a photograph, the shot it needs and why it needs it',
+          style: 'font-size:18px',
+          head: '<th>Surface</th><th>Shot</th><th>Why</th>',
+          body: shots.slice(0, 8).map((sh) => `<tr><td style="padding:14px 16px 14px 0"><strong>${esc(sh.surface ?? '')}</strong></td><td style="padding:14px 16px 14px 0">${esc(sh.shot)}</td><td style="padding:14px 0;color:var(--muted)">${sh.why ? esc(sh.why) : ''}</td></tr>`).join(''),
+        }) : `<p>${todo('a shot list')}</p>`}`,
       });
     },
   });
@@ -1467,7 +1726,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     render: (n) => {
       // Fewer rules get bigger tiles; a long list steps down so it stays on the page.
       const dense = Math.max((img.dos ?? []).length, (img.donts ?? []).length) > 4;
-      const tiles = (items, ok, colour) => `<div style="display:flex;flex-direction:column;gap:${dense ? 10 : 16}px;margin-top:${dense ? 16 : 40}px">${items.map((d) => `<div class="card photo-tile" data-verdict="${ok ? 'yes' : 'no'}" style="background:transparent;border-color:${colour};color:${colour};flex-direction:row;align-items:flex-start;gap:16px;padding:${dense ? '16px 20px' : '28px'};min-height:${dense ? 0 : 120}px">${ok ? tick(colour, dense ? 22 : 28) : cross(colour, dense ? 22 : 28)}<p style="font-size:${dense ? 18 : 22}px;line-height:1.35;color:${colour}">${esc(d)}</p></div>`).join('')}</div>`;
+      const tiles = (items, ok, colour) => `<div style="display:flex;flex-direction:column;gap:${dense ? 10 : 16}px;margin-top:${dense ? 16 : 40}px;flex:1">${items.map((d) => `<div class="card photo-tile" data-verdict="${ok ? 'yes' : 'no'}" style="background:transparent;border-color:${colour};color:${colour};flex:1;flex-direction:row;align-items:center;gap:16px;padding:${dense ? '16px 20px' : '28px'};min-height:${dense ? 0 : 120}px">${ok ? tick(colour, dense ? 22 : 28) : cross(colour, dense ? 22 : 28)}<p style="font-size:${dense ? 18 : 22}px;line-height:1.35;color:${colour}">${esc(d)}</p></div>`).join('')}</div>`;
       return `<section class="page" id="photography">
   <div style="display:grid;grid-template-columns:560px 1fr 1fr;width:100%;height:100%">
     <div class="rail"><h1>Photography</h1><p>What a photograph from this brand does, and what it never does. Anything not on the left is a question for whoever commissions the shoot.</p><p><span class="mono">Text tiles until the library has photographs to show.</span></p></div>
@@ -1491,7 +1750,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       render: (n) => {
         const tile = (text, ok) => `<div class="card illustration-tile" data-verdict="${ok ? 'do' : 'dont'}" style="flex-direction:row;align-items:flex-start;gap:14px;padding:22px 24px;min-height:96px">${ok ? tick(tokens.pass, 24) : cross(tokens.fail, 24)}<p style="font-size:18px;line-height:1.4;color:var(--ink)">${esc(text)}</p></div>`;
         return contentPage(ctx, {
-          id: 'illustration', chapter: 'Brand assets', title: 'Illustration', n, centre: true,
+          id: 'illustration', chapter: 'Brand assets', title: 'Illustration', n, fill: true,
           rail: railText(has(il.style) ? esc(il.style) : todo('an illustration style'), 'Themes, and the rules, laid out as tiles so a stranger can hold a drawing against them.'),
           canvas: `${has(il.themes) ? `<div><h2 style="font-size:30px">Themes</h2><div style="display:grid;grid-template-columns:repeat(${Math.min(4, il.themes.length)},minmax(0,1fr));gap:16px;margin-top:16px">${il.themes.map((t) => `<div class="card illustration-theme" style="background:var(--tint);border-color:transparent;min-height:120px;justify-content:center;align-items:center;text-align:center"><p style="font-family:var(--display);font-size:24px;color:var(--ink);font-weight:700">${esc(t)}</p></div>`).join('')}</div></div>` : `<p>${todo('illustration themes (identity.illustration.themes)')}</p>`}
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
@@ -1509,7 +1768,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       const big = 432;
       const cell = big / p.grid;
       return contentPage(ctx, {
-        id: 'icons', chapter: 'Brand assets', title: 'Icons', n, centre: true,
+        id: 'icons', chapter: 'Brand assets', title: 'Icons', n, fill: true,
         rail: railText(
           has(ico.style) ? esc(ico.style) : todo('an icon style'),
           `Drawn on a ${p.grid}px grid at a ${p.stroke}px stroke with ${p.cap} terminals and ${p.join} corners. Icons are drawn, never typed: emoji render differently on every platform.`,
@@ -1547,7 +1806,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
           `Cards and controls take --radius-${esc(mid.name)} (${mid.px}px). A box nested inside another takes the outer radius minus the gap between them, or the inner corner reads as too round.`,
           `<span class="mono">Tokens: ${radii.map((x) => `${esc(x.name)} ${x.px}`).join(', ')}, full 9999.</span>`,
         ),
-        canvas: `<div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;align-items:center">
+        canvas: `<div style="flex:1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;align-items:end">
           ${trio.map(([label, x], i) => `<div style="display:flex;flex-direction:column;gap:16px;align-items:center">
             <div style="width:100%;aspect-ratio:1;background:${i === 1 ? 'var(--primary)' : 'var(--tint)'};border-radius:${Math.min(x.px * 4, 200)}px;border:${i === 1 ? 'none' : '1px solid var(--rule)'}"></div>
             <h2 style="font-size:26px">${label}</h2><span class="mono" style="color:var(--muted)">--radius-${esc(x.name)} ${x.px}px, shown at 4x</span>
@@ -1562,7 +1821,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     chapter: 'assets', id: 'device', title: 'Supporting graphic device',
     ...(move ? {} : absent('Supporting graphic device', 'a signature move')),
     render: (n) => contentPage(ctx, {
-      id: 'device', chapter: 'Brand assets', title: 'Supporting graphic device', n, centre: true,
+      id: 'device', chapter: 'Brand assets', title: 'Supporting graphic device', n, fill: true,
       rail: railText(
         `<strong>${esc(move?.name ?? '')}.</strong> ${has(move?.howItWorks) ? esc(move.howItWorks) : ''}`,
         has(move?.brokenConvention) ? `<strong>What it breaks.</strong> ${esc(move.brokenConvention)}` : null,
@@ -1587,7 +1846,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       const bps = system.layout.breakpoints;
       const widest = Math.max(...bps.map((b) => b.px), system.layout.contentMaxPx);
       return contentPage(ctx, {
-        id: 'space-layout', chapter: 'System', title: 'Spacing and layout', n, centre: true,
+        id: 'space-layout', chapter: 'System', title: 'Spacing and layout', n, fill: true,
         rail: railText(
           `A ${system.meta.spaceBase}px base. Tokens are named by their pixel value, so --space-16 is 16px and needs no arithmetic.`,
           esc(system.layout.note),
@@ -1608,7 +1867,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     render: (n) => {
       const longest = Math.max(...system.motion.durations.map((d) => d.ms), 1);
       return contentPage(ctx, {
-        id: 'motion', chapter: 'System', title: 'Motion', n, centre: true,
+        id: 'motion', chapter: 'System', title: 'Motion', n, fill: true,
         rail: railText(
           has(id.motionPrinciple) ? `<strong>${esc(id.motionPrinciple)}</strong>` : `<strong>${esc(system.meta.motion)}.</strong>`,
           esc(system.meta.motionNote),
@@ -1642,13 +1901,18 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       })).join('');
       const problems = system.audit.findings.filter((f) => f.level !== 'info');
       return contentPage(ctx, {
-        id: 'accessibility', chapter: 'System', title: 'Accessibility', n, centre: true,
+        id: 'accessibility', chapter: 'System', title: 'Accessibility', n, fill: true,
         rail: railText(
           system.audit.ok ? 'Every pairing here was measured when this deck was generated, and every one passed. Nothing is a claim; the numbers are the evidence.' : '<strong>This system does not currently pass its own audit.</strong> The failures are marked FAIL and listed below. Nothing has been hidden or rounded in its favour.',
           `Focus is visible on every interactive element: a ${system.focus.widthPx}px outline at ${system.focus.offsetPx}px offset. Targets are 24px at least, 44px where there is room. Nothing is carried by colour alone. WCAG 2.2 1.4.1, 1.4.3, 1.4.11, 2.4.7, 2.5.8.`,
           problems.length ? `<strong>Known problems.</strong> ${problems.map((f) => esc(f.message)).join(' ')}` : null,
         ),
-        canvas: `<table style="font-size:16px"><thead><tr><th>Pairing</th><th>Theme</th><th>Values</th><th>Measured</th><th>APCA</th><th>Required</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+        canvas: `${table({
+          caption: 'Every measured colour pairing in both themes, its contrast, the contrast it is required to reach and whether it passes',
+          style: 'font-size:16px',
+          head: '<th>Pairing</th><th>Theme</th><th>Values</th><th>Measured</th><th>APCA</th><th>Required</th><th>Verdict</th>',
+          body: rows,
+        })}
         <div style="display:flex;gap:40px;align-items:center;margin-top:16px"><span class="label">Colour vision</span>${['protanopia', 'deuteranopia', 'tritanopia'].map((t) => `<div style="display:flex;flex-direction:column;gap:6px"><span class="mono" style="color:var(--muted)">${t}</span><div style="display:flex;width:220px;height:40px">${['success', 'warning', 'danger'].map((k) => `<div style="flex:1;background:${simulateCvd(r(`${k}.solid`), t)}"></div>`).join('')}</div></div>`).join('')}<span style="font-size:15px;color:var(--muted);max-width:30ch">Status is never carried by colour alone: every state gets an icon and a word.</span></div>`,
       });
     },
@@ -1656,7 +1920,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
   page({
     chapter: 'system', id: 'implementation', title: 'Implementation',
     render: (n) => contentPage(ctx, {
-      id: 'implementation', chapter: 'System', title: 'Implementation', n, centre: true,
+      id: 'implementation', chapter: 'System', title: 'Implementation', n, fill: true,
       rail: railText(
         'Everything in this deck is generated from brand/brand.json. The token files are generated from the same source, so the deck and the code cannot disagree.',
         '<strong>The one rule.</strong> Build with the semantic tokens, never with a raw ramp step. If a component needs something the semantic layer does not have, add it to the semantic layer.',
@@ -1684,7 +1948,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     chapter: 'in-use', id: 'applications', title: 'Applications',
     ...(apps.length ? {} : absent('Applications', 'the applications this system will be tested on')),
     render: (n) => contentPage(ctx, {
-      id: 'applications', chapter: 'Brand in use', title: 'Applications', n, centre: true,
+      id: 'applications', chapter: 'Brand in use', title: 'Applications', n, fill: true,
       rail: railText(
         'Every surface the brand has to work on, what each is for, and the notes that decide how it is drawn. The pages that follow show the ones drawn so far.',
         artboards.length
@@ -1697,7 +1961,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     const drawn = a.file && artboards.some((b) => b.file === a.file);
     return `<div class="card application-tile" style="padding:28px;gap:12px;min-height:200px">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><h3 style="font-size:24px">${esc(a.name ?? a.surface)}</h3><span class="pill" style="flex:none;${drawn ? 'background:var(--primary);color:var(--on-primary);border-color:var(--primary)' : ''}">${drawn ? 'drawn' : 'not yet drawn'}</span></div>
-          <span class="mono" style="color:var(--muted)">${[a.surface, a.frame, a.file].filter(has).map(esc).join(' / ')}</span>
+          <span class="mono" style="color:var(--muted)">${[a.surface, frameLabel(a.frame), a.file].filter(has).map(esc).join(' / ')}</span>
           ${has(a.purpose) ? `<p style="font-size:16px;color:var(--ink)">${esc(a.purpose)}</p>` : ''}
           ${has(a.notes) ? `<p style="font-size:15px;color:var(--muted)">${esc(a.notes)}</p>` : ''}
         </div>`;
@@ -1715,7 +1979,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     page({
       chapter: 'in-use', id: pid, title: a.title,
       render: (n) => contentPage(ctx, {
-        id: pid, chapter: 'Brand in use', title: a.title, n, centre: true,
+        id: pid, chapter: 'Brand in use', title: a.title, n, fill: true,
         rail: railText(
           // Never claim the brand is on the photograph when it is not: the
           // artboard records whether anything was composited onto it.
@@ -1772,7 +2036,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       ].filter(Boolean);
       const rules = own?.length ? own : generic;
       return contentPage(ctx, {
-        id: 'anti-patterns', chapter: 'Rules and decisions', title: 'What not to do', n, centre: true,
+        id: 'anti-patterns', chapter: 'Rules and decisions', title: 'What not to do', n, fill: true,
         rail: railText(
           'The specific habits that would make this brand look like everyone else. Just do not do these things.',
           own?.length ? null : '<span class="mono">These are the house rules. Record this brand\'s own under governance.antiPatterns and they replace them.</span>',
@@ -1790,16 +2054,24 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       const open = (gov.openQuestions ?? []).filter((q) => q.status === 'open');
       const counts = Object.keys(PROVENANCE).map((k) => [k, (brand.evidence ?? []).filter((e) => e.provenance === k).length]).filter(([, c]) => c > 0);
       return contentPage(ctx, {
-        id: 'decisions', chapter: 'Rules and decisions', title: 'Decisions and open questions', n, centre: true,
+        id: 'decisions', chapter: 'Rules and decisions', title: 'Decisions and open questions', n, fill: true,
         rail: railText(
           'What was decided, why, and what nobody has answered yet. A change nobody wrote down becomes an inconsistency the next person has to guess about.',
           `<strong>Where this came from.</strong> ${counts.length ? counts.map(([k, c]) => `${esc(PROVENANCE[k].label)} ${c}`).join(', ') : 'no evidence recorded'}. Every statement in this deck is traceable to one of those; anything assumed is a working assumption, not a finding.`,
           has(gov.trademark?.notice) ? `<strong>Trademark.</strong> ${esc(gov.trademark.notice)}` : null,
         ),
         canvas: `<h2>Decision log</h2>
-        ${has(gov.decisions) ? `<table><thead><tr><th>Date</th><th>Decision</th><th>Because</th></tr></thead><tbody>${gov.decisions.slice(0, 6).map((d) => `<tr><td class="mono" style="white-space:nowrap">${esc(d.date)}</td><td style="font-size:15px">${esc(d.decision)}</td><td style="font-size:14px;color:var(--muted)">${esc(d.rationale)}</td></tr>`).join('')}</tbody></table>` : `<p>${todo('a decision log')}</p>`}
+        ${has(gov.decisions) ? table({
+          caption: 'The decision log: what was decided, when, and the reason recorded with it',
+          head: '<th>Date</th><th>Decision</th><th>Because</th>',
+          body: gov.decisions.slice(0, 6).map((d) => `<tr><td class="mono" style="white-space:nowrap">${esc(d.date)}</td><td style="font-size:15px">${esc(d.decision)}</td><td style="font-size:14px;color:var(--muted)">${esc(d.rationale)}</td></tr>`).join(''),
+        }) : `<p>${todo('a decision log')}</p>`}
         <h2>Open questions</h2>
-        ${open.length ? `<table><thead><tr><th>Question</th><th>Assumed meanwhile</th><th>Who can answer</th></tr></thead><tbody>${open.slice(0, 5).map((q) => `<tr><td style="font-size:15px">${esc(q.question)}</td><td style="font-size:14px">${esc(q.assumedMeanwhile ?? 'nothing')}</td><td style="font-size:14px;color:var(--muted)">${esc(q.whoCanAnswer ?? 'unassigned')}</td></tr>`).join('')}</tbody></table>` : '<p style="color:var(--muted)">None open.</p>'}`,
+        ${open.length ? table({
+          caption: 'The open questions, what is assumed until each is answered, and who can answer it',
+          head: '<th>Question</th><th>Assumed meanwhile</th><th>Who can answer</th>',
+          body: open.slice(0, 5).map((q) => `<tr><td style="font-size:15px">${esc(q.question)}</td><td style="font-size:14px">${esc(q.assumedMeanwhile ?? 'nothing')}</td><td style="font-size:14px;color:var(--muted)">${esc(q.whoCanAnswer ?? 'unassigned')}</td></tr>`).join(''),
+        }) : '<p style="color:var(--muted)">None open.</p>'}`,
       });
     },
   });
@@ -1893,7 +2165,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [] }) 
 </section>`;
 
   const intro = `<section class="page" id="intro" style="background:var(--tint);color:var(--ink)">
-  <div class="full" style="justify-content:center">
+  <div class="full" style="justify-content:flex-end;padding-bottom:132px">
     <h1 class="big" style="font-size:64px;max-width:22ch;font-weight:400;line-height:1.15">This document gives the ${esc(name)} team, and anyone working with it, the guidance to use the brand correctly and consistently across everything it produces.</h1>
     <p style="font-size:22px;margin-top:48px;max-width:50ch;color:var(--muted)">It is generated from brand.json, so every value here is the value the code is built from. If something is wrong, fix the source and regenerate. It is a living document: version ${esc(ctx.version)}.</p>
   </div>
@@ -1915,10 +2187,37 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [] }) 
     }
     tocItems.push(`<div class="toc-chapter" data-chapter="${ch.id}">${entries.join('')}</div>`);
   }
+  // The contents is three columns of a fixed height, and a chapter block never
+  // breaks across one, so what decides whether it fits is not the number of
+  // lines but how the blocks pack. A brand that records enough to earn extra
+  // pages used to push the last chapter under the footer; the type steps down
+  // instead.
+  const tocBlockLines = tocItems.map((block) => (block.match(/<a /g) ?? []).length - 1);
+  // The room between the heading and the bottom margin of the contents page.
+  const TOC_BUDGET = PAGE_H - 96 - 76 - 56 - 96;
+  const tocSettings = [
+    ['', 16, 21, 4, 22],
+    ['--toc-entry:14px;--toc-chapter:18px;--toc-pad:3px;--toc-gap:16px', 14, 18, 3, 16],
+    ['--toc-entry:12.5px;--toc-chapter:16px;--toc-pad:2px;--toc-gap:12px', 12.5, 16, 2, 12],
+  ];
+  const packs = (heights, budget) => {
+    let column = 0;
+    let used = 1;
+    for (const h of heights) {
+      if (column + h > budget) { used += 1; column = 0; }
+      if (h > budget) return false;
+      column += h;
+    }
+    return used <= 3;
+  };
+  const tocScale = (tocSettings.find(([, entry, chapter, pad, gap]) => packs(
+    tocBlockLines.map((lines) => chapter * 1.5 + 6 + lines * (entry * 1.5 + pad * 2) + gap),
+    TOC_BUDGET,
+  )) ?? tocSettings.at(-1))[0];
   const contents = `<section class="page" id="contents" style="background:var(--tint-2);color:var(--ink)">
   <div class="full" style="gap:56px">
     <h1 style="font-size:72px">Contents</h1>
-    <nav class="toc" aria-label="Contents">${tocItems.join('')}</nav>
+    <nav class="toc" aria-label="Contents"${tocScale ? ` style="${tocScale}"` : ''}>${tocItems.join('')}</nav>
   </div>
   ${cornerMark(ctx)}
   <div class="footer"><span></span><span>${esc(name)} brand guidelines / v${esc(ctx.version)}</span><span class="folio">3</span></div>
@@ -1978,4 +2277,4 @@ ${rendered.map((p) => `<div class="slide">\n${p}\n</div>`).join('\n')}
   };
 }
 
-export default { renderBrandDeck, pairingMatrix, PAGE_W, PAGE_H, PLACEHOLDER };
+export default { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PAGE_W, PAGE_H, PLACEHOLDER };

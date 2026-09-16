@@ -23,6 +23,8 @@ import { contrastRatio, apcaContrast, bestTextOn, simulateCvd } from './color.mj
 import { googleFontsUrl, parseRatio } from './artboards.mjs';
 import { PROVENANCE } from './brandfile.mjs';
 
+import { titleise, frameLabel } from './branddeck.mjs';
+
 export { renderBrandDeck, pairingMatrix, PLACEHOLDER as DECK_PLACEHOLDER } from './branddeck.mjs';
 
 const esc = (s) =>
@@ -684,7 +686,7 @@ ${Object.entries(system.palettes).map(([f, pal]) => rampBlock(system, f, pal, 'd
     ${has(Object.keys(voice.mechanics ?? {})) ? `<div class="stack" style="gap:8px"><span class="eyebrow">Mechanics</span>
       <p class="lede" style="font-size:14px">The small decisions, settled once, so nobody has to have the argument again.</p>
       <table><thead><tr><th>Question</th><th>Our answer</th></tr></thead><tbody>
-        ${Object.entries(voice.mechanics).map(([k, v]) => `<tr><td style="white-space:nowrap">${esc(k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase()))}</td><td>${esc(v)}</td></tr>`).join('')}
+        ${Object.entries(voice.mechanics).map(([k, v]) => `<tr><td style="white-space:nowrap">${esc(titleise(k))}</td><td>${esc(v)}</td></tr>`).join('')}
       </tbody></table></div>` : ''}
     ${has(voice.vocabulary?.hardThings) ? `<div class="stack" style="gap:8px"><span class="eyebrow">How we say hard things</span>
       <p class="lede" style="font-size:14px">The moments where tone is decided under pressure, written down in advance so it is not.</p>
@@ -783,7 +785,7 @@ ${Object.entries(system.palettes).map(([f, pal]) => rampBlock(system, f, pal, 'd
         <h3>${esc(a.name ?? a.surface ?? 'Application')}</h3>
         ${a.purpose ? `<p>${esc(a.purpose)}</p>` : ''}
         ${a.notes ? `<p>${esc(a.notes)}</p>` : ''}
-        ${a.frame ? `<span class="mono">${esc(a.frame)}</span>` : ''}
+        ${has(a.frame) ? `<span class="mono">${esc(frameLabel(a.frame))}</span>` : ''}
         ${a.file ? `<span class="mono">${esc(a.file)}</span>` : ''}
       </div>`).join('')}
     </div>` : todo('the applications this system has actually been tested on')}

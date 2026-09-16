@@ -805,12 +805,9 @@ Which means the enforcement travels with the brand rather than with the person w
 
 It will. Extending a system is normal; drifting is not. The difference is a record.
 
-```
-1. Add the decision and the reason to governance.decisions in brand.json.
-2. Bump meta.version.
-3. Regenerate: brandi system && brandi tokens && brandi guardian.
-4. Commit the regenerated files in the same commit as the brand file change.
-```
+The five-step procedure, including the commands to rerun, lives in the `brand-guardian` skill under
+"When something should change". It is written down once, because the copy that used to sit here named
+a different set of commands from the one the guardian named, and only one of them can be right.
 
 A change nobody wrote down becomes an inconsistency the next person has to guess about. A change
 with a dated reason is a system with a history, and it is the thing that lets somebody in two years

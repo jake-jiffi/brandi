@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { renderBrandBook, pdfChromeArgs } from '../scripts/brandbook.mjs';
+import { frameLabel } from '../scripts/branddeck.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 import { buildSystem } from '../scripts/system.mjs';
 import { emptyBrand, systemInputFromBrand } from '../scripts/brandfile.mjs';
@@ -373,5 +374,36 @@ describe('R3-N-06: the print book says what the deck says about what not to do',
     const w = renderBrandBook({ brand: waived, system: buildSystem(systemInputFromBrand(waived)) });
     assert.match(w, /Inter, Roboto, Arial, Poppins are banned outright/);
     assert.equal(/Montserrat are banned/.test(w), false);
+  });
+});
+
+describe('R5-05: an application frame reads as a size in both shapes', () => {
+  // `applications[].frame` is free-form. A person writes "1440x1600"; anything
+  // generating JSON writes [1440, 1600], and the book printed that list
+  // straight, as "1440,1600".
+  const withFrames = (frames) => {
+    const b = JSON.parse(JSON.stringify(brand));
+    b.applications = frames.map((frame, i) => ({ name: `Surface ${i + 1}`, surface: 'web', frame, file: `S${i + 1}.dc.html` }));
+    return renderBrandBook({ brand: b, system });
+  };
+
+  test('a list frame reads the same as the string a person would have typed', () => {
+    const asList = withFrames([[1440, 1600]]);
+    const asString = withFrames(['1440x1600']);
+    assert.match(asList, /<span class="mono">1440x1600<\/span>/);
+    assert.equal(/1440,1600/.test(asList), false, 'the list is not printed as a comma pair');
+    assert.match(asString, /<span class="mono">1440x1600<\/span>/);
+  });
+
+  test('a frame that is not a pair of sane numbers is shown as it stands, not tidied', () => {
+    assert.equal(frameLabel([1440]), '1440');
+    assert.equal(frameLabel(['a', 'b']), 'a,b');
+    assert.equal(frameLabel([1440, 1600, 900]), '1440,1600,900');
+    assert.equal(frameLabel([9, 9]), '9,9', 'below the ten pixel floor');
+    assert.equal(frameLabel(null), '');
+    // And the book says nothing at all when there is no frame.
+    const none = JSON.parse(JSON.stringify(brand));
+    none.applications = [{ name: 'Surface', surface: 'web', file: 'S.dc.html' }];
+    assert.equal(/<span class="mono">undefined<\/span>/.test(renderBrandBook({ brand: none, system })), false);
   });
 });

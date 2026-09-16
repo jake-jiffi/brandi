@@ -518,6 +518,51 @@ describe('the references agree with the code they describe', () => {
     assert.equal(/hard fail/.test(doc), false);
     assert.equal(doc.includes('fill="#000000"'), false, 'concepts are drawn in #111111, as the forge tells every agent');
   });
+
+  // 04 quoted three of the five traits `frontend-design` lists, closed with a
+  // sentence that skill does not contain, and then offered as "two more" the
+  // two items it had dropped. A reference that misquotes its source is worse
+  // than one that cites nothing, because it reads as checked.
+  test('04 quotes the frontend-design trait list at its real length', () => {
+    const doc = references['04-anti-slop.md'];
+    assert.match(doc, /`frontend-design` skill names five/);
+    assert.equal(/names three/.test(doc), false, '04 still shrinks the list it quotes');
+    assert.match(doc, /^> All traits are legitimate for some briefs, but they are defaults rather than choices/m);
+    assert.equal(/All three are legitimate/.test(doc), false, 'that sentence is not in the source');
+    // The quoted list runs 1 to 5, and Brandi's own additions come after it.
+    for (const n of [1, 2, 3, 4, 5]) {
+      assert.match(doc, new RegExp(`^> ${n}\\. `, 'm'), `the quotation is missing trait ${n}`);
+    }
+    assert.match(doc, /^6\. \*\*The violet SaaS look/m);
+    assert.match(doc, /^7\. \*\*The pastel humanist look/m);
+    assert.equal(/^4\. \*\*The violet SaaS look/m.test(doc), false, 'Brandi’s additions still overwrite two of the five');
+  });
+
+  // Settled by the foundry's own site and by Fonts In Use: Anybody is Etcetera
+  // Type Company (Ty Finck), released 2018 and opened up through Google Fonts.
+  // Velvetyne publishes plenty that this reference names elsewhere, but not it.
+  test('03 credits Anybody to the foundry that published it', () => {
+    const m = /\*\*Anybody\*\*\s*\n?\s*\(([^)]+)\)/.exec(references['03-design-schools.md']);
+    assert.ok(m, '03 no longer credits Anybody at all');
+    assert.match(m[1], /Etcetera Type Company/);
+    assert.equal(/Velvetyne/.test(m[1]), false, 'Anybody is not a Velvetyne release');
+  });
+
+  // Two regenerate recipes, naming different commands, is a coin toss for
+  // whoever reads one of them. One copy, and the other points at it.
+  test('the regenerate recipe is written once, and the reference points at it', () => {
+    const guardian = skillFiles['brand-guardian'];
+    const impl = references['10-implementation.md'];
+    const m = /Regenerate: `([^`]+)`/.exec(guardian);
+    assert.ok(m, 'the guardian skill no longer states the regenerate line');
+    assert.deepEqual(
+      m[1].split('&&').map((s) => s.trim()),
+      ['brandi system', 'brandi tokens', 'brandi book --pdf', 'brandi guardian'],
+      'the one recipe has to be the superset of the two that disagreed',
+    );
+    assert.equal(/Regenerate: brandi/.test(impl), false, '10 carries a second regenerate line again');
+    assert.match(impl, /brand-guardian` skill under\s+"When something should change"/, '10 does not say where the procedure lives');
+  });
 });
 
 describe('house style', () => {
@@ -584,8 +629,8 @@ describe('the README states numbers that are true', () => {
   // `test(` call site, so adding one trips this and forces whoever added it to
   // re-run the suite and refresh all three numbers. A test added inside an
   // existing loop is the one case that slips through.
-  const SUITE_TESTS = 1806;
-  const STATIC_TEST_CALLS = 1512;
+  const SUITE_TESTS = 1828;
+  const STATIC_TEST_CALLS = 1534;
   let readme;
   // The worked example the README counts pages for: the deck `brandi book`
   // builds from tests/fixtures/muddy-paws.json. It is built here rather than

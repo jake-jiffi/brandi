@@ -88,11 +88,18 @@ everything equally gets ignored, and then nothing is checked at all.
 Sometimes the finding is right and the brand is wrong. Extending a system is normal; drifting is not,
 and the only difference is the record.
 
-To extend it deliberately:
+Extend it deliberately, in five steps. This is the only copy of them, and the reference material
+points here rather than repeating it, because two copies once disagreed about which to rerun:
 
 1. Add the value to `brand/brand.json`.
 2. Add a decision to `governance.decisions` with the reason, and what was rejected.
 3. Bump `meta.version`.
-4. Regenerate: `brandi tokens && brandi book --pdf && brandi guardian`.
+4. Regenerate: `brandi system && brandi tokens && brandi book --pdf && brandi guardian`.
+5. Commit the regenerated files in the same commit as the brand file change.
+
+Every step of the regenerate line earns its place: `system` re-resolves the design system from the
+changed brand file, `tokens` rewrites what the code imports, `book --pdf` rebuilds the document
+people are shown, and `guardian` rewrites the project's own enforcement skill so the next check
+holds work against the new value rather than the old one.
 
 A change nobody wrote down becomes an inconsistency the next person has to guess about.

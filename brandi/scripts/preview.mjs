@@ -13,14 +13,19 @@
  * still works and can be opened by hand.
  *
  * Usage:
- *   node preview.mjs <file.dc.html> [--width 1200] [--height 2400] [--png false]
+ *   node preview.mjs <file.dc.html> [--width N] [--height N] [--png false]
  *   node preview.mjs --dir <folder> --out <folder> [--png false]
  *
- * `--dir` is the fallback for a session with no /design canvas, so it has to
- * show the artboards as they are, not as a default guess: each one is rendered
- * at its own frame from canvas.json, and the preview carries a <base> pointing
- * back at the source directory so a relatively-referenced photograph resolves
- * instead of rendering as a broken-image icon.
+ * This is the fallback for a session with no /design canvas, so it has to show
+ * the artboards as they are, not as a default guess: every artboard is rendered
+ * at its own frame, from the canvas.json beside it, then its own $preview hint,
+ * then 1200x2400. One file named on its own resolves the same way as a whole
+ * `--dir`, because the two have to agree about how big a given artboard is. A
+ * size passed on the command line is a deliberate override and wins.
+ *
+ * A preview carries a <base> pointing back at the source directory so a
+ * relatively-referenced photograph resolves instead of rendering as a
+ * broken-image icon.
  */
 
 import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
@@ -308,6 +313,9 @@ async function main(argv) {
   const width = size('width', 1200);
   const height = size('height', 2400);
   const wantPng = args.get('png') !== 'false';
+  // A frame given on the command line is a deliberate override and wins, for
+  // one file and for a whole directory alike.
+  const override = given('width') || given('height');
 
   if (args.has('dir')) {
     const dir = args.get('dir');
@@ -317,12 +325,10 @@ async function main(argv) {
       console.error(`no .dc.html files in ${dir}`);
       process.exit(1);
     }
-    // A frame given on the command line is a deliberate override and wins.
     // Otherwise every artboard is rendered at its own size: canvas.json is the
     // record that gets corrected, the artboard's own $preview hint is next, and
     // the 1200x2400 default is the last resort rather than the only answer.
     const frames = await manifestFrames(dir);
-    const override = given('width') || given('height');
     const rendered = [];
     for (const f of files) {
       const file = path.join(dir, f);
@@ -361,11 +367,25 @@ async function main(argv) {
     console.error('usage: preview.mjs <file.dc.html> [--width N] [--height N] [--png false]  |  --dir <folder> [--out <folder>] [--png false]');
     process.exit(1);
   }
-  const res = await previewArtboard(positional[0], {
+  // One file gets the same frame resolution as the whole directory: the
+  // canvas.json sitting beside it, then the artboard's own $preview hint, then
+  // the documented default. Without this, previewing a single artboard rendered
+  // a 390x844 phone at 1200x2400 while `--dir` over the same folder rendered it
+  // correctly, so the two ways of looking at one file disagreed.
+  const only = positional[0];
+  const frame = clampFrame(
+    override
+      ? { w: width, h: height }
+      : (await manifestFrames(path.dirname(path.resolve(only)))).get(path.basename(only))
+        ?? declaredFrame(await readFile(only, 'utf8'))
+        ?? { w: width, h: height },
+    path.basename(only),
+  );
+  const res = await previewArtboard(only, {
     outDir: args.get('out'),
-    width,
-    height,
-    png: args.get('png') !== 'false',
+    width: frame.w,
+    height: frame.h,
+    png: wantPng,
   });
   console.log(res.png ?? res.html);
   if (!res.chrome) console.error('note: no headless browser found, wrote HTML preview only');

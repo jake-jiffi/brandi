@@ -14,7 +14,7 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { renderBrandDeck, pairingMatrix, PLACEHOLDER, PAGE_W, PAGE_H } from '../scripts/branddeck.mjs';
+import { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PLACEHOLDER, PAGE_W, PAGE_H } from '../scripts/branddeck.mjs';
 import { renderBrandBook } from '../scripts/brandbook.mjs';
 import { findChrome, runChrome } from '../scripts/preview.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -580,6 +580,19 @@ const MEASURE = `
   };
   var gap = document.querySelector('.cobranding-gap');
   if (gap) out.gap = { recorded: Number(gap.getAttribute('data-gap')), width: gap.getBoundingClientRect().width / s };
+  // Every image that reaches the accessibility tree, and whether it has a name.
+  // An <svg> inside a [role=img] wrapper is not its own image: the wrapper is.
+  out.images = { total: 0, unnamed: [] };
+  Array.prototype.forEach.call(document.querySelectorAll('img, svg, [role="img"]'), function (el) {
+    if (el.parentElement && el.parentElement.closest('[role="img"]')) return;
+    if (el.closest('[aria-hidden="true"]') || el.getAttribute('role') === 'presentation' || el.getAttribute('role') === 'none') return;
+    out.images.total += 1;
+    var label = el.getAttribute('aria-label');
+    var alt = el.getAttribute('alt');
+    var title = el.querySelector(':scope > title');
+    if ((label && label.trim()) || (alt && alt.trim()) || (title && title.textContent.trim())) return;
+    out.images.unnamed.push(((el.closest('.page') || {}).id || '?') + ' ' + el.tagName.toLowerCase());
+  });
   document.documentElement.setAttribute('data-measure', JSON.stringify(out));
 })();
 `;
@@ -608,11 +621,32 @@ describe('the composition of every page, measured in a browser', () => {
     // cards under the tone situations, and the brand's own anti-patterns in
     // place of the nine house rules. Both are measured here or nowhere.
     heavy.voice.vocabulary.hardThings = Array.from({ length: 4 }, (_, i) => ({ situation: `A situation that takes a whole line to describe, number ${i + 1}`, say: long }));
+    // Round 5: `voice.mechanics` is an open object and every recorded rule now
+    // reaches a page. Twenty long ones is what makes the writing page run on
+    // and the contents step its type down, and both have to hold.
+    heavy.voice.mechanics = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`ruleNumber${i}Here`, `${long} Rule ${i + 1}.`]));
     heavy.governance.antiPatterns = Array.from({ length: 9 }, (_, i) => `${i + 1}. ${long}`);
     await writeFile(path.join(dir, 'heavy.html'), renderBrandDeck({ brand: heavy, system: buildSystem(systemInputFromBrand(heavy)) }).html);
+    // Three approved colourways, so the Colourways page has real rows to
+    // measure. The mark is two inks so the colourway has two regions to map.
+    const coloured = clone(brand);
+    const CW_INK = '#1F6F4A';
+    const CW_ASSETS = {
+      ...SCRATCH_ASSETS,
+      'assets/logos/muddy-paws-primary.svg': { kind: 'svg', markup: `<svg xmlns="http://www.w3.org/2000/svg" id="the-mark" viewBox="0 0 300 100"><rect width="220" height="100" fill="${CW_INK}"/><circle cx="260" cy="50" r="38" fill="#C9A227"/></svg>` },
+    };
+    coloured.identity.logo.colourways = ['brand.solid', 'accent1.solid', 'neutral.ink'].map((role, i) => ({
+      id: `cw-${i + 1}`, name: `Treatment ${i + 1}`, idea: 'dealt from the palette', basis: 'dealt',
+      ground: ['neutral.paper', 'neutral.ink', 'brand.solid'][i], approvedBy: 'Jake',
+      regions: [{ region: 'region-1', ink: CW_INK, role }, { region: 'region-2', ink: '#C9A227', role: 'neutral.ink' }],
+    }));
+    await writeFile(path.join(dir, 'colour.html'), renderBrandDeck({ brand: coloured, system, assets: CW_ASSETS }).html);
+    // The Colourways page with three treatments: the column heads are printed
+    // once, and every small render sits on a ground the size of the mark.
+    const COLOUR = `function colour(d){var p=d.querySelector('#colourways');if(!p)return null;var heads=Array.prototype.map.call(p.querySelectorAll('.label'),function(e){return e.textContent.trim();});var tiles=Array.prototype.map.call(p.querySelectorAll('.size-tile'),function(t){var g=t.firstElementChild;var m=t.querySelector('.mark');return {px:Number(t.getAttribute('data-px')),ground:g.getBoundingClientRect().height,mark:m.getBoundingClientRect().height};});var grounds=Array.prototype.map.call(p.querySelectorAll('[data-ground-cell]'),function(e){return e.getBoundingClientRect().height;});return {heads:heads,tiles:tiles,grounds:grounds};}`;
     // Text that reaches the footer band or the right edge of its page.
     const OVERFLOW = `function overflow(d){var out=[];d.querySelectorAll('.page').forEach(function(p){var pb=p.getBoundingClientRect();p.querySelectorAll('*').forEach(function(el){if(el.closest('.footer')||el.closest('.corner-mark'))return;if(!Array.prototype.some.call(el.childNodes,function(n){return n.nodeType===3&&n.textContent.trim();}))return;var r=el.getBoundingClientRect();if(r.bottom>pb.top+${PAGE_H}-90||r.right>pb.left+${PAGE_W}+1)out.push(p.id+': '+el.textContent.trim().slice(0,40));});});return out;}`;
-    const script = `<iframe id="heavy-deck" src="heavy.html" style="width:2000px;height:1200px;border:0" title="heavy"></iframe><script>${OVERFLOW}window.addEventListener("load",function(){var h=document.getElementById("heavy-deck").contentDocument;Promise.all([document.fonts.ready,h.fonts.ready]).then(function(){${MEASURE}var m=JSON.parse(document.documentElement.getAttribute("data-measure"));m.heavyOverflow=overflow(h);document.documentElement.setAttribute("data-measure",JSON.stringify(m));});});</script>`;
+    const script = `<iframe id="heavy-deck" src="heavy.html" style="width:2000px;height:1200px;border:0" title="heavy"></iframe><iframe id="colour-deck" src="colour.html" style="width:2000px;height:1200px;border:0" title="colour"></iframe><script>${OVERFLOW}${COLOUR}window.addEventListener("load",function(){var h=document.getElementById("heavy-deck").contentDocument;var c=document.getElementById("colour-deck").contentDocument;Promise.all([document.fonts.ready,h.fonts.ready,c.fonts.ready]).then(function(){${MEASURE}var m=JSON.parse(document.documentElement.getAttribute("data-measure"));m.heavyOverflow=overflow(h);m.colour=colour(c);document.documentElement.setAttribute("data-measure",JSON.stringify(m));});});</script>`;
     const probePath = path.join(dir, 'measure.html');
     await writeFile(probePath, withLogo.html.replace('</body>', `${script}</body>`));
     // A 2000px window keeps the fit scale at 1, so rects are page pixels.
@@ -623,10 +657,10 @@ describe('the composition of every page, measured in a browser', () => {
   });
   after(async () => { if (dir) await rm(dir, { recursive: true, force: true }); });
 
-  test('R2-N-02: no content page leaves more than 55 percent of its canvas empty below its last piece of content', gate, () => {
+  test('R2-N-02: no content page leaves more than 25 percent of its canvas empty below its last piece of content', gate, () => {
     const content = measured.pages.filter((p) => !p.divider && !['cover', 'intro', 'contents', 'closing'].includes(p.id));
     assert.ok(content.length >= 40);
-    const dead = content.map((p) => ({ id: p.id, empty: (p.boxHeight - p.lastContentBottom) / p.boxHeight })).filter((p) => p.empty > 0.55);
+    const dead = content.map((p) => ({ id: p.id, empty: (p.boxHeight - p.lastContentBottom) / p.boxHeight })).filter((p) => p.empty > 0.25);
     assert.deepEqual(dead, [], `pages with a dead lower half: ${dead.map((p) => `${p.id} ${(p.empty * 100).toFixed(0)}%`).join(', ')}`);
     // And the measurement is real: a page cannot have content below its box.
     for (const p of content) assert.ok(p.lastContentBottom > 0 && p.lastContentBottom <= p.boxHeight + 1, `${p.id} measured ${p.lastContentBottom} of ${p.boxHeight}`);
@@ -660,6 +694,30 @@ describe('the composition of every page, measured in a browser', () => {
   test('R2-N-12: the drawn co-branding gap is as wide as the value it records', gate, () => {
     assert.ok(measured.gap, 'the gap element rendered');
     assert.ok(Math.abs(measured.gap.width - measured.gap.recorded) < 1, `${measured.gap.width} vs ${measured.gap.recorded}`);
+  });
+
+  test('R5-03: every image that reaches the accessibility tree has a name', gate, () => {
+    assert.ok(measured.images.total >= 30, `only ${measured.images.total} images measured`);
+    assert.deepEqual(measured.images.unnamed, [], `images with no accessible name: ${measured.images.unnamed.join(', ')}`);
+  });
+
+  test('R5-04: the colour stage prints its column heads once and draws each small render on a ground the size of the mark', gate, () => {
+    const c = measured.colour;
+    assert.ok(c, 'the colourways page was measured');
+    // Three treatments, so the heads are printed above the rows, once each.
+    for (const head of ['On its ground', 'Greyscale']) {
+      assert.equal(c.heads.filter((h) => h === head).length, 1, `"${head}" is printed ${c.heads.filter((h) => h === head).length} times`);
+    }
+    // Every small render at its real size, on a tile that is the mark plus its
+    // air rather than a panel the height of the proofs beside it.
+    assert.ok(c.tiles.length >= 3, `${c.tiles.length} size tiles`);
+    for (const t of c.tiles) {
+      assert.ok(Math.abs(t.mark - t.px) <= 1, `a ${t.px}px render drew at ${t.mark}px`);
+      assert.ok(t.ground <= t.px + 26, `a ${t.px}px render sits in a ${t.ground}px box`);
+    }
+    // And the proof grounds are pinned to their marks, not stretched to the row.
+    assert.ok(c.grounds.length >= 6, `${c.grounds.length} proof grounds`);
+    assert.ok(Math.max(...c.grounds) <= 260, `a proof ground is ${Math.max(...c.grounds)}px tall`);
   });
 
   test('a heavier brand than the fixture still fits: no text runs under the footer or off the page', gate, () => {
@@ -924,5 +982,121 @@ describe('R3-N-05: a brand-in-use page is the shape of the thing on it', () => {
     const unknown = frame(renderBrandDeck({ brand, system, artboards: [board({ w: null, h: null })] }).html, 'in-use-1-x');
     assert.equal(/aspect-ratio/.test(unknown), false);
     assert.match(unknown, new RegExp(`height:${PAGE_H - 240}px`));
+  });
+});
+
+describe('R5-01: every recorded writing mechanic reaches the deck under its own key', () => {
+  // `voice.mechanics` is an open object. The deck used to hardcode four keys
+  // and print their values with no key at all, so the fixture's eight recorded
+  // rules reached the page as four anonymous sentences and the print book,
+  // which renders every key, disagreed with the deck about what was decided.
+  const six = {
+    sentenceLength: 'Short. Two ideas is two sentences.',
+    contractions: 'Yes, always.',
+    oxfordComma: 'Only where it removes an ambiguity.',
+    numerals: 'Numerals from one upward in prices and times.',
+    dates: '29 August, never 29th August.',
+    quoteMarks: 'Curly, and single inside double.',
+  };
+
+  test('a brand with six mechanics has all six in the deck, each under its titleised key', () => {
+    const b = clone(brand);
+    b.voice.mechanics = six;
+    const out = renderBrandDeck({ brand: b, system: buildSystem(systemInputFromBrand(b)) });
+    const labels = [...out.html.matchAll(/<dt>([^<]*)<\/dt>/g)].map((m) => m[1]);
+    assert.deepEqual(labels.slice().sort(), Object.keys(six).map(titleise).sort());
+    for (const [k, v] of Object.entries(six)) {
+      assert.ok(out.html.includes(`<dt>${titleise(k)}</dt><dd>${v}</dd>`), `${k} is missing its key or its value`);
+    }
+  });
+
+  test('the deck and the print book carry the same set', () => {
+    const b = clone(brand);
+    b.voice.mechanics = six;
+    const sys = buildSystem(systemInputFromBrand(b));
+    const deckHtml = renderBrandDeck({ brand: b, system: sys }).html;
+    const bookHtml = renderBrandBook({ brand: b, system: sys });
+    for (const [k, v] of Object.entries(six)) {
+      assert.ok(deckHtml.includes(titleise(k)), `the deck drops ${k}`);
+      assert.ok(bookHtml.includes(titleise(k)), `the book drops ${k}`);
+      assert.ok(deckHtml.includes(v) && bookHtml.includes(v), `${k}'s value is in one document and not the other`);
+    }
+    // Neither document invents a mechanic the other does not have.
+    const inDeck = new Set([...deckHtml.matchAll(/<dt>([^<]*)<\/dt>/g)].map((m) => m[1]));
+    for (const label of inDeck) assert.ok(bookHtml.includes(label), `the deck shows ${label} and the book does not`);
+  });
+
+  test('the fixture\'s own eight mechanics all reach a page, including the four the deck used to drop', () => {
+    const recorded = Object.keys(brand.voice.mechanics);
+    assert.ok(recorded.length >= 8, 'the fixture records at least eight mechanics');
+    for (const k of recorded) assert.ok(deck.html.includes(`<dt>${titleise(k)}</dt>`), `${k} reaches no page`);
+    // The four that used to be the whole list are still there, now with keys.
+    for (const k of ['sentenceLength', 'contractions', 'headings', 'buttons']) {
+      assert.ok(deck.html.includes(`<dt>${titleise(k)}</dt>`), k);
+    }
+  });
+
+  test('a set too long for one page runs on to a second rather than being cut', () => {
+    const b = clone(brand);
+    b.voice.mechanics = Object.fromEntries(Array.from({ length: 15 }, (_, i) => [`ruleNumber${i}`, `The ${i}th rule, written down so nobody has the argument again.`]));
+    const out = renderBrandDeck({ brand: b, system: buildSystem(systemInputFromBrand(b)) });
+    assert.ok(out.pages.some((pg) => pg.id === 'writing-mechanics'), 'the continuation page is planned');
+    const labels = [...out.html.matchAll(/<dt>([^<]*)<\/dt>/g)].map((m) => m[1]);
+    assert.equal(labels.length, 15);
+    assert.deepEqual(labels.slice().sort(), Object.keys(b.voice.mechanics).map(titleise).sort());
+    // And the contents lists it, so nobody has to find it by accident.
+    assert.match(out.html, /Writing guidance, continued/);
+  });
+
+  test('no mechanics at all is a placeholder, not an empty list', () => {
+    const b = clone(brand);
+    delete b.voice.mechanics;
+    const out = renderBrandDeck({ brand: b, system: buildSystem(systemInputFromBrand(b)) });
+    assert.equal(/<dt>/.test(out.html), false);
+    assert.match(out.html, new RegExp(`${PLACEHOLDER}: voice mechanics`));
+    assert.equal(out.pages.some((pg) => pg.id === 'writing-mechanics'), false);
+  });
+});
+
+describe('R5-02: every table in the deck reaches a screen reader with a name', () => {
+  test('the helper will not build a table without a caption', () => {
+    assert.throws(() => table({ head: '<th>a</th>', body: '<tr><td>b</td></tr>' }), /caption/);
+    assert.throws(() => table({ caption: '  ', head: '', body: '' }), /caption/);
+    assert.match(table({ caption: 'What this is', head: '<th>a</th>', body: '<tr><td>b</td></tr>' }), /<caption class="sr-only">What this is<\/caption>/);
+  });
+
+  test('every table in the built markup opens with its caption', () => {
+    const opens = deck.html.split('<table').slice(1);
+    assert.ok(opens.length >= 8, `${opens.length} tables`);
+    for (const frag of opens) {
+      const after = frag.slice(frag.indexOf('>') + 1).trimStart();
+      assert.ok(after.startsWith('<caption'), `a table opens with ${after.slice(0, 40)}`);
+      const caption = /^<caption[^>]*>([\s\S]*?)<\/caption>/.exec(after);
+      assert.ok(caption && caption[1].trim().length > 12, `a table's caption is ${caption ? `"${caption[1]}"` : 'missing'}`);
+    }
+  });
+});
+
+describe('R5-05: an application frame reads as a size in both shapes', () => {
+  // The applications tile prints surface, frame and file on one line. A frame
+  // written as a list reached it as "1440,1600", which is not a size anybody
+  // writes, and the print book had the same fault on the same field.
+  const tileOf = (frame) => {
+    const b = clone(brand);
+    b.applications = [{ name: 'Home page', surface: 'web', frame, file: 'Main.dc.html' }];
+    const page = pageOf(renderBrandDeck({ brand: b, system }).html, 'applications');
+    return /<span class="mono" style="color:var\(--muted\)">([^<]*)<\/span>/.exec(page)[1];
+  };
+
+  test('a list frame reads the same as the string a person would have typed', () => {
+    assert.equal(tileOf([1440, 1600]), 'web / 1440x1600 / Main.dc.html');
+    assert.equal(tileOf('1440x1600'), 'web / 1440x1600 / Main.dc.html');
+  });
+
+  test('a frame that is not a pair of sane numbers is shown as it stands, and no frame is dropped', () => {
+    assert.equal(tileOf([1440]), 'web / 1440 / Main.dc.html');
+    assert.equal(tileOf(undefined), 'web / Main.dc.html');
+    assert.equal(tileOf([]), 'web / Main.dc.html', 'an empty list is no frame at all');
+    assert.equal(frameLabel([390, 844]), '390x844');
   });
 });

@@ -13,22 +13,36 @@ brief always wins. What is forbidden is arriving at them by gravity.
 
 As of 2026, AI-generated design clusters around a small number of identifiable defaults. They appear
 regardless of subject, which is exactly what makes them defaults rather than choices. Anthropic's own
-`frontend-design` skill names three:
+`frontend-design` skill names five, quoted here as it writes them:
 
-> (1) a warm cream background (near **#F4F1EA**) with a high-contrast serif display and a
-> **terracotta accent**; (2) a near-black background with a single bright **acid-green or vermilion**
-> accent; (3) a **broadsheet-style layout with hairline rules, zero border-radius**, and dense
-> newspaper-like columns.
+> For calibration, AI-generated design right now clusters around some traits:
 >
-> All three are legitimate for some briefs, but they are defaults rather than choices, and they
+> 1. a warm cream background (near #F4F1EA) with a high-contrast serif display and a terracotta or
+>    warm-clay accent (often near #D97757 […]);
+> 2. a near-black background with a single bright acid-green or vermilion accent;
+> 3. a broadsheet-style layout with hairline rules, zero border-radius, and dense newspaper-like
+>    columns;
+> 4. the SaaS-card kit: content chopped into identical rounded cards, one border-radius on everything
+>    regardless of hierarchy, the same soft grey shadow (rgba(0,0,0,.1)) under each, and gradient
+>    washes as decoration;
+> 5. template chrome that appears whatever the subject: a tracked-out ALL-CAPS eyebrow label above
+>    every heading; meta strings joined with middle dots ('A · B · C'); labels built as 'WORD […]
+>    fragment' with a spaced em dash; tinted near-black (#0B0B0B, #111) standing in for black; a
+>    monospace face for small data labels; a '→' appended to link and button text.
+>
+> All traits are legitimate for some briefs, but they are defaults rather than choices, and they
 > appear regardless of subject.
 
-Two more have consolidated since, and are worth naming precisely:
+Both elisions drop a spaced em dash, which this repository's house style keeps out of its own prose.
+The first is the source's aside that `#D97757` is Anthropic's Claude-interaction accent, which the
+hazard note below covers at length. The second is the character itself, inside the example label.
 
-4. **The violet SaaS look.** Near-black or deep navy ground, an indigo-to-violet gradient hero, a
+Two the list does not name have consolidated since, and are worth naming precisely:
+
+6. **The violet SaaS look.** Near-black or deep navy ground, an indigo-to-violet gradient hero, a
    frosted glass panel, and Inter. Logged as the number one reported AI tell by the Refero design
    reference corpus, and the reason `nexu_open-design` blocks seven specific indigo hexes at P0.
-5. **The pastel humanist look.** Warm off-white, one soft radius on everything, faceless flat
+7. **The pastel humanist look.** Warm off-white, one soft radius on everything, faceless flat
    illustrated figures, Poppins or Montserrat, and a rounded three-column feature grid.
 
 ### The cream and terracotta hazard
