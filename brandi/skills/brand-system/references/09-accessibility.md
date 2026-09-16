@@ -1,8 +1,7 @@
 # 09 · Accessibility
 
-> `$A` is the Brandi command line, resolved once at the start of the session: `brandi` when the
-> plugin is installed, or `node <this skill's base directory>/../../scripts/brandi.mjs` from a clone.
-> It is never a bare relative path: the working directory is the user's project, not the plugin.
+> `$A` is the Brandi command line, resolved once by the snippet at the top of the `brand-system` or
+> `logo-forge` skill. It is never a bare relative path: the working directory is the user's project.
 
 The floor. Not the ceiling, and not a chapter that lives at the back of the book after the mood
 board.
@@ -248,7 +247,7 @@ applies to things nobody thinks of as text:
   hairline on white is often below 2:1.
 - Checkbox and radio outlines, and the checked indicator against the box.
 - Toggle switch tracks and thumbs, including in the off state.
-- Focus rings (also covered by 2.4.7 and 2.4.11).
+- Focus rings (also covered by 2.4.7 and 2.4.13).
 - Icon-only buttons, where the icon *is* the control.
 - Chart series, sparklines, meters and progress bars.
 - The boundary of any surface a user must perceive to operate the thing.

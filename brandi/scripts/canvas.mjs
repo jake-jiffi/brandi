@@ -65,7 +65,7 @@ const GENERATED_MARKER = 'generated from the resolved system';
 
 /**
  * Views of the contract rather than second lists to maintain. The document at
- * references/04-anti-slop.md is where a face gets banned.
+ * references/anti-slop.contract.md is where a face gets banned.
  *
  * The two stay separate because the contract separates them, and folding them
  * together turned "Instrument Serif is a default you should argue for" into
@@ -250,16 +250,23 @@ export function canvasManifest(entries, {
   const pageOf = (e) => e.page ?? '\u0000default';
   const order = [...new Set(entries.map(pageOf))];
 
+  // `columns` is a number, or an object keyed by page id (with an optional
+  // `default`) when pages want different widths: a specification page of nine
+  // tall sheets reads at fit zoom five across, a design page of two does not.
+  const columnsFor = (pageId) => (typeof columns === 'object' && columns !== null
+    ? (columns[pageId] ?? columns.default ?? 3)
+    : columns);
   for (const pageId of order) {
     let x = originX;
     let y = originY;
     let rowHeight = 0;
     let col = 0;
+    const cols = columnsFor(pageId);
     for (const e of entries.filter((entry) => pageOf(entry) === pageId)) {
       // An explicitly positioned artboard keeps its place and does not move the
       // cursor: it was put there on purpose.
       const explicit = Number.isFinite(e.x) && Number.isFinite(e.y);
-      if (!explicit && col >= columns) {
+      if (!explicit && col >= cols) {
         x = originX;
         y += rowHeight + gapY;
         rowHeight = 0;
@@ -393,7 +400,7 @@ export function findOverlaps(manifest, { chromeTop = 56 } = {}) {
  * Returns `{ok, errors, warnings}`. Errors mean the artboard will not render
  * correctly. Warnings mean it will render, and look generic.
  */
-export function validateArtboard(source, { name = 'artboard', allowFonts = true } = {}) {
+export function validateArtboard(source, { name = 'artboard', allowFonts = true, brandFonts = [] } = {}) {
   const errors = [];
   const warnings = [];
   const err = (m, fix) => errors.push({ message: m, fix });
@@ -567,14 +574,18 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true 
   // copy of the anti-slop rules, and it disagreed with guardian.mjs: a comment
   // that stood here recorded the day `font-family: 'Inter', sans-serif` passed
   // one validator and failed the other. There is now one implementation, and it
-  // reads references/04-anti-slop.md, which is the document a person edits.
+  // reads references/anti-slop.contract.md, which is the document a person edits.
   // Generated sheets are exempt, for the same reason `check` exempts them: the
   // components sheet demonstrates the whole radius scale and the palette sheet
   // numbers twelve ramp steps, so holding either to a rule about restraint is
   // faulting a specimen for containing specimens.
+  // Each finding carries its rule, so a caller can tell an anti-slop error
+  // (renders fine, reads as machine-made) from a structural one (will not
+  // render). They used to print under one heading that said the wrong thing
+  // about half of them.
   if (!source.slice(0, 4096).includes(GENERATED_MARKER)) {
-    for (const f of slopFindings(loadContractSync(), source, { name })) {
-      (f.severity === 'p0' ? err : warn)(f.message, f.fix);
+    for (const f of slopFindings(loadContractSync(), source, { name, brandFonts })) {
+      (f.severity === 'p0' ? errors : warnings).push({ message: f.message, fix: f.fix, rule: f.rule });
     }
   }
 
@@ -605,9 +616,9 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true 
 }
 
 /** Validate a whole set at once, plus the manifest that lays them out. */
-export function validateCanvas({ artboards, manifest }) {
+export function validateCanvas({ artboards, manifest, brandFonts = [] }) {
   const results = artboards.map(({ file, source }) =>
-    validateArtboard(source, { name: file }),
+    validateArtboard(source, { name: file, brandFonts }),
   );
   const errors = results.flatMap((r) => r.errors.map((e) => ({ file: r.name, ...e })));
   const warnings = results.flatMap((r) => r.warnings.map((w) => ({ file: r.name, ...w })));

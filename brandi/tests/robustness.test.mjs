@@ -7,7 +7,7 @@
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm, symlink, chmod } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, symlink, chmod } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -142,6 +142,37 @@ describe('the CLI when things are missing', () => {
     const r = await cli(['validate', '--dir', c]);
     assert.equal(r.ok, false);
     assert.match(r.error, /canvas\.json is not valid JSON/);
+  });
+
+  test('status on a partial file names what is missing instead of printing undefined', async () => {
+    const p = path.join(dir, 'partial-status');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await writeFile(path.join(p, 'brand', 'brand.json'), '{"meta":{"name":"Partial"}}');
+    const { stdout } = await run(process.execPath, [CLI, 'status'], { cwd: p });
+    assert.equal(/undefined/.test(stdout), false, stdout);
+    assert.match(stdout, /\(no version\)/);
+    assert.match(stdout, /Blocking the recon phase/);
+    assert.match(stdout, /brandi init/);
+    const r = await cli(['status'], p);
+    assert.equal(r.ok, true, 'the exit code is unchanged: status reports, it does not fail');
+  });
+
+  test('complete refuses a phase whose predecessor is not done, and Next names the first gap', async () => {
+    const p = path.join(dir, 'phase-order');
+    await mkdir(p, { recursive: true });
+    await cli(['init', '--name', 'Order'], p);
+    const early = await cli(['complete', 'intake'], p);
+    assert.equal(early.ok, false);
+    assert.match(early.error, /before "recon" is complete/);
+    assert.match(early.error, /brandi complete recon/);
+    assert.equal((await cli(['complete', 'recon'], p)).phase, 'intake');
+    assert.equal((await cli(['complete', 'intake'], p)).phase, 'strategy');
+    // Re-completing an earlier phase must not send the cursor backwards or
+    // announce a phase that is already done.
+    const again = await run(process.execPath, [CLI, 'complete', 'recon'], { cwd: p });
+    assert.match(again.stdout, /Next: Strategy/);
+    const s = await cli(['status'], p);
+    assert.equal(s.phase, 'strategy');
   });
 
   test('complete refuses an unknown phase and lists the real ones', async () => {
@@ -283,5 +314,54 @@ describe('the system against awkward brands', () => {
     const sys = buildSystem({ primary: '#808080', neutralChroma: 0 });
     assert.equal(sys.audit.errors, 0);
     assert.ok(sys.palettes.neutral.light.steps.every((s) => s.C === 0));
+  });
+});
+
+describe('a mockup recorded by hand, badly', () => {
+  const JPEG = Buffer.from('ffd8ffe000104a46494600010100000100010000ffc0001108006400c803011100021101031101ffd9', 'hex');
+  let p;
+  let base;
+  before(async () => {
+    p = path.join(dir, 'bad-mockups');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await writeFile(path.join(p, 'p.jpg'), JPEG);
+    // A file complete enough to build a system, so the failure under test is
+    // the mockup's and not the brand file's.
+    base = JSON.parse(await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+  });
+  const build = async (surfaces) => {
+    const b = JSON.parse(JSON.stringify(base));
+    b.identity.mockups = [{ name: 'Wall', photo: 'p.jpg', surfaces }];
+    await writeFile(path.join(p, 'brand', 'brand.json'), JSON.stringify(b, null, 2));
+    const r = await cli(['mockup', 'build'], p);
+    assert.ok(Array.isArray(r.problems), `expected problems, got ${JSON.stringify(r).slice(0, 200)}`);
+    return r;
+  };
+
+  test('a hole in the surfaces list is named, not dereferenced', async () => {
+    const r = await build([null]);
+    assert.equal(r.ok, false);
+    assert.match(r.problems[0], /Wall \/ surface 0: this surface is null/);
+    assert.equal(/Cannot read properties/.test(JSON.stringify(r)), false, 'no raw TypeError reaches the user');
+  });
+
+  test('a string where a surface record belongs is named too', async () => {
+    const r = await build(['the wall']);
+    assert.equal(r.ok, false);
+    assert.match(r.problems[0], /this surface is string/);
+  });
+
+  test('a mockup with no surfaces at all is refused rather than composited empty', async () => {
+    const r = await build([]);
+    assert.equal(r.ok, false);
+    assert.match(r.problems[0], /no surfaces recorded/);
+    assert.deepEqual(r.written, []);
+  });
+
+  test('corners without artwork are still corners without artwork', async () => {
+    const r = await build([{ name: 'fascia', corners: [[10, 10], [40, 12], [40, 30], [10, 28]] }]);
+    assert.equal(r.ok, false);
+    assert.match(r.problems[0], /no artwork recorded/);
+    assert.equal(existsSync(path.join(p, 'brand', 'canvas', 'MockupWall.dc.html')), false);
   });
 });

@@ -947,7 +947,16 @@ export function slotBrief(slot, brief = {}) {
     slot.position ? `Where it sits: ${slot.position}` : null,
     `The risk you are carrying: ${slot.risk} Counter it: ${slot.deRisk}`,
     '',
-    `Build the ${slot.smallGrade} FIRST, at 16 pixels, and let it drive the rest.`,
+    // An architecture with no symbol was still told to build one first, two
+    // lines under "No symbol. The type carries alone." The smallest grade is a
+    // fallback there, not the thing the concept is: the wordmark is, so it
+    // leads, and the architecture's own contexts table already says a wordmark
+    // hands 16 pixels to its fallback rather than surviving them.
+    slot.symbolApproach
+      ? `Build the ${slot.smallGrade} FIRST, at 16 pixels, and let it drive the rest.`
+      : `Set the wordmark FIRST and let it drive everything. It does not have to survive 16 pixels: `
+        + `that is what the ${slot.smallGrade} fallback is for, and the fallback is drawn last, `
+        + `once the wordmark is settled.`,
     '',
     '## Refused outright',
     '',

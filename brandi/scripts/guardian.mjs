@@ -8,13 +8,13 @@
  * brand's, words the voice guide bans, and the handful of patterns that make
  * output look machine-generated. It reports; it never edits.
  *
- * `emitGuardianSkill` writes a small Claude Code skill named after the brand,
+ * `emitGuardianSkill` writes a small skill named after the brand, for Claude Code and Codex,
  * so any future session in any project can load the brand and check itself
  * before shipping. That is the difference between a brand book and a brand: one
  * is a document somebody read once, the other is a rule that keeps applying.
  */
 
-import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, symlink, lstat, readlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { toOklch, oklchToOklab, contrastRatio, extractColors } from './color.mjs';
@@ -201,10 +201,10 @@ export async function checkFiles({ brand, system, targets, root = process.cwd(),
     }
 
     // --- House floor -----------------------------------------------------
-    // From references/04-anti-slop.md, which is the contract rather than a copy
-    // of it. Seven hand-maintained patterns used to live here and forty were
+    // From references/anti-slop.contract.md, which is the contract rather than a
+    // copy of it. Seven hand-maintained patterns used to live here and forty were
     // specified in the document; the two drifted, as two copies of anything do.
-    for (const f of slopFindings(contract, text, { file: rel })) findings.push(f);
+    for (const f of slopFindings(contract, text, { file: rel, brandFonts })) findings.push(f);
   }
 
   const order = { error: 0, warn: 1, info: 2 };
@@ -346,7 +346,7 @@ export async function checkPromises({ brand, root = process.cwd(), canvasDir = n
 
 const yamlString = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
-function guardianSkillMd({ brand, system, brandFile, cliPath }) {
+function guardianSkillMd({ brand, system, brandFile }) {
   const name = brand.meta?.name ?? 'the brand';
   const slug = brand.meta?.slug ?? 'brand';
   const sem = system.semantic.light;
@@ -434,18 +434,19 @@ never vague. An empty state is an invitation to act.
 
 ## Checking your own work
 
-Run this before you call anything done:
+Run this before you call anything done. The first block finds the command wherever the Brandi
+plugin is installed, so it works in a session where the plugin is not enabled and \`brandi\` is
+not on PATH:
 
 \`\`\`bash
-brandi check <paths>
+A="$(command -v brandi || true)"
+[ -z "$A" ] && A="$(ls -d "$HOME"/.claude/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
+[ -z "$A" ] && A="$(ls -d "\${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
+[ -z "$A" ] && echo "Brandi is not installed on this machine. Install the plugin, then run this again." >&2
 \`\`\`
 
-(\`brandi\` is on PATH wherever the Brandi plugin is enabled. This skill also runs in sessions where
-it is not, so the absolute fallback below is the copy of the command line that generated this file.
-If it has moved, install the plugin or update this line.)
-
 \`\`\`bash
-node ${cliPath ?? '<path to>/brandi/scripts/brandi.mjs'} check <paths>
+"$A" check <paths>
 \`\`\`
 
 It reports off-palette colours, off-brand typefaces, banned vocabulary and the patterns that make
@@ -464,7 +465,7 @@ brand, and work rule by rule rather than line by line.
 ## Before it goes out
 
 \`\`\`bash
-brandi validate --dir brand/canvas
+"$A" validate --dir brand/canvas
 \`\`\`
 
 That checks the artboards will render, and separately whether the brief and the deliverable agree:
@@ -481,12 +482,12 @@ tokens. A change nobody wrote down becomes an inconsistency the next person has 
 }
 
 /** Write the companion enforcement skill for this brand. */
-export async function emitGuardianSkill({ brand, system, dir, brandFile, cliPath }) {
+export async function emitGuardianSkill({ brand, system, dir, brandFile }) {
   const contract = await loadContract();
   await mkdir(dir, { recursive: true });
   const files = [];
   const skillPath = path.join(dir, 'SKILL.md');
-  await writeFile(skillPath, guardianSkillMd({ brand, system, brandFile, cliPath }));
+  await writeFile(skillPath, guardianSkillMd({ brand, system, brandFile }));
   files.push(skillPath);
 
   const rulesPath = path.join(dir, 'rules.json');
@@ -509,4 +510,34 @@ export async function emitGuardianSkill({ brand, system, dir, brandFile, cliPath
   return files;
 }
 
-export default { checkFiles, emitGuardianSkill, paletteOf };
+/**
+ * Codex reads skills from `~/.agents/skills`, Claude Code from `~/.claude/skills`.
+ * When the first exists, link the emitted skill into it so one emit serves both.
+ *
+ * Returns the link path, or null with a reason when nothing was linked: the
+ * directory is absent (this machine has no Codex), or the name is already
+ * taken by something that is not a link to this skill, which is not ours to
+ * replace.
+ */
+export async function linkForCodex(dir, home = process.env.HOME ?? '') {
+  const skills = path.join(home, '.agents', 'skills');
+  if (!home || !existsSync(skills)) return { linked: null, reason: 'no ~/.agents/skills directory' };
+  const link = path.join(skills, path.basename(dir));
+  if (path.resolve(link) === path.resolve(dir)) return { linked: null, reason: 'already emitted into ~/.agents/skills' };
+  try {
+    const s = await lstat(link);
+    if (s.isSymbolicLink() && path.resolve(skills, await readlink(link)) === path.resolve(dir)) return { linked: link, reason: null };
+    return { linked: null, reason: `${link} already exists and is not a link to this skill` };
+  } catch {
+    // Nothing there yet, which is the normal case.
+  }
+  try {
+    await symlink(dir, link);
+  } catch (e) {
+    // The skill is already written; a link that cannot be made is a note, not a failure.
+    return { linked: null, reason: `could not link ${link}: ${e.code ?? e.message}` };
+  }
+  return { linked: link, reason: null };
+}
+
+export default { checkFiles, emitGuardianSkill, paletteOf, linkForCodex };

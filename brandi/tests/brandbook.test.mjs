@@ -1,8 +1,10 @@
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { renderBrandBook } from '../scripts/brandbook.mjs';
+import { renderBrandBook, pdfChromeArgs } from '../scripts/brandbook.mjs';
+import { findChrome } from '../scripts/preview.mjs';
 import { buildSystem } from '../scripts/system.mjs';
 import { emptyBrand, systemInputFromBrand } from '../scripts/brandfile.mjs';
 
@@ -291,5 +293,85 @@ describe('nothing the client supplied is silently dropped', () => {
   test('a direction section exists, because it is what every visual choice hangs off', () => {
     assert.match(html, /id="direction"/);
     assert.ok(html.includes('warm humanist'), 'the chosen school should be readable, not a slug');
+  });
+});
+
+/**
+ * `book --pdf` used to block for exactly 180 seconds: Chrome wrote the PDF in
+ * seconds and then never exited, because `--user-data-dir` gave it a profile
+ * whose updater kept the process alive until the timeout killed it.
+ */
+describe('the PDF step', () => {
+  test('gives Chrome no profile directory, so it exits when the print is done', () => {
+    const args = pdfChromeArgs({ htmlUrl: 'file:///tmp/brand-book.html', pdfPath: '/tmp/brand-book.pdf' });
+    assert.equal(args.some((a) => a.startsWith('--user-data-dir')), false);
+    assert.ok(args.includes('--print-to-pdf=/tmp/brand-book.pdf'));
+    assert.equal(args.at(-1), 'file:///tmp/brand-book.html');
+  });
+
+  test('finishes without a profile directory when a browser is present, and the time is logged rather than bounded', { skip: findChrome() ? false : 'no headless browser on this machine' }, async (t) => {
+    const { mkdtemp, mkdir, copyFile, rm, stat } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const run = promisify(execFile);
+    const dir = await mkdtemp(path.join(tmpdir(), 'brandi-pdf-'));
+    try {
+      await mkdir(path.join(dir, 'brand'), { recursive: true });
+      await copyFile(FIXTURE, path.join(dir, 'brand', 'brand.json'));
+      // R2-N-11: a wall-clock bound here failed at 30 s under load while the
+      // same build takes 2 s alone. The tool's own 180 s Chrome timeout is
+      // the limit; the elapsed time is logged so a regression stays visible.
+      const started = Date.now();
+      const { stdout } = await run(process.execPath, [path.join(import.meta.dirname, '..', 'scripts', 'brandi.mjs'), 'book', '--pdf', '--json'], { cwd: dir, timeout: 240000 });
+      t.diagnostic(`book --pdf took ${Date.now() - started}ms`);
+      const r = JSON.parse(stdout);
+      assert.ok(r.pdf, 'a PDF should have been written');
+      assert.ok((await stat(r.pdf)).size > 10000, 'the PDF should have content');
+      assert.equal(existsSync(path.join(dir, 'brand', '.chrome-profile')), false, 'no profile directory is left behind');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('R3-N-03: the print book carries the recorded voice, and nothing else', () => {
+  test('the tone statement and each trait\'s own example lines reach the voice page', async () => {
+    const b = JSON.parse(await readFile(FIXTURE, 'utf8'));
+    const sys = buildSystem(systemInputFromBrand(b));
+    const html = renderBrandBook({ brand: b, system: sys });
+    assert.ok(html.includes(b.voice.statement), 'the recorded tone statement');
+    for (const a of b.voice.attributes) {
+      for (const line of a.examples) assert.ok(html.includes(line), `"${line}" under ${a.name}`);
+    }
+    const silent = JSON.parse(JSON.stringify(b));
+    delete silent.voice.statement;
+    const bare = renderBrandBook({ brand: silent, system: sys });
+    assert.match(bare, /a one-line tone statement \(voice\.statement\)/);
+    assert.equal(bare.includes(b.voice.statement), false);
+  });
+});
+
+describe('R3-N-06: the print book says what the deck says about what not to do', () => {
+  test('a recorded list replaces the house one, and the house one never bans a face the brand sets', async () => {
+    const b = JSON.parse(await readFile(FIXTURE, 'utf8'));
+    const sys = buildSystem(systemInputFromBrand(b));
+    const own = renderBrandBook({ brand: b, system: sys });
+    assert.match(own, /<ul data-rule-source="brand">/);
+    for (const r of b.governance.antiPatterns) assert.ok(own.includes(r.replace(/"/g, '&quot;')), r);
+    assert.equal(/gradient orbs/.test(own), false, 'the house list is gone');
+
+    const none = JSON.parse(JSON.stringify(b));
+    delete none.governance.antiPatterns;
+    const house = renderBrandBook({ brand: none, system: sys });
+    assert.match(house, /<ul data-rule-source="house">/);
+    assert.match(house, /gradient orbs/);
+    assert.match(house, /Inter, Roboto, Arial, Poppins, Montserrat are banned outright/);
+
+    const waived = JSON.parse(JSON.stringify(none));
+    waived.identity.type.display = 'Montserrat';
+    const w = renderBrandBook({ brand: waived, system: buildSystem(systemInputFromBrand(waived)) });
+    assert.match(w, /Inter, Roboto, Arial, Poppins are banned outright/);
+    assert.equal(/Montserrat are banned/.test(w), false);
   });
 });

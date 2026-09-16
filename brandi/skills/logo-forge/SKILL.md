@@ -28,24 +28,26 @@ drawn one, and every deliverable says so.
 ```bash
 A="$(command -v brandi || true)"
 [ -z "$A" ] && A="$(ls -d "$HOME"/.claude/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
+[ -z "$A" ] && A="$(ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
 [ -z "$A" ] && A="<this skill's base directory>/../../bin/brandi"
-LOGO="$(dirname "$A")/../scripts/logo.mjs"
-node "$LOGO" status
+"$A" logo status
 ```
 
-If none of those resolve, say so plainly rather than improvising a path.
+If none of those resolve, say so plainly rather than improvising a path. Wherever this file writes
+`<brandi>`, it means the plugin root, `$(dirname "$A")/..`; put the resolved absolute path into
+anything you hand to another agent.
 
 ```bash
-node "$LOGO" plan     --count 12 [--seed x] [--name "X"] [--category "X"] [--oneLiner "X"]
-node "$LOGO" wordmark --font "Bitter" --weight 700 [--case upper] [--tracking -15]
-node "$LOGO" lockup   --symbol s.svg --wordmark w.svg [--stacked]
-node "$LOGO" import   brand/logo/concepts/round-01 --model "claude-opus-5"
-node "$LOGO" audit
-node "$LOGO" board
-node "$LOGO" pick     A2 C1 D3
-node "$LOGO" refine                            # four tasks per shortlisted direction
-node "$LOGO" master   C1p --approved-by "Jake"
-node "$LOGO" status
+"$A" logo plan     --count 12 [--seed x] [--name "X"] [--category "X"] [--oneLiner "X"]
+"$A" logo wordmark --font "Bitter" --weight 700 [--case upper] [--tracking -15]
+"$A" logo lockup   --symbol s.svg --wordmark w.svg [--stacked]
+"$A" logo import   brand/logo/concepts/round-01 --model "claude-opus-5"
+"$A" logo audit
+"$A" logo board
+"$A" logo pick     A2 C1 D3
+"$A" logo refine                            # four tasks per shortlisted direction
+"$A" logo master   C1p --approved-by "Jake"
+"$A" logo status
 ```
 
 Add `--json` to any of them to read the result as data.
@@ -67,14 +69,14 @@ about eight minutes of waiting.
 
 ### 1. The brief (one question at most)
 
-Run `node "$LOGO" status`. If a round exists, resume it rather than starting over.
+Run `"$A" logo status`. If a round exists, resume it rather than starting over.
 
 The forge reads `brand/brand.json` for the name, category, positioning and audience. If those are
 there, ask nothing.
 
 If they are not, you need exactly two facts: **the name, spelled exactly as it must be set**, and
-**what the business does, in one line**. Get both in one `AskUserQuestion`, or from the prompt if it
-already said. Never ask a third.
+**what the business does, in one line**. Get both in one `AskUserQuestion` (one plain message where
+there is no such tool), or from the prompt if it already said. Never ask a third.
 
 If nobody answers, do not stall. Infer the name from the directory or `package.json`, commit to one
 reading of what the business does, state the assumption in a line, and carry on. A round delivered
@@ -83,7 +85,7 @@ under stated assumptions is useful; a round that never happened is not.
 ### 2. Plan the range (no questions)
 
 ```bash
-node "$LOGO" plan --count 12
+"$A" logo plan --count 12
 ```
 
 Twelve is the default and the right number. Fewer than eight is not a range; more than sixteen is
@@ -103,6 +105,10 @@ Opus. Each agent gets:
 - `references/11-logo-craft.md` to read first, which is how to draw an SVG mark that is not
   amateur: the construction grid, optical correction, stroke versus fill, node discipline.
 
+Without a subagent tool, draw the slots yourself one at a time, and never re-read another slot's
+brief or your own earlier marks while drawing; say in the handover that isolation was procedural,
+not enforced.
+
 Every agent is told, verbatim:
 
 > Read `<brandi>/skills/brand-system/references/11-logo-craft.md` before drawing anything.
@@ -120,7 +126,7 @@ Every agent is told, verbatim:
 For a wordmark slot, the agent does not hand-draw letters. It calls:
 
 ```bash
-node "$LOGO" wordmark --font "Cabin" --weight 600 --tracking -15 --out brand/logo/concepts/round-01/A1.svg
+"$A" logo wordmark --font "Cabin" --weight 600 --tracking -15 --out brand/logo/concepts/round-01/A1.svg
 ```
 
 which sets the name in a real licensed face and converts it to outlines. Hand-drawn letterforms
@@ -129,9 +135,9 @@ from a language model are the single most reliable way to make a wordmark look m
 ### 4. Measure, then present (no questions)
 
 ```bash
-node "$LOGO" import brand/logo/concepts/round-01 --model "claude-opus-5"
-node "$LOGO" audit
-node "$LOGO" board
+"$A" logo import brand/logo/concepts/round-01 --model "claude-opus-5"
+"$A" logo audit
+"$A" logo board
 ```
 
 `audit` renders every candidate at 16, 32, 64 and 256 pixels in one browser pass and measures it:
@@ -152,6 +158,11 @@ Then publish the canvas, exactly as `brand-system` does it:
    roster lists.
 4. Republish to the same path with the same favicon and contract, and no `capabilities`.
 
+If there is no `design` skill or `Artifact` tool (Codex, or any session without them), stop after
+step 1 and render the boards with `node <brandi>/scripts/preview.mjs --dir brand/logo/canvas --out <dir>`;
+it frames each artboard the way canvas.json records it and writes an index page beside the PNGs.
+Hand that page over instead of a link.
+
 **Render the boards and look at them before publishing.** The validator is structural; it cannot
 see a layout that is merely bad.
 
@@ -169,7 +180,7 @@ Point them at the **Favicons** board specifically. It settles most rounds, and i
 everybody agrees matters and nobody runs.
 
 ```bash
-node "$LOGO" pick A2 C1 D3
+"$A" logo pick A2 C1 D3
 ```
 
 If they name one, take it, and say once that a single direction out of a first round is usually the
@@ -178,7 +189,7 @@ safest thing in the set. Do not argue twice.
 ### 6. Refine
 
 ```bash
-node "$LOGO" refine
+"$A" logo refine
 ```
 
 It takes the shortlist and deals four slots per direction: the 16-pixel redraw, proportion, weight,
@@ -197,9 +208,9 @@ are the same artwork, which means the task was not done.
 Where a direction needs a symbol and a wordmark locked up, compose rather than draw:
 
 ```bash
-node "$LOGO" wordmark --font "Archivo" --weight 600 --tracking -20
-node "$LOGO" lockup --symbol brand/logo/concepts/round-02/C1p.svg --wordmark brand/logo/master/wordmark.svg
-node "$LOGO" lockup --symbol brand/logo/concepts/round-02/C1p.svg --wordmark brand/logo/master/wordmark.svg --stacked
+"$A" logo wordmark --font "Archivo" --weight 600 --tracking -20
+"$A" logo lockup --symbol brand/logo/concepts/round-02/C1p.svg --wordmark brand/logo/master/wordmark.svg
+"$A" logo lockup --symbol brand/logo/concepts/round-02/C1p.svg --wordmark brand/logo/master/wordmark.svg --stacked
 ```
 
 The gap and the symbol size are multiples of the wordmark's cap height, so the horizontal and the
@@ -208,7 +219,7 @@ stacked version cannot drift apart and neither one stretches at large sizes or c
 ### 7. Master
 
 ```bash
-node "$LOGO" master C1p --approved-by "<the person's name>"
+"$A" logo master C1p --approved-by "<the person's name>"
 ```
 
 That normalises the artwork, writes the mono and reversed renditions, computes the clear-space rule

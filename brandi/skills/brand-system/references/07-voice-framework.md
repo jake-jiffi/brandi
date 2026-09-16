@@ -66,6 +66,19 @@ constrain nothing.
 
 ## 3. Voice attributes
 
+### The tone statement comes first
+
+One line that says how this brand sounds, written by a person, recorded in `voice.statement`. It
+is the headline of the tone page and the thing a writer reads before anything else.
+
+The trait names joined into a sentence is not a tone statement. "Plain, Warm and Useful." reads as
+a written line and is not one, and a book that manufactures its own headline cannot be trusted
+about anything else on the page. Write it the way you would say it out loud, or leave it out and
+let the deck print a bracketed placeholder. "Say it the way you would say it to someone standing in
+front of you" is a statement. A list of adjectives is a list of adjectives.
+
+### The set
+
 Three to five. Never more, because past five nothing is load-bearing.
 
 Each attribute is a pair, `X, not Y`, where `Y` is the failure mode when `X` is overdone. The
@@ -90,6 +103,14 @@ Each attribute is a pair, `X, not Y`, where `Y` is the failure mode when `X` is 
 
 Five fields, all required. An attribute with no evidence line is aspirational and must say so.
 An attribute with no do/don't pair has not been made usable yet.
+
+In `brand.json` the block is one entry in `voice.attributes[]`: the "not" half is `notThis`, the
+"we are" half is `doThis`, and the lines that demonstrate it go in that attribute's own
+`examples[]`. A line only belongs there if it demonstrates THAT trait. The deck prints each
+attribute's lines under that attribute and nowhere else, so a line filed under the wrong trait
+becomes an attribution nobody made, printed as though somebody had. Lines that demonstrate the
+brand rather than one trait belong in `voice.examples[]`, and a sentence for a hard moment belongs
+in `voice.vocabulary.hardThings[]` beside the situation it is said in.
 
 ### Choosing the set
 

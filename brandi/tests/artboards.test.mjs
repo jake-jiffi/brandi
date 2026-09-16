@@ -7,6 +7,7 @@ import { validateArtboard, BANNED_FONTS } from '../scripts/canvas.mjs';
 import { buildSystem, resolveToken } from '../scripts/system.mjs';
 import { systemInputFromBrand } from '../scripts/brandfile.mjs';
 import { contrastRatio } from '../scripts/color.mjs';
+import { findChrome, toPreviewHtml } from '../scripts/preview.mjs';
 
 const FIXTURE = path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json');
 
@@ -346,6 +347,41 @@ describe('wordmark and construction sheet', () => {
   test('joins the specification set', () => {
     const files = A.specificationSheets(system).map((s) => s.file);
     assert.ok(files.includes('Logo.dc.html'));
+  });
+
+  test('the frame is tall enough for the misuse grid, which used to run off the bottom', () => {
+    // 2000px fixed, against a sheet Chrome measures at 2407px: the last row of
+    // misuses, the one section drawn rather than described, was clipped.
+    const sheet = A.specificationSheets(system).find((s) => s.file === 'Logo.dc.html');
+    assert.equal(sheet.h, A.logoSheetHeight());
+    const rows = Math.ceil(A.LOGO_MISUSES.length / 4);
+    assert.ok(sheet.h >= 2173 + rows * 116 + rows * 2, `${sheet.h}px does not hold ${rows} rows of misuses`);
+    assert.equal((src.match(/Never /g) ?? []).length, A.LOGO_MISUSES.length, 'every misuse is drawn');
+  });
+
+  test('renders inside its frame in a real browser', { skip: findChrome() ? false : 'no headless browser on this machine' }, async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { pathToFileURL } = await import('node:url');
+    const run = promisify(execFile);
+    const dir = await mkdtemp(path.join(tmpdir(), 'brandi-logo-sheet-'));
+    try {
+      const file = path.join(dir, 'Logo.preview.html');
+      const measured = toPreviewHtml(src, { width: 1200 }).replace('</body>',
+        '<script>addEventListener("load",()=>document.body.setAttribute("data-h",String(Math.ceil(document.querySelector("x-dc").getBoundingClientRect().height))))</script></body>');
+      await writeFile(file, measured);
+      const { stdout } = await run(findChrome(), [
+        '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+        '--virtual-time-budget=4000', '--window-size=1200,800', '--dump-dom', pathToFileURL(file).href,
+      ], { timeout: 45000, maxBuffer: 64 * 1024 * 1024 });
+      const height = Number(/data-h="(\d+)"/.exec(stdout)?.[1]);
+      assert.ok(height > 2000, `the sheet measured ${height}px, which is not a real render`);
+      assert.ok(height <= A.logoSheetHeight(), `the sheet is ${height}px tall inside a ${A.logoSheetHeight()}px frame`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

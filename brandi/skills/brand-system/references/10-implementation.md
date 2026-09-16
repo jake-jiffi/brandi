@@ -1,8 +1,7 @@
 # 10 · Implementation
 
-> `$A` is the Brandi command line, resolved once at the start of the session: `brandi` when the
-> plugin is installed, or `node <this skill's base directory>/../../scripts/brandi.mjs` from a clone.
-> It is never a bare relative path: the working directory is the user's project, not the plugin.
+> `$A` is the Brandi command line, resolved once by the snippet at the top of the `brand-system` or
+> `logo-forge` skill. It is never a bare relative path: the working directory is the user's project.
 
 Getting the system into real code, and keeping it there.
 
@@ -360,15 +359,14 @@ With `inline`, `bg-surface-page` compiles to `background-color: var(--surface-pa
 resolves per element and therefore picks up a `data-theme` set on any ancestor. Without it, the
 substitution happens once at `:root` and a scoped override is ignored.
 
-**One sharp edge worth knowing about.** For the namespaces where Tailwind's name matches Brandi's
-own (`--text-*`, `--font-*`, `--radius-*`, `--shadow-*`, and the raw ramp steps), the generated
-`@theme` line is literally self-referential: `--text-base: var(--text-base)`. It works, and it works
-for a specific reason: `tokens.css` is imported unlayered, Tailwind puts its `@theme` output in
-`@layer theme`, and an unlayered declaration beats a layered one, so the `tokens.css` value wins and
-the self-reference never resolves. That is a load-bearing accident. If you import `tokens.css`
-*inside* a cascade layer, both declarations land in the same layer, the reference becomes a cycle,
-and those custom properties go invalid with no error message. **Import `tokens.css` unlayered**, or
-run `brandi tokens --prefix acme` so the names cannot collide in the first place.
+**Where the names collide, the values are literals.** For the namespaces where Tailwind's name is
+the same as the one `tokens.css` uses (`--text-*`, `--font-*`, `--radius-*`, `--shadow-*`, and the
+raw ramp steps), `toTailwind()` writes the value itself into `@theme` rather than a `var()` back to
+`tokens.css`, so nothing is self-referential and import order does not matter. Only the semantic
+colours (`--color-surface-page: var(--surface-page)`) and spacing (`--spacing-4: var(--space-4)`)
+are aliases, because those names differ. The cost is that a ramp utility means that step in both
+themes, which is what a ramp step should mean. `brandi tokens --prefix acme` still namespaces
+everything if another token file is already using the plain names.
 
 ### 3.3 Next.js App Router
 
@@ -410,7 +408,7 @@ Do not scatter `body.className` through components. One binding, at the root.
 
 **Check the licence before self-hosting.** Webfont licences are usually metered on pageviews or
 domains, and server-side rendering to PDF or images is frequently a separate tier that nobody bought.
-See the licence table in the evidence base and `07-voice-framework.md`'s sibling coverage of type.
+See the licence table in `01-evidence-protocol.md`.
 
 **Avoiding the flash.** See §4. In App Router it is a blocking inline script in the root layout's
 `<head>`, plus `suppressHydrationWarning` on `<html>` because the script mutates an attribute the
@@ -751,19 +749,10 @@ Every step is individually reasonable. That is what makes it drift rather than n
 `.mjs`, `.cjs`, `.ts`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.astro`, `.md`, `.mdx`) and reports.
 It never edits.
 
-| Check | Level | Catches |
-|---|---|---|
-| **Off-palette colour** | error | A hex that is not in any ramp, any semantic token, or black/white. Step 1 above |
-| **Near-palette colour** | warn | A hex within 0.03 OKLab distance of a palette colour. Since about 0.02 is a just-noticeable difference, this is "almost, but not exactly, the brand blue", which is worse than being obviously wrong because nobody sees it |
-| **Off-brand typeface** | warn | Any `font-family` whose first entry is not a brand face |
-| **Banned typeface** | error | Inter, Roboto, Arial, Helvetica Neue, Fraunces, Poppins, Montserrat, Open Sans, Lato, Nunito, Raleway. The faces that make work look machine-generated |
-| **Banned vocabulary** | warn | Words on the brand's do-not-use list |
-| **`outline: none`** | error | With no `:focus-visible` anywhere in the file. WCAG 2.2 2.4.7 |
-| **`@keyframes`** | info | With no `prefers-reduced-motion` anywhere in the file |
-| **Purple/indigo gradient** | warn | The most recognisable machine-generated design tell |
-| **Gradient orb** | warn | Blurred radial gradient in a circle |
-| **Lorem ipsum** | error | Placeholder text in shipped work |
-| **Rounded card with a left accent stripe** | warn | The most-generated component on the internet |
+The findings and their levels are tabled once, in the `brand-guardian` skill; the machine patterns
+behind the house-floor rows are in `anti-slop.contract.md`. Two of them are worth knowing here
+because they are the ones code trips: a near-palette colour (within 0.03 OKLab of a palette colour,
+so "almost the brand blue", which nobody sees) warns, and a hard-banned typeface errors.
 
 Exit code is non-zero when there is at least one error, so it wires into CI without a wrapper:
 
@@ -797,7 +786,8 @@ accumulating the same debt as a codebase with a stray hex, and it is harder to s
 $A guardian
 ```
 
-writes a Claude Code skill named after the brand (default `~/.claude/skills/<slug>-brand/`),
+writes a skill named after the brand (default `~/.claude/skills/<slug>-brand/`, also linked into
+`~/.agents/skills/` for Codex when that directory exists),
 containing a `SKILL.md` with the colour table, the type rules, the shape and motion stances, the
 voice attributes, the banned vocabulary and the check command, plus a `rules.json` with the machine
 form: the full palette map, the fonts, the banned fonts, the banned words, the slop patterns as

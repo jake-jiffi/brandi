@@ -213,6 +213,25 @@ describe('validateArtboard: the house rules', () => {
     assert.equal(r.warnings.some((w) => /machine-generated/.test(w.message)), false);
   });
 
+  test('a banned face the brand itself records is a warning, never an error', () => {
+    // One decision, one severity. `system` already warns about a recorded
+    // banned face; the same face used to be an error here, so the brand's own
+    // display face blocked the brand's own canvas.
+    const src = K.artboard({ name: 'X', body: '<p style="font-family: Inter, sans-serif">x</p>' });
+    const recorded = K.validateArtboard(src, { brandFonts: ['Inter', 'Karla'] });
+    assert.equal(recorded.ok, true, JSON.stringify(recorded.errors));
+    assert.ok(recorded.warnings.some((w) => w.rule === 'banned-font' && /recorded faces/.test(w.message)));
+    const stray = K.validateArtboard(src, { brandFonts: ['Fraunces', 'Karla'] });
+    assert.equal(stray.ok, false, 'Inter is still an error when it is not the brand face');
+    assert.ok(stray.errors.some((e) => e.rule === 'banned-font'));
+  });
+
+  test('anti-slop errors carry a rule, structural errors do not', () => {
+    const r = K.validateArtboard('<html><body><p style="font-family: Inter">x</p></body></html>');
+    assert.ok(r.errors.some((e) => !e.rule && /support\.js/.test(e.message)), 'a missing support line is structural');
+    assert.ok(r.errors.some((e) => e.rule === 'banned-font'), 'a banned face is an anti-slop finding');
+  });
+
   test('flags a purple gradient', () => {
     const r = check('<div style="background: linear-gradient(135deg, #8b5cf6, #6366f1)">x</div>');
     assert.ok(r.warnings.some((w) => /purple or indigo/.test(w.message)));

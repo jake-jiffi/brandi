@@ -740,7 +740,7 @@ export function contentsArtboard(system, { brandName = 'Brand', version = null, 
   const elsewhere = [
     ['brand/brand.json', 'The source of truth. Evidence, decisions, open questions, and every choice that made this system.'],
     ['brand/tokens/', 'The same system as CSS custom properties, Tailwind, TypeScript, JSON and Style Dictionary.'],
-    ['brand/brand-book.html', 'The written guidelines, in nineteen sections, including the misuse page.'],
+    ['brand/brand-book.html', 'The brand guidelines as a deck, one idea per page, logo and misuse drawn; --print for the A4 book.'],
     ['brandi check <paths>', 'Holds real work against this system: off-palette colour, off-brand type, banned vocabulary.'],
   ];
 
@@ -896,30 +896,29 @@ ${(messages.length ? messages : audiences.map((a) => ({ audience: typeof a === '
  * optical weight so the next fifty match. They are a starting point that proves
  * the spec is buildable, not a complete set, and the sheet says so.
  */
-export function iconsArtboard(system, { brandName = 'Brand', iconography = {} } = {}) {
-  const fonts = googleFontsUrl([system.type.fonts.display, system.type.fonts.body, system.type.fonts.mono]);
-  const r = (k) => resolveToken(system.semantic.light[k], system, 'light');
-  const muted = r('text.secondary');
-  const rule = r('border.subtle');
-  const ink = r('text.primary');
-
-  const grid = Number(iconography.grid) || 24;
-  const stroke = Number(iconography.strokePx) || 2;
+/**
+ * The icon spec, resolved from what the brand recorded, and eight primitives
+ * drawn to it. Shared by the icons sheet and the brand book so the two cannot
+ * disagree about the grid, the stroke or the terminals.
+ */
+export function iconPrimitives({ grid: gridIn, strokePx, style: styleIn, shape } = {}) {
+  const grid = Number(gridIn) || 24;
+  const stroke = Number(strokePx) || 2;
   // A recorded statement beats an inferred one. Saying "square terminals" and
   // getting round caps because the shape stance is `rounded` is the tool
   // overruling the brand, which is the one thing it must never do. The stance
   // is only consulted when nobody said.
-  const style = String(iconography.style ?? '');
+  const style = String(styleIn ?? '');
   const rounded = /\b(square|flat|butt|sharp)\b/i.test(style) ? false
     : /\bround/i.test(style) ? true
-      : system.meta.shape !== 'sharp';
+      : shape !== 'sharp';
   const cap = rounded ? 'round' : 'butt';
   const join = rounded ? 'round' : 'miter';
 
   // Coordinates are expressed as fractions of the grid so the set redraws
   // correctly at 16, 20 or 32 without anybody editing a path.
   const u = (n) => Number((n * grid / 24).toFixed(2));
-  const ICONS = [
+  const icons = [
     ['search', `<circle cx="${u(11)}" cy="${u(11)}" r="${u(7)}"/><path d="M${u(16)} ${u(16)} L${u(21)} ${u(21)}"/>`],
     ['close', `<path d="M${u(5)} ${u(5)} L${u(19)} ${u(19)} M${u(19)} ${u(5)} L${u(5)} ${u(19)}"/>`],
     ['check', `<path d="M${u(4)} ${u(13)} L${u(9)} ${u(18)} L${u(20)} ${u(6)}"/>`],
@@ -929,9 +928,21 @@ export function iconsArtboard(system, { brandName = 'Brand', iconography = {} } 
     ['pin', `<path d="M${u(12)} ${u(21)} C${u(12)} ${u(21)} ${u(19)} ${u(14)} ${u(19)} ${u(10)} A${u(7)} ${u(7)} 0 1 0 ${u(5)} ${u(10)} C${u(5)} ${u(14)} ${u(12)} ${u(21)} ${u(12)} ${u(21)} Z"/><circle cx="${u(12)}" cy="${u(10)}" r="${u(2.5)}"/>`],
     ['phone', `<path d="M${u(6)} ${u(4)} L${u(10)} ${u(4)} L${u(12)} ${u(9)} L${u(9)} ${u(11)} C${u(10)} ${u(14)} ${u(10)} ${u(14)} ${u(13)} ${u(15)} L${u(15)} ${u(12)} L${u(20)} ${u(14)} L${u(20)} ${u(18)} C${u(13)} ${u(19)} ${u(5)} ${u(11)} ${u(6)} ${u(4)} Z"/>`],
   ];
-
   const draw = (body, size, colour) =>
     `<svg width="${size}" height="${size}" viewBox="0 0 ${grid} ${grid}" fill="none" stroke="${colour}" stroke-width="${stroke}" stroke-linecap="${cap}" stroke-linejoin="${join}" aria-hidden="true">${body}</svg>`;
+  return { grid, stroke, cap, join, icons, draw };
+}
+
+export function iconsArtboard(system, { brandName = 'Brand', iconography = {} } = {}) {
+  const fonts = googleFontsUrl([system.type.fonts.display, system.type.fonts.body, system.type.fonts.mono]);
+  const r = (k) => resolveToken(system.semantic.light[k], system, 'light');
+  const muted = r('text.secondary');
+  const rule = r('border.subtle');
+  const ink = r('text.primary');
+
+  const { grid, stroke, cap, join, icons: ICONS, draw } = iconPrimitives({
+    grid: iconography.grid, strokePx: iconography.strokePx, style: iconography.style, shape: system.meta.shape,
+  });
 
   const body = `<div class="sheet">
   <div class="sheet__head">
@@ -1130,7 +1141,7 @@ export function specificationSheets(system, opts = {}) {
     { file: 'Components.dc.html', source: componentsArtboard(system, { ...opts, mode: 'light' }), w: FRAMES.sheet.w, h: 2140 },
     { file: 'ComponentsDark.dc.html', source: componentsArtboard(system, { ...opts, mode: 'dark' }), w: FRAMES.sheet.w, h: 2140 },
     { file: 'Tokens.dc.html', source: tokenSheetArtboard(system, opts), w: FRAMES.sheet.w, h: 980 + system.space.length * 22 + system.layout.breakpoints.length * 26 + 300 },
-    { file: 'Logo.dc.html', source: wordmarkArtboard(system, opts), w: FRAMES.sheet.w, h: 2000 },
+    { file: 'Logo.dc.html', source: wordmarkArtboard(system, opts), w: FRAMES.sheet.w, h: logoSheetHeight() },
     {
       file: 'Production.dc.html',
       source: productionArtboard(system, { ...opts, logo: identity.logo ?? {} }),
@@ -1155,7 +1166,7 @@ export function specificationSheets(system, opts = {}) {
 export default {
   paletteArtboard, typographyArtboard, componentsArtboard, tokenSheetArtboard,
   wordmarkArtboard, contentsArtboard, specificationSheets, googleFontsUrl,
-  primaryButtonLabel, BUTTON_STATES,
+  primaryButtonLabel, BUTTON_STATES, iconPrimitives,
 };
 
 // ---------------------------------------------------------------------------
@@ -1180,6 +1191,39 @@ export default {
  * file. The sheet says so: measure it against the outlined mark before this
  * goes to a signwriter.
  */
+/**
+ * The misuses the Logo sheet draws. Captions are imperative, because the
+ * template puts "Never " in front of them. They used to be past participles,
+ * which shipped eight captions reading "do not rotated".
+ */
+export const LOGO_MISUSES = Object.freeze([
+  { id: 'stretch', label: 'stretch it' },
+  { id: 'squash', label: 'squash it' },
+  { id: 'rotate', label: 'rotate it, at any angle' },
+  { id: 'recolour', label: 'recolour it outside the approved variants' },
+  { id: 'shadow', label: 'add a shadow, glow or bevel' },
+  { id: 'outline', label: 'outline it' },
+  { id: 'crowd', label: 'crowd it: the clear space is a rule' },
+  { id: 'retype', label: 'retype it in the body face' },
+]);
+const MISUSE_COLUMNS = 4;
+const MISUSE_CELL = 116;
+const MISUSE_GAP = 2;
+
+/**
+ * The Logo sheet's frame height, from what is on it.
+ *
+ * The frame was a fixed 2000px and the sheet is 2407px tall, so the misuse
+ * grid ran off the bottom of the frame: the one section drawn rather than
+ * described was the one nobody could see. Everything above the grid measures
+ * 2173px in Chrome with the fixture brand; the rest is the grid's rows plus
+ * room for a long face name to wrap the subtitle.
+ */
+export function logoSheetHeight() {
+  const rows = Math.ceil(LOGO_MISUSES.length / MISUSE_COLUMNS);
+  return 2220 + rows * (MISUSE_CELL + MISUSE_GAP);
+}
+
 export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.03em', capHeightEm = 0.72 } = {}) {
   const fonts = googleFontsUrl([system.type.fonts.display, system.type.fonts.body, system.type.fonts.mono]);
   const { display, body, mono } = fontStacks(system);
@@ -1199,20 +1243,19 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
   // Clear space is drawn as a dashed frame one cap height out from the mark.
   const clearSpacePx = Math.round(88 * capHeightEm);
 
-  // Captions are imperative, because the template puts "Never " in front of
-  // them. They used to be past participles, which shipped eight captions
-  // reading "do not rotated". The style is keyed by `id` so the caption can be
-  // rewritten without breaking the drawing.
-  const misuse = [
-    { id: 'stretch', label: 'stretch it', style: `transform: scaleX(1.45); transform-origin: left center;` },
-    { id: 'squash', label: 'squash it', style: `transform: scaleY(0.62); transform-origin: left center;` },
-    { id: 'rotate', label: 'rotate it, at any angle', style: `transform: rotate(-7deg); transform-origin: left center;` },
-    { id: 'recolour', label: 'recolour it outside the approved variants', style: `color: #C026D3;` },
-    { id: 'shadow', label: 'add a shadow, glow or bevel', style: `text-shadow: 2px 3px 0 rgba(0,0,0,.35);` },
-    { id: 'outline', label: 'outline it', style: `-webkit-text-stroke: 1px ${brand}; color: transparent;` },
-    { id: 'crowd', label: 'crowd it: the clear space is a rule', style: '' },
-    { id: 'retype', label: 'retype it in the body face', style: `font-family: ${body};` },
-  ];
+  // The style is keyed by `id` so the caption can be rewritten without
+  // breaking the drawing.
+  const misuseStyle = {
+    stretch: `transform: scaleX(1.45); transform-origin: left center;`,
+    squash: `transform: scaleY(0.62); transform-origin: left center;`,
+    rotate: `transform: rotate(-7deg); transform-origin: left center;`,
+    recolour: `color: #C026D3;`,
+    shadow: `text-shadow: 2px 3px 0 rgba(0,0,0,.35);`,
+    outline: `-webkit-text-stroke: 1px ${brand}; color: transparent;`,
+    crowd: '',
+    retype: `font-family: ${body};`,
+  };
+  const misuse = LOGO_MISUSES.map((m) => ({ ...m, style: misuseStyle[m.id] }));
 
   const body_ = `<div class="sheet">
   <div class="sheet__head">
@@ -1274,8 +1317,8 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
   <div class="block">
     <div class="block__title"><h2>Misuse</h2><span class="eyebrow">${misuse.length} specific ways to get it wrong</span></div>
     <p class="block__note">These are drawn rather than described, because a rule people have seen broken is a rule they remember. Everything here is forbidden without exception.</p>
-    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; background: ${rule};">
-      ${misuse.map((m) => `<div style="background: ${paper}; padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; min-height: 116px; overflow: hidden;">
+    <div style="display: grid; grid-template-columns: repeat(${MISUSE_COLUMNS}, minmax(0, 1fr)); gap: ${MISUSE_GAP}px; background: ${rule};">
+      ${misuse.map((m) => `<div style="background: ${paper}; padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; min-height: ${MISUSE_CELL}px; overflow: hidden;">
         <div style="flex: 1; display: flex; align-items: center; ${m.id === 'crowd' ? `gap: 4px;` : ''}">
           ${m.id === 'crowd' ? `<span style="font-family: ${body}; font-size: 13px; color: ${muted};">Est.</span>` : ''}
           ${mark(26, ink, m.style)}

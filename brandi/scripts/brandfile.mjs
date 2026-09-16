@@ -144,6 +144,7 @@ export function emptyBrand({ name = null, slug = null, now = new Date() } = {}) 
       iconography: { style: null, grid: 24, strokePx: 2, source: null },
     },
     voice: {
+      statement: null,
       attributes: [],
       tone: [],
       vocabulary: { use: [], avoid: [], hardThings: [] },
@@ -155,6 +156,7 @@ export function emptyBrand({ name = null, slug = null, now = new Date() } = {}) 
       decisions: [],
       openQuestions: [],
       nonGoals: [],
+      antiPatterns: [],
       changeLog: [],
     },
   };
@@ -196,12 +198,26 @@ export function addEvidence(brand, { claim, provenance, source = null, confidenc
   return entry;
 }
 
+/**
+ * The date where the person is, not where the server thinks it is.
+ *
+ * `toISOString` is UTC, so anywhere east of Greenwich records the previous day
+ * for the first hours of the morning: a decision taken at 09:21 in Melbourne
+ * was logged as yesterday, in a file whose locale is en-AU. The evidence
+ * timestamps stay UTC on purpose, because those are instants; a decision's date
+ * is the day somebody made it.
+ */
+export function localDate(d = new Date()) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 /** Record a decision, so a year from now someone can tell what was deliberate. */
 export function addDecision(brand, { decision, rationale, alternatives = [], owner = null, now = new Date() }) {
   if (!decision || !rationale) throw new TypeError('a decision needs both the decision and the reason for it');
   const entry = {
     id: `d${brand.governance.decisions.length + 1}`,
-    date: now.toISOString().slice(0, 10),
+    date: localDate(now),
     decision,
     rationale,
     alternatives,
@@ -391,6 +407,151 @@ export function validateBrand(brand, { phase = null } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Field paths
+// ---------------------------------------------------------------------------
+
+/** Does this schema node admit a value of the given JSON type? */
+const typeAllows = (node, type) => {
+  const t = node.type;
+  if (t == null) return type === 'object' ? Boolean(node.properties) : type === 'array' ? Boolean(node.items) : true;
+  return Array.isArray(t) ? t.includes(type) : t === type;
+};
+
+/** Levenshtein distance, for "did you mean". Small inputs, so the plain grid. */
+function editDistance(a, b) {
+  const rows = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) rows[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      rows[i][j] = Math.min(
+        rows[i - 1][j] + 1,
+        rows[i][j - 1] + 1,
+        rows[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+  }
+  return rows[a.length][b.length];
+}
+
+/** The valid key nearest to a typo, or null when nothing is close. */
+function nearestKey(typed, keys) {
+  const lower = typed.toLowerCase();
+  const exact = keys.find((k) => k.toLowerCase() === lower);
+  if (exact) return exact;
+  const prefixed = keys.find((k) => k.toLowerCase().startsWith(lower) || lower.startsWith(k.toLowerCase()));
+  if (prefixed) return prefixed;
+  let best = null;
+  for (const k of keys) {
+    const d = editDistance(lower, k.toLowerCase());
+    if (!best || d < best.d) best = { k, d };
+  }
+  return best && best.d <= Math.max(2, Math.ceil(typed.length / 2)) ? best.k : null;
+}
+
+/**
+ * Hold a dotted `set` path, and the value going into it, against the schema.
+ *
+ * `set nonexistent.path.here x` used to exit 0 and add a top-level key, and
+ * `set voice.attributes.0.not gushing` wrote a `not` key where the schema says
+ * `notThis`, so the companion skill then rendered "not [the opposite nobody
+ * would claim]". A source of truth that accepts any spelling is not one.
+ *
+ * The walk follows `properties` and `items`; a numeric segment indexes a list.
+ * Where the schema stops describing the shape (a list with no `items`, an
+ * object with `additionalProperties`), anything beneath is free-form and is
+ * let through. A leaf that carries a `pattern` refuses a value that does not
+ * match it, which is what stops `#GG0000` reaching the colour engine.
+ */
+export function checkFieldPath(schema, dotted, value) {
+  const keys = dotted.split('.');
+  const walked = [];
+  const here = () => walked.join('.') || 'the brand file';
+  let node = schema;
+  for (const k of keys) {
+    if (!node) break;
+    if (/^\d+$/.test(k)) {
+      if (!typeAllows(node, 'array')) {
+        return { ok: false, error: `${here()} is not a list, so it cannot take the index ${k}.` };
+      }
+      node = node.items ?? null;
+    } else if (node.properties && Object.hasOwn(node.properties, k)) {
+      node = node.properties[k];
+    } else if (node.properties && !node.additionalProperties) {
+      const near = nearestKey(k, Object.keys(node.properties));
+      const hint = near
+        ? `Did you mean ${[...walked, near].join('.')}?`
+        : `The fields under ${here()} are: ${Object.keys(node.properties).join(', ')}.`;
+      return { ok: false, error: `${dotted} is not a field in the brand file: ${here()} has no "${k}". ${hint}`, suggestion: near ? [...walked, near].join('.') : null };
+    } else if (typeAllows(node, 'object')) {
+      node = typeof node.additionalProperties === 'object' ? node.additionalProperties : null;
+    } else {
+      return { ok: false, error: `${here()} holds a ${[].concat(node.type ?? 'value').join(' or ')}, not an object, so it has no "${k}".` };
+    }
+    walked.push(k);
+  }
+
+  const leaf = node;
+  // The value's shape has to be the shape the schema declares. `set
+  // identity.type.licences '{"display":"x"}'` used to write an object where
+  // a list belongs and leave `status` to find it three commands later.
+  const shape = leaf ? checkShape(leaf, value, dotted) : null;
+  if (shape && !shape.ok) return shape;
+  const misfit = (v, n) => typeof v === 'string' && n?.pattern && !new RegExp(n.pattern).test(v);
+  const describe = (n) => (/^\^#\(/.test(n.pattern) ? 'is not a hex colour. Use #RGB or #RRGGBB.' : `does not match ${n.pattern}.`);
+  if (leaf && misfit(value, leaf)) return { ok: false, error: `${dotted}: "${value}" ${describe(leaf)}` };
+  if (leaf && Array.isArray(value) && leaf.items?.pattern) {
+    const bad = value.find((v) => misfit(v, leaf.items));
+    if (bad !== undefined) return { ok: false, error: `${dotted}: "${bad}" ${describe(leaf.items)}` };
+  }
+  // A schema enum is the list of answers the rest of the tool understands.
+  // `set identity.shape wobbly` used to write, and `system` then resolved a
+  // shape nobody had defined. Refuse, and list what is allowed.
+  if (leaf?.enum && !Array.isArray(value) && !leaf.enum.includes(value)) {
+    const allowed = leaf.enum.filter((v) => v !== null).map(String);
+    return { ok: false, error: `${dotted}: "${value}" is not one of the allowed values. Use one of: ${allowed.join(', ')}${leaf.enum.includes(null) ? ', or null' : ''}.` };
+  }
+  return { ok: true, value: shape?.value ?? value };
+}
+
+/** The JSON kind of a value, the way a schema `type` names it. */
+const kindOf = (v) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v === 'number' ? (Number.isInteger(v) ? 'integer' : 'number') : typeof v);
+
+/** An example of the shape a schema node wants, for an error message. */
+function exampleOf(node) {
+  if (typeAllows(node, 'array')) return `[${node.items ? exampleOf(node.items) : '…'}]`;
+  if (typeAllows(node, 'object') && node.properties) return `{${Object.keys(node.properties).slice(0, 3).map((k) => `"${k}": …`).join(', ')}}`;
+  if (typeAllows(node, 'object')) return '{…}';
+  if (node.oneOf) return exampleOf(node.oneOf[0]);
+  const t = [].concat(node.type ?? []).find((x) => x !== 'null');
+  return t === 'string' ? '"…"' : t === 'integer' || t === 'number' ? '0' : t === 'boolean' ? 'true' : '…';
+}
+
+/**
+ * Compare a value's kind with the kinds the schema node allows. A node with
+ * no `type` (a free-form or oneOf node) allows anything. A numeric string
+ * offered to a number field is coerced, because "22" typed at a prompt is
+ * the number 22; nothing else is coerced.
+ */
+function checkShape(node, value, dotted) {
+  const declared = [].concat(node.type ?? []);
+  if (!declared.length && !node.properties && !node.items) return { ok: true, value };
+  const allowed = declared.length ? declared : node.properties ? ['object'] : ['array'];
+  const kind = kindOf(value);
+  const numeric = allowed.includes('number') || allowed.includes('integer');
+  if (allowed.includes(kind) || (kind === 'integer' && allowed.includes('number'))) return { ok: true, value };
+  if (kind === 'string' && numeric && /^-?\d+(\.\d+)?$/.test(value) && (allowed.includes('number') || /^-?\d+$/.test(value))) {
+    return { ok: true, value: Number(value) };
+  }
+  const want = allowed.filter((t) => t !== 'null');
+  const noun = { array: 'a list', object: 'an object', string: 'a string', integer: 'a whole number', number: 'a number', boolean: 'true or false' };
+  const got = { array: 'a list', object: 'an object', string: 'a string', integer: 'a number', number: 'a number', boolean: 'a boolean', null: 'null' }[kind] ?? kind;
+  return {
+    ok: false,
+    error: `${dotted} must be ${want.map((t) => noun[t] ?? t).join(' or ')}${allowed.includes('null') ? ' (or null)' : ''}, not ${got}. Expected shape: ${exampleOf(node)}`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Phases
 // ---------------------------------------------------------------------------
 
@@ -400,10 +561,22 @@ export function nextPhase(id) {
   return i >= 0 && i < PHASES.length - 1 ? PHASES[i + 1].id : null;
 }
 
-/** Mark a phase done and advance. Refuses to advance past a broken file. */
+/**
+ * Mark a phase done and advance. Refuses to advance past a broken file, and
+ * refuses to complete a phase whose predecessors are not done: `complete
+ * intake` before `complete recon` used to succeed in silence, and a later
+ * `complete recon` then announced "Next: Intake" for a phase already marked
+ * done. The cursor lands on the first phase still incomplete.
+ */
 export function completePhase(brand, id, { now = new Date() } = {}) {
-  if (!PHASES.some((p) => p.id === id)) {
+  const at = PHASES.findIndex((p) => p.id === id);
+  if (at < 0) {
     throw new TypeError(`Unknown phase "${id}". The phases are: ${PHASES.map((p) => p.id).join(', ')}.`);
+  }
+  const completed = asArray(brand.brandi?.completed);
+  const skipped = PHASES.slice(0, at).find((p) => !completed.includes(p.id));
+  if (skipped) {
+    throw new Error(`Cannot complete "${id}" before "${skipped.id}" is complete. Finish ${skipped.name} first: brandi complete ${skipped.id}`);
   }
   const check = validateBrand(brand, { phase: id });
   if (!check.ok) {
@@ -411,8 +584,9 @@ export function completePhase(brand, id, { now = new Date() } = {}) {
     e.findings = check;
     throw e;
   }
-  if (!brand.brandi.completed.includes(id)) brand.brandi.completed.push(id);
-  brand.brandi.phase = nextPhase(id) ?? id;
+  if (!completed.includes(id)) completed.push(id);
+  brand.brandi.completed = completed;
+  brand.brandi.phase = PHASES.find((p) => !completed.includes(p.id))?.id ?? PHASES.at(-1).id;
   brand.brandi.updated = now.toISOString();
   return brand.brandi.phase;
 }
@@ -513,7 +687,7 @@ export function systemInputFromBrand(brand) {
 
 export default {
   emptyBrand, slugify, addEvidence, addDecision, addOpenQuestion,
-  validateBrand, completePhase, nextPhase, status,
+  validateBrand, checkFieldPath, completePhase, nextPhase, status,
   loadBrand, saveBrand, systemInputFromBrand,
   PHASES, PROVENANCE, BRAND_FILE_VERSION,
 };

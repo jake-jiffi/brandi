@@ -20,11 +20,9 @@ Three tiers. Only Tier 0 is asked. Tier 1 is Claude's job. Tier 2 is the registe
 
 ### TIER 0: the only thing asked up front
 
-**Four questions. Under 90 seconds. Batched, presented together, answerable by tapping.**
-
-Every question has two to four concrete options and an escape hatch. The escape hatch is not
-a fallback: a free-text answer is always more useful than a tapped one, so never phrase it
-apologetically and never treat it as a failure to answer.
+The four questions the harness asks, with their options and what each answer changes. How to
+ask them (one batch, the free-text escape hatch, never a fifth, a skipped answer becomes an open
+question) is in `SKILL.md` and is not repeated here.
 
 ---
 
@@ -35,8 +33,8 @@ apologetically and never treat it as a failure to answer.
 - **C.** Replacing what exists, deliberately. The current brand is wrong and we know it.
 - **D.** Something else: `[  ]`
 
-*Changes:* whether existing assets are constraints or candidates for retirement; whether §22
-of the book carries a migration plan; whether logo work is in scope; how much of the book is
+*Changes:* whether existing assets are constraints or candidates for retirement; whether the
+decisions carry a migration plan; whether logo work is in scope; how much of the book is
 `EXTRACTED` versus `DECIDED`.
 
 ---
@@ -48,7 +46,7 @@ of the book carries a migration plan; whether logo work is in scope; how much of
 - **D.** A marketplace, a directory, a referral partner, or a platform.
 - **E.** Honestly not sure, or it is a mix: `[  ]`
 
-*Changes:* the application set in §17 (a word-of-mouth business needs a card, a sign and a
+*Changes:* the application set in `applications[]` (a word-of-mouth business needs a card, a sign and a
 vehicle before it needs a social kit); which channel's evidence carries most weight in Tier 1;
 which distinctive assets are worth investing in.
 
@@ -79,13 +77,9 @@ specifications and the machine-readable layer.
 
 ---
 
-**Rules for Tier 0:**
-- Present all four at once. Do not conduct an interview.
-- Never ask a fifth. If a fifth question feels essential, it is a Tier 1 question you have not
-  worked out how to answer yet.
+**Two rules the skill does not state:**
 - Every option is a plain sentence a busy person recognises. No jargon, no "which best
   describes your brand personality", no sliders.
-- A skipped question is `OPEN`, not a blocker. Proceed with the assumption tagged.
 - Record every answer as `SUPPLIED` with the date.
 
 ### TIER 1: Claude answers these from evidence
@@ -314,7 +308,7 @@ it as what it is:
    local competitors. If three or more already use it, uniqueness is low. Record the count and
    the date. Tag `[EXTRACTED: competitor scan, N=20 | 2026-08-29]`.
 3. **Fame proxy:** none exists without asking people. Assume fame is zero for a new asset and
-   say so. `[ASSUMED: no measurement | OQ-NN]`.
+   say so. `[ASSUMED: no measurement | qN]`.
 4. Log an open question recommending the cheap real test: show the asset without the name to
    twenty customers over a fortnight and count who names the business.
 
@@ -644,10 +638,10 @@ four seconds.
 
 ### Tier 2, registered
 
-- **OQ-01** Repeat rate. Assumed high from review language. High priority: pillar 2 leans on it.
-- **OQ-02** Revenue mix across grooming, wash-only, and puppy first-groom. Medium: positioning
+- **q1** Repeat rate. Assumed high from review language. High priority: pillar 2 leans on it.
+- **q2** Revenue mix across grooming, wash-only, and puppy first-groom. Medium: positioning
   should lead with the service that pays, and we do not know which it is.
-- **OQ-03** Is the green ownable locally? Two of the twenty local businesses scanned use a green.
+- **q3** Is the green ownable locally? Two of the twenty local businesses scanned use a green.
   Medium, with a recommendation to test.
 
 ### Frame and parity
@@ -683,7 +677,7 @@ uncontested locally. It was chosen deliberately, with the exclusion written down
 
 **Rejected:** "Brunswick's friendliest groomers." Rejected because friendliness is a point of
 parity, all four competitors claim it, and it gives no reason to drive past two cheaper salons.
-Logged as `DL-002`.
+Logged as `d2`.
 
 **Scoring the chosen territory:** Distinctiveness 5 (nobody local says it) · Credibility 5
 (true today, verifiable from the calendar) · Relevance 4 (6 of 22 reviews raise it unprompted,
@@ -708,7 +702,7 @@ Nadia and became a live business conversation, which is the point of a pre-morte
 
 | Candidate | Uniqueness proxy | Fame | Verdict |
 |---|---|---|---|
-| Deep green `#2E5A50` | 2 of 20. Under the three-competitor threshold, so not disqualified, but green is the category's safe colour and the margin is thin. `[E: scan N=20 \| 2026-08-29]` | Unmeasured `[A \| OQ-03]` | Keep, but it is not the lead asset |
+| Deep green `#2E5A50` | 2 of 20. Under the three-competitor threshold, so not disqualified, but green is the category's safe colour and the margin is thin. `[E: scan N=20 \| 2026-08-29]` | Unmeasured `[A \| q3]` | Keep, but it is not the lead asset |
 | The hand-lettered wordmark | Unique. Nobody else is hand-lettered. | Unmeasured, but it is on the sign and the van already | **Lead asset.** Redraw as vector, change nothing else |
 | "One dog at a time" as a lockup line | Unique locally | Zero | Investable. Put it on everything, unchanged, for three years |
 | A dog silhouette icon | 11 of 20 competitors use one | High category fame, near-zero uniqueness | **Drop.** This is the category's asset, not hers |
@@ -724,7 +718,7 @@ concern. What it generated: patient sentence rhythm, specific reassurance instea
 warmth ("you will get a photo when the dryer goes off", not "we'll take great care of them"),
 and imagery of calm rather than imagery of affection.
 
-The label went into `DL-004` with that rationale. It appears nowhere in the brand book as a
+The label went into `d4` with that rationale. It appears nowhere in the brand book as a
 claim and nowhere in customer copy at all.
 
 ### Messaging hierarchy
@@ -738,7 +732,7 @@ becoming a problem.
 | 2 | No cage drying, ever | Policy. No cage dryer on the premises (photographed). | `S` `E` |
 | 3 | ~~We remember your dog~~ | 5 of 22 reviews mention it by name, which is evidence of the impression, not of the practice. Nadia keeps notes but there is no system. | **demoted** |
 
-Pillar 3 was demoted to `OQ-04` with a recommendation: if the notes become a per-client record
+Pillar 3 was demoted to `q4` with a recommendation: if the notes become a per-client record
 in the booking system, it becomes provable in a fortnight and can be promoted. Until then it is
 not said in customer-facing copy. Nadia's reaction to that was to set the system up, which is
 the best outcome this process produces.
@@ -752,7 +746,7 @@ own" · anything with an exclamation mark · any price framing · "professional 
 
 ### What the book carried out of this
 
-- Positioning, three variants, `DL-001` and `DL-002`.
+- Positioning, three variants, `d1` and `d2`.
 - Two pillars with proof, one hypothesis in the register.
 - Lead distinctive asset identified (the wordmark) and one asset explicitly killed (the
   silhouette), both in the decision log.

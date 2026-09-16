@@ -34,11 +34,13 @@ have it. The glob below covers that, and a clone covers the rest.
 # is exactly the session someone installs it in.
 A="$(command -v brandi || true)"
 [ -z "$A" ] && A="$(ls -d "$HOME"/.claude/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
+[ -z "$A" ] && A="$(ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
 [ -z "$A" ] && A="<this skill's base directory>/../../bin/brandi"
 "$A" status
 ```
 
-If none of those resolve, say so plainly rather than improvising a path.
+If none of those resolve, say so plainly rather than improvising a path. Wherever this file or a
+reference writes `<brandi>`, it means the plugin root, `$(dirname "$A")/..`.
 
 ```bash
 $A init --name "Acme"          # create brand/brand.json
@@ -53,7 +55,7 @@ $A tokens                       # DTCG json, css, tailwind, typescript
 $A sheets                       # write the specification artboards
 $A validate --dir brand/canvas  # check artboards before publishing
 $A canvas --dir brand/canvas --title "Acme brand" --out acme-brand.html
-$A book --pdf                   # the brand book
+$A book --pdf                   # the brand book: a 16:9 deck (add --print for the A4 book)
 $A guardian                     # the companion enforcement skill
 $A check <paths>                # hold real work against the brand
 $A complete <phase>             # mark a phase done and advance
@@ -113,7 +115,8 @@ artefact and `published` for anything from their own channels. Then `$A complete
 ### 2. Intake (ONE batch of questions, then nothing)
 
 This is the only place you interrogate the user. Use **one** `AskUserQuestion` call with these four
-questions. The whole thing should take under ninety seconds.
+questions. The whole thing should take under ninety seconds. If there is no `AskUserQuestion` tool,
+ask the four questions in one plain message and read the answers back.
 
 These assume you already know what the business does and who it serves. If you do not, because the
 prompt did not say and Recon found nothing, get that in one line first. It is the only thing worth a
@@ -265,8 +268,11 @@ a garment, composite the brand onto it:
 1. `$A mockup grid <photo>` writes a page showing the photograph under a percentage grid.
 2. **Open it and look.** Read the four corners of the surface the artwork goes on, clockwise from its
    top left, as x,y percentages.
-3. Record them under `identity.mockups` in `brand.json`, with the artwork.
-4. `$A mockup build` maps the artwork onto those corners and writes the artboard.
+3. Record them under `identity.mockups` in `brand.json`, each surface's `corners` with its
+   `artwork`: `$A set identity.mockups.0.surfaces.0.artwork '<svg…>'`, or the path to an SVG, PNG,
+   JPEG or WebP in the project.
+4. `$A mockup build` maps the artwork onto those corners and writes the artboard. A surface with no
+   artwork is refused, rather than composited empty and reported as done.
 
 The middle step is a person and cannot be automated. Four corners define the projective transform
 exactly, so everything after step 2 is arithmetic; everything before it is looking. The first attempt
@@ -309,13 +315,18 @@ Publish, show it, and `$A complete proof`.
 
 Then, after handing it over rather than before, send the working files to the `brand-critic` agent
 for a second pass. It reads only the files, never edits, and returns what is actually wrong ranked
-by consequence. Fix what it finds and say in a line what changed, or that it held up.
+by consequence. Fix what it finds and say in a line what changed, or that it held up. Without the
+`brand-critic` agent, run `$A check` and the seven questions in `<brandi>/agents/brand-critic.md`
+yourself.
 
 ### 8. Publish (no questions)
 
 ```bash
 $A tokens && $A book --pdf && $A guardian
 ```
+
+The book is a landscape deck, one idea per page, that shows the logo, draws the rules and includes
+every proof artboard in `brand/canvas`; `$A book --print --pdf` writes the A4 print book as well.
 
 Then tell the user, in a few plain sentences: what was decided, what is still open, and where the
 files are. Point at the companion skill and say what it does.
@@ -335,6 +346,11 @@ Always in this order. The validator exists because the format fails silently.
 4. Republish to the same path with the same favicon and the same contract, and no `capabilities`.
 
 Show the link and a sentence or two on what you drafted and assumed. Do not explain the editor.
+
+If there is no `design` skill or `Artifact` tool (Codex, or any session without them), stop after
+step 1 and render the artboards with `node <brandi>/scripts/preview.mjs --dir brand/canvas --out <dir>`;
+it frames each artboard the way canvas.json records it and writes an index page beside the PNGs.
+Hand that page over instead of a link.
 
 ## Standing rules
 

@@ -1,13 +1,12 @@
 # 08 · Logo system
 
-> `$A` is the Brandi command line, resolved once at the start of the session: `brandi` when the
-> plugin is installed, or `node <this skill's base directory>/../../scripts/brandi.mjs` from a clone.
-> It is never a bare relative path: the working directory is the user's project, not the plugin.
+> `$A` is the Brandi command line, resolved once by the snippet at the top of the `brand-system` or
+> `logo-forge` skill. It is never a bare relative path: the working directory is the user's project.
 
 A logo is not a system. A logo system is a set of files, plus rules about which file goes where,
 plus the numbers that stop the rules being opinions. This file is how to work those numbers out.
 
-`06-brand-book-outline.md` §7 and §8 say what the brand book must *contain*. This file says how to
+`06-brand-book-outline.md` says which logo pages the brand book draws. This file says how to
 *derive* it, and what to do in the case the outline cannot cover: there is no logo at all, and there
 is not going to be one this week.
 
@@ -16,8 +15,9 @@ Two rules run through everything below.
 > **Every measurement is a ratio of something in the mark, or it is a number you tested.**
 > Absolute measurements that came from neither are decoration.
 
-> **Brandi does not draw logos.** It specifies them, typesets wordmarks, writes briefs and judges
-> candidates. Section 7 is the honest version of what that means.
+> **A mark is measured before anybody says what they like, and a person picks.** The `logo-forge`
+> skill generates and audits concepts; this file is the system around whichever mark survives, and
+> section 7 is what to do when none does.
 
 ---
 
@@ -158,7 +158,7 @@ Clear space is padding derived from the rendered logo height, so it scales with 
 ```css
 .logo {
   /* The ratio, measured once from the artwork, then applied everywhere. */
-  --logo-clear-ratio: 0.28;      /* cap height ÷ lockup height, from the SVG */
+  --logo-clear-ratio: 0.2;       /* cap height ÷ lockup height, measured from the SVG */
   --logo-height: 2rem;
 
   block-size: var(--logo-height);
@@ -196,8 +196,8 @@ modes, and neither derives from the other.
   smear, or when subpixel rendering shifts a stroke onto a half-pixel boundary. It depends on the
   device pixel ratio and the compression the image survives on the way to the viewer.
 
-Any guideline that gives only one of the two is incomplete. All five published guidelines examined
-give both, in the units of their medium:
+Any guideline that gives only one of the two is incomplete, and of the published guidelines examined
+only two give both, each in the units of its medium:
 
 | Organisation | Print minimum | Screen minimum |
 |---|---|---|
@@ -361,9 +361,8 @@ obviously fine.
 5. **Do not add an outline or stroke to the mark.** It adds a weight the mark was not drawn with,
    and it is almost always an attempt to force contrast that the correct reversed file would have
    provided.
-6. **Do not apply drop shadows, glows, bevels, gradients or any other effect.** Four of the five
-   published guidelines examined name effects specifically. Recreation.gov, MSY and GOV.UK all
-   forbid them outright.
+6. **Do not apply drop shadows, glows, bevels, gradients or any other effect.** Recreation.gov, MSY and
+   GOV.UK forbid them outright.
 7. **Do not alter the colour balance between elements within the mark.** GOV.UK's first misuse
    rule. Recolouring one element and not the others is more common than recolouring the whole thing.
 8. **Do not remove, rearrange or re-lockup the elements.** Somebody rebuilt the lockup in Canva
@@ -380,7 +379,7 @@ obviously fine.
 13. **Do not use the reversed version on light, or the light version on dark.** Ships as a grey
     mark on grey and nobody notices until it is printed.
 14. **Do not use a raster file where a vector is available, and never a raster that has been
-    upscaled.** Pixelation and JPEG haloes around the mark. Four of five guidelines name this.
+    upscaled.** Pixelation and JPEG haloes around the mark.
 15. **Do not tile the mark as a pattern or a watermark** unless the book explicitly provides a
     pattern built from it. A mark repeated is a texture, and a texture made from a mark devalues it.
 16. **Do not alter the alignment of the descriptor or tagline.** Recreation.gov's two lockup-specific
@@ -418,26 +417,33 @@ not
 The favicon is a redraw, not a scale-down. Treat it as its own piece of artwork with its own
 constraints, and the rest of this section becomes straightforward.
 
-### 6.1 The files a brand needs in 2026
+### 6.1 The files `brandi assets` writes
 
-The legacy twenty-file packs are obsolete. Modern browsers downscale well, and the maintained
-minimum is small. The reference for the reduced set is Evil Martians' favicon guide, which is
-updated in place: <https://evilmartians.com/chronicles/how-to-favicon-in-2021-six-files-that-fit-most-needs>
+`$A assets` derives the whole pack from the master SVG in `identity.logo.files` and, when the brand
+has one, uses the 16px redraw in `identity.logo.favicon` for the two smallest sizes. The legacy
+twenty-file packs are obsolete; the reference for the reduced set is Evil Martians' favicon guide,
+which is updated in place: <https://evilmartians.com/chronicles/how-to-favicon-in-2021-six-files-that-fit-most-needs>
 
-| File | Size | Format | Purpose |
-|---|---|---|---|
-| `favicon.ico` | 32 × 32 | ICO | The fallback. Browsers and crawlers that request `/favicon.ico` at the site root regardless of your markup. One 32px entry is enough |
-| `icon.svg` | any | SVG | The primary icon in modern browsers. Scales to every tab size, and can respond to the viewer's colour scheme |
-| `apple-touch-icon.png` | 180 × 180 | PNG, opaque | iOS home screen. Must have a baked-in background: transparency renders black. Do not round the corners, iOS masks it |
-| `icon-192.png` | 192 × 192 | PNG | Web app manifest, `purpose: any` |
-| `icon-512.png` | 512 × 512 | PNG | Web app manifest, `purpose: any`, and install splash screens |
-| `icon-maskable-512.png` | 512 × 512 | PNG, opaque, full bleed | Web app manifest, `purpose: maskable`. Android and other platforms crop this to their own shape |
-| `og.png` | 1200 × 630 | PNG or JPEG | Open Graph and Twitter/X `summary_large_image` link previews |
+| File | Size | Purpose |
+|---|---|---|
+| `svg/primary.svg` | vector | The mark as drawn. Everything else is derived from it, so it is the one to edit |
+| `svg/black.svg`, `svg/white.svg` | vector | One ink for embroidery, foil and a rubber stamp; reversed out of anything dark |
+| `svg/brand.svg`, `svg/on-brand.svg` | vector | The mark in the brand colour, and in whichever of black or white sits on that colour |
+| `png/favicon-16.png`, `png/favicon-32.png` | 16, 32 | The browser tab. Drawn from the 16px redraw when there is one |
+| `png/apple-touch-icon.png` | 180 | iOS home screen: opaque, on the page colour, inside the safe area. iOS rounds the corners itself |
+| `png/icon-192.png` | 192 | The web app manifest |
+| `png/icon-512.png` | 512 | The manifest again, composed inside the maskable safe area on an opaque ground, so one file serves `any` and `maskable` |
+| `png/avatar-400.png`, `png/avatar-400-reversed.png` | 400 | Social profiles, which crop to a circle; on the page colour and on ink |
+| `png/social-1200.png` | 1200 | The square card image |
+| `favicon.ico` | 16 and 32 | Both sizes in one file, which is what a browser asks for at `/favicon.ico` |
+| `site.webmanifest` | | Names the two manifest icons, the brand colour and the page colour, so a produced icon is actually referenced |
 
-**The maskable safe zone is a hard number.** Keep everything that matters inside a circle at the
-centre of the icon with a radius of 40% of the icon width (so a 512px icon has a 409.6px diameter
-safe circle). The outer 10% edge may be cropped on some platforms. The background must bleed to
-all four edges.
+Without a Chromium-family browser the five SVGs are written and every raster is listed as skipped,
+with the reason. The pack never reports itself complete when it is not.
+
+**The maskable safe zone.** `icon-512` and the touch icon are composed with the mark inside 80% of
+the icon width (`MASKABLE_SAFE_RATIO` in `scripts/assets.mjs`) on an opaque page-colour ground,
+because launchers crop to their own shape and the outer edge may go.
 <https://web.dev/articles/maskable-icon>
 
 **Google's constraints for search results**: the favicon should be a multiple of 48px square
@@ -447,44 +453,47 @@ favicon per hostname. An SVG satisfies this without a size.
 
 ### 6.2 The HTML
 
-Four lines in `<head>`. That is the whole thing.
+Four lines in `<head>`, using the pack's own names. Serve the pack from the site root, or rewrite
+the paths to wherever it lives:
 
 ```html
-<link rel="icon" href="/favicon.ico" sizes="32x32">
-<link rel="icon" href="/icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png"><!-- 180×180 -->
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32">
+<link rel="icon" href="/png/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="/png/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 ```
 
-Order matters less than it used to, but keep the `.ico` first: some older parsers take the first
-`rel="icon"` they find. Everything else that used to be in this block (`msapplication-*`,
-`browserconfig.xml`, `rel="mask-icon"`, the fifteen sized PNGs) can go.
+Keep the `.ico` first: some older parsers take the first `rel="icon"` they find. Everything else
+that used to be in this block (`msapplication-*`, `browserconfig.xml`, `rel="mask-icon"`, the
+fifteen sized PNGs) can go. The pack writes no SVG favicon; §6.4 is how to add one by hand.
 
 ### 6.3 The manifest
+
+What `site.webmanifest` contains, written from the resolved system rather than by hand:
 
 ```json
 {
   "name": "Acme",
   "short_name": "Acme",
   "icons": [
-    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
-    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" },
-    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+    { "src": "png/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "png/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "theme_color": "#134489",
-  "background_color": "#ffffff",
-  "display": "standalone",
-  "start_url": "/"
+  "background_color": "#FBF7F2",
+  "display": "standalone"
 }
 ```
 
-`theme_color` and `background_color` are brand decisions, so they belong in the token file and get
-written here from it. `background_color` is the splash screen behind the icon during launch, so it
-should be the brand's page surface, not white by default.
+`theme_color` is the brand's strong solid and `background_color` its page surface, both taken from
+`system.json`, because the splash screen behind the icon during launch should be the brand's ground
+and not white by default. The icon paths are relative to wherever the manifest is served from: move
+the `png/` folder with it, or edit them.
 
 ### 6.4 The dark-mode SVG favicon
 
-An SVG favicon can carry its own stylesheet, so one file covers both browser themes:
+The pack does not write this. An SVG favicon can carry its own stylesheet, so one hand-made file
+covers both browser themes:
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
@@ -502,8 +511,13 @@ a hard reload or a query string to see a change at all.
 
 ### 6.5 The Open Graph image
 
+The pack's `social-1200.png` is the mark composed square, which is what a `summary` card and most
+chat previews want. The 1200 × 630 `summary_large_image` preview is a composition rather than a
+mark, so it is the `Listing.dc.html` proof artboard, rendered with `preview.mjs` and served as an
+absolute URL:
+
 ```html
-<meta property="og:image" content="https://example.com/og.png">
+<meta property="og:image" content="https://example.com/listing.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Acme. Commercial laundry, Melbourne.">
@@ -514,7 +528,7 @@ a hard reload or a query string to see a change at all.
 no preview. Declaring width and height lets platforms render a placeholder at the right aspect
 ratio before the image loads.
 
-Design the OG image at 1200 × 630 but keep everything essential inside a centred safe area of about
+Design the listing at 1200 × 630 but keep everything essential inside a centred safe area of about
 1200 × 600, because some surfaces crop the top and bottom. Set type at a size that survives being
 displayed at 300px wide in a chat client, which in practice means nothing smaller than about 40px
 in the source file.
@@ -536,61 +550,43 @@ The favicon is drawn on a pixel grid, not scaled onto one. What changes:
   grey and the mark looks blurred while every other tab looks sharp.
 
 Test by rendering at 16px next to eight real favicons from sites the audience uses. If you cannot
-pick it out in under a second, it has failed the only job it has.
+pick it out in under a second, it has failed the only job it has. Record the redraw in
+`identity.logo.favicon` and the pack uses it for the two smallest sizes.
 
 ---
 
-## 7. When there is no logo
+## 7. When the forge produces nothing worth keeping
 
-Most small businesses arriving at a brand system have no usable mark. They have a raster with a
-white matte, a Canva file nobody can find, or nothing at all. This section is how to work honestly
-in that situation, because the dishonest options are easy and expensive.
+Most small businesses arriving at a brand system have no usable mark. The answer to that is the
+`logo-forge` skill: a dealt concept round, drawn as vector geometry on a grid, measured at 16, 32,
+64 and 256 pixels, and picked by a person. This section is for the round that produces nothing
+worth keeping, and for the brand with no budget for a second one, because the dishonest options at
+that point are easy and expensive.
 
-### 7.1 What Brandi cannot do
+### 7.1 What a forge mark is, and is not
 
-**It cannot draw a finished logo.** It has no drawing surface, no curve editor, and no way to
-iterate visually on a mark at the resolution real logo work requires. Saying otherwise produces a
-worse outcome than saying so.
+- It is vector geometry drawn on a stated grid and audited against numbers, which is a real
+  artefact and a real improvement on a traced raster. Hundreds of nodes, wobbling curves and
+  antialiasing baked into the outline are exactly what the audit's node-count check refuses.
+- It is a starting point a person approved, not a drawn one. `logo master` records who approved it
+  and says "candidate, not approved" until somebody did, and the book says the same.
+- It has not been searched or cleared. Nothing in the pipeline compares it against a register;
+  `brand/logo/rights/` holds the checklist, and for anything going on a building, a vehicle or a
+  registration a trade mark professional looks at it first.
+- Never trace a raster and present the trace as the mark, and never redraw a client's existing mark
+  by eye. Those are fabrications with vector points, and `01-evidence-protocol.md` says the same
+  from the evidence side.
 
-**A generated raster mark is not a logo.** Even if it looks acceptable in the chat window:
-
-- There is no vector source, so it cannot be reproduced at other sizes, cut in vinyl, embroidered,
-  or printed as a spot colour.
-- Traced paths from a raster are not drawn paths. They carry hundreds of nodes, wobbling curves and
-  antialiasing artefacts baked into the outline, and they fall apart at large sizes.
-- It cannot be defended in a trademark application if it resembles something in the training data,
-  and you have no way to check whether it does.
-- It will read as generated to anybody in the industry, which is the opposite of the job.
-
-`01-evidence-protocol.md` states the same rule from the evidence side: **logo is binary**. If a
-usable file exists, use it. If it does not, stop and ask. Never generate one, never redraw one by
-eye, never trace a raster and present the trace as the mark. A traced logo is a fabrication with
-vector points.
-
-### 7.2 What Brandi can do
-
-Four things, all of them real work:
-
-1. **Specify the system.** Variants, clear space, minimum sizes, renditions, misuse, the favicon
-   pack, placement. All of section 1 to 6 can be written before the mark exists, as constraints the
-   mark must satisfy. This is genuinely useful: it turns "we need a logo" into a brief with numbers.
-2. **Build a wordmark from a licensed typeface.** Covered below. This is a legitimate answer, not a
-   placeholder.
-3. **Write the brief** that a human designer or illustrator can execute against, or that an image
-   model can generate reference material for.
-4. **Evaluate candidates** against the tests in section 8, which is where most logo decisions
-   actually go wrong.
-
-### 7.3 The four honest answers, ranked
+### 7.2 The honest answers, ranked
 
 | Option | What it is | When it is right |
 |---|---|---|
-| **1. Typeset wordmark** | The name set in a licensed face, spaced by eye, outlined to curves | Almost always the right first answer. Ship it, use it consistently, and it accrues equity while you decide whether you need more |
-| **2. Modified wordmark** | A typeset wordmark with one deliberate intervention (a joined pair, a replaced counter, a custom terminal), made by a person | When the name is short and there is budget for a few hours of a designer's time |
-| **3. Commissioned mark** | A designer or illustrator draws it, working from the brief | When the brand has a symbol-shaped job to do (an app icon, a product stamp, a category where everyone has a mark) and there is real budget |
-| **4. Image-model concepts** | Raster concept sketches used as reference material only | Only as input to option 2 or 3. Never shipped, never presented as the mark |
+| **1. Typeset wordmark** | The name set in a licensed face, spaced by eye, outlined to curves: `$A logo wordmark` | Almost always the right first answer. Ship it, use it consistently, and it accrues equity while you decide whether you need more |
+| **2. Modified wordmark** | The `display-drawn` register: a typeset wordmark with one or two glyphs redrawn to solve a named problem, by a person | When the name is short and there is time for a few hours of drawing |
+| **3. Another round, with a corrected brief** | If more than half a round was rejected, the brief or the draw instructions were wrong, not the concepts | When the audit did the rejecting, not taste |
+| **4. Commissioned mark** | A designer or illustrator draws it, working from the brief in §7.5 | When the brand has a symbol-shaped job to do (an app icon, a product stamp, a category where everyone has a mark) and there is real budget |
 
-### 7.4 The typeset wordmark is a legitimate answer
+### 7.3 The typeset wordmark is a legitimate answer
 
 Say this to the client plainly, because they will assume it is a compromise. It is not. A large
 share of the world's most recognised identities are wordmarks set in, or derived from, an existing
@@ -599,18 +595,13 @@ applied consistently for long enough to be recognised. Distinctiveness comes fro
 originality of construction (Romaniuk, *Building Distinctive Brand Assets*, OUP 2018,
 <https://global.oup.com/academic/product/building-distinctive-brand-assets-9780190311506>).
 
-A typeset wordmark beats a bad generated mark on every axis that matters:
+It is honest: nobody has to pretend anything designed a brand. It is reproducible, as real vector
+outlines from a real font, at any size, in any process. It is legally cleaner, because the
+typeface's licence is known and checkable and the mark is your arrangement of it. And it can be
+upgraded without losing equity: adding a symbol later to an established wordmark keeps everything
+the wordmark has earned, where replacing a bad mark starts again.
 
-- It is honest. Nobody has to pretend an image model designed a brand.
-- It is reproducible. Real vector outlines from a real font, at any size, in any process.
-- It is legally cleaner. The typeface's licence is known and checkable, and the mark is your
-  arrangement of it.
-- It does not look like a stock icon, because it is not one. A generated mark almost always lands
-  in the same visual territory as thousands of others.
-- It can be upgraded without losing equity. Adding a symbol later to an established wordmark keeps
-  everything the wordmark has earned. Replacing a bad mark starts again.
-
-### 7.5 The typeset wordmark protocol
+### 7.4 The typeset wordmark protocol
 
 **Step 1. Check the licence before you set anything.**
 
@@ -648,6 +639,10 @@ often bland at 200px, which is where the wordmark lives.
 4. **Outline the paths.** Convert to curves so the mark is artwork rather than text, and so it
    cannot silently change when the font updates or is missing.
 
+`$A logo wordmark --font "Bitter" --weight 700 --tracking -15` does the setting and the outlining
+from the real font file and records the recipe with the output. Steps 1 and 2, and the pass over
+the spacing, are still yours.
+
 **Step 4. Archive the recipe.** Record the font name, the exact version, the weight, the optical
 size axis value if there is one, the size it was set at, and the final tracking and kerning values.
 Keep the live-text source file alongside the outlined one. Without this the wordmark cannot be
@@ -658,7 +653,7 @@ and state what would trigger commissioning a drawn mark ("when we need an app ic
 a second location", "at $X revenue"). A typeset wordmark declared as a deliberate stage is a
 decision. The same wordmark undeclared is an omission somebody will find.
 
-### 7.6 The logo brief template
+### 7.5 The logo brief template
 
 This is the deliverable when the answer is "commission it". Fill every field. The empty fields are
 where the money goes.
@@ -734,29 +729,20 @@ The eleven tests in section 8 of the brand system, applied to every candidate be
 discussion of preference.
 ```
 
-### 7.7 If an image model is in the loop
+### 7.6 If an image model is in the loop
 
-It can be, with three rules.
+The forge does not use one, but a client may bring pictures from one. Three rules:
 
-1. **It produces reference, never the mark.** The output is input to a person who will draw the
-   real thing. Say this in writing to the client so nobody is surprised.
+1. **They are reference, never the mark.** A raster is input to a person, or to a forge brief,
+   that will draw the real thing. Say this in writing to the client so nobody is surprised.
 2. **No text in the image.** Image models mangle letterforms in ways that are hard to see and
-   impossible to fix. Generate silhouettes, shapes and compositions. Set the name separately.
-3. **Check the output against the exclusion list** in brief section 3 before showing it to anyone.
+   impossible to fix. Set the name separately.
+3. **Check them against the exclusion list** in brief section 3 before showing them to anyone.
    The first ten results from any concept prompt cluster on the category cliché, which is exactly
    what the brief said not to do.
 
-A workable prompt shape, kept deliberately narrow:
-
-```
-A single flat vector-style symbol, black on white, no text, no letters, centred,
-[the concrete subject: "a folded sheet seen edge-on", not "innovation"],
-geometric construction, even stroke weight, high contrast, readable at 16 pixels,
-no gradient, no shadow, no 3D, no perspective.
-```
-
-Then apply the section 8 tests. Most of what comes back fails the one-colour and 16px tests, which
-is the fastest way to make the point that this is reference material.
+Most of what comes back fails the one-colour and 16px tests in section 8, which is the fastest way
+to make the point that this is reference material.
 
 ---
 
@@ -808,10 +794,9 @@ identity.logo.misuse[]         one entry per rule
 identity.logo.favicon          the redraw, not the lockup
 ```
 
-Note on the misuse shape: the brand book renderer currently reads each entry as a plain string and
-prefixes it with "Do not", so write them as bare rules (`"stretch or squash the mark"`). The richer
-form in `06-brand-book-outline.md` §8, carrying `what`, `why`, `source` and `image`, is the target
-shape and needs a renderer change before it will render.
+Note on the misuse shape: an entry is either a bare rule as a string (`"stretch or squash the mark"`,
+rendered as "Do not ...") or an object `{ what, why, source }`. The renderers accept both; prefer the
+object, because the deck's misuse page draws the `why` beside each tile.
 
 Brandi's brand-file validation warns when there is no vector master, no clear-space rule, no
 minimum size, or fewer than six documented misuses. Those are floors, not targets. Twelve misuses,

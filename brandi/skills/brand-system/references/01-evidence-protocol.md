@@ -21,12 +21,16 @@ it is the recorded absence of one, weight zero.
 
 | Code | Tier | Means | Weight | Re-derivable? |
 |---|---|---|---|---|
-| `E` | **EXTRACTED** | Measured from a real artefact the brand owns | **1.0** | Yes, re-run the measurement |
-| `S` | **SUPPLIED** | The user stated it | **0.9** | No, ask again |
+| `S` | **SUPPLIED** | The user stated it | **1.0** | No, ask again |
+| `E` | **EXTRACTED** | Measured from a real artefact the brand owns | **0.9** | Yes, re-run the measurement |
 | `P` | **PUBLISHED** | From the brand's own public channels | **0.8** | Yes, until the page changes |
-| `D` | **DECIDED** | Chosen during this journey, dated | authority, not evidence | No, it is a decision |
-| `A` | **ASSUMED** | Claude's working assumption | **0.3** | Must be flagged, never silent |
+| `D` | **DECIDED** | Chosen during this journey, dated | **1.0**, authority rather than evidence | No, it is a decision |
+| `A` | **ASSUMED** | Claude's working assumption | **0.4** | Must be flagged, never silent |
 | `O` | **OPEN** | Unresolved and listed | **0.0** | Blocks nothing, registered |
+
+The weights are the ones `PROVENANCE` in `scripts/brandfile.mjs` carries, and `brandi evidence`
+derives each entry's confidence from them: 0.8 and above is high, 0.4 and above medium, below that
+low.
 
 Weights rank **competing claims about the same fact**. They do not rank importance. A
 `SUPPLIED` mission statement is not "worth less" than an `EXTRACTED` hex; they are answering
@@ -81,8 +85,8 @@ asking the owner to confirm.
 
 ### DECIDED
 
-Chosen during the journey. Carries a date and, where it is consequential, a decision-log row
-ID from §22 of the brand book.
+Chosen during the journey. Carries a date and, where it is consequential, a decision id (`d1`,
+`d2`, ...) from `brandi decision`.
 
 `DECIDED` values are authoritative going forward and make no claim about the past. Most of the
 system layer is `DECIDED` by construction: spacing scale, radii, motion durations, clear-space
@@ -99,7 +103,7 @@ Claude's working assumption. Two kinds, and they are treated differently.
    in the row: `[A: derived from accent, darkened to 4.60:1 on paper]`.
 2. **Guessed.** A gap filled by inference. "Audience is mostly local because there is one
    shopfront and no delivery." Ship it only with a matching open question. A guess with no
-   `OQ` is a fabrication with better manners.
+   open question is a fabrication with better manners.
 
 Never silent. A brand book with no `A` tags anywhere is either a very well evidenced brand or,
 far more often, a document that is hiding its assumptions.
@@ -113,7 +117,7 @@ state rather than an empty space someone fills in later with a guess.
 
 | Conflict | Resolution |
 |---|---|
-| `S` hex vs `E` hex | `E` wins for the current value. Note the discrepancy: they may be describing what they want, not what is deployed. Log an `OQ` if the gap is large. |
+| `S` hex vs `E` hex | `S` wins for the value, because the owner outranks the artefact. Note the discrepancy: the site may be stale, or they may be describing what they want rather than what is deployed. Log a question with `brandi question` if the gap is large. |
 | `S` self-description vs `P` evidence | `S` wins for intent, `P` wins for current reality. Both go in the book: "what we say we are" and "what the site currently does" is a useful gap, not an error. |
 | `P` vs `P` across two channels | Most recent wins. Note the inconsistency, because it is usually a real brand problem worth naming. |
 | `E` vs `E` across two artefacts | Both are true. Their marketing palette and their product UI palette are frequently different, and both are real. Pick the facet that matches the deliverable and say which. |
@@ -146,11 +150,11 @@ The accent is #4A7C6F. [EXTRACTED: background-color on .btn-book | thewashhouse.
 
 "Every dog leaves calmer than it arrived." [PUBLISHED: Google Business Profile description | 2026-08-29]
 
-Clear space equals one x-height of the wordmark. [DECIDED: DL-007 | 2026-08-29]
+Clear space equals one x-height of the wordmark. [DECIDED: d7 | 2026-08-29]
 
-Roughly 70% of bookings are repeat customers. [ASSUMED: inferred from review language | see OQ-03]
+Roughly 70% of bookings are repeat customers. [ASSUMED: inferred from review language | see q3]
 
-Average job value. [OPEN: OQ-06]
+Average job value. [OPEN: q6]
 ```
 
 ### Blanket tags
@@ -175,7 +179,7 @@ alone is not enough.
 | `accent` | `#4A7C6F` | one moment per view | `E` | `.btn-book` background, 2026-08-29 |
 | `accent-text` | `#487A6C` | accent at body contrast | `A` | derived: accent is 4.47:1 on paper, this clears at 4.60:1 |
 | `paper` | `#FBF7F2` | ground | `E` | `body` background, 2026-08-29 |
-| `ink` | `#241F1C` | text | `D` | DL-003, replaces measured `#000000` |
+| `ink` | `#241F1C` | text | `D` | d3, replaces measured `#000000` |
 
 Two rows in that table are worth reading twice. `ink` is a decision that overrides a
 measurement, and it says so. `accent` is the value measured on the site today, which is not
@@ -186,21 +190,25 @@ legible.
 
 ### Machine-readable mirror
 
-`brand.json` carries a `_provenance` object keyed by RFC 6901 JSON Pointer into the same
-document. Every field whose tier is not `DECIDED`-by-construction needs an entry.
+`brandi evidence` writes each tagged claim to `evidence[]` in `brand.json`, and `--field` names
+the dotted path the claim backs. Every field whose value was not decided by construction should
+have an entry pointing at it.
 
-```json
-"_provenance": {
-  "/colors/5/hex":  { "tier": "EXTRACTED", "where": "computed style .btn-book background, thewashhouse.com.au", "date": "2026-08-29" },
-  "/colors/5/name": { "tier": "DECIDED",   "where": "DL-005", "date": "2026-08-29" },
-  "/mission":       { "tier": "SUPPLIED",  "where": "owner interview", "date": "2026-08-29" },
-  "/audience":      { "tier": "ASSUMED",   "where": "inferred from single-location, no-delivery model", "openQuestion": "OQ-02" },
-  "/logo/minSize":  { "tier": "DECIDED",   "where": "DL-007", "date": "2026-08-29" }
-}
+```bash
+$A evidence --claim "The accent is #4A7C6F" --provenance extracted \
+  --source "computed style .btn-book background, thewashhouse.com.au, 2026-08-29" \
+  --field identity.colour.accents.0
 ```
 
-(Field names inside `brand.json` use `color`, not `colour`, because they map onto CSS custom
-property names. Prose in every document uses Australian spelling.)
+Each entry carries an id (`e1`, `e2`, ...), the claim, the provenance, the source, the field, a
+confidence derived from the tier's weight, and when it was recorded. Decisions go to
+`governance.decisions` as `d1`, `d2`, ... through `brandi decision`, and open questions to
+`governance.openQuestions` as `q1`, `q2`, ... through `brandi question`. Those are the ids to cite
+in prose.
+
+Field names inside `brand.json` use Australian spelling (`identity.colour.primary`); the CSS custom
+properties generated from them are named by role (`--accent-solid`), so no field name has to match
+a property name. Prose in every document uses Australian spelling too.
 
 ---
 
@@ -209,6 +217,10 @@ property names. Prose in every document uses Australian spelling.)
 Provenance is per fact. Confidence is per section. They are different instruments: a section
 can be full of well provenanced facts and still be low confidence because there are only two
 of them.
+
+Not implemented: no command computes a section or aggregate confidence and `brand.json` has no
+field for one. It is a manual judgement, stated in the prose of the section it describes, using
+the rubric below. The only computed confidence is the per-entry one on `evidence[]`.
 
 ### Assigning it
 
@@ -247,83 +259,43 @@ Section-level rubric for the sections that carry evidence:
 | Logo system | Vector source held, all variants present | Vector held, variants to be produced | Raster only, or no usable file |
 | Imagery | Real photography in hand, shot rules derived from it | Direction agreed, examples referenced but not held | Direction described in adjectives only |
 
-### Aggregating it
-
-Weighted average across the evidence-bearing sections. `High` = 1.0, `Medium` = 0.6,
-`Low` = 0.3.
-
-| Section | Weight |
-|---|---|
-| Positioning and audience | 25% |
-| Messaging and proof | 15% |
-| Voice | 15% |
-| Logo system | 15% |
-| Colour | 15% |
-| Typography | 10% |
-| Imagery | 5% |
-
-Sections that are `DECIDED` by construction (spacing, radii, motion, token naming,
-accessibility rules, anti-patterns) are excluded. They are design authority, not findings,
-and including them inflates the score.
-
-Thresholds: **0.85 to 1.00 = High · 0.60 to 0.84 = Medium · below 0.60 = Low.**
-
-The aggregate goes on the cover page of the brand book and in `brand.json` as
-`"_confidence": { "overall": "Medium", "score": 0.71, "sections": { … } }`. A `Medium` on the
-cover is not a failure. It is an honest statement that this is a v1 built on what was
-available, and it tells the client exactly where to spend their next hour.
-
 ### Presenting it
 
-Every section heading carries its label. Every `Medium` and `Low` section carries one line
-saying why, and one line saying what would raise it.
+A `Medium` is not a failure. It is an honest statement that this is a v1 built on what was
+available, and it tells the client exactly where to spend their next hour. Every `Medium` and
+`Low` section carries one line saying why, and one line saying what would raise it:
 
 ```markdown
-## 15. Voice and tone  ·  Confidence: Medium
-
-> Derived from four Google review replies and one welcome SMS. No long-form writing exists
-> yet. Raising to High needs three to five pieces of longer copy the owner has written
-> (an About page draft, a customer email, an Instagram caption they liked).
+Voice and tone. Confidence: Medium. Derived from four Google review replies and one welcome SMS.
+No long-form writing exists yet. Raising to High needs three to five pieces of longer copy the
+owner has written (an About page draft, a customer email, an Instagram caption they liked).
 ```
 
 ---
 
 ## 4. The open-questions register
 
-Every ambiguity becomes a numbered entry. The register lives in §21 of the brand book and in
-`brand.json` under `openQuestions`.
+Every ambiguity becomes a numbered entry. The register lives on the deck's "Decisions and open
+questions" page and in `brand.json` under `governance.openQuestions`, written by `brandi question`.
 
-Six fields, all required:
+Five fields, which are the five the command takes. The first two are required:
 
-```markdown
-### OQ-03 · What is the actual repeat-customer rate?
-- **Why it matters:** the "regulars" pillar is currently unproven, and it is the pillar the
-  whole positioning leans on. If the rate is ordinary for the category, the pillar changes.
-- **Assumed meanwhile:** high, inferred from review language ("been coming for years" appears
-  in 6 of 22 reviews). Tagged `[ASSUMED]` everywhere it appears.
-- **Who can answer:** Nadia, from the booking system's client list.
-- **What changes if the answer differs:** if repeat rate is under about 40%, pillar 2 becomes
-  "we remember your dog" (service memory, provable from notes) rather than "most of our
-  clients are regulars" (a claim about the book).
-- **Priority:** High.
-- **Recommendation:** export twelve months of bookings and count unique clients with two or
-  more visits. Ten minutes of work. Until then the pillar ships tagged and the claim does not
-  appear in customer-facing copy.
+```bash
+$A question --question "What is the actual repeat-customer rate?" \
+  --why "The regulars pillar is unproven and the whole positioning leans on it. If the rate is ordinary for the category, the pillar changes." \
+  --assumed "High, inferred from review language: 'been coming for years' appears in 6 of 22 reviews. Tagged [ASSUMED] wherever it appears." \
+  --who "Nadia, from the booking system's client list" \
+  --changes "Under about 40%, pillar 2 becomes 'we remember your dog' (service memory, provable from notes). Export twelve months of bookings and count clients with two or more visits: ten minutes of work. Until then the claim stays out of customer-facing copy."
 ```
 
-**Priority mapping**, taken from the confidence state:
-
-- Low confidence **plus a conflict** = High priority. It blocks completion of that section.
-- Low confidence **plus a gap** = Medium priority. The section ships with an assumption.
-- Medium confidence plus a minor inconsistency = Low priority. Note it and move on.
-
-**Every open question carries a recommendation.** Ambiguity is turned into "confirm or
-override", never into a dead end. A register entry that says "we do not know" and stops is a
-failure of the register, not a gap in the evidence.
+**Every open question says what would answer it.** Put the recommendation at the end of
+`--changes`, as above, so ambiguity is turned into "confirm or override" and never into a dead
+end. A register entry that says "we do not know" and stops is a failure of the register, not a
+gap in the evidence.
 
 Register hygiene:
-- Numbered `OQ-01` upwards, never renumbered once issued.
-- Every `[ASSUMED]` tag that is a guess (not a derivation) cites an `OQ`.
+- Numbered `q1` upwards by the command, never renumbered once issued.
+- Every `[ASSUMED]` tag that is a guess (not a derivation) cites an open question (`q1`, `q2`, ...).
 - Resolved entries stay in the document, marked `Resolved YYYY-MM-DD` with the answer and the
   decision-log row it produced. Deleting them destroys the audit trail.
 
@@ -359,7 +331,7 @@ in caps, naming exactly what is needed and who can supply it.
 
 ```
 Good:  Serving [SUBURB] since [YEAR, ask Nadia].
-       Trusted by [N] regular clients. [OQ-03]
+       Trusted by [N] regular clients. [q3]
        "[CUSTOMER QUOTE, pull a real one from Google reviews with permission]"
        [LOGO: no vector supplied. Placeholder box at 240 × 64. See asset gap AG-01.]
 
@@ -495,9 +467,10 @@ All of this is fetched under §6 fencing rules.
 
 ### Step 3. Quality threshold
 
-**Logo is binary.** If a usable file exists, use it. If it does not, stop and ask. Never
-generate a logo, never redraw one by eye, never trace one from a raster and present the trace
-as the mark. A traced logo is a fabrication with vector points.
+**Logo is binary.** If a usable file exists, use it. If it does not, the `logo-forge` skill is the
+answer, and a mark it produces is vector geometry a person approved, recorded as such. Never
+redraw an existing mark by eye, and never trace one from a raster and present the trace as the
+mark. A traced logo is a fabrication with vector points.
 
 **Everything else runs 5-10-2-8:**
 
@@ -553,7 +526,7 @@ An honest placeholder, never a bad fake.
 Specifically banned as substitutes:
 - A CSS or SVG drawing standing in for a real product or premises
 - A generic stock photograph presented as theirs
-- A generated image of a logo, mark, or wordmark
+- A generated raster image of a logo, mark, or wordmark presented as the mark
 - A generated image of a real place, product, or person
 - Lorem ipsum where a real claim belongs (use a bracketed placeholder, so the gap is legible)
 
@@ -561,7 +534,7 @@ Generated imagery is permissible only for texture, pattern, and abstract backgro
 only when it is labelled as generated in the manifest, and never for the mark or for anything
 a viewer would read as a photograph of the actual business.
 
-Every gap becomes an `AG-NN` row in the manifest and, if it blocks a section, an `OQ` as well.
+Every gap becomes an `AG-NN` row in the manifest and, if it blocks a section, an open question as well.
 
 ### Step 5. Freeze the manifest
 
@@ -583,8 +556,8 @@ turns and gets re-derived, differently, next time.
 ## Gaps
 - **AG-01** Symbol alone. Only a wordmark exists. Options: extract a mark from the wordmark
   (a design decision, log it), or commission one. Blocks: favicon, app icon, social avatar.
-- **AG-02** Interior photography. Blocks: §17 applications, §13 imagery rules.
-  Shot brief written, see §13.
+- **AG-02** Interior photography. Blocks: the Brand in use and Imagery pages.
+  Shot brief written.
 
 ## Licensing
 - Display face: [FAMILY]. Foundry [X]. Web licence: not held. Open-source substitute: [Y].
@@ -605,7 +578,7 @@ The ways this protocol gets quietly abandoned, in order of how often it happens.
    left in the final book with a fabricated statistic inside it. Bracket every number in every
    example.
 4. **`ASSUMED` used as a shrug.** Tagging a guess is not the same as recording it. Every
-   guess needs an `OQ` with a recommendation.
+   guess needs an open question with a recommendation.
 5. **Confidence inflated by counting decisions as evidence.** Excluding the `DECIDED`-by-
    construction sections from the aggregate is what keeps the score honest.
 6. **Competitor evidence leaking into the brand.** Measured from their site, tagged as

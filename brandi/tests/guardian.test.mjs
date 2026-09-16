@@ -1,6 +1,6 @@
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, writeFile, mkdir, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, writeFile, mkdir, rm, readFile, readlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import * as G from '../scripts/guardian.mjs';
@@ -318,5 +318,98 @@ describe('the emitted companion skill', () => {
 
   test('carries no em dashes', () => {
     assert.equal(skill.includes('—'), false);
+  });
+
+  test('resolves the command the way the plugin skills do, with no machine path and no PATH claim', () => {
+    // It used to say `brandi` was on PATH wherever the plugin is enabled, which
+    // is not true until the next session, and embed /Users/<name>/... as the
+    // fallback, which is true on exactly one machine.
+    assert.ok(skill.includes('command -v brandi'), 'the resolver snippet must be there');
+    assert.ok(skill.includes('"$HOME"/.claude/plugins/cache/*/brandi/*/bin/brandi'));
+    // Codex reads CODEX_HOME before ~/.codex, so a glob nailed to $HOME misses
+    // every user who has moved it. The brace has to survive the template
+    // literal this skill is built from, so assert on the emitted text.
+    assert.ok(skill.includes('"${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/brandi/*/bin/brandi'));
+    assert.equal(/"\$HOME"\/\.codex/.test(skill), false, 'the Codex glob still ignores CODEX_HOME');
+    assert.equal(/\/Users\//.test(skill), false, 'no absolute machine path');
+    assert.equal(/is on PATH wherever/.test(skill), false, 'no PATH claim');
+    assert.match(skill, /"\$A" check <paths>/);
+    assert.match(skill, /"\$A" validate --dir brand\/canvas/);
+  });
+});
+
+describe('linking the emitted skill where Codex reads it', () => {
+  let home;
+  before(async () => {
+    home = await mkdtemp(path.join(tmpdir(), 'brandi-codex-home-'));
+  });
+  after(async () => {
+    await rm(home, { recursive: true, force: true });
+  });
+
+  test('a machine with no ~/.agents/skills gets no link and a reason', async () => {
+    const r = await G.linkForCodex(path.join(dir, 'emitted-brand'), home);
+    assert.equal(r.linked, null);
+    assert.match(r.reason, /agents\/skills/);
+  });
+
+  test('with ~/.agents/skills present the skill is linked there by name, and linking again is a no-op', async () => {
+    const skills = path.join(home, '.agents', 'skills');
+    await mkdir(skills, { recursive: true });
+    const emitted = path.join(dir, 'acme-brand');
+    await mkdir(emitted, { recursive: true });
+    const first = await G.linkForCodex(emitted, home);
+    assert.equal(first.linked, path.join(skills, 'acme-brand'));
+    assert.equal(await readlink(first.linked), emitted);
+    const again = await G.linkForCodex(emitted, home);
+    assert.equal(again.linked, first.linked, 'an existing link to the same skill is reported, not replaced');
+  });
+
+  test('a name already taken by something else is left alone and reported', async () => {
+    const skills = path.join(home, '.agents', 'skills');
+    await mkdir(path.join(skills, 'taken-brand'), { recursive: true });
+    const r = await G.linkForCodex(path.join(dir, 'taken-brand'), home);
+    assert.equal(r.linked, null);
+    assert.match(r.reason, /already exists/);
+  });
+
+  test('a link that cannot be made is reported, not thrown, because the skill itself was written', async () => {
+    const fileHome = await mkdtemp(path.join(tmpdir(), 'brandi-codex-filehome-'));
+    try {
+      await mkdir(path.join(fileHome, '.agents'), { recursive: true });
+      await writeFile(path.join(fileHome, '.agents', 'skills'), 'not a directory');
+      const r = await G.linkForCodex(path.join(dir, 'acme-brand'), fileHome);
+      assert.equal(r.linked, null);
+      assert.match(r.reason, /could not link/);
+    } finally {
+      await rm(fileHome, { recursive: true, force: true });
+    }
+  });
+
+  test('`brandi guardian` with no --out writes to ~/.claude/skills and links into ~/.agents/skills, under a scratch HOME', async () => {
+    // A scratch HOME, so this never touches the real skills directories.
+    const project = path.join(home, 'project');
+    await mkdir(path.join(project, 'brand'), { recursive: true });
+    await writeFile(path.join(project, 'brand', 'brand.json'), await readFile(FIXTURE, 'utf8'));
+    await mkdir(path.join(home, '.agents', 'skills'), { recursive: true });
+    const cli = path.join(import.meta.dirname, '..', 'scripts', 'brandi.mjs');
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const run = promisify(execFile);
+    const { stdout } = await run(process.execPath, [cli, 'guardian', '--json'], { cwd: project, env: { ...process.env, HOME: home } });
+    const r = JSON.parse(stdout);
+    assert.equal(r.ok, true);
+    assert.equal(r.dir, path.join(home, '.claude', 'skills', 'muddy-paws-brand'));
+    assert.equal(r.linked, path.join(home, '.agents', 'skills', 'muddy-paws-brand'));
+    assert.equal(await readlink(r.linked), r.dir);
+    const prose = await run(process.execPath, [cli, 'guardian'], { cwd: project, env: { ...process.env, HOME: home } });
+    assert.match(prose.stdout, /Linked it at .*\.agents\/skills\/muddy-paws-brand, which is where Codex reads skills from/);
+    assert.match(prose.stdout, /any Claude Code or Codex session/);
+
+    // An explicit --out is left exactly where it was asked for, with no link.
+    const out = await run(process.execPath, [cli, 'guardian', '--out', 'gs', '--json'], { cwd: project, env: { ...process.env, HOME: home } });
+    const o = JSON.parse(out.stdout);
+    assert.equal(o.linked, null);
+    assert.equal(o.linkNote, '--out given');
   });
 });

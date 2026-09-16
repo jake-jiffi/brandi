@@ -220,12 +220,17 @@ export function mockupBody({
     // Written the other way round it scaled a 1000px box and then projected it,
     // which put a corner of the artwork's border across the whole frame and read
     // as "the transform is broken" rather than "the composition is inverted".
-    return `  <div style="position:absolute;left:0;top:0;width:${w}px;height:${h}px;pointer-events:none">
+    // The panel says whether anything is actually on it, because the deck
+    // captions a mockup as "the brand composited onto a real photograph" and
+    // that caption has to be answerable from the artboard itself. A surface
+    // with no artwork used to render an empty box under that sentence.
+    const art = String(s.artwork ?? '').trim();
+    return `  <div data-surface="${escapeHtml(s.name ?? 'surface')}" data-artwork="${art ? 'yes' : 'no'}" style="position:absolute;left:0;top:0;width:${w}px;height:${h}px;pointer-events:none">
     <div style="position:absolute;left:0;top:0;width:1000px;height:${boxH}px;
       transform-origin:0 0;
       transform:${check.matrix3d} scale(${(1 / 1000).toFixed(8)},${(1 / boxH).toFixed(8)});
       mix-blend-mode:${s.blend ?? 'multiply'};opacity:${s.opacity ?? 0.96}">
-${s.artwork ?? ''}
+${art}
     </div>
   </div>`;
   }).join('\n');

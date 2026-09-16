@@ -40,7 +40,7 @@ import { pathToFileURL } from 'node:url';
 import { describeSvg, inkBounds, collectShapes, viewBox } from './svg.mjs';
 import { decodePng, toGrey, inkCoverage, countRegions, minFeatureWidth, dHash, hamming, boundingBox } from './png.mjs';
 import { fitSvg, svgChildren, monochromeSvg } from './assets.mjs';
-import { findChrome } from './preview.mjs';
+import { findChrome, runChrome } from './preview.mjs';
 import { CONTEXTS, CONSTRAINTS, ARCHITECTURES } from './logospec.mjs';
 
 const run = promisify(execFile);
@@ -389,7 +389,7 @@ async function shoot(chrome, htmlPath, pngPath, width, height) {
   // No `--user-data-dir`: a second Chrome contending for a profile on a machine
   // where the user already has Chrome open costs two minutes rather than two
   // seconds, whether the profile is fresh or shared.
-  await run(chrome, [
+  await runChrome(chrome, [
     '--headless=new',
     '--disable-gpu',
     '--hide-scrollbars',

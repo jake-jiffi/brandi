@@ -156,6 +156,21 @@ describe('the composited body', () => {
     assert.match(html, /repeating-linear-gradient/);
   });
 
+  test('R3-N-01: a panel says whether anything was actually composited onto it', () => {
+    // The deck captions a mockup as "the brand composited onto a real
+    // photograph", and used to print that over an empty box.
+    const withArt = mockupBody({ photo: 'p.jpg', width: 100, height: 100, surfaces: [{ ...surface, artwork: '<svg id="art"></svg>' }] });
+    assert.match(withArt, /data-artwork="yes"/);
+    assert.match(withArt, /<svg id="art">/);
+    const without = mockupBody({ photo: 'p.jpg', width: 100, height: 100, surfaces: [{ ...surface, artwork: null }] });
+    assert.match(without, /data-artwork="no"/);
+    assert.equal(/data-artwork="yes"/.test(without), false);
+    // Whitespace is not artwork.
+    assert.match(mockupBody({ photo: 'p.jpg', width: 100, height: 100, surfaces: [{ ...surface, artwork: '   ' }] }), /data-artwork="no"/);
+    // The surface is named on the panel, so a problem can be traced to it.
+    assert.match(withArt, /data-surface="panel"/);
+  });
+
   test('the photograph is contained rather than forced, so a disagreement is visible', () => {
     // A header reader and a browser can disagree about orientation. Explicit
     // dimensions would distort silently; containing it letterboxes visibly.

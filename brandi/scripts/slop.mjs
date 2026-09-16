@@ -3,7 +3,8 @@
  * of it.
  *
  * `references/04-anti-slop.md` has always carried a YAML block that calls
- * itself "the linter contract". Nothing read it. Meanwhile `guardian.mjs`
+ * itself "the linter contract" (it now lives beside it, in
+ * `references/anti-slop.contract.md`). Nothing read it. Meanwhile `guardian.mjs`
  * hand-maintained seven patterns and `canvas.mjs` hand-maintained a third,
  * overlapping set, and they disagreed: a comment in canvas.mjs records the day
  * `font-family: 'Inter', sans-serif` passed one validator and failed the other,
@@ -166,7 +167,7 @@ export function parseContractYaml(source) {
 /** Pull the fenced yaml block out of the reference document. */
 export function extractContract(markdown) {
   const m = /```yaml\n([\s\S]*?)\n```/.exec(markdown);
-  if (!m) throw new Error('04-anti-slop.md no longer contains a ```yaml contract block.');
+  if (!m) throw new Error('anti-slop.contract.md no longer contains a ```yaml contract block.');
   return parseContractYaml(m[1]);
 }
 
@@ -206,7 +207,7 @@ export function assertContract(c) {
     }
   }
   if (problems.length) {
-    throw new Error(`The anti-slop contract in references/04-anti-slop.md no longer matches what the linter reads:\n  ${problems.join('\n  ')}`);
+    throw new Error(`The anti-slop contract in references/anti-slop.contract.md no longer matches what the linter reads:\n  ${problems.join('\n  ')}`);
   }
   return c;
 }
@@ -228,7 +229,7 @@ function* compilableRules(c) {
 // ---------------------------------------------------------------------------
 
 const HERE = path.dirname(new URL(import.meta.url).pathname);
-export const CONTRACT_PATH = path.join(HERE, '..', 'skills', 'brand-system', 'references', '04-anti-slop.md');
+export const CONTRACT_PATH = path.join(HERE, '..', 'skills', 'brand-system', 'references', 'anti-slop.contract.md');
 
 let cached = null;
 
@@ -296,7 +297,12 @@ function waiverNear(lines, lineNo, pattern, hasReason) {
  * for stylesheets, 'any' for everything. Copy and colour rules run everywhere;
  * the CSS structural ones only make sense where there is CSS.
  */
-export function slopFindings(contract, text, { file = '', mode = 'any' } = {}) {
+export function slopFindings(contract, text, { file = '', mode = 'any', brandFonts = [] } = {}) {
+  // The faces the brand itself records, lowercased. A banned face that the
+  // brand chose is still worth saying, but it is one decision, and `system`
+  // already warns about it: reporting it as an error here made the brand's
+  // own display face block the brand's own canvas.
+  const recorded = new Set(brandFonts.filter(Boolean).map((f) => String(f).trim().toLowerCase()));
   const findings = [];
   const body = scrub(text);
   const lines = text.split('\n');
@@ -350,9 +356,15 @@ export function slopFindings(contract, text, { file = '', mode = 'any' } = {}) {
     const declared = m[1].split(',')[0].replace(/["']/g, '').trim();
     for (const banned of fonts.literals) {
       if (new RegExp(`\\b${banned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(declared)) {
-        add('banned-font', fonts.severity, m.index,
-          `${banned} is a typeface that makes work look machine-generated.`,
-          'Use a brand face, or waive it with a reason: /* anti-slop-waiver: the client owns this licence */');
+        if (recorded.has(declared.toLowerCase())) {
+          add('banned-font', 'p1', m.index,
+            `${banned} is one of the brand's recorded faces, and it is still a typeface that makes work look machine-generated.`,
+            'Record in the decision log why it is right for this brand, or choose a face with a point of view.');
+        } else {
+          add('banned-font', fonts.severity, m.index,
+            `${banned} is a typeface that makes work look machine-generated.`,
+            'Use a brand face, or waive it with a reason: /* anti-slop-waiver: the client owns this licence */');
+        }
       }
     }
     for (const soft of fonts.soft_literals ?? []) {

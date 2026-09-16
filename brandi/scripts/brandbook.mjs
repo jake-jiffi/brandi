@@ -1,8 +1,14 @@
 /**
- * The brand book: a single self-contained HTML file that reads well in a
- * browser and prints to a proper PDF.
+ * The brand book.
  *
- * This is a VIEW of brand.json, not a source. Every value is read from the
+ * Two forms. The default product of `brandi book` is the presentation deck in
+ * branddeck.mjs: 1920x1080 landscape pages that wear the brand, the way an
+ * agency's guidelines do. This file keeps the earlier A4 print book, a single
+ * self-contained HTML file that reads well in a browser and prints to a proper
+ * PDF, behind `brandi book --print`, because it is what existing users have and
+ * it carries the full written detail the deck condenses.
+ *
+ * Both are a VIEW of brand.json, not a source. Every value is read from the
  * brand file or the resolved system, so the book cannot disagree with the
  * tokens the code is built from. That is the failure this whole architecture
  * exists to prevent: a beautiful PDF that stopped being true six months ago.
@@ -16,6 +22,8 @@ import { resolveToken } from './system.mjs';
 import { contrastRatio, apcaContrast, bestTextOn, simulateCvd } from './color.mjs';
 import { googleFontsUrl, parseRatio } from './artboards.mjs';
 import { PROVENANCE } from './brandfile.mjs';
+
+export { renderBrandDeck, pairingMatrix, PLACEHOLDER as DECK_PLACEHOLDER } from './branddeck.mjs';
 
 const esc = (s) =>
   String(s ?? '')
@@ -655,8 +663,9 @@ ${Object.entries(system.palettes).map(([f, pal]) => rampBlock(system, f, pal, 'd
   // --- Voice -------------------------------------------------------------
   body.push(section('voice', 'Voice and tone', 'Voice is constant. Tone moves with the reader.', `
   <div class="stack" style="gap:22px">
+    ${has(voice.statement) ? `<p class="lede">${esc(voice.statement)}</p>` : todo('a one-line tone statement (voice.statement)')}
     ${has(voice.attributes) ? `<div class="grid-3">
-      ${voice.attributes.map((a) => `<div class="card"><h3>${esc(a.name ?? a)}</h3>${a.notThis ? `<p><strong>Not</strong> ${esc(a.notThis)}</p>` : ''}${a.doThis ? `<p>${esc(a.doThis)}</p>` : ''}</div>`).join('')}
+      ${voice.attributes.map((a) => `<div class="card"><h3>${esc(a.name ?? a)}</h3>${a.notThis ? `<p><strong>Not</strong> ${esc(a.notThis)}</p>` : ''}${a.doThis ? `<p>${esc(a.doThis)}</p>` : ''}${has(a.examples) ? `<p style="font-style:italic;color:var(--muted);font-size:13px">${a.examples.filter(has).slice(0, 2).map((x) => `&ldquo;${esc(x)}&rdquo;`).join('<br>')}</p>` : ''}</div>`).join('')}
     </div>` : todo('voice attributes, each paired with what it is not')}
     ${has(voice.tone) ? `<div class="stack" style="gap:8px"><span class="eyebrow">Tone by situation</span>
       <table><thead><tr><th>When</th><th>The reader feels</th><th>So we sound</th></tr></thead><tbody>
@@ -799,18 +808,29 @@ ${Object.entries(system.palettes).map(([f, pal]) => rampBlock(system, f, pal, 'd
   </div>`));
 
   // --- Anti-patterns -----------------------------------------------------
+  // The brand's own habits when it has recorded them, the house list when it
+  // has not, and never a face this brand itself sets: the deck and the print
+  // book have to say the same thing here, and neither may contradict the type
+  // page two chapters earlier.
+  const ownAntiPatterns = has(gov.antiPatterns) ? gov.antiPatterns.filter(has).map(String) : [];
+  const ourFaces = new Set([id.type?.display, id.type?.body, id.type?.mono, ...Object.values(system.type.fonts ?? {})]
+    .filter(has).map((f) => String(f).split(',')[0].replace(/["']/g, '').trim().toLowerCase()));
+  const stillBanned = ['Inter', 'Roboto', 'Arial', 'Poppins', 'Montserrat'].filter((f) => !ourFaces.has(f.toLowerCase()));
+  const houseAntiPatterns = [
+    'No gradient backgrounds, and never a purple or indigo one. A single-hue gradient under ten degrees of variance is fine; a rainbow is not.',
+    'No blurred gradient orbs standing in for an idea.',
+    'No emoji as icons. Icons are drawn.',
+    'No rounded card with a left accent stripe. It is the most-generated component on the internet.',
+    'No three-column feature grid as the default structure. Reach for a single-column narrative, a comparison, or a full-bleed demonstration first.',
+    'No 01 / 02 / 03 numbering unless the content genuinely is a sequence.',
+    'No invented statistics, testimonials or logos. A bracketed placeholder is honest; a fabrication is not.',
+    'No lorem ipsum, and no "Welcome to our website".',
+    stillBanned.length ? `No default typefaces. ${stillBanned.join(', ')} ${stillBanned.length > 1 ? 'are' : 'is'} banned outright.` : null,
+  ].filter(Boolean);
   body.push(section('anti-patterns', 'What not to do', 'The specific habits that would make this brand look like everyone else.', `
   <div class="stack" style="gap:14px">
-    <ul>
-      <li>No gradient backgrounds, and never a purple or indigo one. A single-hue gradient under ten degrees of variance is fine; a rainbow is not.</li>
-      <li>No blurred gradient orbs standing in for an idea.</li>
-      <li>No emoji as icons. Icons are drawn.</li>
-      <li>No rounded card with a left accent stripe. It is the most-generated component on the internet.</li>
-      <li>No three-column feature grid as the default structure. Reach for a single-column narrative, a comparison, or a full-bleed demonstration first.</li>
-      <li>No 01 / 02 / 03 numbering unless the content genuinely is a sequence.</li>
-      <li>No invented statistics, testimonials or logos. A bracketed placeholder is honest; a fabrication is not.</li>
-      <li>No lorem ipsum, and no "Welcome to our website".</li>
-      <li>No default typefaces. ${esc(['Inter', 'Roboto', 'Arial', 'Poppins', 'Montserrat'].join(', '))} are banned outright.</li>
+    <ul data-rule-source="${ownAntiPatterns.length ? 'brand' : 'house'}">
+      ${(ownAntiPatterns.length ? ownAntiPatterns : houseAntiPatterns).map((t) => `<li>${esc(t)}</li>`).join('')}
     </ul>
     ${has(gov.nonGoals) ? `<div class="stack" style="gap:6px"><span class="eyebrow">What this system is not</span>${list(gov.nonGoals)}</div>` : ''}
   </div>`));
@@ -903,4 +923,24 @@ ${body.slice(1).join('\n')}
 `;
 }
 
-export default { renderBrandBook };
+/**
+ * The argv that turns the rendered book into a PDF through headless Chrome.
+ *
+ * No `--user-data-dir`. With one, Chrome wrote the PDF in about four seconds
+ * and then never exited, because the profile's updater process kept it alive
+ * until the 180 second timeout killed it. Without one it exits when the print
+ * is done, and the PDF is byte-identical. The other three Chrome callers
+ * (assets, logoaudit, preview) learned the same lesson separately.
+ */
+export function pdfChromeArgs({ htmlUrl, pdfPath }) {
+  return [
+    '--headless=new', '--disable-gpu', '--no-pdf-header-footer',
+    '--no-first-run', '--no-default-browser-check',
+    '--virtual-time-budget=8000',
+    `--print-to-pdf=${pdfPath}`,
+    htmlUrl,
+  ];
+}
+
+export default { renderBrandBook, pdfChromeArgs };
+

@@ -134,6 +134,23 @@ describe('running the rules', () => {
   test('`unless` stands a rule down when the file answered it', () => {
     assert.deepEqual(rules('a:focus{outline:none}'), ['focus-outline-removed']);
     assert.deepEqual(rules('a:focus{outline:none} a:focus-visible{outline:2px solid}'), []);
+  });
+
+  test('mentioning :focus-visible is not a replacement; drawing one is', () => {
+    // `unless: ':focus-visible'` stood the rule down whenever the file so much
+    // as mentioned the pseudo-class, so removing the outline INSIDE a
+    // :focus-visible block was never reported.
+    assert.deepEqual(rules('button:focus-visible { outline: 0; }'), ['focus-outline-removed']);
+    assert.deepEqual(rules('button:focus-visible { outline: none; }'), ['focus-outline-removed']);
+    assert.deepEqual(rules('a:focus { outline: none }\n.btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }'), []);
+    assert.deepEqual(rules('a:focus { outline: none }\n.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }'), []);
+    assert.deepEqual(rules('a:focus { outline: none }\n.btn:focus-visible { outline-offset: 2px; }'), ['focus-outline-removed'],
+      'outline-offset without an outline draws nothing');
+    // `outline: 0 !important` is still no outline, and it is not a replacement.
+    // Two removed outlines, two findings: the :focus-visible one is no longer taken as a replacement.
+    assert.deepEqual(rules('a:focus { outline: none; }\nbutton:focus-visible { outline: 0 !important; }'), ['focus-outline-removed', 'focus-outline-removed']);
+    assert.deepEqual(rules('button:focus-visible { outline: none !important }'), ['focus-outline-removed']);
+    assert.deepEqual(rules('a:focus { outline: none }\n.btn:focus-visible { outline: 2px solid red !important; }'), []);
     assert.deepEqual(rules('@keyframes spin{}'), ['animation-without-reduced-motion']);
     assert.deepEqual(rules('@keyframes spin{} @media (prefers-reduced-motion: reduce){}'), []);
   });

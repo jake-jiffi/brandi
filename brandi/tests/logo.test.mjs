@@ -577,6 +577,29 @@ describe('argument parsing', () => {
   });
 });
 
+describe('setting a wordmark in a banned face', () => {
+  test('warns, in the same words the system audit uses, and does not refuse', () => {
+    // `logo wordmark --font Inter` used to set the mark in silence, and the
+    // first anyone heard of it was `system` three commands later.
+    assert.match(L.bannedFaceWarning('Inter'), /Inter/);
+    assert.match(L.bannedFaceWarning('  poppins '), /Poppins/, 'case and whitespace do not matter');
+    assert.match(L.bannedFaceWarning('Inter'), /machine-generated/);
+    assert.equal(L.bannedFaceWarning('Bitter'), null);
+    assert.equal(L.bannedFaceWarning(null), null);
+  });
+
+  test('the wordmark command carries the warning in its JSON', async () => {
+    // The dispatcher is the seam: the warning has to reach both the terminal
+    // and the --json reader, and the source is the only place both are visible
+    // without downloading a font.
+    const src = await readFile(LOGO, 'utf8');
+    const block = /case 'wordmark': \{([\s\S]*?)break;/.exec(src)[1];
+    assert.match(block, /bannedFaceWarning\(family\)/);
+    assert.match(block, /console\.error\(w\)/);
+    assert.match(block, /warnings \}/);
+  });
+});
+
 describe('the command line, run as a command line', () => {
   test('with no arguments it prints the usage', async () => {
     const { stdout } = await run(process.execPath, [LOGO]);

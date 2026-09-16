@@ -378,7 +378,7 @@ ${audits.map(rowFor).join('\n')}
   </table>
   <div class="rule"></div>
   <p class="lede"><b>Handed to another asset</b> is not a failure. A lockup cannot work at sixteen pixels and is still the right primary mark, because the small-grade version carries that context. The budget of two failures applies to the system of three assets, not to any one file.</p>
-  <p class="lede">Thresholds come from the application-context matrix in <code>references/11-logo-craft.md</code>. Anything marked as derived is stated as derived there, with the reasoning.</p>
+  <p class="lede">Each threshold is the thinnest stroke and the smallest gap a mark can carry in a given use, from a browser tab at sixteen pixels to embroidery and signage, before it stops reading. Where a number was derived rather than measured, the audit says so and gives the reasoning.</p>
 </div>`;
 
   return {

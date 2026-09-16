@@ -323,9 +323,23 @@
                       "type": "string"
                     },
                     "description": "A pillar with no proof is a slogan. Find evidence or make it an open question."
+                  },
+                  "why": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "description": "Why this pillar matters to the audience. The book shows it beside the proof."
                   }
                 }
               }
+            },
+            "tagline": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The tagline as a strategy artefact. voice.tagline.line is the same line with its usage rules; the book reads either."
             }
           }
         },
@@ -827,6 +841,46 @@
                   ]
                 }
               }
+            },
+            "rationale": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "The story the mark tells, in a paragraph. Shown beside the logo in the brand book."
+            },
+            "cobranding": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "How the mark sits beside a partner logo. Without this the book shows a placeholder page that says the rule is still to be decided.",
+              "properties": {
+                "rule": {
+                  "type": "string"
+                },
+                "alignment": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "What aligns to what, e.g. the partner's cap height to the x-height of the wordmark."
+                },
+                "gap": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The space between the two, as an element of the mark."
+                },
+                "partnerMax": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The most a partner logo may ever be, relative to the mark."
+                }
+              }
             }
           }
         },
@@ -1120,6 +1174,13 @@
                       "minimum": 0,
                       "maximum": 1
                     },
+                    "artwork": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "description": "What goes on the surface: either inline markup (an <svg>, or a <div> of type) or a path to an .svg, .png, .jpg or .webp relative to the project. Without it there is nothing to composite and `mockup build` refuses the mockup rather than writing an empty panel."
+                    },
                     "reviewed": {
                       "type": "boolean",
                       "description": "True only when somebody rendered it and looked. Corners that have never been checked are corners somebody typed."
@@ -1129,12 +1190,49 @@
               }
             }
           }
+        },
+        "illustration": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "description": "Only when the brand has illustration. Absent means the book omits the page rather than inventing a style.",
+          "properties": {
+            "style": {
+              "type": "string"
+            },
+            "themes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "dos": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "donts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
     "voice": {
       "type": "object",
       "properties": {
+        "statement": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The one line that says how this brand sounds, written by somebody. The trait names joined into a sentence is not a tone statement, and the book prints a bracketed placeholder rather than manufacture one."
+        },
         "attributes": {
           "type": "array",
           "items": {
@@ -1149,6 +1247,13 @@
               },
               "doThis": {
                 "type": "string"
+              },
+              "examples": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Lines that demonstrate THIS trait. A line is only shown under a trait when it is recorded here; nothing is dealt out from the general examples."
               }
             }
           }
@@ -1305,6 +1410,13 @@
               ],
               "description": "Whether it locks to the mark, and at what relationship."
             },
+            "locked": {
+              "type": [
+                "boolean",
+                "null"
+              ],
+              "description": "false when the tagline is never locked to the mark: the book then shows it alone in headline position and draws no lockup. true draws the lockup whatever the sentence says. Absent, the lockup sentence is read for a refusal."
+            },
             "translations": {
               "type": "array",
               "items": {
@@ -1414,6 +1526,13 @@
             "type": "string"
           },
           "description": "What this system deliberately does not cover."
+        },
+        "antiPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The specific habits that would make THIS brand look like everyone else. The book prints these when they are recorded; without them it falls back to the generic list, minus anything that would contradict the brand's own decisions."
         },
         "changeLog": {
           "type": "array",

@@ -28,7 +28,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
-import { findChrome } from './preview.mjs';
+import { findChrome, runChrome } from './preview.mjs';
 import { bestTextOn } from './color.mjs';
 
 const run = promisify(execFile);
@@ -171,7 +171,7 @@ ${svg}`);
     // second instance contends for a profile whether the profile is fresh or
     // shared. Measured: 2.2s against 120s+. It was costing this command eight
     // minutes to produce fifteen small files.
-    await run(chrome, [
+    await runChrome(chrome, [
       '--headless=new', '--disable-gpu', '--hide-scrollbars',
       '--no-first-run', '--no-default-browser-check',
       '--force-device-scale-factor=1',
@@ -180,7 +180,7 @@ ${svg}`);
       `--window-size=${size},${size}`,
       `--screenshot=${pngPath}`,
       pathToFileURL(htmlPath).href,
-    ], { timeout: 45000 });
+    ]);
   } finally {
     await rm(dir, { recursive: true, force: true }).catch(() => {});
   }

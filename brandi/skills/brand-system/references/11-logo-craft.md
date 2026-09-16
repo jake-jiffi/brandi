@@ -1,8 +1,7 @@
 # 11 · Logo craft
 
-> `$A` is the Brandi command line, resolved once at the start of the session: `brandi` when the
-> plugin is installed, or `node <this skill's base directory>/../../scripts/brandi.mjs` from a clone.
-> It is never a bare relative path: the working directory is the user's project, not the plugin.
+> `$A` is the Brandi command line, resolved once by the snippet at the top of the `brand-system` or
+> `logo-forge` skill. It is never a bare relative path: the working directory is the user's project.
 
 Load this when you are drawing concepts. `08-logo-system.md` is the other half: it covers the system
 around a mark that already exists (variants, clear space, minimum sizes, renditions, misuse, the
@@ -62,8 +61,8 @@ wearing a different word.
 invisible while you look at them one at a time. Put the lockup, the square alternate and the small
 grade side by side before you call any of them finished.
 
-Both rules are printed into every slot brief by `slotBrief()`, so an agent drawing one concept sees
-them whether or not it has read this file.
+The first rule is printed into every slot brief by `slotBrief()`. The second is only in the plan's
+`rules` list, which no agent sees, so an agent drawing a concept gets it from this file.
 
 ---
 
@@ -237,7 +236,7 @@ large-arc=1 sweep=1  ->  large arc, clockwise
 A full circle needs two arcs, because a single arc from a point to itself is degenerate:
 
 ```xml
-<path d="M 50 8 A 42 42 0 1 1 50 92 A 42 42 0 1 1 50 8 Z" fill="#000000"/>
+<path d="M 50 8 A 42 42 0 1 1 50 92 A 42 42 0 1 1 50 8 Z" fill="#111111"/>
 ```
 
 **No acute tips.** A shape that tapers to a point has a region near the point where the ink is
@@ -288,8 +287,9 @@ kind.
   licensing-safe delivery form (`PKG:181`), because the delivered file then contains your arrangement
   of shapes rather than the foundry's glyph outlines.
 - **Concepts are drawn black on white.** Colour is decided later, and it must not be allowed to
-  rescue a weak silhouette. This is rule three in `planConcepts()` and it is there because a
-  two-colour mark that reads as two shapes is one shape the moment it is etched.
+  rescue a weak silhouette. This is the third of the four rules `planConcepts()` writes into the
+  plan; `slotBrief()` does not print it, so the forge's dispatch text repeats it. It is there
+  because a two-colour mark that reads as two shapes is one shape the moment it is etched.
 
 Two masters when the mark ships: a frozen one with literal hex for anything rasterised or loaded
 without a CSS context (favicon, `<img>`, OG image), and a themed one for inline use. Never one file
@@ -306,7 +306,7 @@ concept is too complex. Start again with a simpler hook.
 therefore the one an agent gets right:
 
 ```xml
-<path fill-rule="evenodd" fill="#000000"
+<path fill-rule="evenodd" fill="#111111"
       d="M 50 8 A 42 42 0 1 1 50 92 A 42 42 0 1 1 50 8 Z
          M 24 40 H 76 V 56 H 24 Z"/>
 ```
@@ -317,7 +317,7 @@ therefore the one an agent gets right:
 parameterisable:
 
 ```xml
-<g fill="#000000">
+<g fill="#111111">
   <path d="M 50 10 L 58 44 L 50 50 Z"/>
   <path d="M 50 10 L 58 44 L 50 50 Z" transform="rotate(120 50 50)"/>
   <path d="M 50 10 L 58 44 L 50 50 Z" transform="rotate(240 50 50)"/>
@@ -347,7 +347,7 @@ Real path data, drawn on the conventions above. Each one is a small-grade asset,
   Double read: peak first, then the letter. Both directions must hold.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path fill-rule="evenodd" fill="#000000"
+  <path fill-rule="evenodd" fill="#111111"
         d="M 50 6 L 94 94 L 76 94 L 65 72 L 35 72 L 24 94 L 6 94 Z
            M 50 42 L 58 58 L 42 58 Z"/>
 </svg>
@@ -371,7 +371,7 @@ between y 58 and y 72 and the counter stops at 58. Nothing is drawn twice.
   Narrowest bridge: 14.8 units at the slot ends, which is 2.4px at 16px.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path fill-rule="evenodd" fill="#000000"
+  <path fill-rule="evenodd" fill="#111111"
         d="M 50 8 A 42 42 0 1 1 50 92 A 42 42 0 1 1 50 8 Z
            M 24 40 H 76 V 56 H 24 Z"/>
 </svg>
@@ -394,7 +394,7 @@ single connected shape for embroidery, which halves the thread path.
   One idea: a sheet folded twice. Not a letter S, not three bars.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <path fill="#000000"
+  <path fill="#111111"
         d="M 12 7 H 88 V 59 H 30 V 75 H 88 V 93 H 12 V 41 H 70 V 25 H 12 Z"/>
 </svg>
 ```
@@ -438,8 +438,8 @@ audit and the planner key off them.
 
 | id | What it is | Needs as fallback | The discipline |
 |---|---|---|---|
-| `wordmark` | The name set and worked. No standalone symbol. Best at 4 to 8 letters, 9 to 12 needs justification, 13+ is a hard fail | `letterform-as-symbol`, `monogram` | Letter by letter. Kerning is not optional. One structural intervention at most |
-| `lockup` | Wordmark plus symbol in a fixed relationship, with a stacked alternate. **The default** | `symbol-only`, `letterform-as-symbol`, `monogram` | The gap is a ratio of the wordmark x-height, so it holds at every size. Symbol optical weight matches the wordmark stroke |
+| `wordmark` | The name set and worked. No standalone symbol. Best at 4 to 8 letters, 9 to 12 needs justification (`nameLength` in `logospec.mjs`; nothing fails on length alone) | `letterform-as-symbol`, `monogram` | Letter by letter. Kerning is not optional. One structural intervention at most |
+| `lockup` | Wordmark plus symbol in a fixed relationship, with a stacked alternate. **The default** | `symbol-only`, `letterform-as-symbol`, `monogram` | The gap is a ratio of the wordmark cap height, so it holds at every size. Symbol optical weight matches the wordmark stroke |
 | `symbol-only` | Symbol carrying alone, wordmark relegated to legal surfaces | `wordmark` | Mechanically it passes everything and strategically it is unavailable to a new brand. Gated on `maturityGated` |
 | `letterform-as-symbol` | One letter, drawn so it reads as the letter **and** as the idea | `wordmark` | The double read is the gate. Good letters M A B S D W K R; hard letters I L J T |
 | `monogram` | Two or three initials as one shape: `pure-ligature`, `framed`, or `tight-kerned` | `wordmark` | Under-styled it is typed initials, over-framed it is a fake-heritage template. The distance between those is the work |
@@ -634,7 +634,6 @@ was drawn).
 | `no-ink` | error | nothing paints | Nothing to audit |
 | `live-text` | error on a master, note on a candidate | any `<text>` | `PKG:181` |
 | `raster` | error | any `<image>` | Cannot be cut in vinyl or reproduced at signage scale |
-| `script`, `foreign-object` | error | present | Stripped or dropped everywhere it is used |
 | `external-ref` | error | any off-file reference | Nothing downstream has network access |
 | `script` | error | any `<script>` | Stripped everywhere the mark is used, so anything depending on it is already broken |
 | `foreign-object` | error | any `<foreignObject>` | Does not survive rasterising, so it is absent from every PNG the pack produces |
@@ -858,7 +857,7 @@ or to wire up.
 | 17 | No small-grade asset exists | mech | Assert all three hierarchy tiers. If tier three cannot be derived from tier one, the primary is over-detailed |
 | 18 | No square alternate | mech | Assert an asset with an aspect ratio between 0.9 and 1.1 |
 | 19 | Symbol and wordmark in different weight classes | mech | Symbol limb width against wordmark stem width, within 15 per cent |
-| 20 | Lockup gap not tied to x-height | mech | Assert `gap = k × xHeight` for a declared `k`, then re-render at 200, 100, 50 and 25 per cent |
+| 20 | Lockup gap not tied to cap height | mech | Assert `gap = k × capHeight` for a declared `k` (`composeLockup()` does), then re-render at 200, 100, 50 and 25 per cent |
 | 21 | Reverse-on-dark contrast fails | mech | Every fill at 3:1 or better against the dark ground |
 | 22 | Geometry lost to a circle mask | mech | All ink inside the inscribed circle |
 | 23 | Anaemic at signage scale | mech | Minimum limb at 4 per cent of the mark's larger dimension |
@@ -903,15 +902,18 @@ reverse image search, or compares the mark against anything outside the concept 
 `near-duplicate` check compares candidates in the same round against each other, and that is all it
 does. Do not let a clean audit be read as clearance.
 
-**Record this, per concept, in the sidecar:**
+**Record this, per concept, in the sidecar.** `logo import` writes it as `generationRecord()`
+does, with these fields:
 
 ```
-model            the model id that drew it
-prompt           the exact slot brief it received, verbatim
-date             ISO date
-slot             the planner slot id (family, architecture, register, symbol approach, seed)
+id               the concept id
+generatedBy      the model id that drew it (`--model`), or "unrecorded"
+generatedOn      local date
+slot             { id, family, architecture, register, symbolApproach } from the planner
+prompt           the path of the slot brief it received
 edits            every human change after generation, with who made it and when
-approved         the name of the person who approved it, and the date
+approvedBy       the name of the person who approved it; null until somebody did
+status           derived from approvedBy, never set by hand
 ```
 
 The `edits` field is the one that does real work. Human modification is what a copyright argument

@@ -1,6 +1,6 @@
 # Brandi
 
-An agency-grade brand and design system builder for Claude Code.
+An agency-grade brand and design system builder for Claude Code, which also runs on Codex.
 
 Give it a logo and a rough idea, or give it nothing at all. It runs the whole engagement: strategy,
 three genuinely different visual directions on a canvas you can look at, a real range of logo
@@ -9,8 +9,10 @@ a brand book, DTCG design tokens, and a companion skill that keeps every future 
 
 ## Install
 
-You need [Claude Code](https://claude.com/claude-code). Everything else is built in: Brandi has no
-npm dependencies at all.
+You need [Claude Code](https://claude.com/claude-code) or Codex. Everything else is built in: Brandi
+has no npm dependencies at all. The two hosts are not equal. Claude Code gets all of it, including
+the `/design` canvas and the published artifact. Codex gets the skills, the command line and every
+file Brandi writes. Its visual rounds arrive as PNG previews rather than a canvas.
 
 **1. Clone it,** in a terminal:
 
@@ -38,10 +40,19 @@ Code, at its prompt, not in a terminal:
 It writes into `brand/` in whatever directory you started it in, so start it where you want the
 brand to live.
 
+**On Codex** the same plugin installs from the same files: in a terminal, `codex plugin marketplace add
+<path or owner/repo>` then `codex plugin add brandi@brandi`, and `codex plugin list` should show it.
+Codex has no `/brandi:*` commands and no canvas, so you invoke the skills as `$brand-system`,
+`$logo-forge` and `$brand-guardian`, and the visual rounds arrive as PNG previews instead of a link.
+
 ### Checking it worked
 
 `/brandi:brand-status` should tell you which phase you are in. If the command is not offered,
 Claude Code has not picked the plugin up: check `/plugin list` shows `brandi@brandi`, and restart.
+
+After a version bump the installed copy is stale until you refresh it: `/plugin marketplace update
+brandi` then `/plugin update brandi@brandi` in Claude Code, or `codex plugin add brandi@brandi` on
+Codex (after `codex plugin marketplace upgrade` if you added the marketplace from Git).
 
 ### Optional
 
@@ -49,16 +60,10 @@ A Chromium-family browser (Chrome, Chromium, Edge, Brave) is used for the PDF, t
 artboard previews. Everything else works without one, and Brandi says plainly which outputs it could
 not produce rather than reporting a complete set. Set `CHROME_PATH` if yours lives somewhere unusual.
 
-
-Then, in any project:
-
-```
-/brandi:brand
-```
-
 Claude Code puts a plugin's `bin` on PATH from the next session, so `brandi` is not a shell command
 until you restart. Nothing depends on that: the skills resolve the command themselves, and fall back
-to the installed copy under `~/.claude/plugins/cache/`. Restart when convenient, not before you start.
+to the installed copy under `~/.claude/plugins/cache/` or `~/.codex/plugins/cache/`. Restart when
+convenient, not before you start.
 
 ## What you get
 
@@ -66,8 +71,13 @@ to the installed copy under `~/.claude/plugins/cache/`. Restart when convenient,
 brand/
   brand.json           the source of truth. Everything else is a view of it
   system.json          the resolved system: every ramp, every token, audited
-  brand-book.html      a real brand book, 14 sections. Prints to A4
-  brand-book.pdf       the same, 18 pages, through headless Chrome
+  brand-book.html      the brand guidelines as a 1920x1080 deck that wears the brand: eight
+                       chapters (framework and voice, logo, colour, typography, assets, system,
+                       brand in use, rules and decisions), 53 pages for the worked example
+  brand-book.pdf       the same, one PDF page per deck page, through headless Chrome
+                       (`brandi book --print` writes the earlier A4 print book instead).
+                       The deck is a desktop and print document: on a phone the pages
+                       reflow, but the PDF is the thing to send
   tokens/
     tokens.json                  Design Tokens Community Group format
     tokens.style-dictionary.json the same, with string dimensions for older pipelines
@@ -78,7 +88,8 @@ brand/
                        generated palette, type specimen, component-state sheet,
                        token reference and logo construction sheet
   assets/logos/
-~/.claude/skills/<slug>-brand/   a companion skill that enforces the brand
+~/.claude/skills/<slug>-brand/   a companion skill that enforces the brand, also linked
+                                 into ~/.agents/skills/ when that directory exists, so Codex reads it
 ```
 
 ## The journey
@@ -211,7 +222,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-1485 tests. They include property tests over the colour and type engines against hundreds of random
+1738 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

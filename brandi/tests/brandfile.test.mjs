@@ -1,4 +1,4 @@
-import { test, describe } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -217,6 +217,104 @@ describe('phase readiness', () => {
   test('refuses an unknown phase', () => {
     assert.throws(() => B.completePhase(B.emptyBrand(), 'vibing'), TypeError);
   });
+
+  test('refuses a phase whose predecessors are not complete', async () => {
+    const b = await loadFixture();
+    b.brandi.completed = [];
+    b.brandi.phase = 'recon';
+    assert.throws(() => B.completePhase(b, 'intake'), /before "recon" is complete/);
+    assert.equal(b.brandi.phase, 'recon', 'a refused completion must not move the cursor');
+    assert.deepEqual(b.brandi.completed, []);
+    B.completePhase(b, 'recon');
+    assert.equal(B.completePhase(b, 'intake'), 'strategy');
+  });
+
+  test('re-completing an earlier phase leaves the cursor on the first incomplete one', async () => {
+    const b = await loadFixture();
+    b.brandi.completed = ['recon', 'intake'];
+    b.brandi.phase = 'strategy';
+    assert.equal(B.completePhase(b, 'recon'), 'strategy');
+    b.brandi.completed = B.PHASES.map((p) => p.id);
+    assert.equal(B.completePhase(b, 'recon'), 'publish', 'nothing is pending, so the cursor stays at the end');
+  });
+});
+
+describe('checkFieldPath', () => {
+  let schema;
+  before(async () => {
+    schema = JSON.parse(await readFile(path.join(import.meta.dirname, '..', 'schemas', 'brand.schema.json'), 'utf8'));
+  });
+
+  test('walks properties, list indexes and nested objects', () => {
+    for (const p of ['meta.name', 'strategy.audiences.0.name', 'brandi.completed.3']) {
+      assert.equal(B.checkFieldPath(schema, p, 'x').ok, true, p);
+    }
+    // A number field takes a number, so the walk into it is tested with one
+    // (R2-N-03 refuses the string 'x' there, as the shape test below asserts).
+    assert.equal(B.checkFieldPath(schema, 'identity.logo.minSize.screenPx', 28).ok, true);
+    assert.equal(B.checkFieldPath(schema, 'identity.logo.minSize.screenPx', '28').value, 28, 'the string the command line passes');
+    assert.equal(B.checkFieldPath(schema, 'identity.colour.accents.1', '#1F6F4A').ok, true);
+  });
+
+  test('refuses a key the schema does not have, and names the nearest one', () => {
+    const r = B.checkFieldPath(schema, 'voice.attributes.0.not', 'gushing');
+    assert.equal(r.ok, false);
+    assert.equal(r.suggestion, 'voice.attributes.0.notThis');
+    assert.match(B.checkFieldPath(schema, 'metta.name', 'x').error, /Did you mean meta/);
+    const far = B.checkFieldPath(schema, 'nonexistent.path.here', 'x');
+    assert.equal(far.ok, false);
+    assert.equal(far.suggestion, null);
+    assert.match(far.error, /The fields under the brand file are/);
+  });
+
+  test('refuses an index into something that is not a list, and a key on a scalar', () => {
+    assert.match(B.checkFieldPath(schema, 'meta.0', 'x').error, /not a list/);
+    assert.match(B.checkFieldPath(schema, 'identity.colour.primary.foo', 'x').error, /not an object/);
+  });
+
+  test('lets free-form parts of the file through', () => {
+    assert.equal(B.checkFieldPath(schema, 'applications.0.anything.at.all', 'x').ok, true);
+    assert.equal(B.checkFieldPath(schema, 'voice.mechanics.contractions', 'yes').ok, true);
+  });
+
+  test('R2-N-03: refuses a value whose shape is not the schema\'s, naming the shape it wants', () => {
+    const licences = B.checkFieldPath(schema, 'identity.type.licences', { display: 'x' });
+    assert.equal(licences.ok, false);
+    assert.match(licences.error, /identity\.type\.licences must be a list, not an object/);
+    assert.match(licences.error, /Expected shape: \[\{"family": …, "source": …, "permits": …\}\]/);
+    const audiences = B.checkFieldPath(schema, 'strategy.audiences', '"s"');
+    assert.equal(audiences.ok, false);
+    assert.match(audiences.error, /strategy\.audiences must be a list, not a string/);
+    const misuse = B.checkFieldPath(schema, 'identity.logo.misuse', { a: 1 });
+    assert.equal(misuse.ok, false);
+    assert.match(misuse.error, /identity\.logo\.misuse must be a list, not an object/);
+    // Scalars are held to their type too.
+    assert.match(B.checkFieldPath(schema, 'meta.name', true).error, /meta\.name must be a string \(or null\), not a boolean/);
+    assert.match(B.checkFieldPath(schema, 'identity.logo.minSize.screenPx', 'wide').error, /must be a number \(or null\), not a string\. Expected shape: 0/);
+    assert.match(B.checkFieldPath(schema, 'voice.tagline.locked', 'no').error, /must be true or false \(or null\), not a string/);
+  });
+
+  test('R2-N-03: the right shape passes, a numeric string becomes a number, and a oneOf list takes either member', () => {
+    const ok = (p, v) => { const r = B.checkFieldPath(schema, p, v); assert.equal(r.ok, true, `${p}: ${r.error}`); return r.value; };
+    assert.deepEqual(ok('identity.type.licences', [{ family: 'Bitter', source: 'Google Fonts', permits: 'OFL' }]), [{ family: 'Bitter', source: 'Google Fonts', permits: 'OFL' }]);
+    assert.deepEqual(ok('strategy.audiences', [{ name: 'Regulars' }]), [{ name: 'Regulars' }]);
+    assert.deepEqual(ok('identity.logo.misuse', ['stretch it', { what: 'rotate it', why: 'it reads as a mistake' }]), ['stretch it', { what: 'rotate it', why: 'it reads as a mistake' }]);
+    assert.equal(ok('identity.logo.misuse.0', 'stretch it'), 'stretch it');
+    assert.deepEqual(ok('identity.logo.misuse.0', { what: 'rotate it' }), { what: 'rotate it' });
+    assert.equal(ok('identity.logo.minSizes.0.printMm', '22'), 22, 'a numeric string offered to a number field');
+    assert.equal(ok('identity.logo.minSizes.0.printMm', 22), 22);
+    assert.equal(ok('voice.tagline.locked', false), false);
+    assert.equal(ok('voice.tagline.lockup', null), null, 'a nullable string takes null');
+    assert.equal(ok('meta.name', '007'), '007', 'a string field keeps a numeric-looking string');
+  });
+
+  test('refuses a non-hex where the schema says hex, in a scalar and in a list', () => {
+    assert.match(B.checkFieldPath(schema, 'identity.colour.primary', '#GG0000').error, /not a hex colour/);
+    assert.match(B.checkFieldPath(schema, 'identity.colour.accents.0', 'green').error, /not a hex colour/);
+    assert.match(B.checkFieldPath(schema, 'identity.colour.accents', ['#1F6F4A', '#GG0000']).error, /#GG0000/);
+    assert.equal(B.checkFieldPath(schema, 'identity.colour.primary', '#1F6F4A').ok, true);
+    assert.equal(B.checkFieldPath(schema, 'identity.colour.primary', null).ok, true, 'null is how a colour is unset');
+  });
 });
 
 describe('status', () => {
@@ -297,5 +395,33 @@ describe('the provenance model', () => {
     assert.equal(B.PROVENANCE.supplied.weight, 1);
     assert.equal(B.PROVENANCE.decided.weight, 1);
     assert.ok(B.PROVENANCE.assumed.weight < B.PROVENANCE.extracted.weight);
+  });
+});
+
+describe('R3-N-08: a decision carries the day it was taken, where it was taken', () => {
+  test('a late-evening decision is dated locally, not in UTC', () => {
+    // 23:30 UTC on 15 September is already the 16th in Melbourne. The brand
+    // file's locale is en-AU and the decision log is read as evidence of when
+    // the work was done, so the UTC day is the wrong day.
+    const b = B.emptyBrand({ name: 'Acme' });
+    const late = new Date('2026-09-15T23:30:00Z');
+    const entry = B.addDecision(b, { decision: 'Green, not blue', rationale: 'It is already the shop colour', now: late });
+    assert.equal(entry.date, B.localDate(late));
+    assert.match(entry.date, /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(entry.date, `${late.getFullYear()}-${String(late.getMonth() + 1).padStart(2, '0')}-${String(late.getDate()).padStart(2, '0')}`);
+    // In any zone east of Greenwich that instant is the following day.
+    if (-late.getTimezoneOffset() >= 30) assert.notEqual(entry.date, late.toISOString().slice(0, 10));
+  });
+
+  test('localDate pads and never drifts across the month boundary', () => {
+    assert.equal(B.localDate(new Date(2026, 0, 1, 0, 0, 0)), '2026-01-01');
+    assert.equal(B.localDate(new Date(2026, 11, 31, 23, 59, 0)), '2026-12-31');
+    assert.equal(B.localDate(new Date(2026, 8, 5, 12, 0, 0)), '2026-09-05');
+  });
+
+  test('evidence keeps a full UTC instant, because that is a moment, not a day', () => {
+    const b = B.emptyBrand({ name: 'Acme' });
+    const e = B.addEvidence(b, { claim: 'They said green', provenance: 'supplied', now: new Date('2026-09-15T23:30:00Z') });
+    assert.equal(e.recorded, '2026-09-15T23:30:00.000Z');
   });
 });

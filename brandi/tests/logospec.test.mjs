@@ -412,9 +412,40 @@ describe('the slot brief is self contained', () => {
     }
   });
 
-  test('it states the smallest-first rule', () => {
+  test('it states the smallest-first rule, and what carries 16 pixels', () => {
     for (const slot of plan.slots) {
-      assert.match(L.slotBrief(slot, brief), /FIRST, at 16 pixels/);
+      const text = L.slotBrief(slot, brief);
+      assert.match(text, /16 pixels/, `${slot.id} says nothing about the smallest size`);
+      assert.ok(text.includes(slot.smallGrade), `${slot.id} never names its smallest grade`);
+      if (slot.symbolApproach) assert.match(text, /FIRST, at 16 pixels/);
+      // A wordmark hands 16 pixels to its fallback. Its own contexts table says
+      // so ('favicon-16': 'fallback'), and the brief has to agree.
+      else assert.match(text, /Set the wordmark FIRST/);
+    }
+  });
+
+  test('a brief never tells one agent to build a symbol it has just forbidden', () => {
+    // "No symbol. The type carries alone." sat four lines above "Build the
+    // letterform-as-symbol FIRST", so a wordmark slot contradicted itself and
+    // the agent had to pick one.
+    const wordmarks = plan.slots.filter((s) => !s.symbolApproach);
+    assert.ok(wordmarks.length, 'the fixture must contain a wordmark-only slot');
+    for (const slot of wordmarks) {
+      const text = L.slotBrief(slot, brief);
+      assert.match(text, /No symbol\. The type carries alone\./);
+      assert.equal(/Build the \S+ FIRST/.test(text), false, `${slot.id} forbids a symbol and then orders one`);
+    }
+  });
+
+  test('every architecture in every category produces one instruction, not two', () => {
+    for (const category of ['pets', 'saas', 'legal', 'fashion', 'general']) {
+      const b = { name: 'Muddy Paws', category };
+      for (const slot of L.planConcepts(b, { count: 12 }).slots) {
+        const text = L.slotBrief(slot, b);
+        const forbidsSymbol = /No symbol\. The type carries alone\./.test(text);
+        const ordersSymbol = /Build the \S+ FIRST/.test(text);
+        assert.equal(forbidsSymbol && ordersSymbol, false, `${category} ${slot.id} contradicts itself`);
+      }
     }
   });
 

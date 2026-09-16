@@ -13,17 +13,17 @@
  *   brandi question --question ... --why ...
  *   brandi system                     resolve and audit the design system
  *   brandi tokens [--out brand/tokens] [--prefix acme] [--strict-dimensions]
- *   brandi sheets --out <dir>         write the specification artboards
+ *   brandi sheets [--out <dir>]       write the specification artboards
  *   brandi canvas --dir <dir> --title "Acme brand" --out acme-brand.html
  *   brandi validate --dir <dir>       check artboards before they are published
- *   brandi book [--pdf]               the brand book
- *   brandi logo <plan|wordmark|audit|board|pick|master|status>
+ *   brandi book [--pdf] [--print]     the brand book: a 16:9 deck, or the A4 print book with --print
+ *   brandi logo <plan|refine|wordmark|lockup|import|audit|board|pick|master|status>
  *   brandi images <dir> [--check]      measure supplied photography before planning
  *   brandi mockup grid <photo>         read a surface's corners off a real photograph
  *   brandi mockup build                composite the brand onto the recorded surfaces
  *   brandi assets [--out <dir>]        derive the asset pack from the master SVG
  *   brandi handoff [--out <dir>]       assemble the package a client is given
- *   brandi guardian                   emit the enforcement skill
+ *   brandi guardian [--out <dir>]     emit the enforcement skill
  *   brandi fonts                      check the typefaces actually load from Google Fonts
  *   brandi check <paths...> [--limit N]  hold work against the brand
  *   brandi complete <phase>           mark a phase done and advance
@@ -32,7 +32,8 @@
  * form instead, so the skill can read a result without parsing prose.
  */
 
-import { readFile, writeFile, mkdir, readdir, stat, copyFile, rm, realpath } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, mkdtemp, readdir, rm, stat, copyFile, realpath } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -40,7 +41,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
-  emptyBrand, loadBrand, saveBrand, validateBrand, completePhase, status as brandStatus, migrateBrand,
+  emptyBrand, loadBrand, saveBrand, validateBrand, checkFieldPath, completePhase, status as brandStatus, migrateBrand,
   systemInputFromBrand, addDecision, addEvidence, addOpenQuestion, slugify, PHASES, PROVENANCE,
 } from './brandfile.mjs';
 import { buildSystem, assertPublishable } from './system.mjs';
@@ -50,8 +51,9 @@ import { artboard as artboardOf } from './canvas.mjs';
 import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES } from './canvas.mjs';
 import { extractColors } from './color.mjs';
 import { locateDesignHelper, NOT_FOUND_MESSAGE } from './design-locate.mjs';
-import { renderBrandBook } from './brandbook.mjs';
-import { emitGuardianSkill, checkFiles, checkPromises } from './guardian.mjs';
+import { renderBrandBook, renderBrandDeck, pdfChromeArgs } from './brandbook.mjs';
+import { toPreviewHtml, screenshot, findChrome, runChrome } from './preview.mjs';
+import { emitGuardianSkill, checkFiles, checkPromises, linkForCodex, GENERATED_MARKER } from './guardian.mjs';
 import { buildAssetPack } from './assets.mjs';
 import { buildHandoff } from './handoff.mjs';
 import { catalogueImages, summarise } from './images.mjs';
@@ -172,23 +174,37 @@ async function cmdInit(flags) {
 async function cmdStatus(flags) {
   const { brand } = await needBrand(flags);
   const s = brandStatus(brand);
-  const check = validateBrand(brand, { phase: s.phase });
-  const lines = [`${s.name}  v${s.version}`, ''];
+  // A file with no brandi block has no phase, and the first phase is where it
+  // is. Printing "vundefined" and "the undefined phase" told the reader nothing
+  // about the one thing wrong with the file.
+  const phase = s.phase ?? PHASES[0].id;
+  const check = validateBrand(brand, { phase });
+  const lines = [`${s.name}  ${s.version ? `v${s.version}` : '(no version)'}`, ''];
   for (const p of s.phases) {
-    const mark = p.done ? '[x]' : p.current ? '[>]' : '[ ]';
+    const mark = p.done ? '[x]' : (p.current || (!s.phase && p.id === phase)) ? '[>]' : '[ ]';
     lines.push(`${mark} ${p.name.padEnd(12)} ${p.outcome}`);
   }
   lines.push('');
   lines.push(`evidence ${s.counts.evidence} | decisions ${s.counts.decisions} | open questions ${s.counts.openQuestions}`);
   if (check.errors.length) {
-    lines.push('', `Blocking the ${s.phase} phase:`);
+    lines.push('', `Blocking the ${phase} phase:`);
     for (const e of check.errors) lines.push(`  ${e.field}: ${e.message}`);
+  }
+  if (!brand.brandi?.version) {
+    lines.push('', 'This is not a complete brand file. Run `brandi init --force` to start it properly (which discards what is here), or add the missing sections by hand.');
   }
   if (check.warnings.length) {
     lines.push('', 'Worth fixing:');
     for (const w of check.warnings.slice(0, 8)) lines.push(`  ${w.field}: ${w.message}`);
   }
-  emit(lines.join('\n'), { ok: true, ...s, check });
+  // The JSON mirrors the text: a file with no phase is at the first one.
+  emit(lines.join('\n'), {
+    ok: true,
+    ...s,
+    phase,
+    phases: s.phases.map((p) => ({ ...p, current: p.current || (!s.phase && p.id === phase) })),
+    check,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -408,21 +424,50 @@ async function cmdSet(flags, positional) {
     return fail(`"${dotted}" is not a field path. Use dotted segments, e.g. identity.colour.primary`);
   }
   const { file, brand } = await needBrand(flags);
-  const value = coerce(rest.join(' '), dotted);
+  // Against the plugin's own schema, not the copy `init` left beside the brand
+  // file: that one is whatever version was current when the brand was started.
+  const schema = JSON.parse(await readFile(path.join(HERE, '..', 'schemas', 'brand.schema.json'), 'utf8'));
+  const raw = rest.join(' ');
+  let shape = checkFieldPath(schema, dotted, coerce(raw, dotted));
+  // true, false and null are read as JSON, but a text field refuses them as
+  // the wrong shape, which would leave no way to write the word itself. When
+  // the field takes text, the word is the text.
+  if (!shape.ok && /^(true|false|null)$/.test(raw)) {
+    const asText = checkFieldPath(schema, dotted, raw);
+    if (asText.ok) shape = asText;
+  }
+  if (!shape.ok) return fail(shape.error, { field: dotted, suggestion: shape.suggestion ?? null });
+  // The value as the schema shaped it: "22" offered to a number field is 22.
+  const value = shape.value;
   const keys = dotted.split('.');
 
   // Walk by INDEX, not by indexOf: a repeated segment (voice.examples.0.examples)
   // made indexOf find the first occurrence and pick the wrong container type,
   // which silently discarded the write.
+  // An index past the end of a list would pad it with nulls, and a list with
+  // holes in it is a file every later command has to guess about. The index
+  // equal to the length appends; anything beyond is refused.
+  const tooFar = (list, k) => Array.isArray(list) && /^\d+$/.test(k) && Number(k) > list.length;
   let node = brand;
   for (let i = 0; i < keys.length - 1; i++) {
     const k = keys[i];
     const nextIsIndex = /^\d+$/.test(keys[i + 1]);
     if (node[k] == null || typeof node[k] !== 'object') node[k] = nextIsIndex ? [] : {};
+    if (tooFar(node[k], keys[i + 1])) {
+      return fail(`${keys.slice(0, i + 1).join('.')} has ${node[k].length} entries, so index ${keys[i + 1]} would leave a gap. Use ${node[k].length} to append.`, { field: dotted });
+    }
     node = node[k];
   }
   node[keys.at(-1)] = value;
   if (dotted === 'meta.name' && !brand.meta.slug) brand.meta.slug = slugify(String(value));
+  // A banned face recorded in identity.type is caught where the decision is
+  // made, not three commands later. The same one-line warning the forge gives.
+  const warnings = [];
+  if (/^identity\.type\.(display|body|mono)$/.test(dotted) && typeof value === 'string') {
+    const { bannedFaceWarning } = await import('./logo.mjs');
+    const w = bannedFaceWarning(value);
+    if (w) { warnings.push(w); console.error(w); }
+  }
   await saveBrand(file, brand);
 
   // Read it back off disk. A source of truth that confirms a write it discarded
@@ -435,7 +480,7 @@ async function cmdSet(flags, positional) {
         `the file now holds ${JSON.stringify(written)}. Nothing was reported as set.`,
     );
   }
-  emit(`${dotted} = ${JSON.stringify(value)}`, { ok: true, field: dotted, value });
+  emit(`${dotted} = ${JSON.stringify(value)}`, { ok: true, field: dotted, value, warnings });
 }
 
 // ---------------------------------------------------------------------------
@@ -665,9 +710,38 @@ async function cmdSheets(flags) {
   });
   const keepPositions = sameFileSet && allPositioned && sameSizes && prior.size > 0;
 
+  // What the brand ALREADY SAYS an authored artboard is: `applications[].frame`
+  // for a page somebody recorded, and the composite's own dimensions for a
+  // mockup, which `mockupBody` wrote into the artboard.
+  //
+  // Without this, `sheets` gave a 390x844 phone and a 794x1123 flyer the
+  // 1440x900 desktop frame and said "because nothing said otherwise" in a
+  // project whose brand file said otherwise on the line above. The deck then
+  // letterboxed all three.
+  const recorded = new Map();
+  const frameOf = (v) => {
+    const m = /^\s*(\d{2,5})\s*[x\u00d7]\s*(\d{2,5})\s*$/.exec(String(v ?? ''));
+    return m ? { w: Number(m[1]), h: Number(m[2]) } : null;
+  };
+  for (const f of existing) {
+    if (known.has(f)) continue; // a generated sheet is sized by its generator
+    const app = (brand.applications ?? []).find((a) => a && a.file === f);
+    const fromApp = frameOf(app?.frame);
+    if (fromApp) { recorded.set(f, { ...fromApp, why: `applications[].frame records ${fromApp.w}x${fromApp.h}` }); continue; }
+    if (!/^Mockup/.test(f)) continue;
+    const drawn = /<div style="position:relative;width:(\d+)px;height:(\d+)px/
+      .exec(await readFile(path.join(dir, f), 'utf8'));
+    if (drawn) recorded.set(f, { w: Number(drawn[1]), h: Number(drawn[2]), why: 'the composite is that size' });
+  }
+
   const entries = existing.map((f) => {
     const generated = known.get(f);
     const was = prior.get(f);
+    const says = recorded.get(f);
+    // A size that is only in canvas.json because an earlier run defaulted it is
+    // not a decision anybody made, so the brand file wins over it. A size
+    // somebody actually chose is left alone.
+    const wasDefaulted = was && was.w === FRAMES.desktop.w && was.h === FRAMES.desktop.h;
     const position = keepPositions && was ? { x: was.x, y: was.y } : {};
     if (generated) {
       // A generated sheet's size is always the freshly computed one. Main is the
@@ -683,16 +757,32 @@ async function cmdSheets(flags) {
     // recovered without a re-seed. Fall through to the default and say so.
     const staleGeneratedSize = f === 'Main.dc.html' && keptMain && was
       && was.w === contentsSize.w && was.h === contentsSize.h;
-    if (was && !staleGeneratedSize && Number.isFinite(was.w) && Number.isFinite(was.h)) {
+    if (was && !staleGeneratedSize && !(wasDefaulted && says) && Number.isFinite(was.w) && Number.isFinite(was.h)) {
       return { ...was, file: f, page: was.page ?? 'work', ...position };
     }
-    // New, authored, and never sized before. Default, and say so rather than
-    // letting a too-small frame clip in silence.
+    // The brand file, or the composite itself, before the default.
+    if (says) return { file: f, w: says.w, h: says.h, page: 'work', ...(was ? {} : position) };
+    // New, authored, and nothing anywhere says how big it is. Default, and say
+    // so rather than letting a too-small frame clip in silence.
     return { file: f, w: FRAMES.desktop.w, h: FRAMES.desktop.h, page: 'work', unsized: true };
   });
 
   const unsized = entries.filter((e) => e.unsized).map((e) => e.file);
   for (const e of entries) delete e.unsized;
+  // Which authored artboards took their frame from the brand file rather than
+  // from the default, so the person can see it happened and correct it.
+  const sized = entries
+    .filter((e) => recorded.has(e.file) && recorded.get(e.file).w === e.w && recorded.get(e.file).h === e.h)
+    .map((e) => `${e.file} ${e.w}x${e.h}, because ${recorded.get(e.file).why}`);
+
+  // The specification page reads in the order the contents sheet lists ("In
+  // this set"), not in the order readdir happened to return the files.
+  const listed = new Map(all.map((s, i) => [s.file, i]));
+  entries.sort((a, b) => {
+    if (a.page !== b.page) return a.page === 'work' ? -1 : 1;
+    if (a.page !== 'spec') return 0;
+    return (listed.get(a.file) ?? 99) - (listed.get(b.file) ?? 99);
+  });
 
   // Specification sheets go on their own page so they do not crowd the design.
   const pages = [{ id: 'work', name: 'Design' }, { id: 'spec', name: 'Specification' }];
@@ -703,8 +793,11 @@ async function cmdSheets(flags) {
   const launch = previous?.launch?.view === 'focused' && existing.includes(previous.launch.file)
     ? previous.launch
     : { view: 'canvas', page: hasWork ? 'work' : 'spec' };
+  // Five across on the specification page: nine tall sheets two across make a
+  // strip that is unreadable at fit zoom. The design page keeps two.
+  const columns = { work: 2, spec: 5 };
   const manifest = canvasManifest(entries, {
-    columns: 2,
+    columns,
     pages: hasWork ? pages : [{ id: 'spec', name: 'Specification' }],
     launch,
   });
@@ -714,7 +807,7 @@ async function cmdSheets(flags) {
   if (findOverlaps(manifest).length) {
     finalManifest = canvasManifest(
       entries.map(({ x, y, ...rest }) => rest),
-      { columns: 2, pages: hasWork ? pages : [{ id: 'spec', name: 'Specification' }], launch },
+      { columns, pages: hasWork ? pages : [{ id: 'spec', name: 'Specification' }], launch },
     );
   }
   const clashes = findOverlaps(finalManifest);
@@ -732,18 +825,49 @@ async function cmdSheets(flags) {
       sheets.map((s) => `  ${s.file.padEnd(24)} ${s.w}x${s.h}`).join('\n') +
       (keptMain ? `\n  Main.dc.html             kept as it is. Pass --force to replace it with the generated contents page.` : '') +
       `\n  canvas.json              ${plural(finalManifest.artboards.length, 'artboard')}` +
+      (sized.length ? `\n\nSized from the brand file:\n${sized.map((l) => `  ${l}`).join('\n')}` : '') +
       (unsized.length
-        ? `\n\nSized as 1440x900 because nothing said otherwise: ${unsized.join(', ')}.\n` +
+        ? `\n\nSized as ${FRAMES.desktop.w}x${FRAMES.desktop.h} because nothing said otherwise: ${unsized.join(', ')}.\n` +
           `A frame smaller than its content clips, and clipping is not recoverable without a re-seed,\n` +
-          `so set the real size in canvas.json before publishing.`
+          `so record it as applications[].frame, or set the real size in canvas.json, before publishing.`
         : ''),
-    { ok: true, dir, files: sheets.map((s) => s.file), manifest: finalManifest, unsized },
+    { ok: true, dir, files: sheets.map((s) => s.file), manifest: finalManifest, unsized, sized },
   );
 }
 
 // ---------------------------------------------------------------------------
 // validate
 // ---------------------------------------------------------------------------
+
+/**
+ * The brand file that belongs to a canvas directory, if there is one.
+ *
+ * NOT brandPath(flags): here `--dir` names the canvas, not the brand
+ * directory, so asking brandPath for it looked for brand/canvas/brand.json,
+ * found nothing, and reported a clean deliverable that was not clean.
+ * Returns null when the file is absent or is not JSON; a caller that needs to
+ * report the latter reads it again itself.
+ */
+async function brandBesideCanvas(dir, flags) {
+  const bf = [
+    flags.brand && path.resolve(flags.brand),
+    path.join(path.dirname(dir), 'brand.json'),
+    path.resolve('brand', 'brand.json'),
+  ].filter(Boolean).find((p) => existsSync(p));
+  if (!bf) return null;
+  try {
+    return { file: bf, brand: migrateBrand(JSON.parse(await readFile(bf, 'utf8'))) };
+  } catch (e) {
+    // Only an unreadable brand file is this pass's business. A bare `catch {}`
+    // here once swallowed a ReferenceError and printed "Clean." over eight
+    // real errors, which is the worst thing a checker can do.
+    if (!(e instanceof SyntaxError)) throw e;
+    return null;
+  }
+}
+
+/** The faces a brand records, so a validator can tell its own face from a stray one. */
+const recordedFonts = (brand) => ['display', 'body', 'mono'].map((k) => brand?.identity?.type?.[k]).filter(Boolean);
 
 async function cmdValidate(flags, positional) {
   const dir = path.resolve(flags.dir ?? positional[0] ?? 'brand/canvas');
@@ -759,36 +883,33 @@ async function cmdValidate(flags, positional) {
       return fail(`canvas.json is not valid JSON: ${e.message}`);
     }
   }
-  const result = validateCanvas({ artboards, manifest });
+  const near = await brandBesideCanvas(dir, flags);
+  const result = validateCanvas({ artboards, manifest, brandFonts: recordedFonts(near?.brand) });
 
   // The artboards can all be correct and the deliverable still contradict the
   // brief: four logo variants documented and one drawn, a photographic
   // signature and no photograph. Those are the contradictions a client finds
   // first, so they belong in the same pass.
   let promises = { ok: true, findings: [] };
-  // NOT brandPath(flags): here `--dir` names the canvas, not the brand
-  // directory, so asking brandPath for it looked for brand/canvas/brand.json,
-  // found nothing, and reported a clean deliverable that was not clean.
-  const bf = [
-    flags.brand && path.resolve(flags.brand),
-    path.join(path.dirname(dir), 'brand.json'),
-    path.resolve('brand', 'brand.json'),
-  ].filter(Boolean).find((p) => existsSync(p));
-  if (bf) {
-    try {
-      const brand = migrateBrand(JSON.parse(await readFile(bf, 'utf8')));
-      promises = await checkPromises({ brand, root: path.dirname(path.dirname(bf)), canvasDir: dir });
-    } catch (e) {
-      // Only an unreadable brand file is this pass's business. A bare `catch {}`
-      // here once swallowed a ReferenceError and printed "Clean." over eight
-      // real errors, which is the worst thing a checker can do.
-      if (!(e instanceof SyntaxError)) throw e;
-    }
+  if (near) {
+    promises = await checkPromises({ brand: near.brand, root: path.dirname(path.dirname(near.file)), canvasDir: dir });
   }
   const lines = [`Checked ${plural(files.length, 'artboard')} in ${path.relative(process.cwd(), dir)}`];
-  if (result.errors.length) {
-    lines.push('', `${result.errors.length} error${result.errors.length === 1 ? '' : 's'} (these will not render correctly):`);
-    for (const e of result.errors) {
+  // Two kinds of error, and they used to share a heading that was wrong for
+  // one of them: a missing support line will not render, a banned typeface
+  // renders perfectly and reads as machine-made.
+  const structural = result.errors.filter((e) => !e.rule);
+  const slop = result.errors.filter((e) => e.rule);
+  if (structural.length) {
+    lines.push('', `${plural(structural.length, 'error')} (these will not render correctly):`);
+    for (const e of structural) {
+      lines.push(`  ${e.file}: ${e.message}`);
+      if (e.fix) lines.push(`      ${e.fix}`);
+    }
+  }
+  if (slop.length) {
+    lines.push('', `${plural(slop.length, 'anti-slop error')} (these will render, and read as machine-made):`);
+    for (const e of slop) {
       lines.push(`  ${e.file}: ${e.message}`);
       if (e.fix) lines.push(`      ${e.fix}`);
     }
@@ -844,7 +965,8 @@ async function cmdCanvas(flags) {
   if (existsSync(path.join(dir, 'canvas.json'))) {
     manifest = JSON.parse(await readFile(path.join(dir, 'canvas.json'), 'utf8'));
   }
-  const check = validateCanvas({ artboards, manifest });
+  const near = await brandBesideCanvas(dir, flags);
+  const check = validateCanvas({ artboards, manifest, brandFonts: recordedFonts(near?.brand) });
   if (!check.ok && !flags.force) {
     return fail(
       `Refusing to seed a canvas with ${plural(check.errors.length, 'error')}:\n` +
@@ -934,7 +1056,9 @@ async function loadLogoAssets(brand, brandDir) {
   const assets = {};
   const MAX = 512 * 1024;
   const projectRoot = path.resolve(brandDir, '..');
-  for (const entry of brand.identity?.logo?.files ?? []) {
+  // The favicon is a logo file too: the deck has a page for it.
+  const named = [...(brand.identity?.logo?.files ?? []), brand.identity?.logo?.favicon].filter(Boolean);
+  for (const entry of named) {
     const rel = typeof entry === 'string' ? entry : entry?.path;
     if (!rel || path.isAbsolute(rel)) continue;
     const candidates = [path.resolve(brandDir, rel), path.resolve(projectRoot, rel)];
@@ -1140,6 +1264,91 @@ async function cmdImages(flags, rest) {
 }
 
 /**
+ * What goes on a mockup surface, from the one string the brand file records.
+ *
+ * Two forms, because both are natural to record and neither should need a
+ * second field to say which it is: markup starting with `<` is used as it
+ * stands, and anything else is a path to a file in the project. A file is
+ * COPIED beside the artboard and referenced, never inlined: an `<img>` cannot
+ * run what an SVG might carry, and the canvas seeds relative files anyway.
+ *
+ * An absent value is an error rather than an empty box. The deck captions a
+ * mockup as the brand composited onto a photograph, and an empty box under that
+ * sentence is the tool asserting something that is not on the page.
+ */
+async function resolveArtwork(value, { projectRoot, brandDir, prefix }) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (!raw) {
+    return {
+      error: 'no artwork recorded, so there is nothing to composite. Set the surface\'s `artwork` to '
+        + 'inline markup (an <svg> or a <div> of type) or to the path of an .svg, .png, .jpg or .webp in this project.',
+    };
+  }
+  // Inline markup is the author's own and is used as it stands, minus anything
+  // scriptable: the artboard is a file somebody opens, and `loadLogoAssets`
+  // strips the same things off a supplied SVG for the same reason.
+  if (raw.startsWith('<')) {
+    return {
+      markup: raw
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+        .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+        .replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, ''),
+    };
+  }
+  if (path.isAbsolute(raw)) return { error: `artwork "${raw}" is an absolute path. Record it relative to the project.` };
+  if (!/\.(svg|png|jpe?g|webp)$/i.test(raw)) {
+    return { error: `artwork "${raw}" is neither markup (it does not start with "<") nor a path to an .svg, .png, .jpg or .webp file.` };
+  }
+  const candidates = [path.resolve(brandDir, raw), path.resolve(projectRoot, raw)];
+  let full = null;
+  for (const c of candidates) {
+    if (existsSync(c) && await reallyInside(c, projectRoot)) { full = c; break; }
+  }
+  if (!full) return { error: `artwork "${raw}" is not a file inside this project.` };
+  const stats = await stat(full);
+  if (!stats.isFile()) return { error: `artwork "${raw}" is not a file.` };
+  if (stats.size > 2 * 1024 * 1024) return { error: `artwork "${raw}" is ${Math.round(stats.size / 1024)}KB, which is too large to carry on an artboard. Keep it under 2MB.` };
+  // The copied name is reduced to characters that need no escaping, so the
+  // file on disk and the `src` that points at it cannot disagree about a space
+  // or a quote.
+  const local = `${prefix}-${path.basename(full).replace(/[^A-Za-z0-9._-]+/g, '-')}`;
+  return {
+    copy: { from: full, to: local },
+    markup: `<img src="${local}" alt="" style="display:block;width:100%;height:100%;object-fit:contain">`,
+  };
+}
+
+const MOCKUP_USAGE = `brandi mockup — put the brand on a real photograph
+
+  brandi mockup grid <photo> [--rotate 0|90|180|270] [--out <file>]
+      Write a page showing the photograph under a percentage grid, so the four
+      corners of the surface are READ off the picture rather than estimated.
+      The page must sit beside the photograph, which is where --out defaults.
+
+  brandi mockup build [--file <brand.json>] [--dir <canvas dir>]
+      Composite every mockup recorded under identity.mockups onto its
+      photograph and write one artboard each into the brand canvas.
+
+Recorded per mockup, under identity.mockups:
+  photo      path to the photograph, relative to the project. Not HEIC.
+  rotate     applied BEFORE the corners are read, if the phone stored it
+             one way round and meant another.
+  caption    the line printed across the foot of the artboard.
+  surfaces[] one per panel the artwork goes on:
+     corners four x,y percentages, clockwise from the surface's top left
+     artwork inline markup (an <svg>, or a <div> of type), or the path to an
+             .svg, .png, .jpg or .webp in this project. Required: without it
+             there is nothing to composite and the mockup is refused.
+     aspect  height over width of the artwork box. The panel's proportions.
+     blend   multiply (a wrap, paint, print) or normal (a sticker, backlit)
+     opacity 0 to 1
+     reviewed true only once somebody rendered it and looked
+
+  brandi set identity.mockups.0.surfaces.0.artwork "$(cat brand/logo/master.svg)"
+  brandi set identity.mockups.0.surfaces.0.artwork brand/logo/master.svg`;
+
+/**
  * `brandi mockup grid <photo>` and `brandi mockup build`.
  *
  * Two steps on purpose, and the gap between them is a person. The grid renders
@@ -1150,6 +1359,11 @@ async function cmdImages(flags, rest) {
  */
 async function cmdMockup(flags, rest) {
   const sub = rest[0] ?? 'build';
+
+  if (flags.help || sub === 'help') {
+    emit(MOCKUP_USAGE, { ok: true, usage: MOCKUP_USAGE });
+    return;
+  }
 
   if (sub === 'grid') {
     const photo = rest[1] ?? flags.photo;
@@ -1182,7 +1396,11 @@ async function cmdMockup(flags, rest) {
       `Wrote ${path.relative(process.cwd(), out)}`,
       '',
       'Open it, and read the FOUR CORNERS of the surface the artwork goes on, clockwise from its',
-      'top left, as x,y percentages. Then record them under identity.mockups in brand.json.',
+      'top left, as x,y percentages. Then record them under identity.mockups in brand.json,',
+      'with the artwork that goes on them:',
+      '',
+      '  brandi set identity.mockups.0.surfaces.0.corners \'[[12,30],[62,34],[60,58],[14,54]]\'',
+      '  brandi set identity.mockups.0.surfaces.0.artwork brand/logo/master.svg',
       '',
       'If the photograph is on its side, pass --rotate 90, 180 or 270 and read the corners again:',
       'they have to be read from the picture as it will be composited.',
@@ -1216,18 +1434,41 @@ async function cmdMockup(flags, rest) {
     if (size.format === 'heic') { problems.push(`${m.name ?? m.photo}: HEIC, which no browser decodes. Convert it.`); continue; }
 
     // Every surface is checked before anything renders, because a bow tie or a
-    // repeated corner draws something that looks deliberate.
+    // repeated corner draws something that looks deliberate, and because a
+    // surface with nothing on it used to composite an empty box and still
+    // report success, under a deck caption claiming the brand was on the
+    // photograph. Corners and artwork are both preconditions, not options.
     let bad = false;
-    for (const s of m.surfaces ?? []) {
+    const surfaces = [];
+    const copies = [];
+    const inSurfaces = m.surfaces ?? [];
+    if (!inSurfaces.length) {
+      problems.push(`${m.name ?? m.photo}: no surfaces recorded, so there is nothing to composite.`);
+      continue;
+    }
+    for (const [i, s] of inSurfaces.entries()) {
+      const where = `${m.name ?? m.photo} / ${s?.name ?? `surface ${i}`}`;
+      // A hand-edited file can hold a hole in the list. Say so, rather than
+      // die on "Cannot read properties of null".
+      if (!s || typeof s !== 'object') { problems.push(`${where}: this surface is ${s === null ? 'null' : typeof s}, not a record with corners and artwork.`); bad = true; continue; }
       const check = validateCorners((s.corners ?? []).map((c) => [c[0], c[1]]));
-      if (!check.ok) { problems.push(`${m.name ?? m.photo} / ${s.name ?? 'surface'}: ${check.reason}`); bad = true; }
+      if (!check.ok) { problems.push(`${where}: ${check.reason}`); bad = true; continue; }
+      const art = await resolveArtwork(s.artwork, {
+        projectRoot, brandDir: path.dirname(file), prefix: `${name.toLowerCase()}-art-${i}`,
+      });
+      if (art.error) { problems.push(`${where}: ${art.error}`); bad = true; continue; }
+      if (art.copy) copies.push(art.copy);
+      surfaces.push({ ...s, artwork: art.markup });
     }
     if (bad) continue;
 
-    // The photograph travels with the artboard: the canvas has no network and
-    // a relative path out of the canvas directory does not survive seeding.
+    // The photograph and any artwork FILE travel with the artboard: the canvas
+    // has no network and a relative path out of the canvas directory does not
+    // survive seeding. Copied only once the whole mockup is known to be good,
+    // so a refused mockup leaves nothing behind.
     const localPhoto = `${name.toLowerCase()}-${path.basename(src)}`;
     await copyFile(src, path.join(canvasDir, localPhoto));
+    for (const c of copies) await copyFile(c.from, path.join(canvasDir, c.to));
 
     const body = mockupBody({
       photo: localPhoto,
@@ -1235,7 +1476,7 @@ async function cmdMockup(flags, rest) {
       height: size.height,
       rotate: m.rotate ?? 0,
       caption: m.caption ?? null,
-      surfaces: m.surfaces ?? [],
+      surfaces,
     });
     const unreviewed = (m.surfaces ?? []).filter((s) => !s.reviewed).length;
     const file2 = path.join(canvasDir, `Mockup${name}.dc.html`);
@@ -1294,52 +1535,154 @@ async function cmdHandoff(flags) {
   if (fatal.length) process.exitCode = 1;
 }
 
+/**
+ * The scroll height of a rendered page, measured in headless Chrome, capped
+ * at 8000px so a runaway layout cannot ask for a screenshot the size of a
+ * wall. Falls back to the frame height when the probe cannot be read.
+ * The probe waits for the load event and the fonts, not for animation
+ * frames: under a virtual time budget a small headless window never ran the
+ * frame callback, and every tall artboard came back at its frame height.
+ */
+async function documentHeight(chrome, htmlPath, width, fallback) {
+  const probe = htmlPath.replace(/\.html$/, '.probe.html');
+  const html = await readFile(htmlPath, 'utf8');
+  // Measured at load, and again once the fonts settle, so a font that never
+  // arrives (offline, a licensed face) still leaves the load-time height.
+  const script = '<script>window.addEventListener("load",function(){var d=document.documentElement;function m(){d.setAttribute("data-scroll-height",String(d.scrollHeight));}m();document.fonts.ready.then(m);});</script>';
+  await writeFile(probe, /<\/body>/i.test(html) ? html.replace(/<\/body>/i, `${script}</body>`) : `${html}${script}`);
+  try {
+    const { stdout } = await runChrome(chrome, [
+      '--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+      '--force-device-scale-factor=1', '--virtual-time-budget=4000', `--window-size=${width},${fallback}`, '--dump-dom', pathToFileURL(probe).href,
+    ]);
+    const m = /data-scroll-height="(\d+)"/.exec(stdout);
+    return m ? Math.min(8000, Number(m[1])) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * The artboards the brand-in-use chapter shows: every authored artboard in
+ * brand/canvas (the generated specification sheets are skipped by their
+ * marker) and every mockup `brandi mockup build` wrote, rendered to PNG through
+ * headless Chrome at the frame width canvas.json records and at the taller of
+ * the frame and the document. Without a browser each one becomes a page that
+ * says so, rather than a page that is missing.
+ */
+async function proofArtboards(brand, brandDir) {
+  const canvasDir = path.join(brandDir, 'canvas');
+  if (!existsSync(canvasDir)) return [];
+  let manifest = null;
+  try { manifest = JSON.parse(await readFile(path.join(canvasDir, 'canvas.json'), 'utf8')); } catch { manifest = null; }
+  const frames = new Map((manifest?.artboards ?? []).map((a) => [a.file, a]));
+  const apps = brand.applications ?? [];
+  const chrome = findChrome();
+  const out = [];
+  for (const file of (await readdir(canvasDir)).filter((f) => f.endsWith('.dc.html')).sort()) {
+    const full = path.join(canvasDir, file);
+    const head = (await readFile(full, 'utf8')).slice(0, 4096);
+    const mockup = /^Mockup/.test(file);
+    if (!mockup && head.includes(GENERATED_MARKER)) continue;
+    const stem = file.replace(/\.dc\.html$/, '');
+    const source = await readFile(full, 'utf8');
+    const app = apps.find((a) => a && a.file === file);
+    // A mockup's frame is the photograph's own, and `mockupBody` wrote it into
+    // the artboard. Falling back to the 1440x900 desktop frame letterboxed a
+    // 1400x582 composite into half a page of nothing.
+    const drawn = mockup ? /<div style="position:relative;width:(\d+)px;height:(\d+)px/.exec(source) : null;
+    const frame = (drawn ? { w: Number(drawn[1]), h: Number(drawn[2]) } : null) ?? frames.get(file);
+    const entry = {
+      file, stem, kind: mockup ? 'mockup' : 'proof',
+      title: app?.name ?? (mockup ? stem.replace(/^Mockup/, '') : stem),
+      purpose: app?.purpose ?? null, notes: app?.notes ?? null,
+      w: frame?.w ?? FRAMES.desktop.w, h: frame?.h ?? FRAMES.desktop.h,
+      png: null, reason: null,
+      // The caption says the brand is composited on the photograph, so ask the
+      // artboard whether it is. `mockup build` refuses an artwork-less surface
+      // now, but a file written before that, or by hand, can still be here.
+      composited: mockup ? /data-artwork="yes"/.test(source) : null,
+    };
+    if (!chrome) {
+      entry.reason = 'no headless browser on this machine';
+    } else {
+      const tmp = await mkdtemp(path.join(tmpdir(), 'brandi-book-'));
+      try {
+        // The preview is written to a scratch directory, so a photograph the
+        // artboard references by a relative path (a mockup's, for one) is
+        // resolved back to the canvas directory with a <base>.
+        const base = `<base href="${pathToFileURL(canvasDir + path.sep).href}">`;
+        const preview = toPreviewHtml(source, { width: entry.w, height: entry.h, label: file });
+        const htmlPath = path.join(tmp, `${stem}.preview.html`);
+        await writeFile(htmlPath, /<head[^>]*>/i.test(preview) ? preview.replace(/<head[^>]*>/i, (m) => `${m}${base}`) : `${base}${preview}`);
+        // The frame is a minimum, not a crop: an artboard that runs past it is
+        // rendered at its own scroll height, so the page shows it as drawn.
+        entry.renderedH = Math.max(entry.h, await documentHeight(chrome, htmlPath, entry.w, entry.h));
+        const pngPath = path.join(tmp, `${stem}.png`);
+        await screenshot(chrome, htmlPath, pngPath, { width: entry.w, height: entry.renderedH });
+        entry.png = `data:image/png;base64,${(await readFile(pngPath)).toString('base64')}`;
+      } catch (e) {
+        entry.reason = `the render failed: ${e.message}`;
+      } finally {
+        await rm(tmp, { recursive: true, force: true });
+      }
+    }
+    out.push(entry);
+  }
+  return out;
+}
+
 async function cmdBook(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const dir = path.dirname(file);
   const assets = await loadLogoAssets(brand, dir);
-  const html = renderBrandBook({ brand, system, assets });
-  const htmlPath = path.join(dir, 'brand-book.html');
+  const print = Boolean(flags.print);
+  let html;
+  let pages;
+  // The print book's <section class="page"> elements are sections that flow
+  // over as many A4 sheets as they need, so its page count is only known once
+  // a PDF exists. Until then the count is reported as sections.
+  let sections = null;
+  if (print) {
+    html = renderBrandBook({ brand, system, assets });
+    sections = (html.match(/<section class="page"/g) ?? []).length;
+    pages = null;
+  } else {
+    const deck = renderBrandDeck({ brand, system, assets, artboards: await proofArtboards(brand, dir) });
+    html = deck.html;
+    pages = deck.pages.filter((p) => !p.absent).length;
+  }
+  const stem = print ? 'brand-book-print' : 'brand-book';
+  const htmlPath = path.join(dir, `${stem}.html`);
   await writeFile(htmlPath, html);
   const written = [path.relative(process.cwd(), htmlPath)];
+  const format = print ? 'print' : 'deck';
 
   let pdfPath = null;
   if (flags.pdf) {
-    const chrome = [
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-      '/Applications/Chromium.app/Contents/MacOS/Chromium',
-      '/usr/bin/google-chrome',
-      '/usr/bin/chromium',
-      process.env.CHROME_PATH,
-    ].filter(Boolean).find((p) => existsSync(p));
+    const chrome = findChrome();
     if (!chrome) {
-      emit(`Wrote ${written.join(', ')}. No headless browser found, so no PDF.`, { ok: true, files: written, pdf: null });
+      emit(`Wrote ${written.join(', ')}. No headless browser found, so no PDF.`, { ok: true, files: written, pdf: null, format, pages, sections });
       return;
     }
-    pdfPath = path.join(dir, 'brand-book.pdf');
-    const profile = path.join(dir, '.chrome-profile');
+    pdfPath = path.join(dir, `${stem}.pdf`);
     try {
-      await run(chrome, [
-        '--headless=new', '--disable-gpu', '--no-pdf-header-footer',
-        `--user-data-dir=${profile}`,
-        '--virtual-time-budget=8000',
-        `--print-to-pdf=${pdfPath}`,
-        pathToFileURL(htmlPath).href,
-      ], { timeout: 180000 });
+      await runChrome(chrome, pdfChromeArgs({ htmlUrl: pathToFileURL(htmlPath).href, pdfPath }), { timeout: 180000 });
       written.push(path.relative(process.cwd(), pdfPath));
+      if (print) pages = ((await readFile(pdfPath, 'latin1')).match(/\/Type\s*\/Page(?![s])/g) ?? []).length;
     } catch (e) {
-      emit(`Wrote ${written.join(', ')}. The PDF step failed: ${e.message}`, { ok: true, files: written, pdf: null });
+      emit(`Wrote ${written.join(', ')}. The PDF step failed: ${e.message}`, { ok: true, files: written, pdf: null, format, pages, sections });
       return;
-    } finally {
-      await rm(profile, { recursive: true, force: true }).catch(() => {});
     }
   }
   const named = (brand.identity?.logo?.files ?? []).length;
-  const embedded = Object.keys(assets).length;
+  const embedded = (brand.identity?.logo?.files ?? []).filter((f) => assets[typeof f === 'string' ? f : f?.path]).length;
+  const count = pages != null ? plural(pages, 'page') : plural(sections, 'section');
   emit(
-    `Wrote ${written.join('\n       ')}` +
-      (named && embedded < named ? `\n\n${named - embedded} of ${named} logo files could not be embedded, so the logo chapter names them instead of showing them.` : ''),
-    { ok: true, files: written, pdf: pdfPath, logosEmbedded: embedded, logosNamed: named },
+    `Wrote ${written.join('\n       ')}\n       ${count}, ${print ? 'A4 print book' : '1920x1080 deck'}.` +
+      (named && embedded < named ? `\n\n${named - embedded} of ${named} logo files could not be embedded, so the logo chapter names them instead of showing them.` : '') +
+      (print ? '' : '\nThe A4 print book is still available: brandi book --print.'),
+    { ok: true, files: written, pdf: pdfPath, logosEmbedded: embedded, logosNamed: named, format, pages, sections },
   );
 }
 
@@ -1399,22 +1742,22 @@ async function cmdFonts(flags) {
 async function cmdGuardian(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const target = path.resolve(flags.out ?? path.join(process.env.HOME ?? '.', '.claude', 'skills', `${brand.meta.slug ?? 'brand'}-brand`));
-  const written = await emitGuardianSkill({
-    brand, system, dir: target, brandFile: file,
-    // Embed the real path of the CLI generating this, because the guardian runs
-    // in future sessions where the plugin may not be enabled and `brandi` will
-    // not be on PATH: exactly where the guardian is supposed to work.
-    cliPath: path.join(HERE, 'brandi.mjs'),
-  });
+  const written = await emitGuardianSkill({ brand, system, dir: target, brandFile: file });
+  // The default location is Claude Code's. Codex reads ~/.agents/skills, so when
+  // that exists the same emit is linked there too. An explicit --out is left
+  // exactly where it was asked for.
+  const codex = flags.out ? { linked: null, reason: '--out given' } : await linkForCodex(target);
   emit(
     [
       `Wrote the ${brand.meta.name ?? 'brand'} enforcement skill to ${target}`,
       ...written.map((w) => `  ${path.basename(w)}`),
+      ...(codex.linked ? [`Linked it at ${codex.linked}, which is where Codex reads skills from.`] : []),
+      ...(codex.reason && /already exists|could not link/.test(codex.reason) ? [`Not linked for Codex: ${codex.reason}.`] : []),
       '',
-      'From now on, any Claude Code session in a project that uses this brand can',
+      `From now on, any Claude Code${codex.linked ? ' or Codex' : ''} session in a project that uses this brand can`,
       'load it and check its own work before shipping.',
     ].join('\n'),
-    { ok: true, dir: target, files: written },
+    { ok: true, dir: target, files: written, linked: codex.linked, linkNote: codex.reason },
   );
 }
 
@@ -1427,9 +1770,13 @@ async function cmdCheck(flags, positional) {
   // failure the guardian skill warns about, produced by the guardian itself.
   const byRule = {};
   const byFile = {};
+  // Keyed by rule AND level: one rule can emit both (a recorded banned face
+  // warns, a stray one errors), and "2 error banned-font" for one of each was
+  // a summary that disagreed with its own findings list.
   for (const f of result.findings) {
-    byRule[f.rule] ??= { rule: f.rule, level: f.level, count: 0 };
-    byRule[f.rule].count++;
+    const key = `${f.rule}:${f.level}`;
+    byRule[key] ??= { rule: f.rule, level: f.level, count: 0 };
+    byRule[key].count++;
     byFile[f.file] = (byFile[f.file] ?? 0) + 1;
   }
   const rules = Object.values(byRule).sort((a, b) => b.count - a.count);
@@ -1486,7 +1833,8 @@ async function cmdComplete(flags, positional) {
   }
   await saveBrand(file, brand);
   const done = PHASES.find((p) => p.id === id);
-  emit(`${done.name} complete. Next: ${PHASES.find((p) => p.id === next)?.name ?? 'nothing, the system is published'}`, { ok: true, completed: id, phase: next });
+  const pending = PHASES.find((p) => !brand.brandi.completed.includes(p.id));
+  emit(`${done.name} complete. Next: ${pending?.name ?? 'nothing, the system is published'}`, { ok: true, completed: id, phase: next });
 }
 
 // ---------------------------------------------------------------------------
@@ -1522,11 +1870,23 @@ async function main() {
   out.json = Boolean(flags.json);
   const [command, ...rest] = positional;
   if (!command || command === 'help' || flags.help) {
-    console.log(String(await readFile(fileURLToPath(import.meta.url)))
+    // The whole header comment, not a fixed number of its lines: a count that
+    // was right when it was written silently dropped the last three commands
+    // added after it, and the drift test read the source rather than this.
+    // `brandi logo --help` is the forge's question, not this file's, and
+    // `brandi mockup --help` is the mockup's: a subcommand that asks for help
+    // and gets the top-level help has not been answered.
+    if (command === 'logo') return cmdLogo(flags, rest, ['--help']);
+    if (command === 'mockup') return cmdMockup({ ...flags, help: true }, rest);
+    const source = String(await readFile(fileURLToPath(import.meta.url)));
+    // Drop the shebang and the comment opener by what they are, not by line
+    // count: slicing a fixed number of lines printed `/**` as the first line.
+    console.log(source.slice(0, source.indexOf(' */'))
       .split('\n')
-      .slice(1, 26)
-      .map((l) => l.replace(/^ \* ?/, '').replace(/^\/\*\*?/, ''))
-      .join('\n'));
+      .filter((l) => !/^#!/.test(l) && !/^\/\*\*?\s*$/.test(l))
+      .map((l) => l.replace(/^ \* ?/, ''))
+      .join('\n')
+      .trim());
     return;
   }
   const fn = COMMANDS[command];

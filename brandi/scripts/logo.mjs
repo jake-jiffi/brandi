@@ -42,7 +42,7 @@ import { describeSvg } from './svg.mjs';
 import { auditCandidates } from './logoaudit.mjs';
 import { conceptRoundBoards, fitFrames } from './logoboard.mjs';
 import { normaliseMaster, monoVariants, typesetWordmark, composeLockup, clearSpaceRule, minimumSizes, generationRecord, localDate } from './logogen.mjs';
-import { canvasManifest } from './canvas.mjs';
+import { canvasManifest, BANNED_FONTS } from './canvas.mjs';
 import { loadBrand, saveBrand, addDecision } from './brandfile.mjs';
 import { parseFont, fetchGoogleFont } from './font.mjs';
 
@@ -523,6 +523,17 @@ export async function pickDirections(root, ids, { round = null } = {}) {
 // wordmark and lockup
 // ---------------------------------------------------------------------------
 
+/**
+ * The same judgement `system` makes about a recorded face, at the moment a
+ * wordmark is set in one. A wordmark in Inter is a real decision and this
+ * does not refuse it; it says what the rest of the tool will say later.
+ */
+export function bannedFaceWarning(family) {
+  const hit = BANNED_FONTS.find((b) => b.toLowerCase() === String(family ?? '').trim().toLowerCase());
+  if (!hit) return null;
+  return `${hit} is one of the typefaces that makes work look machine-generated. A wordmark set in it will be flagged by \`system\`, \`validate\` and \`check\`; pick a face with a point of view, or record in the decision log why this one is right for this brand.`;
+}
+
 export async function buildWordmark(root, { family, weight = 400, text = null, size = 200, tracking = 0, letterCase = 'as-given', pairAdjust = {}, out = null } = {}) {
   const state = (await loadState(root)) ?? emptyState(await briefFromBrand(root));
   const name = text ?? state.brand.name;
@@ -852,6 +863,7 @@ const intFlag = (flags, key, fallback) => {
 const USAGE = `brandi logo: generate, measure and choose a mark
 
   plan     [--count 12] [--seed x] [--round N] [--name "X"] [--category "X"]
+           [--oneLiner "what it is, in a sentence"] [--audience "who it is for"]
   refine   [<id>...] [--from N] [--round N]      the shortlist, four tasks each
   wordmark --font "Family" [--weight 700] [--case upper|lower] [--text "X"]
            [--size 200] [--tracking -15] [--out file.svg]
@@ -859,11 +871,11 @@ const USAGE = `brandi logo: generate, measure and choose a mark
   import   <dir|file.svg...> [--round N] [--model "claude-opus-5"]
   audit    [--round N]
   board    [--round N]
-  pick     <id> [<id>...]
+  pick     <id> [<id>...] [--round N]
   master   <id> [--approved-by "name"] [--round N]
   status
 
-Add --json to read any result as data.`;
+Add --json to read any result as data, and --root <dir> to work in another project.`;
 
 /** The `brandi logo` dispatcher, exported so brandi.mjs can delegate in-process. */
 export async function main(argv) {
@@ -926,8 +938,11 @@ export async function main(argv) {
     }
 
     case 'wordmark': {
+      const family = flags.get('font') === true ? null : flags.get('font');
+      const warnings = [bannedFaceWarning(family)].filter(Boolean);
+      for (const w of warnings) console.error(w);
       const res = await buildWordmark(root, {
-        family: flags.get('font') === true ? null : flags.get('font'),
+        family,
         weight: intFlag(flags, 'weight', 400),
         text: flags.get('text') === true ? null : flags.get('text'),
         size: intFlag(flags, 'size', 200),
@@ -935,7 +950,7 @@ export async function main(argv) {
         letterCase: flags.get('case') === true ? 'as-given' : (flags.get('case') ?? 'as-given'),
         out: flags.get('out') === true ? null : flags.get('out'),
       });
-      say(res.recipe, `Set and outlined in ${res.recipe.family} ${res.recipe.weight}, cap height ${res.recipe.capHeight}.\n${path.relative(path.resolve(root), res.file)}`);
+      say({ ...res.recipe, warnings }, `Set and outlined in ${res.recipe.family} ${res.recipe.weight}, cap height ${res.recipe.capHeight}.\n${path.relative(path.resolve(root), res.file)}`);
       break;
     }
 
@@ -1082,6 +1097,7 @@ export default {
   buildBoards,
   pickDirections,
   buildWordmark,
+  bannedFaceWarning,
   buildLockup,
   promoteToMaster,
   writeIntoBrand,

@@ -18,8 +18,8 @@ If it exists, that project has a Brandi brand system and everything below applie
 
 If it does not, look for what the project does have: a `tokens.css`, a `tailwind.config.*` theme, a
 `theme.ts`, a design-system folder, a Storybook. Check against that instead and say what you used
-as the standard. If there is nothing at all, say so plainly and offer `/brandi:brand` rather than
-inventing a standard and grading against it.
+as the standard. If there is nothing at all, say so plainly and offer `/brandi:brand` (on Codex,
+`$brand-system`) rather than inventing a standard and grading against it.
 
 ## Run the check
 
@@ -29,6 +29,7 @@ install, so the glob matters:
 ```bash
 A="$(command -v brandi || true)"
 [ -z "$A" ] && A="$(ls -d "$HOME"/.claude/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
+[ -z "$A" ] && A="$(ls -d "${CODEX_HOME:-$HOME/.codex}"/plugins/cache/*/brandi/*/bin/brandi 2>/dev/null | sort -V | tail -1)"
 [ -z "$A" ] && A="<this skill's base directory>/../../bin/brandi"
 "$A" check <paths>
 ```
@@ -39,13 +40,14 @@ It reads real source files and reports:
 | --- | --- | --- |
 | Off-palette colour | error | A colour nobody chose, which nobody will maintain |
 | Nearly-palette colour | warn | `#1F6F4B` beside `#1F6F4A` is drift starting |
-| Off-brand typeface | warn | Or error, if it is one of the banned defaults |
+| Off-brand typeface | warn | A face that is not the brand's |
+| Banned typeface | error | A face on the hard list in `references/anti-slop.contract.md`; a face on its soft list warns |
 | Banned vocabulary | warn | The voice guide exists for a reason |
 | Focus outline removed | error | Fails WCAG 2.2 2.4.7 Focus Visible outright |
 | Lorem ipsum | error | Shipped placeholder text |
 | Purple or indigo gradient | warn | The most recognisable machine-generated tell there is |
 | Gradient orb | warn | The most over-used signifier in tech design |
-| Card with a left accent stripe | warn | The most-generated component on the internet |
+| Card with a left accent stripe | error | The most-generated component on the internet |
 | Animation with no reduced-motion handling | info | WCAG 2.2 2.3.3, Level AAA, and a house rule here |
 
 It reports. It does not edit. That is deliberate: the user decides what is a mistake and what is a
@@ -91,6 +93,6 @@ To extend it deliberately:
 1. Add the value to `brand/brand.json`.
 2. Add a decision to `governance.decisions` with the reason, and what was rejected.
 3. Bump `meta.version`.
-4. Regenerate: `brandi tokens && ... book && ... guardian`.
+4. Regenerate: `brandi tokens && brandi book --pdf && brandi guardian`.
 
 A change nobody wrote down becomes an inconsistency the next person has to guess about.

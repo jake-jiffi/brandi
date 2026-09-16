@@ -409,21 +409,32 @@
     }
   },
   "voice": {
+    "statement": "Say it the way you would say it to someone standing in front of you with a wet dog.",
     "attributes": [
       {
         "name": "Plain",
         "notThis": "blunt",
-        "doThis": "Say the thing in the fewest words that still sound like a person. \"Warm water in every bay\", not \"premium thermal amenity\"."
+        "doThis": "Say the thing in the fewest words that still sound like a person. \"Warm water in every bay\", not \"premium thermal amenity\".",
+        "examples": [
+          "Ten dollars. Ten minutes. Towels are a dollar.",
+          "The big bay fits a wolfhound."
+        ]
       },
       {
         "name": "Warm",
         "notThis": "gushing",
-        "doThis": "Address the owner as a competent adult who likes their dog. No exclamation marks in headlines."
+        "doThis": "Address the owner as a competent adult who likes their dog. No exclamation marks in headlines.",
+        "examples": [
+          "Bring her in. We will find you a bay down the quiet end."
+        ]
       },
       {
         "name": "Useful",
         "notThis": "instructional",
-        "doThis": "Every sentence either tells them something they can act on or gets out of the way."
+        "doThis": "Every sentence either tells them something they can act on or gets out of the way.",
+        "examples": [
+          "Start at the neck and work down. The dryer is on the wall to your left."
+        ]
       }
     ],
     "tone": [
@@ -634,6 +645,17 @@
       "This is not a franchise system. Nothing here is designed to survive being applied by someone who has never seen the shop.",
       "This is not a product brand. There is no packaging, and adding some would need a fresh look at the whole colour system.",
       "This does not cover vehicle livery. The van needs its own sheet."
+    ],
+    "antiPatterns": [
+      "No stock photography of studio-clean dogs. Ours come out wet.",
+      "No paw prints as bullet points, dividers or background pattern.",
+      "No exclamation marks in headlines, and no puns on \"pawfect\".",
+      "No cartoon dogs. The mark is the only drawn dog in the system.",
+      "No before-and-after grids. They sell a transformation we do not do.",
+      "No price with an asterisk. If a number needs a footnote, change the number.",
+      "No \"book now\" over a photograph of a dog looking anxious.",
+      "No green on orange for text, at any size, on any surface.",
+      "No third typeface. Two faces and the mono are the whole system."
     ],
     "changeLog": [
       {

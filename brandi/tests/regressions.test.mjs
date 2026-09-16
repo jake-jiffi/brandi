@@ -21,7 +21,8 @@ import * as A from '../scripts/artboards.mjs';
 import { componentsArtboard, paletteArtboard } from '../scripts/artboards.mjs';
 import { checkFiles, emitGuardianSkill } from '../scripts/guardian.mjs';
 import { toCss, toTailwind, toTypeScript, toDtcg } from '../scripts/tokens.mjs';
-import { toPreviewHtml, previewArtboard } from '../scripts/preview.mjs';
+import { toPreviewHtml, previewArtboard, findChrome } from '../scripts/preview.mjs';
+import { mockupBody } from '../scripts/mockup.mjs';
 
 const run = promisify(execFile);
 const CLI = path.join(import.meta.dirname, '..', 'scripts', 'brandi.mjs');
@@ -349,10 +350,12 @@ describe('C11: set never confirms a write it discarded', () => {
   });
 
   test('a repeated path segment still lands in the file', async () => {
-    const r = await cli(['set', 'voice.examples.0.examples.title', 'probe'], p);
+    // `applications` entries are free-form in the schema, so the repeated
+    // segment is a legal path as well as an awkward one.
+    const r = await cli(['set', 'applications.0.applications.title', 'probe'], p);
     assert.equal(r.ok, true);
     const saved = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'));
-    assert.equal(saved.voice.examples[0].examples.title, 'probe');
+    assert.equal(saved.applications[0].applications.title, 'probe');
   });
 
   test('a numeric-looking string stays a string where the schema says string', async () => {
@@ -371,6 +374,47 @@ describe('C11: set never confirms a write it discarded', () => {
     const r = await cli(['set', 'not a path!', 'x'], p);
     assert.equal(r.ok, false);
     assert.match(r.error, /not a field path/);
+  });
+
+  test('a path the schema does not know is refused rather than invented', async () => {
+    const r = await cli(['set', 'nonexistent.path.here', 'x'], p);
+    assert.equal(r.ok, false);
+    assert.match(r.error, /not a field in the brand file/);
+    const saved = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'));
+    assert.equal('nonexistent' in saved, false, 'nothing may be written on a refused path');
+  });
+
+  test('a misspelt key is refused with the key that was meant', async () => {
+    const r = await cli(['set', 'voice.attributes.0.not', 'gushing'], p);
+    assert.equal(r.ok, false);
+    assert.match(r.error, /Did you mean voice\.attributes\.0\.notThis/);
+    assert.equal(r.suggestion, 'voice.attributes.0.notThis');
+  });
+
+  test('a colour field refuses a non-hex at write time, not three commands later', async () => {
+    const r = await cli(['set', 'identity.colour.primary', '#GG0000'], p);
+    assert.equal(r.ok, false);
+    assert.match(r.error, /not a hex colour/);
+    const accents = await cli(['set', 'identity.colour.accents', '["#1F6F4A","#GG0000"]'], p);
+    assert.equal(accents.ok, false);
+    assert.match(accents.error, /#GG0000/);
+  });
+
+  test('a real path at every depth still writes: scalar, list index, nested object', async () => {
+    for (const [k, v, read] of [
+      ['meta.tagline', 'Warm water in every bay', (b) => b.meta.tagline],
+      // Index 0 on the empty list: index 1 would leave a hole, and `set` now
+      // refuses that rather than padding with nulls (see R2 below).
+      ['strategy.audiences.0.name', 'Owners', (b) => b.strategy.audiences[0].name],
+      ['identity.logo.minSize.screenPx', '24', (b) => b.identity.logo.minSize.screenPx],
+      ['identity.colour.accents', '["#1F6F4A"]', (b) => b.identity.colour.accents[0]],
+      ['voice.mechanics.contractions', 'yes', (b) => b.voice.mechanics.contractions],
+    ]) {
+      const r = await cli(['set', k, v], p);
+      assert.equal(r.ok, true, `${k}: ${r.error}`);
+      const saved = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'));
+      assert.equal(String(read(saved)), v.startsWith('[') ? JSON.parse(v)[0] : v);
+    }
   });
 });
 
@@ -414,7 +458,7 @@ describe('C13: the WCAG citations are the right ones', () => {
 
     // And it reaches a brand's own guardian, derived rather than restated.
     const out = path.join(dir, 'c13-guardian');
-    await emitGuardianSkill({ brand, system, dir: out, brandFile: 'brand/brand.json', cliPath: CLI });
+    await emitGuardianSkill({ brand, system, dir: out, brandFile: 'brand/brand.json' });
     const rules = JSON.parse(await readFile(path.join(out, 'rules.json'), 'utf8'));
     assert.ok(rules.slopRules.some((r) => r.rule === 'css_patterns.focus_outline_removed'));
   });
@@ -426,11 +470,15 @@ describe('C13: the WCAG citations are the right ones', () => {
 });
 
 describe('C14: the generated guardian names a command that resolves', () => {
-  test('it embeds the absolute path of the CLI that generated it', async () => {
+  test('it resolves the CLI from PATH or the plugin caches, never from a path baked in at generation', async () => {
+    // It used to embed the absolute path of the CLI that generated it, which
+    // resolves on one machine and nowhere the skill is actually shared.
     const out = path.join(dir, 'c14-guardian');
-    await emitGuardianSkill({ brand, system, dir: out, brandFile: 'brand/brand.json', cliPath: CLI });
+    await emitGuardianSkill({ brand, system, dir: out, brandFile: 'brand/brand.json' });
     const skill = await readFile(path.join(out, 'SKILL.md'), 'utf8');
-    assert.ok(skill.includes(CLI), 'the fallback must be a path that exists on this machine');
+    assert.equal(skill.includes(CLI), false, 'no machine-specific path');
+    assert.ok(skill.includes('command -v brandi'));
+    assert.ok(skill.includes('plugins/cache/*/brandi/*/bin/brandi'));
     assert.equal(/<clone>/.test(skill), false, 'a placeholder is not a fallback');
   });
 });
@@ -945,8 +993,26 @@ describe('the specification set has an entry artboard', () => {
 
     assert.notDeepEqual([after.w, after.h], [generated.w, generated.h],
       'the frame of the file that is gone must not be reused');
-    assert.match(stdout, /nothing said otherwise: Main\.dc\.html/, 'and it has to say so out loud');
     assert.equal(after.page, 'work');
+    // Where the new frame came from is said out loud, either way. The fixture
+    // records Main at 1440x1600, so the brand file answers (R3-N-05); without
+    // that entry it is a guess and has to be flagged as one.
+    assert.deepEqual([after.w, after.h], [1440, 1600]);
+    assert.match(stdout, /Main\.dc\.html 1440x1600, because applications\[\]\.frame records 1440x1600/,
+      'it has to say where the frame came from');
+
+    const brandPath = path.join(p, 'brand', 'brand.json');
+    const saved = await readFile(brandPath, 'utf8');
+    const b = JSON.parse(saved);
+    b.applications = b.applications.filter((a) => a.file !== 'Main.dc.html');
+    await writeFile(brandPath, JSON.stringify(b, null, 2));
+    const manifestPath = path.join(canvas, 'canvas.json');
+    const m = JSON.parse(await readFile(manifestPath, 'utf8'));
+    m.artboards = m.artboards.filter((a) => a.file !== 'Main.dc.html');
+    await writeFile(manifestPath, JSON.stringify(m, null, 2));
+    const guessed = await run('node', [CLI, 'sheets', '--out', 'brand/canvas'], { cwd: p });
+    assert.match(guessed.stdout, /nothing said otherwise: Main\.dc\.html/, 'a guess is still flagged as one');
+    await writeFile(brandPath, saved);
   });
 
   test('--force replaces an authored Main, because the escape hatch has to exist', async () => {
@@ -1486,5 +1552,496 @@ describe('numeric flags refuse to be silently wrong', () => {
     await run('node', [CLI, 'init', '--name', 'Depthy'], { cwd: p });
     const e = await run('node', [CLI, 'scan', '--depth', '0'], { cwd: p }).catch((err) => err);
     assert.match(e.stderr, /--depth takes a whole number/);
+  });
+});
+
+/**
+ * With identity.type.display set to a banned face, `system` warned and said
+ * record a decision, while `validate` and `check` reported an error and exited
+ * 1, under a heading that said the artboard would not render. One decision,
+ * three severities, and the brand's own face blocked the brand's own canvas.
+ */
+describe('the brand\'s own typeface is one decision, not three severities', () => {
+  let p;
+  const authored = (font) => K.artboard({
+    name: 'Poster',
+    body: `<div style="display:flex;gap:8px;font-family:'${font}',serif;padding:32px">Muddy Paws</div>`,
+  });
+
+  before(async () => {
+    p = path.join(dir, 'own-face');
+    await mkdir(path.join(p, 'brand', 'canvas'), { recursive: true });
+    await cli(['init', '--name', 'Own Face'], p);
+    for (const [k, v] of [
+      ['identity.colour.primary', '#1F6F4A'], ['identity.school', 'craft'],
+      ['identity.type.display', 'Fraunces'], ['identity.type.body', 'Karla'],
+    ]) await cli(['set', k, v], p);
+    await writeFile(path.join(p, 'brand', 'canvas', 'Main.dc.html'), authored('Fraunces'));
+  });
+
+  test('validate accepts an authored artboard set in the recorded display face', async () => {
+    const r = await cli(['validate', '--dir', 'brand/canvas'], p);
+    assert.equal(r.ok, true, JSON.stringify(r.errors));
+    assert.ok(r.warnings.some((w) => /Fraunces/.test(w.message) && /recorded faces/.test(w.message)), 'still worth a warning');
+    const { stdout } = await run('node', [CLI, 'validate', '--dir', 'brand/canvas'], { cwd: p });
+    assert.equal(/will not render/.test(stdout), false, stdout);
+  });
+
+  test('validate still refuses Inter when Inter is not the brand face, under the right heading', async () => {
+    await writeFile(path.join(p, 'brand', 'canvas', 'Main.dc.html'), authored('Inter'));
+    const r = await cli(['validate', '--dir', 'brand/canvas'], p);
+    assert.equal(r.ok, false);
+    assert.ok(r.errors.some((e) => e.rule === 'banned-font'));
+    const e = await run('node', [CLI, 'validate', '--dir', 'brand/canvas'], { cwd: p }).catch((err) => err);
+    assert.notEqual(e.code, 0);
+    assert.match(e.stdout, /anti-slop error/);
+    assert.equal(/will not render/.test(e.stdout), false, 'a banned face renders fine; the heading must not say otherwise');
+    await writeFile(path.join(p, 'brand', 'canvas', 'Main.dc.html'), authored('Fraunces'));
+  });
+
+  test('check applies the same rule: the recorded face warns, a stray banned face errors', async () => {
+    await writeFile(path.join(p, 'own.css'), ".a { font-family: 'Fraunces', serif; }");
+    await writeFile(path.join(p, 'stray.css'), '.a { font-family: Inter, sans-serif; }');
+    const own = await cli(['check', 'own.css'], p);
+    assert.equal(own.ok, true, JSON.stringify(own.findings));
+    assert.ok(own.findings.some((f) => f.rule === 'banned-font' && f.level === 'warn'));
+    const stray = await cli(['check', 'stray.css'], p);
+    assert.equal(stray.ok, false);
+    assert.ok(stray.findings.some((f) => f.rule === 'banned-font' && f.level === 'error'));
+  });
+});
+
+/**
+ * Round 2: the small defects the round 1 review found, each with the exact
+ * command that showed it.
+ */
+describe('R2: set refuses what the schema does not allow, and warns where the decision is made', () => {
+  let p;
+  before(async () => {
+    p = path.join(dir, 'r2-set');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await writeFile(path.join(p, 'brand', 'brand.json'), await readFile(FIXTURE, 'utf8'));
+  });
+
+  test('an enum value outside the schema is refused with the allowed values listed', async () => {
+    for (const [field, value, allowed] of [
+      ['identity.shape', 'wobbly', 'sharp, crisp, soft, rounded, pill'],
+      ['identity.motion', 'frantic', 'still, restrained, fluid, lively'],
+      ['evidence.0.provenance', 'bogus', 'supplied, extracted'],
+      ['governance.openQuestions.0.status', 'maybe', 'open, answered, dropped'],
+      ['identity.spaceBase', '5', '4, 8'],
+    ]) {
+      const r = await cli(['set', field, value], p);
+      assert.equal(r.ok, false, `${field} ${value} should be refused`);
+      assert.ok(r.error.includes(allowed), `${field}: ${r.error}`);
+    }
+    const ok = await cli(['set', 'identity.shape', 'pill'], p);
+    assert.equal(ok.ok, true);
+    assert.equal(JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8')).identity.shape, 'pill');
+  });
+
+  test('an index past the end of a list is refused; the index equal to the length appends', async () => {
+    const before = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8')).strategy.audiences.length;
+    const far = await cli(['set', `strategy.audiences.${before + 6}.name`, 'Late'], p);
+    assert.equal(far.ok, false);
+    assert.match(far.error, new RegExp(`has ${before} entries`));
+    assert.match(far.error, new RegExp(`Use ${before} to append`));
+    const append = await cli(['set', `strategy.audiences.${before}.name`, 'Late'], p);
+    assert.equal(append.ok, true);
+    const after = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8')).strategy.audiences;
+    assert.equal(after.length, before + 1);
+    assert.equal(after.some((a) => a === null), false, 'no nulls padded in');
+  });
+
+  test('a banned typeface set on identity.type warns on stderr and in the JSON, and still writes', async () => {
+    const { stdout, stderr } = await run(process.execPath, [CLI, 'set', 'identity.type.display', 'Inter', '--json'], { cwd: p });
+    const r = JSON.parse(stdout);
+    assert.equal(r.ok, true);
+    assert.equal(r.warnings.length, 1);
+    assert.match(r.warnings[0], /Inter is one of the typefaces that makes work look machine-generated/);
+    assert.match(stderr, /machine-generated/);
+    const clean = await cli(['set', 'identity.type.display', 'Bitter'], p);
+    assert.deepEqual(clean.warnings, []);
+  });
+
+  test('the hex refusal names both forms it accepts', async () => {
+    const r = await cli(['set', 'identity.colour.primary', '#GG0000'], p);
+    assert.equal(r.ok, false);
+    assert.match(r.error, /Use #RGB or #RRGGBB\./);
+    assert.equal((await cli(['set', 'identity.colour.primary', '#abc'], p)).ok, true);
+    await cli(['set', 'identity.colour.primary', '#1F6F4A'], p);
+  });
+
+  test('R2-N-03: the wrong JSON shape for a list field is refused at write time, with the shape named, and nothing is written', async () => {
+    const before = await readFile(path.join(p, 'brand', 'brand.json'), 'utf8');
+    for (const [field, value, want] of [
+      ['identity.type.licences', '{"display":"x"}', /must be a list, not an object\. Expected shape: \[\{"family"/],
+      ['strategy.audiences', '"s"', /must be a list, not a string\. Expected shape: \[\{"name"/],
+      ['identity.logo.misuse', '{"a":1}', /must be a list, not an object\. Expected shape: \["…"\]/],
+    ]) {
+      const r = await cli(['set', field, value], p);
+      assert.equal(r.ok, false, `${field} = ${value}`);
+      assert.match(r.error, want);
+      assert.equal(r.field, field);
+    }
+    assert.equal(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'), before, 'a refused set writes nothing');
+    // The correct array forms still write.
+    const licences = await cli(['set', 'identity.type.licences', '[{"family":"Bitter","source":"Google Fonts","permits":"OFL"}]'], p);
+    assert.equal(licences.ok, true);
+    assert.deepEqual(licences.value, [{ family: 'Bitter', source: 'Google Fonts', permits: 'OFL' }]);
+    assert.equal((await cli(['set', 'strategy.audiences', '[{"name":"The regular","need":"In and out"}]'], p)).ok, true);
+    assert.equal((await cli(['set', 'identity.logo.misuse', '["stretch it",{"what":"rotate it"}]'], p)).ok, true);
+    const saved = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'));
+    assert.deepEqual(saved.identity.logo.misuse, ['stretch it', { what: 'rotate it' }]);
+    // A numeric string offered to a number field is written as a number.
+    const mm = await cli(['set', 'identity.logo.minSizes.0.printMm', '24'], p);
+    assert.equal(mm.ok, true);
+    assert.equal(mm.value, 24);
+    assert.equal(JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8')).identity.logo.minSizes[0].printMm, 24);
+    // A scalar is held to its type too: a word where a number belongs is refused.
+    assert.equal((await cli(['set', 'identity.logo.minSize.screenPx', '28'], p)).value, 28);
+    const word = await cli(['set', 'identity.logo.minSize.screenPx', 'wide'], p);
+    assert.equal(word.ok, false);
+    assert.match(word.error, /must be a number \(or null\), not a string/);
+    // A keyword offered to a text field is the word; offered to a boolean field it is the boolean.
+    const text = await cli(['set', 'strategy.category', 'true'], p);
+    assert.equal(text.ok, true, text.error);
+    assert.equal(text.value, 'true');
+    assert.equal((await cli(['set', 'voice.tagline.locked', 'false'], p)).value, false);
+    assert.equal((await cli(['set', 'identity.logo.minSize.screenPx', 'null'], p)).value, null);
+    // And `status` no longer has anything to complain about afterwards.
+    const status = await cli(['status'], p);
+    assert.equal(status.ok, true);
+  });
+});
+
+describe('R2: status, check and sheets say what they mean', () => {
+  test('status --json on a partial file names the recon phase and marks it current', async () => {
+    const p = path.join(dir, 'r2-partial');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await writeFile(path.join(p, 'brand', 'brand.json'), '{"meta":{"name":"X"}}');
+    const r = await cli(['status'], p);
+    assert.equal(r.phase, 'recon');
+    assert.deepEqual(r.phases.filter((x) => x.current).map((x) => x.id), ['recon']);
+  });
+
+  test('the By-rule summary counts a rule once per level', async () => {
+    const p = path.join(dir, 'r2-check');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await run('node', [CLI, 'init', '--name', 'Fraunces Co'], { cwd: p });
+    for (const [k, v] of [['identity.colour.primary', '#2563EB'], ['identity.school', 'swiss'], ['identity.type.display', 'Fraunces'], ['identity.type.body', 'Figtree']]) {
+      await cli(['set', k, v], p);
+    }
+    await writeFile(path.join(p, 'mixed.css'), ".a{font-family:'Fraunces'}\n.b{font-family:Inter}\n");
+    const r = await cli(['check', 'mixed.css'], p);
+    const rows = r.byRule.filter((x) => x.rule === 'banned-font');
+    assert.deepEqual(rows.map((x) => [x.level, x.count]).sort(), [['error', 1], ['warn', 1]]);
+    const { stdout } = await run('node', [CLI, 'check', 'mixed.css'], { cwd: p }).catch((e) => e);
+    assert.match(stdout, /1  error banned-font/);
+    assert.match(stdout, /1  warn  banned-font/);
+  });
+
+  test('the Specification page is laid out in the "In this set" order, five across, without overlaps', async () => {
+    const p = path.join(dir, 'r2-sheets');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await writeFile(path.join(p, 'brand', 'brand.json'), await readFile(FIXTURE, 'utf8'));
+    const r = await cli(['sheets'], p);
+    const spec = r.manifest.artboards.filter((a) => a.page === 'spec');
+    const order = spec.slice().sort((a, b) => a.y - b.y || a.x - b.x).map((a) => a.file);
+    assert.deepEqual(order.slice(0, 5), ['Palette.dc.html', 'Typography.dc.html', 'Components.dc.html', 'ComponentsDark.dc.html', 'Tokens.dc.html']);
+    assert.deepEqual(order.slice(5), ['Logo.dc.html', 'Production.dc.html', 'Voice.dc.html', 'Icons.dc.html']);
+    assert.equal(new Set(spec.map((a) => a.y)).size, 2, 'two rows');
+    assert.deepEqual(K.findOverlaps(r.manifest), []);
+    // Chrome-backed tests elsewhere cover the render; here the geometry reads
+    // at fit zoom: wider than it is tall, or near enough, rather than a strip.
+    const W = Math.max(...spec.map((a) => a.x + a.w));
+    const H = Math.max(...spec.map((a) => a.y + a.h));
+    assert.ok(W / H > 0.8, `spec page is ${W}x${H}`);
+  });
+});
+
+describe('R3-N-01: the documented mockup workflow, end to end', () => {
+  // A photograph and a piece of artwork, both real files on disk. The grid
+  // page is what the corners are READ off; the corners below are the ones that
+  // reading produced, and the build has to carry them through without anybody
+  // doing arithmetic.
+  const PHOTO_CORNERS = [[20, 20], [70, 24], [68, 62], [22, 58]];
+  const ART = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100"><rect width="300" height="100" fill="#1F6F4A"/><circle id="the-art" cx="50" cy="50" r="30" fill="#FFF"/></svg>';
+  let p;
+
+  before(async () => {
+    p = path.join(dir, 'r3-mockup');
+    await mkdir(path.join(p, 'brand'), { recursive: true });
+    await mkdir(path.join(p, 'photos'), { recursive: true });
+    await mkdir(path.join(p, 'assets'), { recursive: true });
+    await writeFile(path.join(p, 'brand', 'brand.json'), await readFile(FIXTURE, 'utf8'));
+    await writeFile(path.join(p, 'assets', 'mark.svg'), ART);
+    // A JPEG whose header really declares 200x100: APP0 then an SOF0 frame,
+    // which is what `imageSize` reads. Dimensions have to be real, because the
+    // corners are percentages OF THEM.
+    await writeFile(path.join(p, 'photos', 'shopfront.jpg'), Buffer.from(
+      'ffd8ffe000104a46494600010100000100010000ffc0001108006400c803011100021101031101ffd9',
+      'hex',
+    ));
+  });
+
+  test('`mockup grid` writes a grid beside the photograph and says what to do with it', async () => {
+    const r = await cli(['mockup', 'grid', 'photos/shopfront.jpg'], p);
+    assert.equal(r.ok, true, r.error);
+    assert.ok(existsSync(path.join(p, 'photos', 'shopfront-grid.html')));
+    const grid = await readFile(path.join(p, 'photos', 'shopfront-grid.html'), 'utf8');
+    assert.match(grid, /src="shopfront\.jpg"/, 'it references the photograph beside it');
+    assert.match(grid, /FOUR CORNERS/);
+    // The dimensions it reports are the file's, not a guess.
+    assert.equal(r.width, 200);
+    assert.equal(r.height, 100);
+  });
+
+  test('every field the workflow records is settable, artwork included', async () => {
+    for (const [field, value] of [
+      ['identity.mockups.0.name', 'Shopfront'],
+      ['identity.mockups.0.photo', 'photos/shopfront.jpg'],
+      ['identity.mockups.0.caption', 'The sign, read off a photograph of the shop'],
+      ['identity.mockups.0.surfaces.0.name', 'fascia'],
+      ['identity.mockups.0.surfaces.0.corners', JSON.stringify(PHOTO_CORNERS)],
+      ['identity.mockups.0.surfaces.0.aspect', '0.333'],
+      ['identity.mockups.0.surfaces.0.blend', 'multiply'],
+      // The one the round 1 path check refused, while the skill told the user
+      // to record it. A source of truth that forbids its own documented field
+      // is not one.
+      ['identity.mockups.0.surfaces.0.artwork', 'assets/mark.svg'],
+    ]) {
+      const r = await cli(['set', field, value], p);
+      assert.equal(r.ok, true, `${field}: ${r.error}`);
+    }
+    const saved = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'));
+    assert.equal(saved.identity.mockups[0].surfaces[0].artwork, 'assets/mark.svg');
+    assert.deepEqual(saved.identity.mockups[0].surfaces[0].corners, PHOTO_CORNERS);
+    // And the file is still valid afterwards.
+    assert.equal((await cli(['status'], p)).ok, true);
+  });
+
+  test('`mockup build` carries the artwork onto the recorded corners', async () => {
+    const r = await cli(['mockup', 'build'], p);
+    assert.equal(r.ok, true, JSON.stringify(r.problems));
+    assert.equal(r.written.length, 1);
+    const board = await readFile(path.join(p, 'brand', 'canvas', 'MockupShopfront.dc.html'), 'utf8');
+    assert.match(board, /data-artwork="yes"/);
+    assert.match(board, /matrix3d\(/, 'the corners became a projective transform');
+    // The artwork travelled with the artboard, and is referenced, not inlined.
+    assert.match(board, /<img src="shopfront-art-0-mark\.svg"/);
+    assert.ok(existsSync(path.join(p, 'brand', 'canvas', 'shopfront-art-0-mark.svg')));
+    assert.equal(await readFile(path.join(p, 'brand', 'canvas', 'shopfront-art-0-mark.svg'), 'utf8'), ART);
+    // The photograph travelled too, or the canvas shows a broken image.
+    assert.ok(existsSync(path.join(p, 'brand', 'canvas', 'shopfront-shopfront.jpg')));
+  });
+
+  test('inline markup is accepted as artwork and used as it stands', async () => {
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', '<div id="typed">Muddy Paws</div>'], p);
+    const r = await cli(['mockup', 'build'], p);
+    assert.equal(r.ok, true, JSON.stringify(r.problems));
+    const board = await readFile(path.join(p, 'brand', 'canvas', 'MockupShopfront.dc.html'), 'utf8');
+    assert.match(board, /<div id="typed">Muddy Paws<\/div>/);
+    assert.match(board, /data-artwork="yes"/);
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/mark.svg'], p);
+  });
+
+  test('inline artwork cannot smuggle a script into an artboard somebody opens', async () => {
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork',
+      '<div onclick="steal()"><script>fetch("http://x")</script>Muddy Paws</div>'], p);
+    const r = await cli(['mockup', 'build'], p);
+    assert.equal(r.ok, true, JSON.stringify(r.problems));
+    const board = await readFile(path.join(p, 'brand', 'canvas', 'MockupShopfront.dc.html'), 'utf8');
+    assert.equal(/<script>fetch/.test(board), false);
+    assert.equal(/onclick=/.test(board), false);
+    assert.match(board, /<div\s*>Muddy Paws<\/div>/);
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/mark.svg'], p);
+  });
+
+  test('a surface with no artwork is refused plainly, and nothing is written or left behind', async () => {
+    await rm(path.join(p, 'brand', 'canvas'), { recursive: true, force: true });
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'null'], p);
+    const { stdout, code } = await run(process.execPath, [CLI, 'mockup', 'build', '--json'], { cwd: p })
+      .then((x) => ({ ...x, code: 0 })).catch((e) => ({ stdout: e.stdout, code: e.code }));
+    const r = JSON.parse(stdout);
+    assert.equal(r.ok, false);
+    assert.equal(code, 1, 'it exits non-zero rather than reporting success');
+    assert.equal(r.written.length, 0);
+    assert.equal(r.problems.length, 1);
+    assert.match(r.problems[0], /Shopfront \/ fascia: no artwork recorded/);
+    assert.match(r.problems[0], /inline markup .* or to the path of an \.svg/);
+    assert.equal(existsSync(path.join(p, 'brand', 'canvas', 'MockupShopfront.dc.html')), false);
+    // Not even the photograph is copied for a mockup that was refused.
+    assert.equal(existsSync(path.join(p, 'brand', 'canvas', 'shopfront-shopfront.jpg')), false);
+  });
+
+  test('artwork that is not markup and not a usable file in the project is named as such', async () => {
+    for (const [value, want] of [
+      ['assets/missing.svg', /is not a file inside this project/],
+      ['brand/brand.json', /neither markup .* nor a path to an \.svg, \.png, \.jpg or \.webp file/],
+      ['/etc/hosts.svg', /is an absolute path/],
+      ['../../../etc/passwd.svg', /is not a file inside this project/],
+    ]) {
+      await cli(['set', 'identity.mockups.0.surfaces.0.artwork', value], p);
+      const r = await cli(['mockup', 'build'], p);
+      assert.equal(r.ok, false, `${value} should be refused`);
+      assert.match(r.problems[0], want, `${value}: ${r.problems[0]}`);
+      assert.equal(r.written.length, 0);
+    }
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/mark.svg'], p);
+  });
+
+  test('a filename with spaces and brackets is copied and referenced by the same safe name', async () => {
+    await writeFile(path.join(p, 'assets', 'my mark (v2).svg'), ART);
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/my mark (v2).svg'], p);
+    const r = await cli(['mockup', 'build'], p);
+    assert.equal(r.ok, true, JSON.stringify(r.problems));
+    const board = await readFile(path.join(p, 'brand', 'canvas', 'MockupShopfront.dc.html'), 'utf8');
+    const src = /<img src="([^"]+)" alt="" style="display:block/.exec(board)[1];
+    assert.equal(/[^A-Za-z0-9._-]/.test(src), false, `the src needs no escaping: ${src}`);
+    assert.ok(existsSync(path.join(p, 'brand', 'canvas', src)), `${src} is on disk beside the artboard`);
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/mark.svg'], p);
+  });
+
+  test('a symlink cannot walk artwork in from outside the project', async () => {
+    const outside = path.join(dir, 'outside-art.svg');
+    await writeFile(outside, '<svg id="escaped"></svg>');
+    await symlink(outside, path.join(p, 'assets', 'linked.svg'));
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/linked.svg'], p);
+    const r = await cli(['mockup', 'build'], p);
+    assert.equal(r.ok, false);
+    assert.match(r.problems[0], /is not a file inside this project/);
+    await cli(['set', 'identity.mockups.0.surfaces.0.artwork', 'assets/mark.svg'], p);
+  });
+
+  test('the deck embeds the composite, and its caption matches what is on the page', async () => {
+    await cli(['mockup', 'build'], p);
+    const chrome = findChrome();
+    const r = await cli(['book'], p);
+    assert.equal(r.ok, true, r.error);
+    const html = await readFile(path.join(p, 'brand', 'brand-book.html'), 'utf8');
+    const section = /<section class="page" id="in-use-\d+-mockupshopfront"[^>]*>([\s\S]*?)<\/section>/.exec(html);
+    assert.ok(section, 'the mockup has a page in the brand-in-use chapter');
+    assert.match(section[1], /A mockup: the brand composited onto a real photograph of the surface\./);
+    if (chrome) assert.match(section[1], /<img src="data:image\/png;base64,/, 'the composite is embedded');
+
+    // And when nothing is composited, the caption says so rather than claiming
+    // the brand is on the photograph.
+    const board = path.join(p, 'brand', 'canvas', 'MockupShopfront.dc.html');
+    await writeFile(board, (await readFile(board, 'utf8')).replace(/data-artwork="yes"/g, 'data-artwork="no"'));
+    await cli(['book'], p);
+    const bare = /<section class="page" id="in-use-\d+-mockupshopfront"[^>]*>([\s\S]*?)<\/section>/
+      .exec(await readFile(path.join(p, 'brand', 'brand-book.html'), 'utf8'))[1];
+    assert.match(bare, /with nothing composited onto it/);
+    assert.equal(/the brand composited onto a real photograph/.test(bare), false);
+  });
+
+  test('R3-N-09: `mockup --help` answers the mockup, not the whole tool', async () => {
+    const { stdout } = await run(process.execPath, [CLI, 'mockup', '--help'], { cwd: p });
+    assert.match(stdout, /^brandi mockup — put the brand on a real photograph/);
+    assert.match(stdout, /brandi mockup grid <photo>/);
+    assert.match(stdout, /artwork inline markup/);
+    assert.equal(/brandi init \[--name/.test(stdout), false, 'not the top-level help');
+    // And the top-level help still answers for the tool itself.
+    const top = await run(process.execPath, [CLI, '--help'], { cwd: p });
+    assert.match(top.stdout, /brandi init \[--name/);
+  });
+});
+
+describe('R3-N-05: an artboard is framed by what the brand file already records', () => {
+  const authored = (w, h, label) => `<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc>
+<div style="width:${w}px;height:${h}px;background:#F4FBF6;padding:24px">${label}</div>
+</x-dc></body></html>`;
+  let p;
+  let canvasDir;
+  const manifest = async () => JSON.parse(await readFile(path.join(canvasDir, 'canvas.json'), 'utf8'));
+  const sizeOf = async (file) => {
+    const a = (await manifest()).artboards.find((x) => x.file === file);
+    return a ? `${a.w}x${a.h}` : null;
+  };
+
+  before(async () => {
+    p = path.join(dir, 'r3-frames');
+    canvasDir = path.join(p, 'brand', 'canvas');
+    await mkdir(canvasDir, { recursive: true });
+    await writeFile(path.join(p, 'brand', 'brand.json'), await readFile(FIXTURE, 'utf8'));
+    // The three the fixture records a frame for, plus one it says nothing about.
+    await writeFile(path.join(canvasDir, 'Main.dc.html'), authored(1440, 1600, 'home'));
+    await writeFile(path.join(canvasDir, 'Mobile.dc.html'), authored(390, 844, 'phone'));
+    await writeFile(path.join(canvasDir, 'Print.dc.html'), authored(794, 1123, 'flyer'));
+    await writeFile(path.join(canvasDir, 'Sticker.dc.html'), authored(600, 600, 'sticker'));
+  });
+
+  test('the first pass frames from the brand file and defaults only what it cannot', async () => {
+    const r = await cli(['sheets'], p);
+    assert.equal(r.ok, true, r.error);
+    assert.equal(await sizeOf('Main.dc.html'), '1440x1600');
+    assert.equal(await sizeOf('Mobile.dc.html'), '390x844');
+    assert.equal(await sizeOf('Print.dc.html'), '794x1123');
+    // And it says which ones and why, rather than silently sizing them.
+    assert.ok(r.sized.some((l) => /Mobile\.dc\.html 390x844, because applications\[\]\.frame records/.test(l)), r.sized.join(' | '));
+    // Sticker is the one the fixture says nothing about. It, and only it, is
+    // the one the tool had to guess at.
+    assert.equal(await sizeOf('Sticker.dc.html'), '1440x900');
+    assert.deepEqual(r.unsized, ['Sticker.dc.html']);
+  });
+
+  test('the human output names both, and never puts a recorded frame in the guessed list', async () => {
+    const { stdout } = await run(process.execPath, [CLI, 'sheets'], { cwd: p });
+    assert.match(stdout, /Sized from the brand file:/);
+    assert.match(stdout, /Mobile\.dc\.html 390x844, because applications\[\]\.frame records 390x844/);
+    assert.match(stdout, /MockupLaptop|Print\.dc\.html 794x1123/);
+    // Sticker keeps the size the first pass gave it, so the warning has done
+    // its job and is not repeated; what must never happen is a recorded frame
+    // being described as a guess.
+    assert.equal(/nothing said otherwise: [^\n]*(Mobile|Print|Main)/.test(stdout), false);
+  });
+
+  test('a size somebody chose by hand is left alone; one that is only the old default is corrected', async () => {
+    const edit = async (file, w, h) => {
+      const m = await manifest();
+      for (const a of m.artboards) if (a.file === file) { a.w = w; a.h = h; }
+      await writeFile(path.join(canvasDir, 'canvas.json'), JSON.stringify(m, null, 2));
+    };
+    // A deliberate correction: a different phone. The brand file does not win.
+    await edit('Mobile.dc.html', 430, 932);
+    await cli(['sheets'], p);
+    assert.equal(await sizeOf('Mobile.dc.html'), '430x932');
+    // The stuck case: 1440x900 in canvas.json only because an earlier run put
+    // it there. The brand file wins, or the defect is unrecoverable.
+    await edit('Mobile.dc.html', 1440, 900);
+    await cli(['sheets'], p);
+    assert.equal(await sizeOf('Mobile.dc.html'), '390x844');
+  });
+
+  test('a mockup artboard is framed by the composite, not by a desktop page', async () => {
+    const body = mockupBody({
+      photo: 'p.jpg', width: 1600, height: 665, surfaces: [],
+      caption: 'the trailer',
+    });
+    await writeFile(path.join(canvasDir, 'MockupTrailer.dc.html'), `<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc>\n${body}\n</x-dc></body></html>`);
+    const r = await cli(['sheets'], p);
+    assert.equal(r.ok, true, r.error);
+    assert.equal(await sizeOf('MockupTrailer.dc.html'), '1400x582', 'the composite scales 1600x665 into a 1400 frame');
+    assert.ok(r.sized.some((l) => /MockupTrailer\.dc\.html 1400x582, because the composite is that size/.test(l)), r.sized.join(' | '));
+    assert.equal(r.unsized.includes('MockupTrailer.dc.html'), false);
+  });
+
+  test('a frame nobody can parse is not guessed at', async () => {
+    // The fixture's signage frame is "A3 portrait". A person can read that; a
+    // layout cannot, and half-reading it would be worse than defaulting.
+    const b = JSON.parse(await readFile(path.join(p, 'brand', 'brand.json'), 'utf8'));
+    b.applications.push({ name: 'Bay sign', file: 'BaySign.dc.html', frame: 'A3 portrait' });
+    await writeFile(path.join(p, 'brand', 'brand.json'), JSON.stringify(b, null, 2));
+    await writeFile(path.join(canvasDir, 'BaySign.dc.html'), authored(842, 1191, 'bay'));
+    const r = await cli(['sheets'], p);
+    assert.equal(await sizeOf('BaySign.dc.html'), '1440x900');
+    assert.deepEqual(r.unsized, ['BaySign.dc.html']);
+    assert.equal(r.sized.some((l) => /BaySign/.test(l)), false);
+  });
+
+  test('every pass leaves a layout with no overlaps', async () => {
+    const r = await cli(['sheets'], p);
+    assert.deepEqual(K.findOverlaps(r.manifest), []);
   });
 });
