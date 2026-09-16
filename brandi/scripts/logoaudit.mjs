@@ -410,14 +410,26 @@ async function shoot(chrome, htmlPath, pngPath, width, height) {
  * so what is measured here is what actually ships rather than an approximation
  * of it.
  */
-export async function renderBatch(sources, { sizes = AUDIT_SIZES.map((s) => s.px), chrome = findChrome(), tightViewBox = true } = {}) {
+export async function renderBatch(sources, {
+  sizes = AUDIT_SIZES.map((s) => s.px), chrome = findChrome(), tightViewBox = true,
+  // One ground per source, for the colour stage. A mark reversed out of a dark
+  // ground renders as nothing on the sheet's white, and every region count taken
+  // off that render is a measurement of an empty square. Each cell carries its
+  // own ground, and the region counter is told what the ground is so it knows
+  // which pixels are ink.
+  backgrounds = null,
+  // The smallest area that counts as an area, as a fraction of the cell. Zero
+  // keeps every sliver, which is what the concept round has always measured.
+  minAreaRatio = 0,
+} = {}) {
   if (!chrome) return { available: false, results: sources.map(() => null) };
 
   const prepared = sources.map((s) => (tightViewBox ? tighten(s) : s));
   const { cells, width, height } = spriteLayout(sources.length, sizes);
+  const groundOf = (i) => backgrounds?.[i] ?? null;
 
   const imgs = cells.map((c) => {
-    const svg = fitSvg(prepared[c.index], { size: c.px, ratio: 1, background: null });
+    const svg = fitSvg(prepared[c.index], { size: c.px, ratio: 1, background: groundOf(c.index) });
     return `<img src="${dataUri(svg)}" style="position:absolute;left:${c.x}px;top:${c.y}px;width:${c.px}px;height:${c.px}px" alt="">`;
   }).join('\n');
 
@@ -439,7 +451,12 @@ ${imgs}`;
     for (const c of cells) {
       const cell = crop(grey, sheet.width, c.x, c.y, c.px, c.px);
       const colourCell = cropRgb(sheet, c.x, c.y, c.px, c.px);
-      results[c.index][c.px] = measure(cell, colourCell, c.px);
+      const ground = groundOf(c.index);
+      results[c.index][c.px] = measure(
+        cell, colourCell, c.px,
+        ground ? Number.parseInt(String(ground).replace('#', ''), 16) : 0xffffff,
+        minAreaRatio > 0 ? Math.max(4, Math.round(c.px * c.px * minAreaRatio)) : 1,
+      );
     }
     return { available: true, results, sheetWidth: width, sheetHeight: height };
   } finally {
@@ -519,7 +536,7 @@ function inkBucket(v) {
   return 1 + (Math.floor((hue * 60) / 30) % 12);
 }
 
-export function solidRegions(rgb, width, height, { background = 0xffffff, tolerance = 24 } = {}) {
+export function solidRegions(rgb, width, height, { background = 0xffffff, tolerance = 24, minArea = 1 } = {}) {
   const q = inkBucket;
   const far = (v) => Math.max(
     Math.abs(((v >> 16) & 255) - ((background >> 16) & 255)),
@@ -549,6 +566,18 @@ export function solidRegions(rgb, width, height, { background = 0xffffff, tolera
   // apples to oranges: erosion fragments a thin letter stroke into islands, so
   // a single-ink wordmark reported fifteen colour areas against eleven grey ones
   // and was rejected for a colour problem it did not have.
+  //
+  // `minArea` exists because of one measurement. Where two large areas of
+  // different hue MEET, the antialiased boundary is a ramp of blended colours,
+  // and blending a green into an orange walks through half a dozen hue buckets.
+  // Erosion does not remove those pixels, because they are not next to the
+  // background, so each blend sliver was counted as its own area: a two-colour
+  // mark whose parts touch reported 49 areas in colour against 1 in ink. The
+  // VERDICT was right and the number was nonsense, and a number nobody believes
+  // is a number that gets the whole check ignored. Areas smaller than the floor
+  // are counted as part of nothing.
+  //
+  // The default is 1, so every existing caller measures exactly what it did.
   const count = (joinOn) => {
     const seen = new Uint8Array(width * height);
     const stack = [];
@@ -556,12 +585,13 @@ export function solidRegions(rgb, width, height, { background = 0xffffff, tolera
     for (let start2 = 0; start2 < width * height; start2++) {
       if (seen[start2] || !solid[start2]) continue;
       const colour = joinOn ? q(rgb[start2]) : 0;
-      regions++;
+      let area = 0;
       stack.length = 0;
       stack.push(start2);
       seen[start2] = 1;
       while (stack.length) {
         const p = stack.pop();
+        area++;
         const px = p % width;
         const py = (p - px) / width;
         for (let dy = -1; dy <= 1; dy++) {
@@ -578,6 +608,7 @@ export function solidRegions(rgb, width, height, { background = 0xffffff, tolera
           }
         }
       }
+      if (area >= minArea) regions++;
     }
     return regions;
   };
@@ -590,13 +621,13 @@ export function countColourRegions(rgb, width, height, options) {
   return solidRegions(rgb, width, height, options).byColour;
 }
 
-function measure(grey, rgb, size) {
+function measure(grey, rgb, size, background = 0xffffff, minArea = 1) {
   const box = boundingBox(grey, size, size);
   return {
     coverage: inkCoverage(grey),
     regions: countRegions(grey, size, size),
     ...(rgb ? (() => {
-      const r = solidRegions(rgb, size, size);
+      const r = solidRegions(rgb, size, size, { background, minArea });
       return { colourRegions: r.byColour, solidRegions: r.byInk };
     })() : { colourRegions: null, solidRegions: null }),
     minFeature: minFeatureWidth(grey, size, size),

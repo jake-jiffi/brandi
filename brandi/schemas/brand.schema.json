@@ -817,6 +817,41 @@
               ],
               "description": "Where it sits and what it aligns to, on each surface it appears on."
             },
+            "colourways": {
+              "type": "array",
+              "description": "Approved colour treatments of the mark. Each is a MAPPING from an ink the mark was drawn in to a role in the palette, never a set of fixed colours, so a colourway follows the palette instead of freezing a copy of it. Written by `brandi logo colour approve`, which refuses without a master somebody approved and a resolved palette: the silhouette is approved first, and a colourway may not carry meaning the silhouette cannot carry alone.",
+              "items": {
+                "type": "object",
+                "required": ["id", "regions"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "name": { "type": ["string", "null"] },
+                  "ground": {
+                    "type": ["string", "null"],
+                    "description": "The palette role of the surface this treatment is drawn for, e.g. neutral.paper."
+                  },
+                  "regions": {
+                    "type": "array",
+                    "description": "One entry per painted region of the master. A region is an ink the mark was actually drawn in, not a node.",
+                    "items": {
+                      "type": "object",
+                      "required": ["ink", "role"],
+                      "properties": {
+                        "region": { "type": ["string", "null"], "description": "The region's handle, e.g. region-1, largest first." },
+                        "ink": { "type": "string", "description": "The colour this region carries in the master. The key into the drawing, not a colour decision." },
+                        "role": { "type": "string", "description": "The palette role it is painted in, e.g. brand.solid. The colour decision." }
+                      }
+                    }
+                  },
+                  "file": { "type": ["string", "null"], "description": "The rendition derived from the mapping. Derived, so it can be rebuilt and must never be hand-edited." },
+                  "approvedBy": {
+                    "type": ["string", "null"],
+                    "description": "Null means nobody approved it, and it stays null until somebody did."
+                  },
+                  "approvedOn": { "type": ["string", "null"] }
+                }
+              }
+            },
             "monochrome": {
               "type": "object",
               "description": "One-colour behaviour, which is what embroidery, foil, etching and a fax get.",

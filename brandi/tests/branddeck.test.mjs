@@ -47,7 +47,7 @@ const pageOf = (html, id) => new RegExp(`<section class="page" id="${id}"[^>]*>(
 const clone = (b) => JSON.parse(JSON.stringify(b));
 
 // The fixture's page count, and the count once artboards are supplied.
-const FIXTURE_PAGES = 53;
+const FIXTURE_PAGES = 54;
 
 describe('the deck is a 16:9 presentation, in the order the brief lists', () => {
   test('every page is one 1920x1080 section and the page list agrees with the markup', () => {
@@ -71,7 +71,7 @@ describe('the deck is a 16:9 presentation, in the order the brief lists', () => 
     // applications page.
     const expected = [
       'purpose', 'driver', 'field', 'pillars', 'personality', 'proposition', 'tone', 'tone-situations', 'key-messaging', 'writing',
-      'our-logo', 'variants', 'clear-space', 'minimum-size', 'misuse', 'cobranding', 'tagline-lockup', 'favicon',
+      'our-logo', 'variants', 'colourways', 'clear-space', 'minimum-size', 'misuse', 'cobranding', 'tagline-lockup', 'favicon',
       'primary-palette', 'production', 'ramps', 'colour-usage', 'pairings', 'scalability',
       'primary-typeface', 'secondary-typeface', 'hierarchy', 'type-scale', 'type-examples',
       'imagery', 'photography', 'icons', 'shape', 'device',
@@ -99,7 +99,7 @@ describe('the deck is a 16:9 presentation, in the order the brief lists', () => 
     assert.match(page, /<div class="footer"/);
     assert.match(page, /Logo<\/span>/);
     assert.match(page, /Muddy Paws brand guidelines \/ v1\.0\.0/);
-    assert.match(page, /<span class="folio"[^>]*>20<\/span>/);
+    assert.match(page, /<span class="folio"[^>]*>21<\/span>/);
   });
 
   test('one h1 per page, a lang attribute, alt text on every image, and a visible focus style', () => {
@@ -164,7 +164,7 @@ describe('it does not invent things', () => {
     const found = [...deck.html.matchAll(new RegExp(`\\[${PLACEHOLDER}: ([^\\]]+)\\]`, 'g'))].map((m) => m[1]);
     assert.ok(found.length > 0);
     // Every placeholder names a thing the fixture genuinely lacks.
-    const allowed = [/why this pillar matters/, /story behind the mark/, /logo artwork/, /co-branding rule/, /favicon artwork/, /coated match/, /uncoated match/, /usage rights/, /price or opening hours/, /proof artboards/];
+    const allowed = [/why this pillar matters/, /story behind the mark/, /logo artwork/, /an approved colourway/, /co-branding rule/, /favicon artwork/, /coated match/, /uncoated match/, /usage rights/, /price or opening hours/, /proof artboards/];
     for (const f of found) assert.ok(allowed.some((re) => re.test(f)), `unexpected placeholder: ${f}`);
     assert.ok(found.some((f) => /co-branding rule/.test(f)), 'the fixture has no co-branding rule');
   });

@@ -730,8 +730,11 @@ describe('the whole round, end to end', () => {
     assert.ok(res.minimumSizes.screenPx % 10 === 0);
 
     const final = await L.forgeStatus(dir);
-    assert.equal(final.next, 'done');
+    // Not 'done'. An approved silhouette is what OPENS the colour stage, and
+    // the forge says so rather than implying the mark is finished in black.
+    assert.equal(final.next, 'logo colour plan');
     assert.equal(final.master.approvedBy, 'Jake');
+    assert.equal(final.colour, null, 'the colour stage has not started');
   });
 
   test('every artboard the round produces passes the canvas validator', needsChrome, async () => {

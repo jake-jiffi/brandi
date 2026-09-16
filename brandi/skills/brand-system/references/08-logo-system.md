@@ -299,6 +299,15 @@ Four, as separate files, not as CSS filters or effects applied at layout time.
 Add **single-colour brand** (the whole mark in one brand colour) if the brand will ever be screen
 printed, embroidered, etched, foiled or cut in vinyl. It will.
 
+`brandi logo colour` deals these treatments from the brand's own palette and measures them. It
+refuses to run until a person has approved a master and the palette has resolved, because the
+silhouette is approved first and colour is a later stage. Each treatment is recorded in
+`identity.logo.colourways` as a mapping from an ink the mark was drawn in to a palette role, never
+as a colour, so the renditions follow the palette instead of freezing a copy of it. The audit
+renders each one in its colourway and again with every ink collapsed to one, and rules out any
+treatment that reads as more separate shapes in colour than in ink: that is colour carrying a split
+the shape is not, and it merges under the needle and the die.
+
 **Not every mark may be reversed.** NASA's rule is explicit: "The full-color Insignia … may not be
 displayed in reverse." If the mark has an internal figure-ground relationship that inverts into
 nonsense, say so and forbid it, rather than shipping a reversed file that is quietly wrong.
@@ -429,6 +438,7 @@ which is updated in place: <https://evilmartians.com/chronicles/how-to-favicon-i
 | `svg/primary.svg` | vector | The mark as drawn. Everything else is derived from it, so it is the one to edit |
 | `svg/black.svg`, `svg/white.svg` | vector | One ink for embroidery, foil and a rubber stamp; reversed out of anything dark |
 | `svg/brand.svg`, `svg/on-brand.svg` | vector | The mark in the brand colour, and in whichever of black or white sits on that colour |
+| `svg/colourway-<id>.svg` | vector | One per approved colourway, derived from its mapping. Rebuilt by `brandi assets`, so it is never hand-edited |
 | `png/favicon-16.png`, `png/favicon-32.png` | 16, 32 | The browser tab. Drawn from the 16px redraw when there is one |
 | `png/apple-touch-icon.png` | 180 | iOS home screen: opaque, on the page colour, inside the safe area. iOS rounds the corners itself |
 | `png/icon-192.png` | 192 | The web app manifest |
@@ -810,5 +820,8 @@ $A check <paths>
 
 The guardian reports off-palette colours and off-brand typefaces, which catches the two most common
 ways a logo system leaks: a mark recoloured to something almost right, and a wordmark retyped in
-whatever face was loaded. It reports, it does not edit. Fix what it finds, or record a deliberate
+whatever face was loaded. It reads the recorded logo files themselves for the first of those, not
+only the source around them, because a colourway is defined by role and a logo file painted a colour
+the palette does not have has stopped following the system. Black, white and grey are left alone:
+they are the silhouette and the one-ink rendition, not a colour decision. It reports, it does not edit. Fix what it finds, or record a deliberate
 exception in the decision log rather than letting the system quietly drift.

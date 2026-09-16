@@ -181,11 +181,11 @@ move the unchosen sketches to a second page, and `$A complete territories`.
 **If there is no usable mark, run the forge first, before any colour is decided.** Load the
 `logo-forge` skill. It deals a set of concept slots that cannot converge on one idea, drives parallel
 agents to draw them, measures every candidate mechanically, and puts them on a canvas to pick from.
-Everything is drawn in black on white, because colour comes after the silhouette is right: a weak
-mark rescued by a good palette is a decision you find out about eighteen months later, on a
-one-colour press. When a direction is approved, `$A logo master` writes the outlined vector masters,
-the clear-space rule and the minimum sizes into `brand.json`, and `$A assets` derives the rest of the
-pack from there.
+Everything is drawn in black on white, because you have to love the mark as a silhouette before
+colour enters: a weak mark rescued by a good palette is a decision you find out about eighteen
+months later, on a one-colour press. When a direction is approved, `$A logo master` writes the
+outlined vector masters, the clear-space rule and the minimum sizes into `brand.json`, and
+`$A assets` derives the rest of the pack from there.
 
 A generated mark is a starting point somebody approved, not a drawn one, and the book says so. If a
 round produces nothing worth keeping, say that and set the name properly instead. A typeset wordmark
@@ -206,6 +206,23 @@ evidence beats a general rule. Keep it by writing a reason next to it,
 with `$A decision`. A waiver with no reason after it is reported as its own finding, because a
 waiver nobody had to argue for is how a rule set quietly stops meaning anything. The canvas can only
 load fonts from Google Fonts, so pick from there or embed a face as a data URI.
+
+Then the mark gets its colour, and not before. `$A logo colour` refuses to run until a person has
+approved a master and the palette has resolved, so this is the order whether or not anybody
+remembers it:
+
+```bash
+$A logo colour plan      # four to six treatments, dealt from this palette
+$A logo colour audit     # paint ceilings, contrast on every ground, colour vision, the one-colour test
+$A logo colour board     # each treatment beside its own greyscale and its own 16px render
+$A logo colour approve <id> --approved-by "<name>"
+```
+
+A colourway is recorded as a mapping from an ink the mark was drawn in to a role in the palette,
+never as a colour, so the mark follows the palette rather than freezing a copy of it. It never
+carries meaning the silhouette cannot carry alone, and the audit rules out any treatment that does.
+A brand with no approved colourway gets a bracketed placeholder on the book's colourway page, which
+is the honest answer until somebody has looked.
 
 Specify the logo system, or if there is no logo, write the brief for one and set a typeset wordmark
 as the interim mark. `references/08-logo-system.md` covers both. Then `$A complete identity`.

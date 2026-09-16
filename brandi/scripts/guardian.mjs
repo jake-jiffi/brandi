@@ -14,7 +14,7 @@
  * is a document somebody read once, the other is a rule that keeps applying.
  */
 
-import { readFile, writeFile, mkdir, readdir, symlink, lstat, readlink } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, stat, symlink, lstat, readlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { toOklch, oklchToOklab, contrastRatio, extractColors } from './color.mjs';
@@ -70,6 +70,82 @@ export function paletteOf(system) {
   out.set('#FFFFFF', 'white');
   out.set('#000000', 'black');
   return out;
+}
+
+/**
+ * The mark itself, held against the palette it is supposed to be painted in.
+ *
+ * This is here because a colourway is now defined by ROLE. Every colour a logo
+ * file puts down should be a role the system resolves, and a logo carrying a
+ * colour the palette does not have is either a file somebody recoloured by hand
+ * or a file left behind by an older palette. Both are the same failure: the
+ * mark has stopped following the system, and it is the one asset nobody thinks
+ * to check because it looks finished.
+ *
+ * Neutral ink is always allowed, and deliberately. Black, white and grey are
+ * what the silhouette and the one-colour rendition are drawn in, they are not a
+ * colour decision, and flagging them would flag every master the forge writes.
+ * So the test is on CHROMA: a colour with hue in it is a colour somebody chose,
+ * and it has to be one the brand chose.
+ */
+export async function checkLogoColour({ brand, system, root = process.cwd(), tolerance = 0.03 }) {
+  const palette = paletteOf(system);
+  const paletteHexes = [...palette.keys()];
+  const logo = brand.identity?.logo ?? {};
+  const named = new Map();
+  const add = (file, what) => {
+    if (!file || typeof file !== 'string' || path.isAbsolute(file)) return;
+    if (!named.has(file)) named.set(file, what);
+  };
+  for (const f of logo.files ?? []) add(typeof f === 'string' ? f : f?.path, 'a recorded logo file');
+  for (const v of logo.variants ?? []) add(v?.file, `the "${v?.name ?? 'unnamed'}" variant`);
+  for (const c of logo.colourways ?? []) add(c?.file, `the "${c?.name ?? c?.id}" colourway`);
+  add(logo.favicon, 'the favicon');
+
+  const findings = [];
+  const base = path.resolve(root);
+  for (const [rel, what] of named) {
+    // The same two places `loadLogoAssets` looks, for the same reason: a brand
+    // file records paths relative to itself or to the project it sits in, and
+    // both spellings are in the wild.
+    const full = [path.resolve(root, rel), path.resolve(root, 'brand', rel)].find((c) => existsSync(c));
+    if (!full || !/\.svg$/i.test(full)) continue;
+    // A path that climbs out of the project is not this project's logo, and
+    // reading it would be reporting somebody else's file under this brand.
+    if (full !== base && !full.startsWith(base + path.sep)) continue;
+    let text;
+    try {
+      // The same ceiling `loadLogoAssets` uses. A logo is tens of kilobytes; a
+      // megabyte of SVG is a traced raster or something that is not a logo.
+      const stats = await stat(full);
+      if (!stats.isFile() || stats.size > 512 * 1024) continue;
+      text = await readFile(full, 'utf8');
+    } catch { continue; }
+
+    const seen = new Set();
+    for (const found of extractColors(text)) {
+      const hex = found.hex.toUpperCase();
+      if (seen.has(hex)) continue;
+      seen.add(hex);
+      if (palette.has(hex)) continue;
+      // Neutral ink is the silhouette, not a colourway.
+      if (toOklch(hex).C < 0.02) continue;
+      let nearest = null;
+      for (const p of paletteHexes) {
+        const d = distance(hex, p);
+        if (!nearest || d < nearest.d) nearest = { hex: p, d, name: palette.get(p) };
+      }
+      findings.push({
+        level: nearest && nearest.d <= tolerance ? 'warn' : 'error',
+        file: path.relative(root, full),
+        line: text.slice(0, found.index).split('\n').length,
+        rule: 'logo-off-palette',
+        message: `${what} is painted ${found.raw}${found.notation === 'hex' ? '' : ` (${hex})`}, which is not in the ${brand.meta?.name ?? 'brand'} palette${nearest ? ` (nearest is ${nearest.hex}, ${nearest.name})` : ''}.`,
+        fix: 'A colourway is defined by role, not by a colour somebody typed into the file. Record it with `brandi logo colour approve` and let `brandi assets` derive the artwork, so the mark follows the palette instead of a copy of it.',
+      });
+    }
+  }
+  return findings;
 }
 
 async function collect(root, targets) {
@@ -206,6 +282,9 @@ export async function checkFiles({ brand, system, targets, root = process.cwd(),
     // specified in the document; the two drifted, as two copies of anything do.
     for (const f of slopFindings(contract, text, { file: rel, brandFonts })) findings.push(f);
   }
+
+  // The mark itself, which is not a source file and is not under `targets`.
+  findings.push(...await checkLogoColour({ brand, system, root, tolerance }));
 
   const order = { error: 0, warn: 1, info: 2 };
   findings.sort((a, b) => order[a.level] - order[b.level] || a.file.localeCompare(b.file) || (a.line ?? 0) - (b.line ?? 0));
@@ -540,4 +619,4 @@ export async function linkForCodex(dir, home = process.env.HOME ?? '') {
   return { linked: link, reason: null };
 }
 
-export default { checkFiles, emitGuardianSkill, paletteOf, linkForCodex };
+export default { checkFiles, checkLogoColour, emitGuardianSkill, paletteOf, linkForCodex };

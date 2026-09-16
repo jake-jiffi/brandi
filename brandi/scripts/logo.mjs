@@ -43,7 +43,10 @@ import { auditCandidates } from './logoaudit.mjs';
 import { conceptRoundBoards, fitFrames } from './logoboard.mjs';
 import { normaliseMaster, monoVariants, typesetWordmark, composeLockup, clearSpaceRule, minimumSizes, generationRecord, localDate } from './logogen.mjs';
 import { canvasManifest, BANNED_FONTS } from './canvas.mjs';
-import { loadBrand, saveBrand, addDecision } from './brandfile.mjs';
+import { loadBrand, saveBrand, addDecision, systemInputFromBrand } from './brandfile.mjs';
+import { buildSystem } from './system.mjs';
+import { regionsOf, planColourways, auditColourways, renderColourway, colourRoles } from './logocolour.mjs';
+import { colourwayBoards } from './logoboard.mjs';
 import { parseFont, fetchGoogleFont } from './font.mjs';
 
 export const LOGO_STATE_VERSION = 1;
@@ -56,6 +59,9 @@ export const LAYOUT = Object.freeze({
   slots: 'brand/logo/brief/slots',
   concepts: 'brand/logo/concepts',
   canvas: 'brand/logo/canvas',
+  // A separate directory, because the concept round's canvas.json is the record
+  // of that round and writing the colour boards over it would lose it.
+  colourCanvas: 'brand/logo/canvas-colour',
   master: 'brand/logo/master',
   rights: 'brand/logo/rights',
 });
@@ -781,6 +787,339 @@ the world. Record here what a person actually looked at.
 }
 
 // ---------------------------------------------------------------------------
+// The colour stage
+// ---------------------------------------------------------------------------
+
+/**
+ * The gate, and the reason it exists.
+ *
+ * You have to love the mark as a silhouette before colour enters. The concept
+ * round is black on white because a mark that only works once it is coloured is
+ * a mark that fails on a one-colour press, and you find that out eighteen months
+ * later on an invoice, a stamp and a shirt. So colour is a stage rather than a
+ * setting, and it does not open until two things are true: a person has approved
+ * a master, and the brand's palette has resolved.
+ *
+ * Both refusals are refusals. Nothing is written, and the message says which of
+ * the two is missing and the command that supplies it, because a gate that only
+ * says no teaches nobody anything.
+ */
+export async function colourGate(root = '.') {
+  const state = await loadState(root);
+  if (!state?.master) {
+    return {
+      ok: false,
+      reason: 'no-master',
+      message: 'There is no master yet, so there is no silhouette to colour.\n'
+        + 'Colour is a stage of this journey and it comes after the shape, because a mark that only\n'
+        + 'works once it is coloured is a mark that fails on a one-colour press.\n'
+        + 'Choose a direction and run: brandi logo master <id> --approved-by "<name>"',
+    };
+  }
+  if (!state.master.approvedBy) {
+    return {
+      ok: false,
+      reason: 'unapproved-master',
+      message: `The master is concept ${state.master.chosenFrom}, and nobody has approved it.\n`
+        + 'A silhouette nobody has approved is not ready for colour. Colour makes a mark harder to\n'
+        + 'reject, not easier, and approving it afterwards is approving it in the wrong order.\n'
+        + `Run: brandi logo master ${state.master.chosenFrom} --approved-by "<the person's name>"`,
+    };
+  }
+
+  const masterFile = within(root, state.master.files.primary);
+  if (!existsSync(masterFile)) {
+    return {
+      ok: false,
+      reason: 'no-master-file',
+      message: `The master is recorded as ${state.master.files.primary}, and that file is not on disk.\n`
+        + 'A colourway is a view of the drawing, so there is nothing to take a view of.\n'
+        + `Restore the file, or run: brandi logo master ${state.master.chosenFrom} --approved-by "${state.master.approvedBy}"`,
+    };
+  }
+
+  const file = within(root, 'brand/brand.json');
+  if (!existsSync(file)) {
+    return {
+      ok: false,
+      reason: 'no-brand',
+      message: 'Colour comes from the brand\'s palette, not from the mark.\n'
+        + `There is no brand file at ${path.relative(path.resolve(root), file)}, so there is no palette to take a role from.\n`
+        + 'Run: brandi init --name "<the brand>", then set a primary colour and run `brandi system`.',
+    };
+  }
+
+  const brand = await loadBrand(file);
+  if (!brand.identity?.colour?.primary) {
+    return {
+      ok: false,
+      reason: 'no-palette',
+      message: 'Colour comes from the brand\'s palette, not from the mark.\n'
+        + 'This brand has no primary colour recorded, so a colourway would be a hex somebody typed\n'
+        + 'rather than a role the system defines, and it would stop being true the moment the\n'
+        + 'palette moved.\n'
+        + 'Run: brandi set identity.colour.primary "#RRGGBB", then brandi system',
+    };
+  }
+
+  let system;
+  try {
+    system = buildSystem(systemInputFromBrand(brand));
+  } catch (e) {
+    return {
+      ok: false,
+      reason: 'no-palette',
+      message: `The palette does not resolve, so there are no roles to map a colourway to:\n  ${e.message}\nFix it and run \`brandi system\`.`,
+    };
+  }
+
+  return { ok: true, state, brand, brandFile: file, system };
+}
+
+/** The master's artwork and the inks it was drawn in. */
+async function masterRegions(root, state) {
+  const master = await readFile(within(root, state.master.files.primary), 'utf8');
+  const { regions, unpainted } = regionsOf(master);
+  return { master, regions, unpainted };
+}
+
+/**
+ * Deal the colourways from the brand's own palette.
+ *
+ * Every treatment is a mapping from an ink the mark was drawn in to a role the
+ * palette defines. No hex is recorded anywhere: the mark stays the single
+ * source of geometry and the palette stays the single source of colour, so a
+ * colourway cannot drift from either.
+ */
+export async function planColourStage(root = '.') {
+  const gate = await colourGate(root);
+  if (!gate.ok) return gate;
+  const { state, system, brand } = gate;
+  const { regions, unpainted } = await masterRegions(root, state);
+
+  const { colourways, notes } = planColourways({ regions, system });
+  if (unpainted.length) {
+    notes.push(`${unpainted.length} painted node${unpainted.length === 1 ? '' : 's'} (${unpainted.join(', ')}) carry no explicit fill, so they are painted black by the SVG default and there is no ink in the file to map to a role. They will keep whatever the default gives them in every colourway. Give every painted node an explicit fill in the master.`);
+  }
+
+  // An approval survives a replan when the treatment it approved is unchanged.
+  // Without this, replanning dropped the approval here while `brand.json` went
+  // on saying the same treatment was approved, which is two records of one fact
+  // disagreeing, and the one people read is the wrong one.
+  const sameMapping = (a, b) => JSON.stringify(a.regions.map((r) => [r.ink, r.role]).sort())
+    === JSON.stringify(b.regions.map((r) => [r.ink, r.role]).sort()) && a.ground === b.ground;
+  const previous = state.colour?.colourways ?? [];
+  const carried = [];
+  for (const c of colourways) {
+    const was = previous.find((p2) => p2.id === c.id && p2.approvedBy && sameMapping(p2, c));
+    if (!was) continue;
+    c.approvedBy = was.approvedBy;
+    c.approvedOn = was.approvedOn;
+    c.file = was.file;
+    carried.push(c.id);
+  }
+
+  // An approval `brand.json` still claims, for a treatment this mark can no
+  // longer take, is the contradiction a client finds. Say it here rather than
+  // letting the book show a colourway nothing can produce.
+  const claimed = (brand.identity?.logo?.colourways ?? []).filter((c) => c?.approvedBy);
+  const orphaned = claimed.filter((c) => !colourways.some((d) => d.id === c.id));
+  if (orphaned.length) {
+    notes.push(`brand.json records ${orphaned.map((c) => `"${c.name ?? c.id}"`).join(' and ')} as approved, and this mark does not take that treatment any more. Approve a replacement, or remove it from identity.logo.colourways, because the book will go on showing it until somebody does.`);
+  }
+
+  state.colour = {
+    plannedOn: localDate(),
+    master: state.master.chosenFrom,
+    masterFile: state.master.files.primary,
+    regions,
+    unpainted,
+    notes,
+    colourways: colourways.map((c) => ({ approvedBy: null, approvedOn: null, ...c })),
+    approved: carried,
+  };
+  await saveState(root, state);
+  return { ok: true, regions, unpainted, notes, carried, colourways: state.colour.colourways, roles: [...colourRoles(system).keys()] };
+}
+
+/** Measure every dealt colourway, with the machinery the concept round uses. */
+export async function auditColourStage(root = '.', { chrome } = {}) {
+  const gate = await colourGate(root);
+  if (!gate.ok) return gate;
+  const { state, system } = gate;
+  if (!state.colour?.colourways?.length) {
+    throw new Error('no colourways have been dealt yet. Run `brandi logo colour plan` first.');
+  }
+  const { master, regions } = await masterRegions(root, state);
+
+  const result = await auditColourways(state.colour.colourways, {
+    master, system, regions, ...(chrome === undefined ? {} : { chrome }),
+  });
+  // The mapping is by ink, so a new master drawn in the same inks takes the old
+  // set unchanged and that is correct. A new master drawn in different inks is
+  // refused by `resolveColourway`. This is the case in between: same inks,
+  // different drawing, and nothing else would mention it.
+  if (state.colour.master && state.colour.master !== state.master.chosenFrom) {
+    result.findings.push({
+      severity: 'note',
+      id: 'planned-against-another-master',
+      message: `This set was dealt against concept ${state.colour.master} and the master is now ${state.master.chosenFrom}.`,
+      fix: 'The mapping is by ink, so it still applies if the new mark is drawn in the same inks. Run `brandi logo colour plan` again to deal against the mark you actually have.',
+    });
+  }
+
+  for (const c of state.colour.colourways) {
+    const a = result.colourways.find((x) => x.id === c.id);
+    if (!a) continue;
+    // The painted SVG is derived, so it is never stored: `brand.json` records
+    // the mapping and the file is produced from the mapping every time.
+    const { svg: _drop, ...rest } = a;
+    c.audit = rest;
+  }
+  state.colour.auditedOn = localDate();
+  state.colour.rendered = result.rendered;
+  state.colour.coverage = result.coverage;
+  state.colour.setFindings = result.findings;
+  await saveState(root, state);
+
+  return { ok: true, ...result };
+}
+
+/**
+ * The boards, which are where a person actually decides.
+ *
+ * Every colourway appears beside its own greyscale and its own 16 pixel render.
+ * That is Jake's rule in visual form: the silhouette has to still be carrying
+ * the mark with the colour taken away and at the size nobody can rescue.
+ */
+export async function buildColourBoards(root = '.') {
+  const gate = await colourGate(root);
+  if (!gate.ok) return gate;
+  const { state, system } = gate;
+  if (!state.colour?.colourways?.length) {
+    throw new Error('no colourways have been dealt yet. Run `brandi logo colour plan` first.');
+  }
+  const unaudited = state.colour.colourways.filter((c) => !c.audit).map((c) => c.id);
+  if (unaudited.length) {
+    // The same rule the concept boards keep. These boards print contrast
+    // numbers and verdicts as fact, and printing them from a set nothing
+    // measured is the failure the audit exists to prevent, produced by the
+    // artefact a person decides from.
+    throw new Error(`${unaudited.length === state.colour.colourways.length ? 'This set has not been audited' : `These colourways have not been audited: ${unaudited.join(', ')}`}. `
+      + 'The boards state the contrast and the verdict of every treatment, so they will not be built from a set that was not measured. Run `brandi logo colour audit` first.');
+  }
+
+  const { master, regions } = await masterRegions(root, state);
+  const painted = state.colour.colourways.map((c) => ({
+    ...c,
+    svg: renderColourway(master, c, { system, regions }),
+  }));
+
+  let boards = colourwayBoards({
+    colourways: painted,
+    regions,
+    system,
+    notes: state.colour.notes ?? [],
+    brandName: state.brand.name ?? gate.brand.meta?.name ?? 'Brand',
+    masterApprovedBy: state.master.approvedBy,
+    coverage: state.colour.coverage ?? [],
+    setFindings: state.colour.setFindings ?? [],
+  });
+  boards = await fitFrames(boards);
+
+  const dir = within(root, LAYOUT.colourCanvas);
+  await mkdir(dir, { recursive: true });
+  for (const b of boards) await writeFile(path.join(dir, b.file), b.source);
+  const manifest = canvasManifest(boards.map(({ file, w, h }) => ({ file, w, h })), {
+    launch: { view: 'canvas' },
+  });
+  await writeFile(path.join(dir, 'canvas.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+
+  state.colour.canvas = path.relative(path.resolve(root), dir);
+  await saveState(root, state);
+  return { ok: true, dir, boards: boards.map((b) => ({ file: b.file, w: b.w, h: b.h })) };
+}
+
+/**
+ * Record an approved colourway and write its renditions.
+ *
+ * `--approved-by` is not optional in spirit, exactly as it is not for the
+ * master. Without it nothing is recorded and the command says so, because the
+ * one thing this tool must never do is imply a person signed off on something
+ * they never saw.
+ */
+export async function approveColourway(root = '.', id, { approvedBy = null } = {}) {
+  const approver = typeof approvedBy === 'string' && approvedBy.trim() ? approvedBy.trim() : null;
+  const gate = await colourGate(root);
+  if (!gate.ok) return gate;
+  const { state, system, brand, brandFile } = gate;
+  const set = state.colour?.colourways ?? [];
+  const colourway = set.find((c) => c.id === id);
+  if (!colourway) {
+    throw new Error(set.length
+      ? `no colourway called ${id}. This set has: ${set.map((c) => c.id).join(', ')}`
+      : 'no colourways have been dealt yet. Run `brandi logo colour plan` first.');
+  }
+  // The id becomes a filename. Every dealt id is a plain slug, so anything else
+  // arrived by hand-editing logo.json, and `colourway-../../x` lands the
+  // rendition somewhere nobody will look for it.
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(colourway.id)) {
+    throw new Error(`"${colourway.id}" is not a colourway id. An id is lower case letters, digits and hyphens, because it becomes a filename.`);
+  }
+  if (!approver) {
+    return {
+      ok: false,
+      reason: 'no-approver',
+      message: `Nothing was recorded. ${id} has not been approved by anybody, and a colourway is a\n`
+        + 'decision about how the brand appears, so it carries a name or it carries nothing.\n'
+        + `Run: brandi logo colour approve ${id} --approved-by "<the person's name>"`,
+    };
+  }
+
+  const { master, regions } = await masterRegions(root, state);
+  const svg = renderColourway(master, colourway, { system, regions });
+  const dir = within(root, LAYOUT.master);
+  await mkdir(dir, { recursive: true });
+  // The id reaches a filename, so it goes through the same guard every other
+  // name-from-somewhere-else does. A dealt id is always safe; a hand-edited
+  // logo.json is where a `../` would come from.
+  const file = within(root, path.join(LAYOUT.master, `colourway-${colourway.id}.svg`));
+  await writeFile(file, `${svg}\n`);
+  const relFile = path.relative(path.resolve(root), file);
+
+  colourway.approvedBy = approver;
+  colourway.approvedOn = localDate();
+  colourway.file = relFile;
+  state.colour.approved = [...new Set([...(state.colour.approved ?? []), id])];
+  await saveState(root, state);
+
+  // Only the outcome crosses into brand.json, and it crosses as the mapping
+  // rather than as the file: the file is derived from it and can be rebuilt,
+  // and the mapping is the thing that stays true when the palette moves.
+  brand.identity ??= {};
+  brand.identity.logo ??= {};
+  const record = {
+    id: colourway.id,
+    name: colourway.name,
+    ground: colourway.ground,
+    regions: colourway.regions.map(({ region, ink, role }) => ({ region, ink, role })),
+    file: relFile,
+    approvedBy: approver,
+    approvedOn: colourway.approvedOn,
+  };
+  const existing = (brand.identity.logo.colourways ?? []).filter((c) => c.id !== colourway.id);
+  brand.identity.logo.colourways = [...existing, record];
+  addDecision(brand, {
+    decision: `The ${colourway.name.toLowerCase()} colourway is approved for the mark.`,
+    rationale: `${colourway.idea} Approved by ${approver} after the silhouette was approved, and recorded as a mapping from the mark's own inks to palette roles rather than as fixed colours, so it follows the palette.`,
+    alternatives: set.filter((c) => c.id !== colourway.id).map((c) => c.name),
+  });
+  await saveBrand(brandFile, brand);
+
+  return { ok: true, id, name: colourway.name, file: relFile, approvedBy: approver, record, warnings: (colourway.audit?.findings ?? []).filter((f) => f.severity === 'error') };
+}
+
+// ---------------------------------------------------------------------------
 // status
 // ---------------------------------------------------------------------------
 
@@ -798,6 +1137,14 @@ export async function forgeStatus(root = '.') {
     : !entry.canvas ? 'logo board'
     : !entry.shortlist.length ? 'show the canvas and logo pick'
     : !state.master ? 'logo master <id> --approved-by "name"'
+    // Colour is a stage of the journey, not an afterthought, so `next` names it.
+    // It stays shut until a person has approved the silhouette, which is why it
+    // only appears here and never earlier.
+    : !state.master.approvedBy ? `logo master ${state.master.chosenFrom} --approved-by "name", before colour`
+    : !state.colour ? 'logo colour plan'
+    : !state.colour.auditedOn ? 'logo colour audit'
+    : !state.colour.canvas ? 'logo colour board'
+    : !state.colour.approved?.length ? 'show the colour canvas and logo colour approve <id> --approved-by "name"'
     : 'done';
 
   return {
@@ -814,6 +1161,9 @@ export async function forgeStatus(root = '.') {
     }, {}),
     shortlist: entry.shortlist,
     master: state.master ? { from: state.master.chosenFrom, approvedBy: state.master.approvedBy } : null,
+    colour: state.colour
+      ? { dealt: state.colour.colourways.length, audited: Boolean(state.colour.auditedOn), approved: state.colour.approved ?? [] }
+      : null,
     next,
   };
 }
@@ -873,9 +1223,21 @@ const USAGE = `brandi logo: generate, measure and choose a mark
   board    [--round N]
   pick     <id> [<id>...] [--round N]
   master   <id> [--approved-by "name"] [--round N]
+  colour   plan | audit | board | approve <id> --approved-by "name"
   status
 
 Add --json to read any result as data, and --root <dir> to work in another project.`;
+
+const COLOUR_USAGE = `brandi logo colour: the colour stage, which opens once a person has approved the silhouette
+
+  plan                                 deal the treatments from the brand's own palette
+  audit                                measure every one of them
+  board                                artboards: each treatment beside its greyscale and its 16px render
+  approve <id> --approved-by "name"    record one and write its rendition
+
+The concept round is black on white because a mark that only works once it is coloured is a
+mark that fails on a one-colour press. Colour comes after the shape, and it never carries
+meaning the silhouette cannot carry alone.`;
 
 /** The `brandi logo` dispatcher, exported so brandi.mjs can delegate in-process. */
 export async function main(argv) {
@@ -1051,6 +1413,84 @@ export async function main(argv) {
       break;
     }
 
+    case 'colour': {
+      const sub = positional.shift();
+      // An if-chain rather than a nested switch, deliberately. `brandi logo
+      // approve` is not a command, so a switch label for it in here would read
+      // as one, both to a person skimming the file and to the docs test that
+      // collects the forge's subcommands out of this dispatcher.
+      //
+      // Every refusal exits 1 and writes nothing. A gate that returns zero is a
+      // gate a script walks straight through.
+      const refuse = (res) => {
+        if (asJson) console.log(JSON.stringify(res, null, 2));
+        else console.error(res.message);
+        process.exitCode = 1;
+      };
+
+      if (sub === 'plan') {
+        const res = await planColourStage(root);
+        if (!res.ok) return refuse(res);
+        say(res, [
+          `Dealt ${res.colourways.length} colourway${res.colourways.length === 1 ? '' : 's'} from the palette, for a mark drawn in ${res.regions.length === 1 ? 'one ink' : `${res.regions.length} inks`}.`,
+          '',
+          ...res.colourways.map((c) => `  ${c.id.padEnd(18)} ${c.name}\n${' '.repeat(20)}${c.regions.map((r) => `${r.region} -> ${r.role}`).join(', ')} on ${c.ground}`),
+          '',
+          ...res.notes.map((n) => `${n}\n`),
+          'Every treatment is a mapping from an ink the mark was drawn in to a role in the palette.',
+          'No colourway holds a colour of its own, so the mark follows the palette rather than',
+          'freezing a copy of it.',
+          '',
+          'Next: logo colour audit',
+        ].filter(Boolean).join('\n'));
+      } else if (sub === 'audit') {
+        const res = await auditColourStage(root);
+        if (!res.ok) return refuse(res);
+        const lines = [`${res.colourways.length} colourways${res.rendered ? '' : ' (no browser, so the one-colour test did not run)'}.`, ''];
+        for (const c of res.colourways) {
+          lines.push(`  ${c.id.padEnd(18)} ${c.verdict}  ${c.paints} colour${c.paints === 1 ? '' : 's'}`);
+          for (const f of c.findings.filter((x) => x.severity === 'error')) lines.push(`${' '.repeat(21)}${f.message}`);
+        }
+        if (res.findings.length) {
+          lines.push('', 'Against the set:');
+          for (const f of res.findings) lines.push(`  ${f.message}`);
+        }
+        lines.push('', 'Next: logo colour board');
+        say(res, lines.join('\n'));
+      } else if (sub === 'board') {
+        const res = await buildColourBoards(root);
+        if (!res.ok) return refuse(res);
+        say(res, [
+          `Wrote ${res.boards.length} artboards to ${path.relative(path.resolve(root), res.dir)}/`,
+          ...res.boards.map((b) => `  ${b.file}  ${b.w}x${b.h}`),
+          '',
+          'Every colourway is beside its own greyscale and its own 16 pixel render, because that is',
+          'where you see whether the silhouette is still carrying the mark.',
+          '',
+          'Validate, seed and publish it, then show the link and ask which treatment to approve.',
+        ].join('\n'));
+      } else if (sub === 'approve') {
+        const id = positional.shift();
+        if (!id) throw new Error('colour approve needs a colourway id');
+        const res = await approveColourway(root, id, {
+          approvedBy: flags.get('approved-by') === true ? null : (flags.get('approved-by') ?? null),
+        });
+        if (!res.ok) return refuse(res);
+        say(res, [
+          `${res.name} is approved by ${res.approvedBy}.`,
+          `  ${res.file}`,
+          ...res.warnings.map((f) => `\nThe audit reported this and it is still recorded, because approving it is your call:\n  ${f.message}`),
+          '',
+          'Written into brand/brand.json as identity.logo.colourways, as the mapping rather than as',
+          'colours, so it follows the palette. `brandi assets` derives the rendition from it.',
+        ].join('\n'));
+      } else {
+        console.log(COLOUR_USAGE);
+        if (sub) process.exitCode = 1;
+      }
+      break;
+    }
+
     case 'status': {
       const res = await forgeStatus(root);
       if (!res.started) {
@@ -1062,6 +1502,9 @@ export async function main(argv) {
         Object.entries(res.verdicts).map(([k, v]) => `  ${v} ${k}`).join('\n'),
         res.shortlist.length ? `Shortlist: ${res.shortlist.join(', ')}` : 'Nothing shortlisted yet.',
         res.master ? `Master: ${res.master.from}, approved by ${res.master.approvedBy ?? 'NOBODY YET'}` : 'No master yet.',
+        res.colour
+          ? `Colour: ${res.colour.dealt} treatments dealt${res.colour.audited ? ', measured' : ', not measured'}${res.colour.approved.length ? `, approved: ${res.colour.approved.join(', ')}` : ', none approved'}`
+          : 'Colour: not started. It opens once a person has approved the silhouette.',
         `Next: ${res.next}`,
       ].filter(Boolean).join('\n'));
       break;
@@ -1100,6 +1543,11 @@ export default {
   bannedFaceWarning,
   buildLockup,
   promoteToMaster,
+  colourGate,
+  planColourStage,
+  auditColourStage,
+  buildColourBoards,
+  approveColourway,
   writeIntoBrand,
   writeRights,
   forgeStatus,

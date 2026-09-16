@@ -32,6 +32,8 @@ import { pathToFileURL } from 'node:url';
 
 import { artboard, FRAMES } from './canvas.mjs';
 import { monochromeSvg } from './assets.mjs';
+import { greyscaleSvg, greyOf, groundsOf } from './logocolour.mjs';
+import { relativeLuminance } from './color.mjs';
 import { inkBounds, viewBox, parseXml, walk } from './svg.mjs';
 import { findChrome } from './preview.mjs';
 
@@ -150,6 +152,9 @@ const boardCss = () => `
   table { border-collapse: collapse; width: 100%; font-size: 12px; }
   th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid #E4E4E4; vertical-align: top; }
   th { font-weight: 600; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: #6B6B6B; }
+  /* A table with no caption reaches a screen reader as an unnamed grid of
+     cells, so every table these boards emit carries one. */
+  caption { text-align: left; font-size: 13px; color: #3A3A3A; padding: 0 0 10px; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 `;
 
@@ -427,6 +432,206 @@ export function conceptRoundBoards({ plan, candidates, audits = [], brandName = 
   ];
 }
 
+
+// ---------------------------------------------------------------------------
+// The colour stage
+// ---------------------------------------------------------------------------
+
+/**
+ * The colourway boards.
+ *
+ * Same chrome as the concept boards, and for the same reason: a presentation
+ * styled in one of the things being presented puts a thumb on the scale. The
+ * only difference is that here the artwork carries colour and the chrome still
+ * does not.
+ *
+ * Every treatment appears three times in one row: on its own ground, in
+ * greyscale, and at sixteen pixels. That layout IS the rule. If the middle cell
+ * stops looking like the mark, the colourway was carrying something the
+ * silhouette cannot carry, and nobody has to be told that in words.
+ */
+const VERDICT_COLOUR = {
+  usable: 'v-contender',
+  'usable-with-notes': 'v-notes',
+  unverified: 'v-notes',
+  rejected: 'v-rejected',
+};
+
+const VERDICT_COLOUR_LABEL = {
+  usable: 'clears every test',
+  'usable-with-notes': 'clears, with notes',
+  unverified: 'not measured, no browser',
+  rejected: 'ruled out',
+};
+
+/** One treatment, drawn on its ground. */
+const onGroundCell = (c, box, groundHex, prefix, label) =>
+  `<div style="background:${groundHex};min-height:${box + 56}px;display:flex;align-items:center;justify-content:center;padding:28px;border:1px solid #E4E4E4;">${boxed(c.svg, { prefix, box, label })}</div>`;
+
+/** The index: what the set is, and the rule it is here to make visible. */
+export function colourIndexBoard({ colourways, regions, brandName, notes, masterApprovedBy, audits }) {
+  const counted = (v) => audits.filter((a) => a?.verdict === v).length;
+  const body = `<div class="board">
+${head(`${brandName} / colour`, 'Colour, after the silhouette',
+  'The concept round was black on white because a mark rescued by a good palette is a decision you find out about eighteen months later, on a one-colour press. The shape is approved. This is the stage where colour joins it, and nothing here may carry meaning the silhouette cannot carry alone.')}
+  <p class="lede"><b>The mark was approved by ${esc(masterApprovedBy ?? 'nobody yet')}.</b> It is drawn in ${regions.length === 1 ? 'one ink' : `${regions.length} inks`}${regions.length ? `: ${regions.map((r) => `${r.id} (${r.ink})`).join(', ')}` : ''}. Every treatment below maps those inks to roles in this brand's palette. None of them holds a colour of its own, so all of them move when the palette moves.</p>
+  <div class="rule"></div>
+  <div class="grid" style="grid-template-columns: repeat(2, 1fr);">
+${colourways.map((c) => {
+  const a = audits.find((x) => x?.id === c.id);
+  return `    <div class="cell">
+      <span class="cell__id">${esc(c.id)}</span>
+      <h2>${esc(c.name)}</h2>
+      <p class="cell__meta">${esc(c.idea)}</p>
+      <p class="cell__meta"><b>${esc(c.regions.map((r) => `${r.region} to ${r.role}`).join(', '))}</b><br>on ${esc(c.ground)} &middot; ${esc(c.basis)}</p>
+      ${a ? `<span class="verdict ${VERDICT_COLOUR[a.verdict] ?? ''}" style="align-self:flex-start;">${esc(VERDICT_COLOUR_LABEL[a.verdict] ?? a.verdict)}</span>` : ''}
+    </div>`;
+}).join('\n')}
+  </div>
+  <div class="rule"></div>
+  <table>
+    <caption>What each board in this set is for.</caption>
+    <tr><th>Board</th><th>What it is for</th></tr>
+    <tr><td><b>Colourways</b></td><td>Each treatment on its ground, beside its own greyscale and its own 16 pixel render. The one board that settles this stage.</td></tr>
+    <tr><td><b>Grounds</b></td><td>Every treatment on every ground this brand actually uses, with the contrast of each.</td></tr>
+    <tr><td><b>Audit</b></td><td>The paint ceilings, the one-colour test and colour vision, run before anybody said what they liked.</td></tr>
+  </table>
+${notes.length ? `  <div class="rule"></div>\n${notes.map((n) => `  <p class="lede">${esc(n)}</p>`).join('\n')}` : ''}
+  <div class="rule"></div>
+  <p class="lede"><b>${counted('usable')} clear every test, ${counted('usable-with-notes')} clear with notes, and ${counted('rejected')} ${counted('rejected') === 1 ? 'is' : 'are'} ruled out.</b> A treatment is ruled out on arithmetic, never on taste, and a person still picks which of the survivors the brand uses.</p>
+</div>`;
+
+  return { height: 900, source: artboard({ name: 'Main', body, css: boardCss(), fonts: BOARD_FONTS, systemNote: `Colourway set, ${GENERATED} palette and the approved master.\nDo not hand-edit: replanning the colour stage regenerates it.` }) };
+}
+
+/**
+ * Colour, greyscale, sixteen pixels. In that order, in one row, every time.
+ *
+ * The greyscale is each colour reduced to its OWN grey rather than flattened to
+ * black, because that is what a photocopier and a monochrome screen do, and it
+ * is the picture that shows whether two parts of the mark stop being two parts.
+ */
+export function colourwayStripBoard({ colourways, brandName, grounds, audits, box = 190 }) {
+  const paper = grounds['neutral.paper'] ?? PAPER;
+  const body = `<div class="board">
+${head(`${brandName} / colourways`, 'Each treatment, its greyscale and its favicon',
+  'Left is the treatment on the ground it is for. Middle is the same file with every colour reduced to its own grey, which is what a photocopier and a black and white printer make of it. Right is sixteen pixels, which is what a browser tab makes of it. If the mark stops being the mark as you move right, the colour was doing work the shape should have been doing.')}
+  <div style="display:grid;grid-template-columns:150px repeat(3,minmax(0,1fr)) 190px;gap:0 10px;margin-bottom:10px;">
+    <span></span><span class="label cell__id">On its ground</span><span class="label cell__id">Greyscale</span><span class="label cell__id">One ink</span><span class="label cell__id">16, 32 and 64 pixels</span>
+  </div>
+${colourways.map((c) => {
+  const a = audits.find((x) => x?.id === c.id);
+  const ground = grounds[c.ground] ?? paper;
+  return `  <div style="display:grid;grid-template-columns:150px repeat(3,minmax(0,1fr)) 190px;gap:0 10px;align-items:stretch;margin-bottom:10px;">
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:6px;padding-right:12px;">
+      <b style="font-size:14px;">${esc(c.name)}</b>
+      <span class="cell__id">${esc(c.id)}</span>
+      ${a ? `<span class="verdict ${VERDICT_COLOUR[a.verdict] ?? ''}" style="align-self:flex-start;">${esc(VERDICT_COLOUR_LABEL[a.verdict] ?? a.verdict)}</span>` : ''}
+    </div>
+    ${onGroundCell(c, box, ground, `cw-${c.id}`, `${c.name}`)}
+    <div style="background:${greyOf(ground)};min-height:${box + 56}px;display:flex;align-items:center;justify-content:center;padding:28px;border:1px solid #E4E4E4;">${boxed(greyscaleSvg(c.svg), { prefix: `cg-${c.id}`, box, label: `${c.name}, greyscale` })}</div>
+    <div style="background:${greyOf(ground) === '#FFFFFF' || relativeLuminance(greyOf(ground)) > 0.3 ? PAPER : INK};min-height:${box + 56}px;display:flex;align-items:center;justify-content:center;padding:28px;border:1px solid #E4E4E4;">${boxed(c.svg, { prefix: `ck-${c.id}`, colour: relativeLuminance(greyOf(ground)) > 0.3 ? INK : '#FFFFFF', box, label: `${c.name}, one ink` })}</div>
+    <div style="display:flex;align-items:center;gap:14px;background:${ground};padding:0 16px;border:1px solid #E4E4E4;">
+${[16, 32, 64].map((px) => `      <span style="flex:none;width:${px}px;height:${px}px;display:block;">${boxed(c.svg, { prefix: `c${px}-${c.id}`, box: px, label: '' })}</span>`).join('\n')}
+    </div>
+  </div>`;
+}).join('\n')}
+  <p class="lede" style="margin-top:24px;">The one-ink column is not the same picture as the greyscale one. Greyscale keeps each colour's lightness; one ink throws it away, which is what etching, foil, embroidery and a rubber stamp do. A mark that survives the middle column and not the third one has a problem the colourway cannot fix.</p>
+</div>`;
+
+  return { height: 420 + colourways.length * (box + 70), source: artboard({ name: 'Colourways', body, css: boardCss(), fonts: BOARD_FONTS, systemNote: `Colourway proofs, ${GENERATED} palette.\nEvery mark is the same geometry; only the paint differs. The 16px cells are at real size: do not scale this artboard when reading it.` }) };
+}
+
+/** Every treatment on every ground the brand uses, with the contrast of each. */
+export function colourGroundsBoard({ colourways, brandName, grounds, audits, box = 110 }) {
+  const list = Object.entries(grounds);
+  const body = `<div class="board">
+${head(`${brandName} / grounds`, 'On everything it will sit on',
+  'A treatment is approved for the ground it was drawn for, and the others are shown so the gap is visible rather than discovered. The number under each is the WCAG contrast of the mark against that ground. Three to one is the floor for a graphic; under it the mark disappears in bright light and under a photocopier.')}
+  <div style="display:grid;grid-template-columns:170px repeat(${list.length},minmax(0,1fr));gap:0 8px;margin-bottom:8px;">
+    <span></span>${list.map(([role, hex]) => `<span class="label cell__id">${esc(role)} ${esc(hex)}</span>`).join('')}
+  </div>
+${colourways.map((c) => {
+  const a = audits.find((x) => x?.id === c.id);
+  return `  <div style="display:grid;grid-template-columns:170px repeat(${list.length},minmax(0,1fr));gap:0 8px;align-items:stretch;margin-bottom:8px;">
+    <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding-right:12px;"><b style="font-size:13px;">${esc(c.name)}</b><span class="cell__id">${esc(c.id)}</span></div>
+${list.map(([role, hex]) => {
+    const rows = (a?.contrast ?? []).filter((r) => r.ground === role);
+    const worst = rows.length ? rows.reduce((lo, r) => (r.ratio < lo.ratio ? r : lo)) : null;
+    const own = c.ground === role;
+    return `    <div style="background:${hex};border:${own ? '2px solid #111111' : '1px solid #E4E4E4'};padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+      ${boxed(c.svg, { prefix: `g-${c.id}-${role.replace(/\W/g, '')}`, box, label: `${c.name} on ${role}` })}
+      <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:${relativeLuminance(hex) > 0.4 ? '#3A3A3A' : '#E4E4E4'};">${worst ? `${worst.ratio.toFixed(2)}:1${worst.ratio < 3 ? ' too low' : ''}` : ''}${own ? ' &middot; its own ground' : ''}</span>
+    </div>`;
+  }).join('\n')}
+  </div>`;
+}).join('\n')}
+  <p class="lede" style="margin-top:24px;">The bordered cell is the ground the treatment is for. Where a mark is shown on a ground it was not drawn for, the number says what happens, and the answer is usually to use the treatment that was drawn for it rather than to adjust this one.</p>
+</div>`;
+
+  return { height: 400 + colourways.length * (box + 80), source: artboard({ name: 'Grounds', body, css: boardCss(), fonts: BOARD_FONTS, systemNote: `Grounds and contrast, ${GENERATED} palette.\nEvery contrast figure is computed, not typed.` }) };
+}
+
+/** What the arithmetic found, including how each treatment reads under CVD. */
+export function colourAuditBoard({ colourways, brandName, audits, coverage, setFindings }) {
+  const rowFor = (c) => {
+    const a = audits.find((x) => x?.id === c.id);
+    if (!a) return '';
+    const errors = a.findings.filter((f) => f.severity === 'error');
+    const deferred = a.contexts.filter((r) => r.status === 'deferred');
+    return `    <tr>
+      <td><b>${esc(c.name)}</b><br><span style="color:#6B6B6B;">${esc(c.id)}</span></td>
+      <td><span class="verdict ${VERDICT_COLOUR[a.verdict] ?? ''}">${esc(VERDICT_COLOUR_LABEL[a.verdict] ?? a.verdict)}</span></td>
+      <td>${a.paints} ${a.paints === 1 ? 'colour' : 'colours'}<br><span style="color:#6B6B6B;">${(a.inks ?? []).map(esc).join('<br>')}</span></td>
+      <td>${a.oneColour?.available ? `${a.oneColour.colourRegions} ${a.oneColour.colourRegions === 1 ? 'shape' : 'shapes'} in colour, ${a.oneColour.inkRegions} in one ink${a.oneColour.colourRegions > a.oneColour.inkRegions ? ', colour is carrying the split' : ''}` : '<span style="color:#6B6B6B;">not measured, no browser</span>'}</td>
+      <td>${(a.cvd ?? []).map((v) => `<span style="display:inline-flex;gap:3px;align-items:center;margin-right:10px;">${v.inks.map((i) => `<span style="width:14px;height:14px;display:inline-block;background:${i.as};border:1px solid #CCC;"></span>`).join('')}<span style="font-size:10px;color:#6B6B6B;">${esc(v.type.slice(0, 5))}</span></span>`).join('')}</td>
+      <td>${errors.length ? errors.map((f) => esc(f.message)).join('<br>') : '<span style="color:#6B6B6B;">nothing</span>'}</td>
+      <td><span style="color:#6B6B6B;">${deferred.length ? esc(deferred.map((r) => r.name).join(', ')) : 'none'}</span></td>
+    </tr>`;
+  };
+
+  const body = `<div class="board">
+${head(`${brandName} / colour audit`, 'What the arithmetic found',
+  'Run before anybody said which treatment they liked. The one-colour column is the test this whole stage exists for: if a treatment reads as more shapes in colour than it does in one ink, colour is carrying meaning the silhouette cannot carry, and it merges the moment the mark is etched, embroidered or faxed.')}
+  <table>
+    <caption>Every treatment, what the arithmetic found and what ruled it out.</caption>
+    <tr><th style="width:150px;">Treatment</th><th style="width:120px;">Verdict</th><th style="width:110px;">Colours</th><th style="width:210px;">One colour</th><th style="width:220px;">Colour vision</th><th>Ruled out by</th><th style="width:150px;">Handed to another treatment</th></tr>
+${colourways.map(rowFor).join('\n')}
+  </table>
+  <div class="rule"></div>
+  <table>
+    <caption>Every application context, its colour ceiling and the treatments that can serve it.</caption>
+    <tr><th>Context</th><th>Colour ceiling</th><th>Which treatments can be used for it</th></tr>
+${(coverage ?? []).map((c) => `    <tr><td><b>${esc(c.name)}</b></td><td>${c.ceiling}</td><td>${c.servedBy.length ? esc(c.servedBy.join(', ')) : '<span style="color:#8A2B14;">nothing in this set</span>'}</td></tr>`).join('\n')}
+  </table>
+${setFindings?.length ? `  <div class="rule"></div>\n${setFindings.map((f) => `  <p class="lede"><b>${esc(f.message)}</b> ${esc(f.fix ?? '')}</p>`).join('\n')}` : ''}
+  <div class="rule"></div>
+  <p class="lede"><b>Handed to another treatment</b> is not a failure. A two-colour mark cannot be foil stamped and is not defective, because the one-ink treatment is what goes to the foil house. What would be a failure is a context nothing in the set can serve, and the table above says whether there is one.</p>
+  <p class="lede">The colour vision swatches are the treatment's own colours as they are seen under protanopia, deuteranopia and tritanopia. Two swatches in a row that look the same are two parts of the mark that look the same to roughly one man in twelve.</p>
+</div>`;
+
+  return { height: 620 + colourways.length * 96 + (coverage?.length ?? 0) * 40, source: artboard({ name: 'Audit', body, css: boardCss(), fonts: BOARD_FONTS, systemNote: `Colour audit, ${GENERATED} palette and the rendered measurements.\nDo not hand-edit: rerunning the audit regenerates it.` }) };
+}
+
+/** The colour stage as a canvas, in the shape `canvasManifest` wants. */
+export function colourwayBoards({ colourways, regions, system, notes = [], brandName = 'Brand', masterApprovedBy = null, coverage = [], setFindings = [] }) {
+  if (!colourways.length) throw new TypeError('the colour stage needs at least one colourway');
+  const audits = colourways.map((c) => c.audit ?? null);
+  const grounds = Object.fromEntries(groundsOf(system).map((g) => [g.role, g.hex]));
+
+  const index = colourIndexBoard({ colourways, regions, brandName, notes, masterApprovedBy, audits });
+  const strip = colourwayStripBoard({ colourways, brandName, grounds, audits });
+  const ground = colourGroundsBoard({ colourways, brandName, grounds, audits });
+  const audit = colourAuditBoard({ colourways, brandName, audits, coverage, setFindings });
+
+  return [
+    { file: 'Main.dc.html', source: index.source, w: 1200, h: index.height },
+    { file: 'Colourways.dc.html', source: strip.source, w: FRAMES.desktopTall.w, h: strip.height },
+    { file: 'Grounds.dc.html', source: ground.source, w: 1200, h: ground.height },
+    { file: 'Audit.dc.html', source: audit.source, w: 1600, h: audit.height },
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Frames
 // ---------------------------------------------------------------------------
@@ -510,5 +715,10 @@ export default {
   reverseBoard,
   auditBoard,
   conceptRoundBoards,
+  colourIndexBoard,
+  colourwayStripBoard,
+  colourGroundsBoard,
+  colourAuditBoard,
+  colourwayBoards,
   fitFrames,
 };

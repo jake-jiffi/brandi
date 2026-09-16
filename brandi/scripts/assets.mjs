@@ -242,6 +242,11 @@ export async function buildAssetPack({
   // is supplied it is used for the two favicon sizes and nothing else, and the
   // pack says which one it used so nobody has to guess by looking.
   faviconSvg = null,
+  // The colourways somebody approved, already resolved into artwork by the
+  // caller, which is the only place that can resolve them: a colourway is a
+  // mapping from the mark's inks to palette roles, and this function sees the
+  // artwork rather than the mapping. Each is `{ id, name, why, svg }`.
+  colourways = [],
 } = {}) {
   const written = [];
   const skipped = [];
@@ -263,6 +268,10 @@ export async function buildAssetPack({
     ['white', reversedSvg(svg), 'Reversed out of anything dark. Check the counters at small sizes.'],
     ['brand', monochromeSvg(svg, brandHex), 'One colour, the brand one, for a single-colour print on the brand ground.'],
     ['on-brand', monochromeSvg(svg, onBrand), `For sitting on ${brandHex}, which needs ${onBrand === '#FFFFFF' ? 'white' : 'black'}.`],
+    // The approved colourways, after the five. They are LAST deliberately: the
+    // five above are derived from the drawing alone and exist for every brand,
+    // and a colourway exists only because a person approved one.
+    ...colourways.map((c) => [`colourway-${c.id}`, c.svg, c.why]),
   ];
   for (const [name, source, why] of variants) {
     const file = path.join(outDir, 'svg', `${name}.svg`);

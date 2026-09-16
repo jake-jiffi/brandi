@@ -73,7 +73,7 @@ brand/
   system.json          the resolved system: every ramp, every token, audited
   brand-book.html      the brand guidelines as a 1920x1080 deck that wears the brand: eight
                        chapters (framework and voice, logo, colour, typography, assets, system,
-                       brand in use, rules and decisions), 53 pages for the worked example
+                       brand in use, rules and decisions), 54 pages for the worked example
   brand-book.pdf       the same, one PDF page per deck page, through headless Chrome
                        (`brandi book --print` writes the earlier A4 print book instead).
                        The deck is a desktop and print document: on a phone the pages
@@ -222,7 +222,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-1738 tests. They include property tests over the colour and type engines against hundreds of random
+1806 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

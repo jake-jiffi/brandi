@@ -17,6 +17,7 @@ import { BANNED_FONTS, FRAMES } from '../scripts/canvas.mjs';
 import { loadContract } from '../scripts/slop.mjs';
 import { emitGuardianSkill } from '../scripts/guardian.mjs';
 import { RASTER_SIZES, MASKABLE_SAFE_RATIO } from '../scripts/assets.mjs';
+import { renderBrandDeck } from '../scripts/branddeck.mjs';
 
 const ROOT = path.join(import.meta.dirname, '..');
 const run = promisify(execFile);
@@ -583,15 +584,20 @@ describe('the README states numbers that are true', () => {
   // `test(` call site, so adding one trips this and forces whoever added it to
   // re-run the suite and refresh all three numbers. A test added inside an
   // existing loop is the one case that slips through.
-  const SUITE_TESTS = 1738;
-  const STATIC_TEST_CALLS = 1444;
-  // `brandi book` on tests/fixtures/muddy-paws.json, which is the brand the
-  // README calls the worked example.
-  const WORKED_EXAMPLE_PAGES = 53;
+  const SUITE_TESTS = 1806;
+  const STATIC_TEST_CALLS = 1512;
   let readme;
+  // The worked example the README counts pages for: the deck `brandi book`
+  // builds from tests/fixtures/muddy-paws.json. It is built here rather than
+  // written down, because a number held against a second copy of itself agrees
+  // with that copy and with nothing anybody shipped.
+  let workedExamplePages;
 
   before(async () => {
     readme = await readFile(path.join(ROOT, '..', 'README.md'), 'utf8');
+    const brand = JSON.parse(await readFile(path.join(ROOT, 'tests', 'fixtures', 'muddy-paws.json'), 'utf8'));
+    const { html } = renderBrandDeck({ brand, system: buildSystem(systemInputFromBrand(brand)) });
+    workedExamplePages = (html.match(/<section class="page(?: divider)?" id="/g) ?? []).length;
   });
 
   test('the test count in the README is the count this suite reports', () => {
@@ -620,7 +626,12 @@ describe('the README states numbers that are true', () => {
   test('the deck page count in the README is the deck the fixture builds', () => {
     const m = /(\d+) pages for the worked example/.exec(readme);
     assert.ok(m, 'the README no longer states a page count for the worked example');
-    assert.equal(Number(m[1]), WORKED_EXAMPLE_PAGES);
+    assert.ok(workedExamplePages > 0, 'the fixture deck built no pages');
+    assert.equal(
+      Number(m[1]), workedExamplePages,
+      'the README and the deck the fixture actually builds disagree. Run `brandi book` on '
+      + 'tests/fixtures/muddy-paws.json and put its page count in the README.',
+    );
   });
 
   test('the README admits Codex without promising it the canvas', () => {

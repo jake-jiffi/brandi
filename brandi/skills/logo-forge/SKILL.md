@@ -47,6 +47,7 @@ anything you hand to another agent.
 "$A" logo pick     A2 C1 D3
 "$A" logo refine                            # four tasks per shortlisted direction
 "$A" logo master   C1p --approved-by "Jake"
+"$A" logo colour   plan | audit | board | approve <id> --approved-by "Jake"
 "$A" logo status
 ```
 
@@ -64,8 +65,8 @@ neither it asks once and gets on with it.
 
 ## The journey
 
-Seven steps. Two of them stop for the user. Everything else runs on its own, and the whole thing is
-about eight minutes of waiting.
+Eight steps. Three of them stop for the user. Everything else runs on its own, and the concept
+round is about eight minutes of waiting.
 
 ### 1. The brief (one question at most)
 
@@ -229,6 +230,47 @@ the generation manifest and the search record.
 **`--approved-by` is not optional in spirit.** Without it the record says nobody approved it, and it
 should stay that way until somebody actually did.
 
+### 8. Colour (STOP HERE, at the end)
+
+Colour is a stage of this journey and it is the last one. It does not open until a person has
+approved the silhouette and the brand's palette has resolved, and `logo colour` refuses to run
+until both are true rather than explaining that they should be.
+
+```bash
+"$A" logo colour plan
+"$A" logo colour audit
+"$A" logo colour board
+```
+
+`plan` deals four to six treatments from the brand's own palette: the mark in the brand colour on
+paper, reversed out of the brand ground, in ink on that ground, and in one ink for press, plus a
+two-colour treatment for each boundary the mark actually contains. A treatment is recorded as a
+mapping from an ink the mark was drawn in to a role in the palette, never as a colour. Change the
+palette and every treatment follows.
+
+A mark drawn in one ink has one region. The plan says so and deals only what a one-region mark can
+take. Nobody invents a boundary so the set can reach six.
+
+`audit` measures the paint count against each application context ceiling, the contrast of every
+colour against every ground the brand uses, how each treatment reads under protanopia, deuteranopia
+and tritanopia, and the one-colour test: the mark is rendered in its colourway and again with every
+ink collapsed to one, and if it reads as more separate shapes in colour than in ink, colour is
+carrying a split the shape is not. That treatment is ruled out and the finding names the regions.
+
+`board` writes four artboards. Publish them the same way as the concept round. On the Colourways
+board every treatment sits beside its own greyscale and its own 16 pixel render, in that order,
+because that is where a person sees whether the silhouette is still carrying the mark.
+
+Show the link, then record the choice:
+
+```bash
+"$A" logo colour approve brand-on-paper --approved-by "<the person's name>"
+```
+
+Without `--approved-by` nothing is recorded, exactly as with `master`. The approved treatment goes
+into `brand.json` as `identity.logo.colourways`, `brandi assets` derives its rendition alongside the
+five it already writes, and the brand book gains a colourway page.
+
 Hand off to `brandi assets` for the raster pack, the favicon and the manifest, which derives all of
 it from the master.
 
@@ -237,8 +279,14 @@ it from the master.
 **A person picks.** Never adopt a generated mark because the audit liked it. The audit rules things
 out; it never rules anything in.
 
-**Black first.** Colour is not applied in a concept round. If someone asks to see it in colour, say
-that colour comes after the silhouette is right, and that it takes ten seconds once it is.
+**Black first, and the tool enforces it.** You have to love the mark as a silhouette before colour
+enters. The concept round is black on white because a silhouette that only works in colour is a mark
+that fails on a one-colour press, and you find that out eighteen months later on an invoice, a stamp
+and a shirt. Colour is a stage, and it comes after a person has approved the shape. A colourway
+never carries meaning the silhouette cannot carry alone, and the audit rules out any that does.
+
+If someone asks to see it in colour during the concept round, say that colour is step 8, that it is
+gated on an approved mark and a resolved palette, and that it takes about a minute once both exist.
 
 **Say what the mark is.** In the book, in the manifest, out loud: a generated mark is a starting
 point a person approved. It has not been searched, it has not been cleared, and an AI-assisted mark

@@ -17,7 +17,7 @@
  *   brandi canvas --dir <dir> --title "Acme brand" --out acme-brand.html
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf] [--print]     the brand book: a 16:9 deck, or the A4 print book with --print
- *   brandi logo <plan|refine|wordmark|lockup|import|audit|board|pick|master|status>
+ *   brandi logo <plan|refine|wordmark|lockup|import|audit|board|pick|master|colour|status>
  *   brandi images <dir> [--check]      measure supplied photography before planning
  *   brandi mockup grid <photo>         read a surface's corners off a real photograph
  *   brandi mockup build                composite the brand onto the recorded surfaces
@@ -55,6 +55,7 @@ import { renderBrandBook, renderBrandDeck, pdfChromeArgs } from './brandbook.mjs
 import { toPreviewHtml, screenshot, findChrome, runChrome } from './preview.mjs';
 import { emitGuardianSkill, checkFiles, checkPromises, linkForCodex, GENERATED_MARKER } from './guardian.mjs';
 import { buildAssetPack } from './assets.mjs';
+import { regionsOf, resolveColourway, renderColourway } from './logocolour.mjs';
 import { buildHandoff } from './handoff.mjs';
 import { catalogueImages, summarise } from './images.mjs';
 import { gridPage, mockupBody, validateCorners } from './mockup.mjs';
@@ -1095,6 +1096,74 @@ async function loadLogoAssets(brand, brandDir) {
 }
 
 /**
+ * The approved colourways, turned into artwork for one master.
+ *
+ * A colourway is a mapping from the inks the mark was drawn in to roles in the
+ * palette, so it can only be applied to a drawing that still carries those
+ * inks. A master that does not is skipped with the reason said out loud, rather
+ * than being given a rendition that is half the colourway and half whatever it
+ * was drawn in.
+ */
+function resolveApprovedColourways(brand, system, masterSvg, notes) {
+  const declared = (brand.identity?.logo?.colourways ?? []).filter((c) => c && c.approvedBy);
+  if (!declared.length) return [];
+  const { regions } = regionsOf(masterSvg);
+  const out = [];
+  for (const c of declared) {
+    const check = resolveColourway(c, { system, regions });
+    if (!check.ok) {
+      notes.push(`The ${c.name ?? c.id} colourway was not derived for this master: ${check.errors[0]}`);
+      continue;
+    }
+    out.push({
+      id: c.id,
+      name: c.name ?? c.id,
+      // The rendition the brand file itself points at, so it can be derived
+      // again rather than left at the colour it was approved in.
+      file: typeof c.file === 'string' ? c.file : null,
+      svg: renderColourway(masterSvg, c, { system, regions }),
+      why: `${c.name ?? c.id}, approved by ${c.approvedBy}. ${c.regions.map((r) => `${r.region ?? r.ink} in ${r.role}`).join(', ')}${c.ground ? `, drawn for ${c.ground}` : ''}. Derived from the mapping, so it follows the palette: never hand-edit it.`,
+    });
+  }
+  return out;
+}
+
+/**
+ * Redraw the rendition `brand.json` names for each approved colourway.
+ *
+ * A colourway is a mapping to palette roles and the artwork is derived from it,
+ * so the file the record points at has to be derived again every time this
+ * command runs. Without this it keeps the colour the palette held on the day it
+ * was approved: the guardian then reports the recorded mark as off-palette and
+ * the remedy it prints is this command, which is the one place the design's own
+ * promise used to leak.
+ *
+ * Only a file already on disk is rewritten. This refreshes the rendition the
+ * brand file points at; it does not decide where one should live, and it does
+ * not put artwork somewhere nobody asked for it.
+ */
+async function refreshRecordedColourways(colourways, brandDir, done) {
+  const projectRoot = path.resolve(brandDir, '..');
+  const written = [];
+  for (const c of colourways) {
+    if (!c.file || path.isAbsolute(c.file) || done.has(c.file)) continue;
+    // This writes over a file the brand file names, so it writes over exactly
+    // the one shape `logo colour approve` writes and nothing else. A hand-edited
+    // brand.json pointing a colourway's `file` at the master would otherwise
+    // have this command paint the master in the colourway and lose the drawing.
+    if (path.basename(c.file) !== `colourway-${c.id}.svg`) continue;
+    // The same two spellings the guardian and `loadLogoAssets` both accept: a
+    // brand file records paths relative to the project or to itself.
+    const full = [path.resolve(projectRoot, c.file), path.resolve(brandDir, c.file)].find((p2) => existsSync(p2));
+    if (!full || !/\.svg$/i.test(full) || !await reallyInside(full, projectRoot)) continue;
+    await writeFile(full, `${c.svg}\n`);
+    done.add(c.file);
+    written.push(path.relative(process.cwd(), full));
+  }
+  return written;
+}
+
+/**
  * Produce the asset pack from the brand's own master SVG.
  *
  * The one thing this refuses to do is invent a mark. If there is no SVG on
@@ -1158,23 +1227,35 @@ async function cmdAssets(flags) {
   const baseOut = path.resolve(flags.out ?? path.join(brandDir, 'assets'));
   const rel = (f) => path.relative(process.cwd(), f);
   const packs = [];
+  const colourwayNotes = [];
+  // A colourway record names one file, so it is a rendition of one master. The
+  // first master that can carry the mapping owns it, which in the one case the
+  // forge produces is the master it was approved against.
+  const refreshed = [];
+  const refreshedPaths = new Set();
   for (const [role, entry] of masters) {
     const outDir = masters.length > 1 ? path.join(baseOut, role) : baseOut;
+    const masterSvg = assets[entry.path].markup;
+    const colourways = resolveApprovedColourways(brand, system, masterSvg, colourwayNotes);
     const result = await buildAssetPack({
-      masterSvg: assets[entry.path].markup,
+      masterSvg,
       outDir,
       system,
       brandName: brand.meta?.name ?? 'Brand',
       // Only the primary gets the simplified favicon: a stacked lockup has no
       // business being the browser tab icon.
       faviconSvg: role === 'primary' ? faviconSvg : null,
+      colourways,
     });
     packs.push({ role, master: entry.path, outDir, ...result });
+    refreshed.push(...await refreshRecordedColourways(colourways, brandDir, refreshedPaths));
   }
 
   const total = packs.reduce((n, p2) => n + p2.written.length, 0);
   const lines = [`Built ${plural(total, 'file')} from ${plural(packs.length, 'master')}.`];
   if (faviconSvg) lines.push(`The favicon uses ${faviconEntry.path}, which is the drawing that survives at 16px.`);
+  if (refreshed.length) lines.push(`Redrew ${plural(refreshed.length, 'recorded colourway rendition')} from the mapping, so ${refreshed.length === 1 ? 'it follows' : 'they follow'} the palette: ${refreshed.join(', ')}.`);
+  for (const note of [...new Set(colourwayNotes)]) lines.push(note);
   for (const p2 of packs) {
     lines.push('', `${p2.role}  <-  ${p2.master}  ->  ${rel(p2.outDir)}`);
     for (const w of p2.written) lines.push(`  ${w.kind.padEnd(5)} ${path.basename(w.file).padEnd(26)} ${w.why}`);
@@ -1182,7 +1263,7 @@ async function cmdAssets(flags) {
   }
   lines.push('', 'Record the favicon path in identity.logo.favicon so the book and the promises check can see it.');
   const ok = packs.every((p2) => p2.ok);
-  emit(lines.join('\n'), { ok, packs: packs.map((p2) => ({ ...p2, outDir: rel(p2.outDir), written: p2.written.map((w) => ({ ...w, file: rel(w.file) })) })) });
+  emit(lines.join('\n'), { ok, refreshed, packs: packs.map((p2) => ({ ...p2, outDir: rel(p2.outDir), written: p2.written.map((w) => ({ ...w, file: rel(w.file) })) })) });
   if (!ok) process.exitCode = 1;
 }
 

@@ -16,6 +16,7 @@ import { resolveToken } from './system.mjs';
 import { contrastRatio, wcagCheck, apcaContrast, bestTextOn, simulateCvd, parseHex } from './color.mjs';
 import { googleFontsUrl, parseRatio, primaryButtonLabel, iconPrimitives } from './artboards.mjs';
 import { PROVENANCE, localDate } from './brandfile.mjs';
+import { regionsOf, resolveColourway, renderColourway, greyscaleSvg, greyOf, colourRoles } from './logocolour.mjs';
 
 export const PAGE_W = 1920;
 export const PAGE_H = 1080;
@@ -411,6 +412,63 @@ function logoContext(brand, assets, tokens) {
       : 'No logo file recorded, so the wordmark below is the name typeset in the display face. It is a real identity as long as the tracking is a decision, and everything on the following pages still applies once a drawn mark arrives.',
     tokens,
   };
+}
+
+
+/**
+ * The approved colourways, drawn from the mapping rather than read off disk.
+ *
+ * The mapping is the record and the artwork is derived from it, so the deck
+ * paints the mark itself: it cannot go stale against the palette, and it works
+ * on a machine that has the brand file and the master and nothing else.
+ *
+ * Anything that will not resolve is reported rather than skipped. A colourway
+ * naming a role the palette dropped is exactly the contradiction the book is
+ * supposed to surface, not hide.
+ */
+function colourwayContext(brand, ctxLogo, system) {
+  const declared = (brand.identity?.logo?.colourways ?? []).filter(Boolean);
+  const approved = declared.filter((c) => c.approvedBy);
+  const roles = colourRoles(system);
+  const ground = (role) => roles.get(role) ?? null;
+
+  if (!approved.length || !ctxLogo.file || ctxLogo.kind !== 'svg') {
+    return {
+      approved: [],
+      declared: declared.length,
+      unapproved: declared.length - approved.length,
+      why: !ctxLogo.file || ctxLogo.kind !== 'svg'
+        ? 'there is no vector master to paint, so no colourway can be drawn'
+        : declared.length
+          ? `${declared.length - approved.length} colourway${declared.length - approved.length === 1 ? ' has' : 's have'} been dealt and nobody has approved one`
+          : 'no colourway has been approved',
+    };
+  }
+
+  const { regions } = regionsOf(ctxLogo.markup);
+  const out = [];
+  const problems = [];
+  for (const c of approved) {
+    const check = resolveColourway(c, { system, regions });
+    if (!check.ok) { problems.push(check.errors[0]); continue; }
+    const markup = renderColourway(ctxLogo.markup, c, { system, regions });
+    const groundHex = ground(c.ground);
+    out.push({
+      id: c.id,
+      name: c.name ?? c.id,
+      approvedBy: c.approvedBy,
+      ground: c.ground,
+      groundHex,
+      // The greyscale proof has to sit on the greyscale of its OWN ground, the
+      // way the Colourways board does it. On the page's paper a reversed
+      // treatment, whose mark greys out to near white, renders nothing at all.
+      greyGroundHex: groundHex ? greyOf(groundHex) : null,
+      mapping: c.regions.map((r) => `${r.region ?? r.ink} in ${r.role}`).join(', '),
+      markup,
+      grey: greyscaleSvg(markup),
+    });
+  }
+  return { approved: out, declared: declared.length, unapproved: declared.length - approved.length, problems, why: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -824,6 +882,105 @@ function planPages(ctx) {
             </div>`;
           }).join('')}
         </div>`,
+      });
+    },
+  });
+  page({
+    chapter: 'logo', id: 'colourways', title: 'Colourways',
+    render: (n) => {
+      const cw = ctx.colourways;
+      const list = cw.approved;
+      const rows = list.slice(0, 3);
+      // The canvas column with its padding taken off, which is the space the
+      // logo pages either side of this one fill. The proofs are sized to it
+      // rather than to a fixed number, because one approved treatment has to
+      // carry the page as well as three do and at a fixed size it did not.
+      const BAND_W = PAGE_W - 560 - 96 - 72;
+      const BAND_H = PAGE_H - 88 - 120;
+      const NAME_W = 230;
+      const LABEL_H = 34;
+      // One treatment gets the hero arrangement: its name across the top, the
+      // mark on its own ground at the size the logo page shows it, and the two
+      // proofs stacked beside it. Three equal columns down the full height
+      // would be three tall empty panels, because a mark in a 306px column
+      // cannot grow to meet them however tall they are.
+      const single = rows.length === 1;
+      const spill = list.length > 3 ? 46 : 0;
+      // The mark is as large as its ground will hold in both directions, so a
+      // wordmark is limited by the width and a tall mark by the height.
+      const aspect = ctx.logo.aspect ?? 3;
+      // The small renders go in a strip of their own, the way the Colourways
+      // board does it, rather than one 16 pixel object alone in a full column
+      // the size of the ones beside it. They are at real size, so a wide mark
+      // takes only the sizes that fit rather than being scaled down to fit.
+      const STRIP_W = 200;
+      const SIZES = [16, 32, 64].filter((_, i, all) => {
+        const upto = all.slice(0, i + 1);
+        return upto.reduce((w, px) => w + px * aspect, 0) + 14 * i + 32 <= STRIP_W;
+      });
+      const SIZE_WORDS = ['sixteen', 'thirty-two', 'sixty-four'];
+      // The column headings are printed once above the rows, not on every row.
+      const HEAD_H = LABEL_H;
+      const rowH = Math.floor((BAND_H - spill - HEAD_H - 22 * (rows.length - 1)) / rows.length);
+      const cellW = Math.floor((BAND_W - NAME_W - STRIP_W - 14 * 3) / 2);
+      const HERO_H = BAND_H - 70;
+      const heroW = Math.floor((BAND_W - 14) * 0.7);
+      const sideW = BAND_W - 14 - heroW;
+      const boxFor = (w, h) => Math.max(24, Math.round(Math.min(h - 50, (w - 50) / aspect)));
+      const cell = (inner, bg, label, grow = 1) => `<div style="display:flex;flex-direction:column;gap:8px;flex:${grow};min-width:0;min-height:0">
+        ${label ? `<span class="label">${esc(label)}</span>` : ''}
+        <div style="background:${bg};border:1px solid var(--rule);flex:1;display:flex;align-items:center;justify-content:center;padding:24px">${inner}</div>
+      </div>`;
+      const draw = (markup, alt, box) => `<span class="mark" role="img" aria-label="${esc(alt)}" style="height:${box}px;width:${Math.round(box * aspect)}px;max-width:100%">${markup}</span>`;
+      const tiny = (c) => `<span class="mark" role="img" aria-label="${esc(`${c.name}, at sixteen pixels`)}" style="height:16px;width:${Math.round(16 * aspect)}px">${c.markup}</span>`;
+      const strip = (c) => SIZES.map((px, i) => `<span class="mark" role="img" aria-label="${esc(`${c.name}, at ${SIZE_WORDS[i]} pixels`)}" style="flex:none;height:${px}px;width:${Math.round(px * aspect)}px">${c.markup}</span>`).join('');
+      const sizeLabel = SIZES.length === 1
+        ? '16 pixels'
+        : `${SIZES.slice(0, -1).join(', ')} and ${SIZES[SIZES.length - 1]} pixels`;
+      const ROW_COLS = `${NAME_W}px repeat(2,minmax(0,1fr)) ${STRIP_W}px`;
+      const headRow = `            <div style="display:grid;grid-template-columns:${ROW_COLS};gap:0 14px;flex:none">
+              <span></span><span class="label">On its ground</span><span class="label">Greyscale</span><span class="label">${esc(sizeLabel)}</span>
+            </div>`;
+      const nameCol = (c) => `<div style="display:flex;flex-direction:column;justify-content:center;gap:6px;padding-right:16px">
+                <strong style="font-size:19px">${esc(c.name)}</strong>
+                <span style="font-size:13px;color:var(--muted);line-height:1.35">${esc(c.mapping)}${c.ground ? `<br>on ${esc(c.ground)}` : ''}</span>
+              </div>`;
+      const nameLine = (c) => `<div style="display:flex;align-items:baseline;gap:18px;flex-wrap:wrap">
+              <strong style="font-size:24px">${esc(c.name)}</strong>
+              <span style="font-size:14px;color:var(--muted)">${esc(c.mapping)}${c.ground ? `, on ${esc(c.ground)}` : ''}</span>
+            </div>`;
+      return contentPage(ctx, {
+        id: 'colourways', chapter: 'Logo', title: 'Colourways', n, centre: true,
+        rail: railText(
+          'A colourway is recorded as a mapping from the inks the mark was drawn in to roles in this palette, never as fixed colours, so every treatment moves when the palette moves.',
+          'Colour came after the silhouette was approved, and it may not carry meaning the silhouette cannot carry alone. Each treatment is shown beside its own greyscale and at sixteen pixels for exactly that reason: if the mark stops being the mark as you move right, the colour was doing the shape\'s job.',
+          list.length ? `Approved by ${esc([...new Set(list.map((c) => c.approvedBy))].join(', '))}.` : null,
+          cw.problems?.length ? `<span class="todo">[${PLACEHOLDER}: ${esc(cw.problems[0])}]</span>` : null,
+        ),
+        canvas: list.length
+          ? `<div style="display:flex;flex-direction:column;gap:22px;flex:1;min-height:0">
+${single ? '' : `${headRow}\n`}${rows.map((c) => (single
+            ? `            ${nameLine(c)}
+            <div style="display:grid;grid-template-columns:7fr 3fr;gap:0 14px;align-items:stretch;flex:1;min-height:0">
+              ${cell(draw(c.markup, c.name, boxFor(heroW, HERO_H - LABEL_H)), c.groundHex ?? 'var(--paper)', 'On its ground')}
+              <div style="min-width:0;display:flex;flex-direction:column;gap:14px">
+                ${cell(draw(c.grey, `${c.name}, greyscale`, boxFor(sideW, (HERO_H - 14) * 0.75 - LABEL_H)), c.greyGroundHex ?? 'var(--paper)', 'Greyscale', 3)}
+                ${cell(tiny(c), c.groundHex ?? 'var(--paper)', '16 pixels', 1)}
+              </div>
+            </div>`
+            : `            <div style="display:grid;grid-template-columns:${ROW_COLS};gap:0 14px;align-items:stretch;flex:1;min-height:0">
+              ${nameCol(c)}
+              ${cell(draw(c.markup, c.name, boxFor(cellW, rowH)), c.groundHex ?? 'var(--paper)', null)}
+              ${cell(draw(c.grey, `${c.name}, greyscale`, boxFor(cellW, rowH)), c.greyGroundHex ?? 'var(--paper)', null)}
+              ${cell(`<div style="display:flex;align-items:center;justify-content:center;gap:14px;width:100%">${strip(c)}</div>`, c.groundHex ?? 'var(--paper)', null)}
+            </div>`)).join('\n')}
+${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${list.length - 3} more approved ${list.length - 3 === 1 ? 'treatment is' : 'treatments are'} recorded and not drawn here: ${esc(list.slice(3).map((c) => c.name).join(', '))}. The asset pack carries every one of them.</p>` : ''}
+          </div>`
+          : `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;gap:28px;max-width:60ch">
+            <p style="font-size:26px;line-height:1.4">${todo(`an approved colourway; ${esc(cw.why)}`)}</p>
+            <p style="font-size:20px;line-height:1.5;color:var(--muted)">Until one is approved the mark is used in the variants on the previous page. Colour is a stage, not a setting: it opens once a person has approved the silhouette, and the treatments are dealt from this palette rather than chosen by eye.</p>
+            <p style="font-size:20px;line-height:1.5;color:var(--muted)">Run <span class="mono">brandi logo colour plan</span>, look at the boards, then <span class="mono">brandi logo colour approve &lt;id&gt; --approved-by "name"</span>.</p>
+          </div>`,
       });
     },
   });
@@ -1695,6 +1852,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [] }) 
     version: brand.meta?.version ?? '0.1.0',
     logo: logoContext(brand, assets, tokens),
   };
+  ctx.colourways = colourwayContext(brand, ctx.logo, system);
 
   // Plan, then number, then render. Front matter takes pages 1 to 3.
   const planned = planPages(ctx);
