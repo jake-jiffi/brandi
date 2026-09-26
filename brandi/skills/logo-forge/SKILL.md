@@ -94,6 +94,26 @@ a wall nobody reads. It writes one brief per slot to `brand/logo/brief/slots/rou
 
 Read two or three of them so you know what you are dispatching. Do not edit them.
 
+### Sparks from image models (optional, and it adds a stop)
+
+When Higgsfield is installed (`"$A" media status`), the round can start from sparks: each slot
+brief rendered by a different image model, black on white, before anybody draws. Two sources of
+variety at once: the briefs cannot converge, and no two sparks share a model's house style.
+
+```bash
+"$A" media plan --kinds ideation     # one spark slot per concept slot, models rotated from the live catalogue
+"$A" media cost && "$A" media run
+"$A" media board --kind ideation     # publish it like any board
+"$A" media pick idea-C1-1 idea-D2-2  # the ones the person thinks are worth pursuing
+```
+
+Check each spark against its own slot's refusals before the person sees the wall; image models
+sometimes draw the cliche they were told to avoid. Sparks are sketches. They are never imported,
+never audited as marks and never approved: `media approve` refuses them.
+
+A picked spark changes one thing in step 3: that slot's agent gets the spark file as well as its
+own brief, and nothing else. Skip this stop and the round runs exactly as before.
+
 ### 3. Draw (parallel agents, and this is the part that matters)
 
 Dispatch **one agent per slot**, or one agent per two slots if you want to halve the cost. Use
@@ -123,6 +143,19 @@ Every agent is told, verbatim:
 > Tens of path nodes, not hundreds. Hundreds means a traced raster and it wobbles at large sizes.
 > Return only: the path you wrote, one sentence on what the mark signals, and one sentence on what
 > it deliberately is not.
+
+For a slot with a picked spark, add, verbatim:
+
+> `<spark path>` is a raster sketch from an image model. Redraw its idea as a vector mark under
+> your brief. Do not trace it: build it on the construction grid from the craft reference. Where
+> the sketch breaks your brief, the brief wins. A redraw nobody would connect to the sketch has
+> lost the reason it was picked.
+
+Then import that slot's file on its own, with a model string naming both, so its provenance record
+carries it: `"$A" logo import brand/logo/concepts/round-01/C1.svg --model "claude-opus-5, redrawn
+from a Higgsfield spark"`. One import call gives every file in it the same string. When a redrawn concept becomes
+the master, the generation manifest lists the picked sparks with their models and job ids. They
+belong in the similarity search, because an image model can reproduce a mark that already exists.
 
 For a wordmark slot, the agent does not hand-draw letters. It calls:
 
@@ -309,3 +342,4 @@ perceptual distance or erosion rounds unless they ask.
 | `../brand-system/references/08-logo-system.md` | Once a mark exists: variants, clear space, misuse, the favicon pack |
 | `../brand-system/references/04-anti-slop.md` | Before every visual round |
 | `../brand-system/references/05-canvas-recipes.md` | Any time you author an artboard |
+| `../brand-system/references/12-media-generation.md` | Sparks, and the logo sting once a master exists |

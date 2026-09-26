@@ -57,6 +57,7 @@ describe('assembling', () => {
       'canvas/Main.dc.html': '<x-dc></x-dc>',
       'assets/svg/primary.svg': '<svg/>',
       'logo/master/primary.svg': '<svg/>',
+      'media/approved/photo/photo-home-page-1.png': 'x',
     });
     const out = path.join(dir, 'complete', 'handover');
     const r = await buildHandoff({ brandDir, outDir: out, brand, system });

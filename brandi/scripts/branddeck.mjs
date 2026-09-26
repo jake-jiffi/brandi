@@ -707,6 +707,35 @@ function railText(...paras) {
   return paras.filter(has).map((p) => `<p>${p}</p>`).join('');
 }
 
+const SAMPLE_KIND = { motion: 'Video', sound: 'Sound', voice: 'Voice', object: '3D model' };
+
+/**
+ * Approved generated media, shown as what it is. Every tile says it was
+ * generated, by which model, and who approved it: a photograph in a brand book
+ * is read as a photograph of the business unless it says otherwise.
+ */
+function samplesPage(ctx, { id, chapter, title, n, rail, items }) {
+  const shown = items.slice(0, 6);
+  const cols = shown.length === 1 ? 1 : shown.length <= 4 ? 2 : 3;
+  const tiles = shown.map((m) => {
+    const art = m.src
+      // A strip of three frames is cropped to nothing by `cover`, so it is
+      // contained on the page ground instead.
+      ? `<img src="${m.src}" alt="${esc(m.title ?? m.id)}" style="width:100%;height:100%;min-height:240px;object-fit:${m.previewKind === 'strip' ? 'contain' : 'cover'};display:block;border-radius:var(--radius)">`
+      : `<div class="card" style="height:100%;min-height:240px;justify-content:center;align-items:center;text-align:center"><p class="mono" style="font-size:16px">${esc(SAMPLE_KIND[m.kind] ?? m.kind)}<br>${esc(m.file ?? '')}</p></div>`;
+    const framing = m.previewKind === 'strip' ? ', shown as its start, middle and end frames' : m.previewKind === 'first-frame' ? ', shown as its first frame' : '';
+    const file = SAMPLE_KIND[m.kind] ? `<br><span class="mono" style="font-size:13px">${esc(SAMPLE_KIND[m.kind])}: ${esc(m.file ?? '')}</span>${esc(framing)}` : '';
+    return `<figure class="media-sample" data-kind="${esc(m.kind)}" style="margin:0;display:flex;flex-direction:column;gap:10px;min-height:0">
+      <div style="flex:1;min-height:0">${art}</div>
+      <figcaption style="font-size:15px;line-height:1.4;color:var(--muted)"><strong style="color:var(--ink)">${esc(m.title ?? m.id)}</strong><br>Generated with ${esc(m.modelName ?? m.model ?? 'a generative model')}, approved by ${esc(m.approvedBy ?? '[nobody]')}${file}</figcaption>
+    </figure>`;
+  });
+  return contentPage(ctx, {
+    id, chapter, title, n, rail,
+    canvas: `<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:28px">${tiles.join('')}</div>`,
+  });
+}
+
 /**
  * A simple diagram of a signature move whose rule can be drawn: an image that
  * leaves the frame on two edges, a band across the frame, or a shape held in
@@ -1743,6 +1772,22 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
 </section>`;
     },
   });
+  // Approved generated media gets its own pages, after the rules it samples,
+  // and only when some exists: an empty "in practice" page is padding.
+  const approvedOf = (...kinds) => (ctx.media ?? []).filter((m) => m && kinds.includes(m.kind));
+  const generatedRail = (what, photographs = false) => railText(
+    `Samples of ${what}, generated and then approved by a person. They show what the direction means.`,
+    photographs ? '<strong>They are not photographs of the business</strong>, and nothing here may be presented as one: no generated person is a customer or a member of staff.' : null,
+  );
+  if (approvedOf('photo').length) {
+    page({
+      chapter: 'assets', id: 'photography-samples', title: 'Photography in practice',
+      render: (n) => samplesPage(ctx, {
+        id: 'photography-samples', chapter: 'Brand assets', title: 'Photography in practice', n,
+        rail: generatedRail('the art direction', true), items: approvedOf('photo'),
+      }),
+    });
+  }
   if (has(id.illustration)) {
     const il = id.illustration;
     page({
@@ -1760,6 +1805,15 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         });
       },
     });
+    if (approvedOf('illustration').length) {
+      page({
+        chapter: 'assets', id: 'illustration-samples', title: 'Illustration in practice',
+        render: (n) => samplesPage(ctx, {
+          id: 'illustration-samples', chapter: 'Brand assets', title: 'Illustration in practice', n,
+          rail: generatedRail('the illustration style, drawn only in the palette'), items: approvedOf('illustration'),
+        }),
+      });
+    }
   }
   page({
     chapter: 'assets', id: 'icons', title: 'Icons',
@@ -1883,6 +1937,19 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       });
     },
   });
+  if (approvedOf('motion', 'sound', 'voice', 'object').length) {
+    page({
+      chapter: 'system', id: 'motion-samples', title: 'Motion and sound in practice',
+      render: (n) => samplesPage(ctx, {
+        id: 'motion-samples', chapter: 'System', title: 'Motion and sound in practice', n,
+        rail: railText(
+          'Generated, then approved by a person. A page cannot play a file, so each shows its poster frame and names the file in the handover.',
+          'A logo sting ends on a frame rendered from the vector master, so the mark it lands on is the approved artwork, not a model\'s idea of it.',
+        ),
+        items: approvedOf('motion', 'sound', 'voice', 'object'),
+      }),
+    });
+  }
   page({
     chapter: 'system', id: 'accessibility', title: 'Accessibility',
     render: (n) => {
@@ -2092,7 +2159,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
  *   {file, stem, title, kind: 'proof'|'mockup', png: data URI|null, reason, w, h, purpose, notes}
  * @returns {{html: string, pages: object[]}} the document and the page list in order
  */
-export function renderBrandDeck({ brand, system, assets = {}, artboards = [] }) {
+export function renderBrandDeck({ brand, system, assets = {}, artboards = [], media = [] }) {
   const name = brand.meta?.name ?? 'Unnamed brand';
   const sem = system.semantic.light;
   const r = (k) => resolveToken(sem[k], system, 'light');
@@ -2120,7 +2187,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [] }) 
     },
   };
   const ctx = {
-    brand, system, assets, artboards, tokens, r, name,
+    brand, system, assets, artboards, media, tokens, r, name,
     version: brand.meta?.version ?? '0.1.0',
     logo: logoContext(brand, assets, tokens),
   };

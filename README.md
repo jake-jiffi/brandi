@@ -88,6 +88,8 @@ brand/
                        generated palette, type specimen, component-state sheet,
                        token reference and logo construction sheet
   assets/logos/
+  media/               only with Higgsfield: the plan, every generated file, the boards,
+                       and approved/, which is what the book shows and the handover carries
 ~/.claude/skills/<slug>-brand/   a companion skill that enforces the brand, also linked
                                  into ~/.agents/skills/ when that directory exists, so Codex reads it
 ```
@@ -116,6 +118,7 @@ Eight phases. Three of them stop for you. Everything else runs on its own.
 | `/brandi:brand-check [paths]` | Hold real work against the brand |
 | `/brandi:brand-canvas` | Rebuild and republish the canvas |
 | `/brandi:brand-logo` | Generate a range of marks and take one to a master |
+| `/brandi:brand-media` | Photography, scenes, motion, sound and logo sparks, with Higgsfield |
 
 ## The logo forge
 
@@ -168,6 +171,42 @@ Everything deterministic is also a command line, if you would rather drive it yo
 ```bash
 node brandi/scripts/brandi.mjs --help
 ```
+
+## Generated media, with Higgsfield
+
+Optional. If the [Higgsfield CLI](https://www.npmjs.com/package/@higgsfield/cli) is installed and
+signed in, Brandi says so once in Recon and the pack gains what a language model cannot draw.
+If it is not, Brandi says in one line what it would add, and never mentions it again.
+
+**What it makes.** Photography in the art direction, one shot per surface that carries one. Blank
+real-world scenes (the shopfront, the van, the sign) that `brandi mockup` then composites the real
+mark onto. A logo sting, loops for the hero and for social, a sonic mnemonic, the brand line spoken,
+and the mark as a 3D object. Anything else the Higgsfield CLI makes, product shots and marketplace
+cards included, comes under the same record with `brandi media import`.
+
+**The mark is never generated.** A sting starts on the brand ground and ends on a frame rendered
+from the vector master. Every sting is scored on how exactly its last frame matches that one, so a
+model that drifts off the mark is caught before anybody picks it.
+
+**Logo sparks, if you want them.** Each of the forge's concept briefs goes to a different image
+model, so a wall of twelve is not one model's house style twelve times. A person picks the sparks
+worth pursuing. The forge redraws each one in vector, and the generation manifest records where the
+idea came from. A spark can be picked. It can never be approved into the brand.
+
+**Models are chosen live.** Brandi reads Higgsfield's catalogue and matches models to jobs by what
+they take, not what they are called: a sting needs start and end frames, illustration needs hard
+palette colours. A newer version of the chosen family is picked up without a code change, and new
+models are named the day they appear. `brandi media trial` runs one prompt on the best of every
+capable family, so a person can pick the winner and pin it with a reason. Every quality parameter
+goes to its top rung on anything that ships.
+
+**Credits are priced before they are spent.** Every run is priced first, and a run that would pass
+the plan's budget is refused before a single job starts. Only files inside the project are ever
+uploaded.
+
+**A person approves, and the book says what it is.** Approved photography, illustration, motion and
+sound get their own pages, each labelled as generated, with the model and the person who approved
+it. No generated person is ever presented as a customer or a member of staff.
 
 ## What makes it different
 
@@ -222,7 +261,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-1828 tests. They include property tests over the colour and type engines against hundreds of random
+1899 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

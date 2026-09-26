@@ -59,6 +59,8 @@ $A book --pdf                   # the brand book: a 16:9 deck (add --print for t
 $A guardian                     # the companion enforcement skill
 $A check <paths>                # hold real work against the brand
 $A complete <phase>             # mark a phase done and advance
+$A media status                 # is Higgsfield there: optional, and never waited on
+$A media plan                   # generated photography, scenes, motion, sound, logo sparks
 ```
 
 Add `--json` to any command to read the result as data instead of prose.
@@ -110,7 +112,16 @@ looked" is a visible state rather than a silent default. You are the one who can
 then record what you saw.
 
 Log everything you find with `$A evidence`, tagged `extracted` for anything you measured off a real
-artefact and `published` for anything from their own channels. Then `$A complete recon`.
+artefact and `published` for anything from their own channels.
+
+**Check for Higgsfield, once.** Run `$A media status`. If it is ready, the pack can also carry
+generated photography in the art direction, real scenes for the mockups, a logo sting that ends on
+the real mark, sound and a 3D mark. Each is made on the strongest model the catalogue has that
+week. Say so in the Recon summary. If it is not ready, say in one line what it would add and the command that
+adds it, then never raise it again. Nothing in the journey waits on it.
+`references/12-media-generation.md` is the whole of it.
+
+Then `$A complete recon`.
 
 ### 2. Intake (ONE batch of questions, then nothing)
 
@@ -171,6 +182,11 @@ is a contents page: the brand name, the three direction names with their
 one-line pitches, and the question being asked. When a direction is chosen, Main becomes the
 deliverable and the sketches move to a second page. `$A validate` warns when Main is missing.
 
+If Higgsfield is there, a direction judged on a flat colour field is being judged on half its
+evidence. Add one photograph per direction, in that direction's own art direction, with
+`$A media add` (a slot per direction, kind `photo`), and put it on the artboard. It is a sketch of
+the direction, labelled as generated, and nothing here is approved into the brand.
+
 Publish the canvas (see "Publishing a canvas" below), show it, and ask which direction. Once they
 pick, rebuild `Main.dc.html` as the chosen direction, record it with `$A set identity.school <name>`, log why with
 `$A decision --decision "..." --rationale "..." --alternatives "the two you did not pick"`,
@@ -225,7 +241,12 @@ A brand with no approved colourway gets a bracketed placeholder on the book's co
 is the honest answer until somebody has looked.
 
 Specify the logo system, or if there is no logo, write the brief for one and set a typeset wordmark
-as the interim mark. `references/08-logo-system.md` covers both. Then `$A complete identity`.
+as the interim mark. `references/08-logo-system.md` covers both.
+
+With Higgsfield there and a master recorded, `$A media plan` now deals the logo sting. Its start and
+end frames are rendered from the master on the brand ground, so it lands on the approved artwork
+rather than a model's idea of it. Every sting is scored on how exactly it lands. Then
+`$A complete identity`.
 
 ### 6. Voice (no questions)
 
@@ -291,6 +312,11 @@ a garment, composite the brand onto it:
 4. `$A mockup build` maps the artwork onto those corners and writes the artboard. A surface with no
    artwork is refused, rather than composited empty and reported as done.
 
+**No photograph of the surface, and Higgsfield there?** Generate one. `$A media plan` deals a blank
+scene for every physical application: the sign panel, the van side, the tote, left blank and square
+to the camera. Run step 1 on the scene file. The model draws the place; the mark on it is still the
+real vector, composited by step 4. Caption it as generated.
+
 The middle step is a person and cannot be automated. Four corners define the projective transform
 exactly, so everything after step 2 is arithmetic; everything before it is looking. The first attempt
 at this skipped the looking and placed a wordmark using percentages estimated from a description of
@@ -302,6 +328,11 @@ and highlights. Use `normal` for a sticker or a backlit sign, which sit on top o
 work: no browser decodes it, and `$A images` names the ones that need converting.
 
 `references/05-canvas-recipes.md` has the recipes, the frame sizes and the format traps.
+
+With Higgsfield, the hero photograph on `Main`, the social post and the story can be generated
+photography in the art direction instead of a grey box. Run the dealt slots, trial the first one
+across models before prompting the rest, and put approved files on the artboards.
+`references/12-media-generation.md` has the loop and the prompt craft.
 
 Write real copy in the brand voice. Never lorem ipsum, never "Welcome to our website", never an
 invented statistic or testimonial. Where a real fact is missing, use a visibly bracketed
@@ -344,6 +375,11 @@ $A tokens && $A book --pdf && $A guardian
 
 The book is a landscape deck, one idea per page, that shows the logo, draws the rules and includes
 every proof artboard in `brand/canvas`; `$A book --print --pdf` writes the A4 print book as well.
+
+Generated media reaches the book only once a person has approved it: `$A media approve <id>
+--approved-by "<name>"` before `$A book`. Approved photography, illustration, motion and sound get
+their own pages, each labelled as generated with the model and the approver, and the handover
+carries the files at full size.
 
 Then tell the user, in a few plain sentences: what was decided, what is still open, and where the
 files are. Point at the companion skill and say what it does.
@@ -407,6 +443,7 @@ Load these as needed rather than up front.
 | `references/09-accessibility.md` | Identity and Proof |
 | `references/10-implementation.md` | Publish, and any time the system meets real code |
 | `references/11-logo-craft.md` | Identity, whenever a mark is being drawn, measured or chosen |
+| `references/12-media-generation.md` | Recon, to check for Higgsfield; then any time media is generated |
 
 ## Working on a brand that already exists
 

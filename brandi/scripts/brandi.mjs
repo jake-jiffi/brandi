@@ -22,6 +22,9 @@
  *   brandi mockup grid <photo>         read a surface's corners off a real photograph
  *   brandi mockup build                composite the brand onto the recorded surfaces
  *   brandi assets [--out <dir>]        derive the asset pack from the master SVG
+ *   brandi media <status|models|use|plan|list|add|set|trial|cost|run|import|board|pick|approve>
+ *                                     photography, scenes, motion, sound and logo sparks
+ *                                     through Higgsfield, when it is installed
  *   brandi handoff [--out <dir>]       assemble the package a client is given
  *   brandi guardian [--out <dir>]     emit the enforcement skill
  *   brandi fonts                      check the typefaces actually load from Google Fonts
@@ -60,6 +63,13 @@ import { buildHandoff } from './handoff.mjs';
 import { catalogueImages, summarise } from './images.mjs';
 import { gridPage, mockupBody, validateCorners } from './mockup.mjs';
 import { imageSize } from './imagesize.mjs';
+import {
+  probeHiggsfield, statusText as mediaStatusText, dealSlots, parseKinds, loadPlan, savePlan, emptyPlan, mergePlan,
+  slotState, promptIsStale, spentOf, setSlotField, newSlot, estimate, runSlots, importJob, findResult, approveResults,
+  renderFrames, writeBoards, planPath, cleanError, findFfmpeg, DEFAULT_BUDGET, USAGE as MEDIA_USAGE, runningNow, takeRunLock,
+  loadCatalogue, saveCatalogue, fetchCatalogue, catalogueIsStale, newSince, candidatesFor, chooseModel, pinModel,
+  fitParams, NEEDS, KINDS as MEDIA_KINDS, trialModels, trialSlot,
+} from './media.mjs';
 
 const run = promisify(execFile);
 // fileURLToPath, not url.pathname: pathname percent-encodes spaces, so a
@@ -75,7 +85,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  * reads the path as the value of --json, drops it, and silently checks the
  * whole project instead: the wrong answer, delivered confidently.
  */
-const BOOLEAN_FLAGS = new Set(['json', 'force', 'pdf', 'help', 'strict-dimensions', 'check']);
+const BOOLEAN_FLAGS = new Set(['json', 'force', 'pdf', 'help', 'strict-dimensions', 'check', 'clear']);
 
 function parseArgs(argv) {
   const flags = {};
@@ -1081,6 +1091,35 @@ async function reallyInside(candidate, root) {
   }
 }
 
+/**
+ * The generated media a person approved, with each preview inlined so the deck
+ * can show it. The preview, not the file: a 4K PNG is five megabytes and its
+ * preview is a hundred kilobytes that look the same on a page. Held to the same
+ * rule as the logo files: nothing is read from outside the project.
+ */
+async function loadApprovedMedia(brand, brandDir) {
+  const projectRoot = path.resolve(brandDir, '..');
+  const MAX = 4 * 1024 * 1024;
+  const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif', svg: 'image/svg+xml' };
+  const out = [];
+  const recorded = Array.isArray(brand.identity?.media) ? brand.identity.media : [];
+  for (const m of recorded) {
+    if (!m || typeof m !== 'object' || m.kind === 'ideation') continue;
+    let src = null;
+    for (const rel of [m.preview, m.file].filter((f) => typeof f === 'string' && !path.isAbsolute(f))) {
+      const full = path.resolve(projectRoot, rel);
+      const mime = MIME[path.extname(full).slice(1).toLowerCase()];
+      if (!mime || !existsSync(full) || !await reallyInside(full, projectRoot)) continue;
+      const s = await stat(full);
+      if (!s.isFile() || s.size > MAX) continue;
+      src = `data:${mime};base64,${(await readFile(full)).toString('base64')}`;
+      break;
+    }
+    out.push({ ...m, src });
+  }
+  return out;
+}
+
 async function loadLogoAssets(brand, brandDir) {
   const assets = {};
   const MAX = 512 * 1024;
@@ -1613,6 +1652,477 @@ async function cmdMockup(flags, rest) {
   if (problems.length) process.exitCode = 1;
 }
 
+// ---------------------------------------------------------------------------
+// media
+// ---------------------------------------------------------------------------
+
+/** The master a sting ends on: the primary if one is named, else the first undeclared vector. */
+function primaryMasterSvg(brand, assets) {
+  const entries = (brand.identity?.logo?.files ?? [])
+    .map((e) => (typeof e === 'string' ? { path: e } : e))
+    .filter((e) => e?.path && assets[e.path]?.kind === 'svg');
+  const pick = entries.find((e) => String(e.role ?? '').toLowerCase() === 'primary') ?? entries.find((e) => !e.role) ?? null;
+  return pick ? assets[pick.path].markup : null;
+}
+
+/** The newest concept round the forge planned, whose briefs the sparks follow. */
+async function latestForgeRound(projectRoot) {
+  const { loadState } = await import('./logo.mjs');
+  const state = await loadState(projectRoot).catch(() => null);
+  const round = (state?.rounds ?? [])
+    // A refinement round's slots refine a mark that exists; sparks are for concepts.
+    .filter((r) => (r.slots ?? []).some((s) => s?.architectureName && !s.refines))
+    .sort((a, b) => b.round - a.round)[0];
+  return round ? { round: round.round, slots: round.slots, brand: state.brand ?? {} } : null;
+}
+
+const jsonFlag = (flags, name) => {
+  if (flags[name] === undefined) return undefined;
+  try {
+    return JSON.parse(String(flags[name]));
+  } catch {
+    throw new Error(`--${name} takes JSON, e.g. --${name} '{"aspect_ratio":"4:5"}'.`);
+  }
+};
+
+function slotLine(s) {
+  const st = slotState(s);
+  const results = `${s.results.length}/${s.count ?? 1}`;
+  const extra = [
+    promptIsStale(s) ? 'prompt written against an older brief' : null,
+    s.blocked ? `blocked: ${s.blocked}` : null,
+  ].filter(Boolean);
+  return `  ${s.id.padEnd(28)} ${s.kind.padEnd(12)} ${st.padEnd(13)} ${String(s.model).padEnd(26)} ${results}${extra.length ? `\n      ${extra.join('; ')}` : ''}`;
+}
+
+/**
+ * `brandi media`: photography, scenes, motion, sound and logo sparks through
+ * Higgsfield, when it is installed. Every subcommand except `status` works on
+ * the plan file, and only the ones that make something need Higgsfield at all:
+ * a plan can be dealt and its prompts written on a machine without it.
+ */
+async function cmdMedia(flags, rest) {
+  const sub = rest[0] ?? 'list';
+  if (flags.help || sub === 'help') {
+    emit(MEDIA_USAGE, { ok: true, usage: MEDIA_USAGE });
+    return;
+  }
+  if (sub === 'status') {
+    const p = await probeHiggsfield();
+    emit(mediaStatusText(p), { ok: true, ...p });
+    return;
+  }
+
+  const { file, brand } = await needBrand(flags);
+  const brandDir = path.dirname(file);
+  const projectRoot = path.resolve(brandDir, '..');
+  const rel = (f) => path.relative(process.cwd(), f);
+  const args = rest.slice(1);
+  const needPlan = async () => {
+    const plan = await loadPlan(brandDir);
+    if (!plan) throw new Error('No media plan yet. Run: brandi media plan');
+    return plan;
+  };
+  const slotById = (plan, id) => {
+    const slot = plan.slots.find((s) => s.id === id);
+    if (!slot) throw new Error(`No slot called ${id}. Slots: ${plan.slots.map((s) => s.id).join(', ') || 'none'}`);
+    return slot;
+  };
+  const ready = async () => {
+    const probe = await probeHiggsfield();
+    if (!probe.available) {
+      const e = new Error(mediaStatusText(probe));
+      e.findings = probe;
+      throw e;
+    }
+    return probe;
+  };
+
+  // Anything that writes the plan waits for a run to finish, or the run's next
+  // save would silently undo it. Reading is always fine.
+  if (['plan', 'add', 'set', 'use', 'trial', 'pick', 'approve'].includes(sub)) {
+    const held = await runningNow(brandDir);
+    if (held) return fail(`A media run (${held.what}) is still going and holds the plan. Wait for it to finish, then run this again.`);
+  }
+
+  /**
+   * The catalogue, refreshed when it is a day old or asked for. Without
+   * Higgsfield the cached one is used however old, and without either the
+   * fallbacks in media.mjs are, and the plan says which.
+   */
+  const catalogueNow = async ({ refresh = false } = {}) => {
+    let catalogue = await loadCatalogue(brandDir);
+    let fresh = [];
+    let note = null;
+    if (refresh || catalogueIsStale(catalogue)) {
+      const probe = await probeHiggsfield();
+      let fetched = null;
+      let why = 'Higgsfield could not be asked what it has today';
+      if (probe.available) {
+        try {
+          fetched = await fetchCatalogue({ bin: probe.bin });
+        } catch (e) {
+          why = `the catalogue could not be read (${cleanError(e)})`;
+        }
+      }
+      if (fetched?.models?.length) {
+        const previous = catalogue;
+        catalogue = fetched;
+        await saveCatalogue(brandDir, catalogue);
+        fresh = newSince(previous, catalogue);
+      } else if (catalogue) {
+        note = `Models were chosen from the catalogue read on ${String(catalogue.fetched).slice(0, 10)}, not today's: ${why}.`;
+      } else {
+        note = `Models are the built-in fallbacks: ${why}. Run brandi media plan again once it can.`;
+      }
+    }
+    return { catalogue, fresh, note };
+  };
+
+  if (sub === 'models') {
+    const { catalogue, fresh, note } = await catalogueNow({ refresh: Boolean(flags.refresh) });
+    if (!catalogue) return fail(note ?? 'No catalogue.');
+    const plan = (await loadPlan(brandDir)) ?? emptyPlan();
+    const only = typeof flags.need === 'string' ? flags.need : null;
+    const needs = Object.keys(NEEDS).filter((n) => !only || n === only);
+    const fallbackFor = (n) => MEDIA_KINDS[n === 'sting' ? 'motion' : n]?.model;
+    const lines = [`${catalogue.models.length} models in the catalogue read ${catalogue.fetched.slice(0, 16).replace('T', ' ')} UTC.`];
+    if (fresh.length) lines.push('', 'New since the last look, so look at these first:', ...fresh.map((m) => `  ${m.job_type.padEnd(30)} ${m.display_name} (${m.type})`));
+    const machine = {};
+    for (const n of needs) {
+      const choice = chooseModel(n, { catalogue, pin: plan.models?.[n], fallback: fallbackFor(n) });
+      const cands = candidatesFor(n, catalogue);
+      machine[n] = { chosen: choice.model, source: choice.source, notes: choice.notes, candidates: cands.map((c) => c.job_type) };
+      lines.push('', `${n}: ${choice.model} (${choice.source}${plan.models?.[n]?.why ? `: ${plan.models[n].why}` : ''})`);
+      for (const c of cands.slice(0, 10)) lines.push(`    ${c.job_type === choice.model ? '*' : ' '} ${c.job_type.padEnd(30)} ${c.display_name}`);
+      if (cands.length > 10) lines.push(`      and ${cands.length - 10} more (--need ${n} --json for all)`);
+      for (const x of choice.notes) lines.push(`    ${x}`);
+    }
+    lines.push('', 'Across families the choice is a judgement. Try a contender on the same prompt with brandi media add, and pin the winner:', '  brandi media use <job> <model> --why "<what it did better>"');
+    emit(lines.join('\n'), { ok: true, fetched: catalogue.fetched, fresh: fresh.map((m) => m.job_type), needs: machine, errors: catalogue.errors ?? [] });
+    return;
+  }
+
+  if (sub === 'use') {
+    const [need, model] = args;
+    const plan = (await loadPlan(brandDir)) ?? emptyPlan();
+    if (flags.clear) {
+      if (!NEEDS[need]) return fail(`"${need}" is not a job. Jobs: ${Object.keys(NEEDS).join(', ')}.`);
+      delete plan.models?.[need];
+      await savePlan(brandDir, plan);
+      emit(`${need} is no longer pinned; the live choice applies from the next brandi media plan.`, { ok: true, need, pinned: null });
+      return;
+    }
+    const catalogue = await loadCatalogue(brandDir);
+    const pin = pinModel(plan, need, model, { why: typeof flags.why === 'string' ? flags.why : null, catalogue, force: Boolean(flags.force) });
+    await savePlan(brandDir, plan);
+    emit(`${need} is pinned to ${pin.model}: ${pin.why}\nRun brandi media plan to re-deal with it. Slots that already have results keep them.`, { ok: true, need, pinned: pin });
+    return;
+  }
+
+  if (sub === 'plan') {
+    const kinds = parseKinds(flags.kinds);
+    // The palette is only needed for the frames a sting is built on, and a plan
+    // dealt before any colour is decided is still a plan.
+    let system = null;
+    try { ({ system } = await resolveSystem(flags, { gate: false })); } catch { system = null; }
+    let frames = { master: false };
+    if (kinds.includes('motion') || kinds.includes('object')) {
+      const masterSvg = primaryMasterSvg(brand, await loadLogoAssets(brand, brandDir));
+      frames = await renderFrames({ masterSvg, system, brandDir, projectRoot, chrome: findChrome() });
+    }
+    const forge = kinds.includes('ideation') ? await latestForgeRound(projectRoot) : null;
+    const existing = await loadPlan(brandDir);
+    const plan = existing ?? emptyPlan();
+    const { catalogue, fresh, note: catalogueNote } = await catalogueNow({ refresh: Boolean(flags.refresh) });
+    const { slots, notes } = dealSlots(brand, { kinds, frames, forge, catalogue, pins: plan.models ?? {} });
+    // Dealing one kind again must not retire every other kind.
+    const untouched = (existing?.slots ?? []).filter((s) => !kinds.includes(s.kind));
+    const touched = { slots: (existing?.slots ?? []).filter((s) => kinds.includes(s.kind)) };
+    plan.slots = [...untouched, ...mergePlan(touched, slots)];
+    plan.notes = notes;
+    if (flags.budget !== undefined) plan.budget = intFlag(flags, 'budget', DEFAULT_BUDGET, { min: 1, max: 1000000 });
+    await savePlan(brandDir, plan);
+    const needing = plan.slots.filter((s) => slotState(s) === 'needs-prompt');
+    const lines = [
+      `${plural(plan.slots.length, 'slot')} in ${rel(planPath(brandDir))}. Budget ${plan.budget} credits, about ${Math.round(spentOf(plan))} spent.`,
+      '',
+      ...plan.slots.map(slotLine),
+    ];
+    if (catalogueNote) lines.push('', catalogueNote);
+    if (fresh.length) lines.push('', `New in the catalogue since the last look: ${fresh.map((m) => m.job_type).join(', ')}. See brandi media models.`);
+    if (notes.length) lines.push('', 'Notes:', ...notes.map((n) => `  ${n}`));
+    lines.push('', needing.length
+      ? `Next: write the ${plural(needing.length, 'prompt')} from each slot's brief (brandi media set <id> prompt "..."), then brandi media cost, then brandi media run.`
+      : 'Next: brandi media cost, then brandi media run.');
+    emit(lines.join('\n'), { ok: true, plan: rel(planPath(brandDir)), budget: plan.budget, spent: spentOf(plan), slots: plan.slots.map((s) => ({ ...s, state: slotState(s) })), notes, frames, catalogue: catalogue?.fetched ?? null, fresh: fresh.map((m) => m.job_type) });
+    return;
+  }
+
+  if (sub === 'list') {
+    const plan = await needPlan();
+    const approved = new Set((Array.isArray(brand.identity?.media) ? brand.identity.media : []).map((m) => m?.id));
+    const lines = [`Budget ${plan.budget} credits, about ${Math.round(spentOf(plan))} spent.`, ''];
+    for (const s of plan.slots) {
+      lines.push(slotLine(s));
+      for (const r of s.results) {
+        lines.push(`      ${r.id.padEnd(30)} ${r.file ?? '(not downloaded)'}${approved.has(r.id) ? '  APPROVED' : ''}${r.picked ? '  picked' : ''}`);
+      }
+      const last = s.failures.at(-1);
+      if (last) lines.push(`      last failure: ${last.error}`);
+    }
+    emit(lines.join('\n'), { ok: true, budget: plan.budget, spent: spentOf(plan), slots: plan.slots.map((s) => ({ ...s, state: slotState(s), stalePrompt: Boolean(promptIsStale(s)) })), approved: [...approved] });
+    return;
+  }
+
+  if (sub === 'add') {
+    const id = args[0];
+    const plan = (await loadPlan(brandDir)) ?? emptyPlan();
+    if (plan.slots.some((s) => s.id === id)) return fail(`There is already a slot called ${id}. Change it with brandi media set.`);
+    const given = jsonFlag(flags, 'params') ?? {};
+    const slot = newSlot(id, {
+      kind: flags.kind,
+      model: typeof flags.model === 'string' ? flags.model : undefined,
+      title: typeof flags.title === 'string' ? flags.title : undefined,
+      prompt: typeof flags.prompt === 'string' ? flags.prompt : undefined,
+      params: given,
+      refs: jsonFlag(flags, 'refs') ?? {},
+      count: flags.count,
+    });
+    // What was given is what the job wants, so it is fitted with the rest: a
+    // 16:9 asked of a model that offers 3:2 at most becomes 3:2 rather than a
+    // refusal, and the top quality rungs come too unless something was named.
+    slot.intent = { ...slot.intent, ...given };
+    const m = (await loadCatalogue(brandDir))?.models?.find((x) => x.job_type === slot.model);
+    if (m) slot.params = fitParams(slot.intent, m, { quality: MEDIA_KINDS[slot.kind]?.quality }).params;
+    plan.slots.push(slot);
+    await savePlan(brandDir, plan);
+    emit(`Added ${slot.id} (${slot.kind}, ${slot.model}, ${slotState(slot)}).`, { ok: true, slot: { ...slot, state: slotState(slot) } });
+    return;
+  }
+
+  if (sub === 'set') {
+    const [id, field, ...value] = args;
+    if (!id || !field || !value.length) return fail('usage: brandi media set <id> <field> <value>');
+    const plan = await needPlan();
+    const slot = slotById(plan, id);
+    setSlotField(slot, field, value.join(' '));
+    // A new model gets the job's intent fitted to what it takes, rather than
+    // the last model's parameters, which it may refuse. Anything set by hand
+    // stays set.
+    if (field === 'model' && slot.intent) {
+      const m = (await loadCatalogue(brandDir))?.models?.find((x) => x.job_type === slot.model);
+      if (m) {
+        const kept = Object.fromEntries(Object.entries(slot.params).filter(([k]) => slot.overrides.includes(`params.${k}`)));
+        slot.params = { ...fitParams(slot.intent, m, { quality: MEDIA_KINDS[slot.kind]?.quality }).params, ...kept };
+      }
+    }
+    await savePlan(brandDir, plan);
+    emit(`${slot.id}: ${field} set. Now ${slotState(slot)}.`, { ok: true, slot: { ...slot, state: slotState(slot) } });
+    return;
+  }
+
+  if (sub === 'trial') {
+    const [id] = args;
+    if (!id) return fail('usage: brandi media trial <slot> [--models a,b,c] [--top N]');
+    const plan = await needPlan();
+    const base = slotById(plan, id);
+    if (base.kind === 'ideation') return fail('A spark wall is already a trial across models. Trial a slot that ships.');
+    const { catalogue, note } = await catalogueNow();
+    if (!catalogue) return fail(note ?? 'No catalogue to choose contenders from.');
+    const need = NEEDS[base.need] ? base.need : base.kind;
+    const named = typeof flags.models === 'string' ? flags.models.split(',').map((x) => x.trim()).filter(Boolean) : null;
+    const models = named ?? trialModels(need, catalogue, { include: base.model, top: intFlag(flags, 'top', 6, { min: 2, max: 12 }) });
+    const made = [];
+    const skipped = [];
+    for (const model of models) {
+      const m = catalogue.models.find((x) => x.job_type === model);
+      if (!m) { skipped.push(`${model}: not in the catalogue`); continue; }
+      const slot = trialSlot(base, m, { quality: MEDIA_KINDS[base.kind]?.quality });
+      if (plan.slots.some((s2) => s2.id === slot.id)) { skipped.push(`${slot.id}: already trialled`); continue; }
+      plan.slots.push(slot);
+      made.push(slot);
+    }
+    await savePlan(brandDir, plan);
+    const ids = made.map((s2) => s2.id);
+    emit([
+      `${plural(made.length, 'contender')} for ${base.id}, same prompt, each on its own model with its own top settings:`,
+      ...made.map((s2) => `  ${s2.id.padEnd(40)} ${JSON.stringify(s2.params)}`),
+      ...(skipped.length ? ['', ...skipped.map((x) => `  skipped ${x}`)] : []),
+      '',
+      `Then: brandi media cost ${ids.join(' ')}`,
+      `      brandi media run ${ids.join(' ')}`,
+      `      brandi media board --kind ${base.kind}, look at them side by side, and pin the winner:`,
+      `      brandi media use ${need} <model> --why "<what it did better>"`,
+    ].join('\n'), { ok: true, of: base.id, need, trial: made.map((s2) => ({ id: s2.id, model: s2.model, params: s2.params })), skipped });
+    return;
+  }
+
+  // Which slots `cost` and `run` act on: the ones named, or every ready one.
+  const selection = (plan) => {
+    const force = Boolean(flags.force);
+    const named = args.map((id) => slotById(plan, id));
+    const pool = named.length ? named : plan.slots.filter((s) => slotState(s) === 'ready' || (force && slotState(s) === 'done'));
+    const skipped = [];
+    const chosen = [];
+    for (const s of pool) {
+      const st = slotState(s);
+      if (st === 'ready' || (force && st === 'done')) chosen.push(s);
+      else skipped.push({ id: s.id, why: st === 'done' ? 'already has its results (pass --force to make more)' : st === 'needs-prompt' ? 'has no prompt yet' : st === 'blocked' ? s.blocked : st });
+    }
+    return { chosen, skipped, force };
+  };
+  const skippedLines = (skipped) => (skipped.length ? ['', 'Not included:', ...skipped.map((s) => `  ${s.id}: ${s.why}`)] : []);
+
+  if (sub === 'cost' || sub === 'run') {
+    const plan = await needPlan();
+    const { chosen, skipped, force } = selection(plan);
+    if (!chosen.length) return fail(['Nothing to run.', ...skippedLines(skipped)].join('\n'), { skipped });
+    const probe = await ready();
+    const est = await estimate(chosen, { bin: probe.bin, projectRoot, force });
+    const budget = flags.budget !== undefined ? intFlag(flags, 'budget', DEFAULT_BUDGET, { min: 1, max: 1000000 }) : (plan.budget ?? DEFAULT_BUDGET);
+    const spent = spentOf(plan);
+    const priced = est.priced.map((p) => `  ${p.slot.id.padEnd(28)} ${String(p.slot.model).padEnd(26)} ${p.calls} x ${p.each} = ${+(p.total.toFixed(2))}`);
+    const errors = est.errors.map((e) => `  ${e.id}: ${e.error}`);
+    const summary = `About ${+(est.total.toFixed(2))} credits for ${plural(est.priced.length, 'slot')}. Spent so far about ${Math.round(spent)}, budget ${budget}, account ${probe.credits == null ? 'unknown' : Math.floor(probe.credits)}.`;
+    const machine = { priced: est.priced.map((p) => ({ id: p.slot.id, model: p.slot.model, calls: p.calls, each: p.each, total: p.total })), errors: est.errors, total: est.total, spent, budget, credits: probe.credits, skipped };
+
+    if (sub === 'cost') {
+      emit([summary, '', ...priced, ...(errors.length ? ['', 'Could not be priced:', ...errors] : []), ...skippedLines(skipped)].join('\n'), { ok: true, ...machine });
+      return;
+    }
+
+    if (spent + est.total > budget) {
+      return fail([
+        `Refused before anything was created: this run would take the plan to about ${Math.round(spent + est.total)} credits against a budget of ${budget}.`,
+        '', ...priced, '',
+        `Run fewer slots, or raise the budget: brandi media run --budget ${Math.ceil(spent + est.total)} (this run), or brandi media plan --budget <n> (the plan).`,
+      ].join('\n'), machine);
+    }
+    if (probe.credits != null && est.total > probe.credits) {
+      return fail(`Refused: this run needs about ${Math.ceil(est.total)} credits and the account has ${Math.floor(probe.credits)}.`, machine);
+    }
+    if (!est.priced.length) return fail(['Nothing could be priced, so nothing ran.', ...errors].join('\n'), machine);
+
+    const concurrency = intFlag(flags, 'concurrency', 3, { min: 1, max: 8 });
+    const release = await takeRunLock(brandDir, `run ${chosen.map((c) => c.id).join(' ')}`.slice(0, 200));
+    let made;
+    let failed;
+    try {
+      ({ made, failed } = await runSlots(est.priced, {
+        bin: probe.bin, brandDir, projectRoot, concurrency, ffmpeg: findFfmpeg(), save: () => savePlan(brandDir, plan),
+      }));
+      await savePlan(brandDir, plan);
+    } finally {
+      await release();
+    }
+    const lines = [
+      `Made ${plural(made.length, 'file')}, about ${+(made.reduce((n, r) => n + (r.credits ?? 0), 0).toFixed(2))} credits.`,
+      ...made.map((r) => `  ${r.id.padEnd(30)} ${r.file}${r.landing ? `  ${r.landing.lands ? 'lands on the mark' : 'DRIFTS off the mark'} (SSIM ${r.landing.ssim})` : ''}`),
+    ];
+    if (failed.length) lines.push('', 'Failed:', ...failed.map((f) => `  ${f.id}: ${f.error}`));
+    if (errors.length) lines.push('', 'Not run, could not be priced:', ...errors);
+    lines.push(...skippedLines(skipped), '', 'Look at them before anybody else does: brandi media board, then publish or preview it.');
+    emit(lines.join('\n'), { ok: failed.length === 0, made, failed, ...machine });
+    if (failed.length) process.exitCode = 1;
+    return;
+  }
+
+  if (sub === 'import') {
+    if (!args.length) return fail('usage: brandi media import <job_id>... --slot <id> | --kind <kind>');
+    const plan = (await loadPlan(brandDir)) ?? emptyPlan();
+    let slot;
+    if (typeof flags.slot === 'string') slot = slotById(plan, flags.slot);
+    else {
+      slot = newSlot(`import-${String(args[0]).slice(0, 8).toLowerCase()}`, {
+        kind: flags.kind,
+        title: typeof flags.title === 'string' ? flags.title : 'Imported from Higgsfield',
+      });
+      // An imported slot is a record of work done elsewhere, not a request for more.
+      slot.count = 0;
+      if (plan.slots.some((s) => s.id === slot.id)) slot = plan.slots.find((s) => s.id === slot.id);
+      else plan.slots.push(slot);
+    }
+    const probe = await ready();
+    const made = [];
+    const failed = [];
+    const release = await takeRunLock(brandDir, `import ${args.join(' ')}`.slice(0, 200));
+    try {
+      for (const jobId of args) {
+        try {
+          made.push(await importJob(jobId, slot, { bin: probe.bin, brandDir, projectRoot, ffmpeg: findFfmpeg() }));
+        } catch (e) {
+          failed.push({ jobId, error: cleanError(e) });
+        }
+      }
+      await savePlan(brandDir, plan);
+    } finally {
+      await release();
+    }
+    emit([
+      `Imported ${plural(made.length, 'job')} into ${slot.id}.`,
+      ...made.map((r) => `  ${r.id.padEnd(30)} ${r.file}`),
+      ...(failed.length ? ['', 'Not imported:', ...failed.map((f) => `  ${f.jobId}: ${f.error}`)] : []),
+    ].join('\n'), { ok: failed.length === 0, slot: slot.id, made, failed });
+    if (failed.length) process.exitCode = 1;
+    return;
+  }
+
+  if (sub === 'board') {
+    const plan = await needPlan();
+    const approved = new Set((Array.isArray(brand.identity?.media) ? brand.identity.media : []).map((m) => m?.id));
+    const kind = typeof flags.kind === 'string' ? flags.kind : null;
+    const res = await writeBoards(plan, { brandDir, projectRoot, brandName: brand.meta?.name ?? 'Brand', approved, kind });
+    if (!res.boards.length) return fail(`No results${kind ? ` of kind ${kind}` : ''} to put on a board yet. Run: brandi media run`);
+    const dirRel = rel(res.dir);
+    emit([
+      `Wrote ${plural(res.boards.length, 'board')} to ${dirRel}.`,
+      ...res.boards.map((b) => `  ${b.file}`),
+      ...(res.missing.length ? ['', `${plural(res.missing.length, 'preview')} missing on disk, shown as file names: ${res.missing.join(', ')}`] : []),
+      '',
+      `Publish: brandi validate --dir ${dirRel}, then brandi canvas --dir ${dirRel} --title "${brand.meta?.name ?? 'Brand'} generated media" --out ${slugify(brand.meta?.name ?? 'brand')}-media.html`,
+      `No canvas here: node <brandi>/scripts/preview.mjs --dir ${dirRel} --out <dir>`,
+    ].join('\n'), { ok: true, dir: dirRel, boards: res.boards, missing: res.missing });
+    return;
+  }
+
+  if (sub === 'pick') {
+    const plan = await needPlan();
+    if (!args.length) return fail('usage: brandi media pick <result>... [--clear]');
+    const hits = args.map((id) => {
+      const hit = findResult(plan, id);
+      if (!hit) throw new Error(`No result called ${id}. See: brandi media list`);
+      return hit;
+    });
+    for (const { result } of hits) result.picked = !flags.clear;
+    await savePlan(brandDir, plan);
+    const sparks = hits.filter((h) => h.slot.kind === 'ideation');
+    emit([
+      `${flags.clear ? 'Unpicked' : 'Picked'} ${args.join(', ')}.`,
+      ...(sparks.length && !flags.clear
+        ? ['', 'Picked sparks go to the forge: one vector drawing agent per spark, each seeing only its own slot brief and its own spark.',
+          ...sparks.map((h) => `  ${h.result.id} -> forge slot ${h.slot.forgeSlot}: ${h.result.file}`)]
+        : []),
+    ].join('\n'), { ok: true, picked: flags.clear ? [] : args, sparks: sparks.map((h) => ({ id: h.result.id, forgeSlot: h.slot.forgeSlot, file: h.result.file })) });
+    return;
+  }
+
+  if (sub === 'approve') {
+    const plan = await needPlan();
+    const records = await approveResults({ brand, plan, ids: args, approvedBy: flags['approved-by'], brandDir, projectRoot });
+    await saveBrand(file, brand);
+    emit([
+      `Approved ${plural(records.length, 'file')} into the brand, by ${records[0].approvedBy}.`,
+      ...records.map((r) => `  ${r.id.padEnd(30)} ${r.file}`),
+      '',
+      'They reach the book on the next brandi book, labelled as generated, and the handover carries brand/media/approved.',
+    ].join('\n'), { ok: true, approved: records });
+    return;
+  }
+
+  return fail(`Unknown subcommand "${sub}".\n\n${MEDIA_USAGE}`);
+}
+
 async function cmdHandoff(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const brandDir = path.dirname(file);
@@ -1757,7 +2267,7 @@ async function cmdBook(flags) {
     sections = (html.match(/<section class="page"/g) ?? []).length;
     pages = null;
   } else {
-    const deck = renderBrandDeck({ brand, system, assets, artboards: await proofArtboards(brand, dir) });
+    const deck = renderBrandDeck({ brand, system, assets, artboards: await proofArtboards(brand, dir), media: await loadApprovedMedia(brand, dir) });
     html = deck.html;
     pages = deck.pages.filter((p) => !p.absent).length;
   }
@@ -1966,6 +2476,7 @@ const COMMANDS = {
   logo: cmdLogo,
   images: cmdImages,
   mockup: cmdMockup,
+  media: cmdMedia,
   assets: cmdAssets,
   handoff: cmdHandoff,
   guardian: cmdGuardian,
@@ -1987,6 +2498,7 @@ async function main() {
     // and gets the top-level help has not been answered.
     if (command === 'logo') return cmdLogo(flags, rest, ['--help']);
     if (command === 'mockup') return cmdMockup({ ...flags, help: true }, rest);
+    if (command === 'media') return cmdMedia({ ...flags, help: true }, rest);
     const source = String(await readFile(fileURLToPath(import.meta.url)));
     // Drop the shebang and the comment opener by what they are, not by line
     // count: slicing a fixed number of lines printed `/**` as the first line.

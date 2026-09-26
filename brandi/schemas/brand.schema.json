@@ -1226,6 +1226,101 @@
             }
           }
         },
+        "media": {
+          "type": "array",
+          "description": "Generated photography, motion, sound and 3D that a person approved by name, written by `brandi media approve`. Every entry is a sample of the direction, not a record of the business, and the book labels it as generated. Logo sparks never appear here.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "kind",
+              "file",
+              "approvedBy"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "photo",
+                  "scene",
+                  "motion",
+                  "illustration",
+                  "icon",
+                  "sound",
+                  "voice",
+                  "object",
+                  "edit"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "surface": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "file": {
+                "type": "string",
+                "description": "The approved file, relative to the project, under brand/media/approved/."
+              },
+              "preview": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "A small preview beside it, which is what the book embeds."
+              },
+              "model": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "modelName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "jobId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The Higgsfield job, so the result can be traced."
+              },
+              "prompt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "provenance": {
+                "type": "string",
+                "enum": [
+                  "generated"
+                ]
+              },
+              "approvedBy": {
+                "type": "string"
+              },
+              "approvedOn": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
         "illustration": {
           "type": [
             "object",

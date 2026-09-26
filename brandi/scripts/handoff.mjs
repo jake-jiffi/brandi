@@ -69,6 +69,18 @@ export const PARTS = Object.freeze([
     optional: true,
   },
   {
+    id: 'media',
+    dest: 'media',
+    from: (b) => path.join(b, 'media', 'approved'),
+    title: 'Generated photography, motion and sound',
+    who: 'Whoever runs the website and the social accounts, and a designer extending the library.',
+    what: 'The generated media a person approved, at full size. Every file is a sample of the direction, not a record of the business, and must never be presented as a photograph of it.',
+    make: 'brandi media approve <id> --approved-by "<name>"',
+    // Only a brand that used generated media has any. One that did not has not
+    // left something out, so the handover does not list it as missing.
+    whenPresent: true,
+  },
+  {
     id: 'tokens',
     dest: 'tokens',
     from: (b) => path.join(b, 'tokens'),
@@ -224,7 +236,7 @@ export async function buildHandoff({ brandDir, outDir, brand, system }) {
   for (const part of PARTS) {
     const source = part.from(brandDir);
     if (!existsSync(source)) {
-      absent.push(part);
+      if (!part.whenPresent) absent.push(part);
       continue;
     }
     if (!await insideBrand(source)) {

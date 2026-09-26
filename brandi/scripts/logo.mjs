@@ -727,6 +727,39 @@ export async function writeIntoBrand(root, state) {
 }
 
 /** The paperwork a generated mark has to carry. */
+/**
+ * The raster sparks a round drew on, when `brandi media` made any and somebody
+ * picked them. A vector drawn from an image model's sketch is still a drawing
+ * somebody can defend, but only if the record says where the idea came from:
+ * image models can reproduce marks that already exist, and the search below is
+ * where that gets checked.
+ */
+async function sparksSection(root, state) {
+  let plan = null;
+  try {
+    plan = JSON.parse(await readFile(within(root, 'brand/media/plan.json'), 'utf8'));
+  } catch {
+    return '';
+  }
+  // A refinement id is its concept's id plus lower-case task suffixes: C1p, C1sm.
+  const chosen = String(state.master?.chosenFrom ?? '').replace(/[a-z]+$/, '');
+  const rows = (plan?.slots ?? [])
+    .filter((s) => s?.kind === 'ideation')
+    .flatMap((s) => (s.results ?? []).filter((r) => r?.picked).map((r) => ({ s, r })));
+  if (!rows.length) return '';
+  return `
+## Sketches the round drew on
+
+These concepts were redrawn in vector from raster sparks generated with Higgsfield. The raster was
+a reference and never the artwork, but the idea came from it, so it is recorded here and belongs in
+the similarity search.
+
+| Spark | Forge slot | Model | Higgsfield job | File |
+|---|---|---|---|---|
+${rows.map(({ s, r }) => `| ${r.id} | ${s.forgeSlot ?? '?'}${s.forgeSlot && chosen && s.forgeSlot === chosen ? ' (the master\'s slot)' : ''} | ${r.modelName ?? r.model ?? '?'} | ${r.jobId ?? 'unrecorded'} | ${r.file ?? ''} |`).join('\n')}
+`;
+}
+
 export async function writeRights(root, state) {
   const dir = within(root, LAYOUT.rights);
   await mkdir(dir, { recursive: true });
@@ -750,7 +783,7 @@ mark was deliberately developed rather than lifted from somewhere nobody can nam
 | Status | ${p.status ?? 'candidate, not approved'} |
 
 ${p.caveat ?? ''}
-`;
+${await sparksSection(root, state)}`;
 
   const search = `# Similarity and trade mark search record
 
