@@ -154,6 +154,26 @@ const latestRound = (state) => (state.rounds.length ? state.rounds[state.rounds.
  * Recon and Strategy have usually already answered most of this, and asking
  * again would be the tool failing to read its own files.
  */
+/**
+ * The brand's own visual language, in two sentences, for a mark to be drawn in.
+ *
+ * A concept round dealt only from the logo taxonomy came back in six registers
+ * that had nothing to do with the illustrations the person had just approved,
+ * and they rejected all twelve: "it all needs to match that defined brand
+ * style in the illustrations". The chosen direction and its drawing style go
+ * into every brief, so a slot varies the idea and keeps the hand.
+ */
+export function houseStyle(brand) {
+  const firstSentences = (text, n) => {
+    const parts = String(text ?? '').trim().split(/(?<=[.!?])\s+/).filter(Boolean);
+    return parts.length ? parts.slice(0, n).join(' ') : null;
+  };
+  const school = brand.identity?.school ? `The chosen direction: ${String(brand.identity.school).replace(/[.\s]+$/, '')}.` : null;
+  const drawing = firstSentences(brand.identity?.illustration?.style, 2);
+  const line = [school, drawing ? `Its drawing: ${drawing}` : null].filter(Boolean).join(' ');
+  return line || null;
+}
+
 export async function briefFromBrand(root = '.') {
   const file = within(root, 'brand/brand.json');
   if (!existsSync(file)) return {};
@@ -168,6 +188,7 @@ export async function briefFromBrand(root = '.') {
       category: brand.strategy?.category ?? brand.meta?.categories?.[0] ?? null,
       oneLiner: brand.strategy?.positioning ?? brand.strategy?.narrative ?? brand.strategy?.purpose ?? null,
       audience: typeof audience === 'string' ? audience : (audience?.name ?? audience?.need ?? null),
+      style: houseStyle(brand),
     };
   } catch {
     // A brand file that will not parse is a problem for `brandi status`, not a
@@ -680,12 +701,20 @@ export async function buildWordmark(root, { family, weight = 400, text = null, s
   const font = parseFont(buffer);
   const built = typesetWordmark(font, name, { size, tracking, pairAdjust, letterCase, family, weight });
 
-  const dest = out ? within(root, out) : within(root, `${LAYOUT.master}/wordmark.svg`);
+  const master = within(root, `${LAYOUT.master}/wordmark.svg`);
+  const dest = out ? within(root, out) : master;
   await mkdir(path.dirname(dest), { recursive: true });
-  await writeFile(dest, `${built.svg}\n`);
+  // The cap height travels with the file, so a lockup composed from this
+  // wordmark reads its own, rather than whichever wordmark was set last.
+  await writeFile(dest, `${built.svg.replace(/<svg\b/, `<svg data-cap-height="${built.recipe.capHeight}"`)}\n`);
 
-  state.wordmark = { ...built.recipe, source: url, file: path.relative(path.resolve(root), dest) };
-  await saveState(root, state);
+  // Only the master's recipe is the brand's. Concept agents setting wordmarks
+  // in parallel each wrote theirs here, and the last one to finish decided the
+  // cap height every later lockup was composed with.
+  if (dest === master) {
+    state.wordmark = { ...built.recipe, source: url, file: path.relative(path.resolve(root), dest) };
+    await saveState(root, state);
+  }
   return { file: dest, ...built };
 }
 
@@ -699,7 +728,9 @@ export async function buildLockup(root, { symbol, wordmark, orientation = 'horiz
     symbol: symbolSvg,
     wordmark: wordSvg,
     orientation,
-    capHeight: capHeight ?? state.wordmark?.capHeight ?? null,
+    capHeight: capHeight
+      ?? (Number(/data-cap-height="([\d.]+)"/.exec(wordSvg)?.[1]) || null)
+      ?? (state.wordmark?.file === path.relative(path.resolve(root), within(root, wordmark)) ? state.wordmark.capHeight : null),
     ...(gapRatio != null ? { gapRatio } : {}),
     ...(symbolRatio != null ? { symbolRatio } : {}),
   });

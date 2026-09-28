@@ -121,6 +121,12 @@ week. Say so in the Recon summary. If it is not ready, say in one line what it w
 adds it, then never raise it again. Nothing in the journey waits on it.
 `references/12-media-generation.md` is the whole of it.
 
+With Higgsfield ready, two stages change and neither waits to be asked. The logo round opens on a
+spark wall of real image generation, many models, in the brand's own hand, so the person points at
+a picture rather than reacting to a description. And Proof ends on the brand in real use: generated
+scenes of a billboard, merch, a card and the rest, with the real mark composited on. Those two are
+what a person remembers a brand book by.
+
 Then `$A complete recon`.
 
 ### 2. Intake (ONE batch of questions, then nothing)
@@ -161,8 +167,13 @@ distinctive assets the brand intends to own. Frameworks and the honest limits of
 `references/02-strategy-frameworks.md`.
 
 Every messaging pillar needs proof. A pillar with no evidence is a slogan: either find the evidence
-with `$A evidence`, or file it with `$A question`. Write the rest into brand.json with `$A set`, then
-`$A complete strategy`.
+with `$A evidence`, or file it with `$A question`. Write the rest into brand.json with `$A set`.
+
+Write `applications` now, each with the artboard `file` that will prove it. It decides the proof
+set, the scenes Higgsfield deals, and exactly what the book's Brand in use chapter prints. Besides
+the channels intake question 2 names, every brand gets three real things with a `surface`: a
+billboard or poster (`signage`), a piece of merch (`merch`), and a card (`card`). A person judges a
+brand by seeing it on things, whatever channel the work comes from. Then `$A complete strategy`.
 
 ### 4. Territories (VISUAL, and the user picks)
 
@@ -202,6 +213,23 @@ colour enters: a weak mark rescued by a good palette is a decision you find out 
 months later, on a one-colour press. When a direction is approved, `$A logo master` writes the
 outlined vector masters, the clear-space rule and the minimum sizes into `brand.json`, and
 `$A assets` derives the rest of the pack from there.
+
+The mark belongs to the same family as everything else. If the chosen direction illustrates, write
+`identity.illustration.style` before the forge runs: `logo plan` puts the chosen direction and its
+drawing into every slot brief and every spark prompt, so the round varies the idea and keeps the
+hand. A round dealt without it came back in six registers that had nothing to do with the
+illustrations the person had approved an hour earlier, and they rejected all twelve.
+
+**If the brand illustrates, the drawings are part of the identity.** When the person approves a set,
+record it:
+
+```bash
+$A illustration add brand/illustration/*.svg --set "Christmas"
+```
+
+The book prints the library after the Illustration page, the handover carries every file, and the
+companion skill tells the next session where they are. A style written down with no drawings
+recorded prints as a description of pictures nobody can see, and `$A validate` says so.
 
 A generated mark is a starting point somebody approved, not a drawn one, and the book says so. If a
 round produces nothing worth keeping, say that and set the name properly instead. A typeset wordmark
@@ -280,6 +308,10 @@ Four artboards are always in the set, because every brand meets these:
 | `Print.dc.html` | 794x1123 | A4, body type at 12pt or larger, works in greyscale |
 | `Components.dc.html` | generated | Already written by `$A sheets`, not authored |
 
+And the brand on three real things, always, as mockups (below): a billboard or poster, a piece of
+merch, and a card. These are the pages a person shows other people. A run that answered "social"
+got no real thing at all, and the book ended on screens.
+
 Then the ones the answer selects. Author every row that applies, and say in the canvas note which
 answer put it there:
 
@@ -299,10 +331,15 @@ A physical business that gets no signage artboard has not been proven, and `$A v
 every application named in `brand.json` is checked against the canvas, whether or not it names a file.
 So the list in `applications` and the artboards you author have to agree.
 
-**Put the brand on a real thing.** An artboard showing artwork on a flat colour field answers "what
-is the artwork" and never answers "what does this look like on the van", which is the question a
-client asks in the first minute. If they supplied a photograph of a vehicle, a shopfront, a window or
-a garment, composite the brand onto it:
+The book's Brand in use chapter prints exactly the artboards `applications` names, by file, and
+every mockup. Nothing else: not the territory sketches, not a logo round board. Keep proof in
+`brand/canvas`, or in `brand/proof` while `brand/canvas` still holds the territory round. The book
+looks in both, `brand/proof` first, and `$A book` names every authored artboard it left out.
+
+**Put the brand on a real thing.** Not optional. An artboard showing artwork on a flat colour field
+answers "what is the artwork" and never answers "what does this look like on the van", which is the
+question a client asks in the first minute. If they supplied a photograph of a vehicle, a shopfront,
+a window or a garment, composite the brand onto it:
 
 1. `$A mockup grid <photo>` writes a page showing the photograph under a percentage grid.
 2. **Open it and look.** Read the four corners of the surface the artwork goes on, clockwise from its
@@ -313,10 +350,23 @@ a garment, composite the brand onto it:
 4. `$A mockup build` maps the artwork onto those corners and writes the artboard. A surface with no
    artwork is refused, rather than composited empty and reported as done.
 
-**No photograph of the surface, and Higgsfield there?** Generate one. `$A media plan` deals a blank
-scene for every physical application: the sign panel, the van side, the tote, left blank and square
-to the camera. Run step 1 on the scene file. The model draws the place; the mark on it is still the
-real vector, composited by step 4. Caption it as generated.
+The artwork is whatever that surface would really carry. A tote or a van takes the master. A poster,
+a billboard or a card takes a proof artboard rendered to PNG
+(`node <brandi>/scripts/preview.mjs brand/canvas/Story.dc.html --out <dir> --width 1080 --height 1920`),
+trimmed inside its safe areas to the panel's shape. Give every surface its real `aspect`, height over
+width, measured off the corners: without it the artwork box is 0.4 and a portrait poster is squashed
+into a letterbox. Shrink a generated scene to 2560px on the long side before step 1
+(`sips -Z 2560 -s format jpeg <scene> --out <scene>-2560.jpg`); Higgsfield returns 5K, which is too
+heavy for the canvas and the book. With proof in `brand/proof`, run step 4 as
+`$A mockup build --dir brand/proof` so the mockups sit beside it.
+
+**No photograph of the surface, and Higgsfield there?** Generate one, without being asked.
+`$A media plan` deals a blank scene for every application with a physical `surface`: the billboard,
+the tote, the card on a table, left blank and square to the camera. Look at each at full size, run
+step 1 on the one you keep, and composite the approved master in step 4. The model draws the place;
+the mark on it is always the real vector. Caption it as generated. Without Higgsfield and without a
+photograph, author the surface as a flat artboard and say in the canvas note that a photograph
+would prove it better.
 
 The middle step is a person and cannot be automated. Four corners define the projective transform
 exactly, so everything after step 2 is arithmetic; everything before it is looking. The first attempt
@@ -374,8 +424,13 @@ yourself.
 $A tokens && $A book --pdf && $A guardian
 ```
 
-The book is a landscape deck, one idea per page, that shows the logo, draws the rules and includes
-every proof artboard in `brand/canvas`; `$A book --print --pdf` writes the A4 print book as well.
+The book is a landscape deck, one idea per page, that shows the logo, draws the rules, prints the
+illustration library, and ends on the brand in use: every application artboard and every mockup.
+`$A book --print --pdf` writes the A4 print book as well.
+
+Before `$A book`, `$A validate` must not report `no-real-world-proof` or `illustration-not-recorded`.
+Those two are what a person remembers a brand book by. Then open the PDF and look at the
+Illustration library and Brand in use pages, and read the list of artboards `$A book` left out.
 
 Generated media reaches the book only once a person has approved it: `$A media approve <id>
 --approved-by "<name>"` before `$A book`. Approved photography, illustration, motion and sound get

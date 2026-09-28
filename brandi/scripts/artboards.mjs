@@ -1225,7 +1225,27 @@ export function logoSheetHeight() {
   return 2220 + rows * (MISUSE_CELL + MISUSE_GAP);
 }
 
-export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.03em', capHeightEm = 0.72 } = {}) {
+/**
+ * A mastered mark, ready to be drawn in one ink by CSS colour: every fill and
+ * stroke becomes currentColor and the root fills whatever box it is put in.
+ */
+function inkable(svg) {
+  return String(svg)
+    .replace(/<svg\b([^>]*)>/i, (m, attrs) => `<svg${attrs.replace(/\s(width|height)\s*=\s*"[^"]*"/g, '')} width="100%" height="100%" style="display: block;">`)
+    .replace(/\b(fill|stroke)\s*=\s*"(?!none)[^"]*"/g, '$1="currentColor"')
+    .replace(/\b(fill|stroke)\s*:\s*(?!none)[^;"]+/g, '$1: currentColor');
+}
+
+/** Width over height, from the viewBox, or the width and height, or a wordmark's 3. */
+function svgRatio(svg) {
+  const vb = /viewBox\s*=\s*"([^"]+)"/i.exec(String(svg))?.[1]?.trim().split(/[\s,]+/).map(Number);
+  if (vb?.length === 4 && vb[2] > 0 && vb[3] > 0) return vb[2] / vb[3];
+  const w = Number(/\swidth\s*=\s*"([\d.]+)/i.exec(String(svg))?.[1]);
+  const h = Number(/\sheight\s*=\s*"([\d.]+)/i.exec(String(svg))?.[1]);
+  return w > 0 && h > 0 ? w / h : 3;
+}
+
+export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.03em', capHeightEm = 0.72, markSvg = null } = {}) {
   const fonts = googleFontsUrl([system.type.fonts.display, system.type.fonts.body, system.type.fonts.mono]);
   const { display, body, mono } = fontStacks(system);
   const mode = 'light';
@@ -1238,8 +1258,16 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
   const brand = r('accent.solid');
   const onBrand = s['accent.on-solid'];
 
-  const mark = (size, color, extra = '') =>
+  const typeset = (size, color, extra = '') =>
     `<span style="font-family: ${display}; font-size: ${size}px; font-weight: 700; letter-spacing: ${tracking}; line-height: 1; color: ${color}; white-space: nowrap; ${extra}">${esc(brandName)}</span>`;
+  // The approved master when there is one. Typesetting the name over a brand
+  // that has a drawn mark specified the wrong artwork, and the one real run with
+  // a drawn mark had to leave this sheet off its canvas.
+  const drawn = markSvg ? inkable(markSvg) : null;
+  const ratio = markSvg ? svgRatio(markSvg) : null;
+  const mark = (size, color, extra = '') => (drawn
+    ? `<span role="img" aria-label="${esc(brandName)}" style="display: inline-block; height: ${size}px; width: ${Math.round(size * ratio)}px; line-height: 0; color: ${color}; ${extra}">${drawn}</span>`
+    : typeset(size, color, extra));
 
   // Clear space is drawn as a dashed frame one cap height out from the mark.
   const clearSpacePx = Math.round(88 * capHeightEm);
@@ -1251,7 +1279,7 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
     squash: `transform: scaleY(0.62); transform-origin: left center;`,
     rotate: `transform: rotate(-7deg); transform-origin: left center;`,
     recolour: `color: #C026D3;`,
-    shadow: `text-shadow: 2px 3px 0 rgba(0,0,0,.35);`,
+    shadow: drawn ? 'filter: drop-shadow(2px 3px 0 rgba(0,0,0,.35));' : `text-shadow: 2px 3px 0 rgba(0,0,0,.35);`,
     outline: `-webkit-text-stroke: 1px ${brand}; color: transparent;`,
     crowd: '',
     retype: `font-family: ${body};`,
@@ -1262,7 +1290,9 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
   <div class="sheet__head">
     <span class="eyebrow">${esc(brandName)} / logo</span>
     <h1 class="sheet__title">Wordmark and construction</h1>
-    <p class="sheet__sub">Set in ${esc(system.type.fonts.display ?? 'the display face')} at ${esc(tracking)} tracking. A typeset wordmark is a real identity, not a placeholder, as long as the tracking is a decision rather than a default. When a drawn mark arrives, everything below still applies to it.</p>
+    <p class="sheet__sub">${drawn
+    ? 'The approved master, drawn from its master file. Clear space, sizes and misuse below all apply to it as drawn.'
+    : `Set in ${esc(system.type.fonts.display ?? 'the display face')} at ${esc(tracking)} tracking. A typeset wordmark is a real identity, not a placeholder, as long as the tracking is a decision rather than a default. When a drawn mark arrives, everything below still applies to it.`}</p>
   </div>
 
   <div class="block">
@@ -1272,7 +1302,7 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
 
   <div class="block">
     <div class="block__title"><h2>Clear space</h2><span class="eyebrow">one cap height, every side</span></div>
-    <p class="block__note">Nothing enters the dashed frame: no type, no rule, no edge of a photograph, no other logo. The measure is the cap height of the wordmark, so it scales with the mark instead of being a fixed number that stops making sense at billboard size. Cap height here is approximated at ${capHeightEm}em; measure it against the outlined mark before this reaches a signwriter.</p>
+    <p class="block__note">Nothing enters the dashed frame: no type, no rule, no edge of a photograph, no other logo. The measure is the cap height of the wordmark, so it scales with the mark instead of being a fixed number that stops making sense at billboard size. ${drawn ? 'The exact rule, measured off the master, is on the Clear space page of the brand book.' : `Cap height here is approximated at ${capHeightEm}em; measure it against the outlined mark before this reaches a signwriter.`}</p>
     <div style="background: ${paper}; border: 1px solid ${rule}; padding: 40px; display: flex; justify-content: center;">
       <div style="border: 1px dashed ${brand}; padding: ${clearSpacePx}px; position: relative;">
         ${mark(88, ink)}
@@ -1322,7 +1352,9 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
       ${misuse.map((m) => `<div style="background: ${paper}; padding: 22px 18px; display: flex; flex-direction: column; gap: 14px; min-height: ${MISUSE_CELL}px; overflow: hidden;">
         <div style="flex: 1; display: flex; align-items: center; ${m.id === 'crowd' ? `gap: 4px;` : ''}">
           ${m.id === 'crowd' ? `<span style="font-family: ${body}; font-size: 13px; color: ${muted};">Est.</span>` : ''}
-          ${mark(26, ink, m.style)}
+          ${drawn && m.id === 'outline'
+    ? `<span style="display: inline-block; height: 26px; width: ${Math.round(26 * ratio)}px; line-height: 0;">${drawn.replace(/(fill|stroke)="currentColor"/g, '$1="none"').replace(/<svg\b/, `<svg fill="none" stroke="${brand}" stroke-width="1"`).replace(/<(path|rect|circle|ellipse|polygon|polyline)\b/g, `<$1 stroke="${brand}" stroke-width="1" vector-effect="non-scaling-stroke"`)}</span>`
+    : drawn && m.id === 'retype' ? typeset(26, ink, m.style) : mark(26, ink, m.style)}
           ${m.id === 'crowd' ? `<span style="font-family: ${body}; font-size: 13px; color: ${muted};">2019</span>` : ''}
         </div>
         <span class="mono" style="font-size: 10px; color: ${muted};">Never ${esc(m.label)}</span>
@@ -1330,11 +1362,11 @@ export function wordmarkArtboard(system, { brandName = 'Brand', tracking = '-0.0
     </div>
   </div>
 
-  <div class="block">
+${drawn ? '' : `  <div class="block">
     <div class="block__title"><h2>If a drawn mark is coming</h2><span class="eyebrow">the brief</span></div>
     <p class="block__note">Everything above survives the arrival of a real mark: the clear space rule, the colourways, the minimum sizes and the misuse page all still apply. What changes is what sits inside the frame. Whoever draws it needs to know it must work at 16 pixels, in one colour, embroidered, on a photograph, and when somebody describes it over the phone.</p>
   </div>
-</div>`;
+`}</div>`;
 
   return artboard({
     name: 'Logo',

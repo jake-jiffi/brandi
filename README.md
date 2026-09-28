@@ -181,6 +181,24 @@ Everything deterministic is also a command line, if you would rather drive it yo
 node brandi/scripts/brandi.mjs --help
 ```
 
+## What the book ends on
+
+The two things people remember a brand book by are the drawings they loved and the brand on real
+things. Brandi used to make both and print neither, so both are now part of the record.
+
+**The illustration library.** `brandi illustration add <files...> --set "Christmas"` records the
+finished drawings. The book prints them straight after the Illustration page, two rows of four to
+a page and captioned by set, and the handover carries every file. The companion skill tells the
+next session where they are, so new work reuses them instead of drawing a new set in another hand.
+
+**Brand in use.** The chapter prints exactly the artboards `applications` names, from `brand/proof`
+or `brand/canvas`, and every mockup. Territory sketches and round boards stay out, and `brandi
+book` names each artboard it left out. Every brand is put on three real things whatever its
+channel: a billboard or poster, a piece of merch, and a card. With Higgsfield, Brandi generates a
+blank scene for each (the bus shelter, the tote, the card on a table) and composites the real
+artwork onto it through the corners someone read off it. `brandi validate` reports a brand with no
+real thing and a style with no recorded drawings, before the book is built.
+
 ## Generated media, with Higgsfield
 
 Optional. If the [Higgsfield CLI](https://www.npmjs.com/package/@higgsfield/cli) is installed and
@@ -197,8 +215,9 @@ cards included, comes under the same record with `brandi media import`.
 from the vector master. Every sting is scored on how exactly its last frame matches that one, so a
 model that drifts off the mark is caught before anybody picks it.
 
-**Logo sparks, if you want them.** Each of the forge's concept briefs goes to a different image
-model, so a wall of twelve is not one model's house style twelve times. A person picks the sparks
+**Logo sparks, by default.** With Higgsfield ready, the logo round opens on a spark wall. Each of
+the forge's concept briefs goes to a different image model, so a wall of twelve is not one model's
+house style twelve times, and every prompt carries the brand's own drawing style. A person picks the sparks
 worth pursuing, and says whether they want the drawing or its idea. The drawing is traced; the idea
 is redrawn under its brief. The generation manifest records where either came from. A spark can be
 picked. It can never be approved into the brand.
@@ -271,7 +290,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-1927 tests. They include property tests over the colour and type engines against hundreds of random
+1939 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

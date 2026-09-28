@@ -14,11 +14,13 @@
  *   brandi system                     resolve and audit the design system
  *   brandi tokens [--out brand/tokens] [--prefix acme] [--strict-dimensions]
  *   brandi sheets [--out <dir>]       write the specification artboards
- *   brandi canvas --dir <dir> --title "Acme brand" --out acme-brand.html
+ *   brandi canvas --dir <dir> --title "Acme brand" [--json]   the files and calls for a Design canvas
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf] [--print]     the brand book: a 16:9 deck, or the A4 print book with --print
  *   brandi logo <plan|refine|trace|wordmark|lockup|import|audit|board|pick|master|colour|status>
  *   brandi images <dir> [--check]      measure supplied photography before planning
+ *   brandi illustration [add <files...> --set "Christmas" | remove <files...>]
+ *                                     the finished illustration library the book and handover carry
  *   brandi mockup grid <photo>         read a surface's corners off a real photograph
  *   brandi mockup build                composite the brand onto the recorded surfaces
  *   brandi assets [--out <dir>]        derive the asset pack from the master SVG
@@ -658,7 +660,12 @@ async function cmdSheets(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const dir = path.resolve(flags.out ?? path.join(path.dirname(file), 'canvas'));
   await mkdir(dir, { recursive: true });
+  // The mastered mark, when there is one, so the logo sheet specifies the real
+  // artwork rather than the name typeset in the display face.
+  const logoAssets = await loadLogoAssets(brand, path.dirname(file));
+  const masterPath = (brand.identity?.logo?.files ?? []).map((f) => (typeof f === 'string' ? f : f?.path)).find((f) => f && logoAssets[f]?.kind === 'svg');
   const all = specificationSheets(system, {
+    markSvg: masterPath ? logoAssets[masterPath].markup : null,
     brandName: brand.meta.name ?? 'Brand',
     version: brand.meta.version ?? null,
     // So the component sheet can label a button the way the brand says to,
@@ -2268,35 +2275,75 @@ async function documentHeight(chrome, htmlPath, width, fallback) {
 }
 
 /**
- * The artboards the brand-in-use chapter shows: every authored artboard in
- * brand/canvas (the generated specification sheets are skipped by their
- * marker) and every mockup `brandi mockup build` wrote, rendered to PNG through
- * headless Chrome at the frame width canvas.json records and at the taller of
- * the frame and the document. Without a browser each one becomes a page that
- * says so, rather than a page that is missing.
+ * The artboards the brand-in-use chapter shows.
+ *
+ * The applications `brand.json` lists, in that order, then every mockup
+ * `brandi mockup build` wrote. Each is looked for in brand/proof first and then
+ * brand/canvas, because a run that keeps its territory sketches in brand/canvas
+ * puts the proof beside them. Taking "every authored artboard in brand/canvas"
+ * printed three territory sketches and a logo round board as the brand in use,
+ * and found the territories' contents page under the name the home page was
+ * listed as, while the real proof sat unread in brand/proof. An authored
+ * artboard that is neither an application nor a mockup is left out and named,
+ * so nothing disappears silently. A brand that lists no application files
+ * keeps the old rule: every authored artboard.
+ *
+ * Each is rendered to PNG through headless Chrome at the frame width
+ * canvas.json records and at the taller of the frame and the document. Without
+ * a browser each one becomes a page that says so, rather than a page that is
+ * missing.
  */
 async function proofArtboards(brand, brandDir) {
-  const canvasDir = path.join(brandDir, 'canvas');
-  if (!existsSync(canvasDir)) return [];
-  let manifest = null;
-  try { manifest = JSON.parse(await readFile(path.join(canvasDir, 'canvas.json'), 'utf8')); } catch { manifest = null; }
-  const frames = new Map((manifest?.artboards ?? []).map((a) => [a.file, a]));
-  const apps = brand.applications ?? [];
+  const dirs = ['proof', 'canvas'].map((d) => path.join(brandDir, d)).filter((d) => existsSync(d));
+  const frames = new Map();
+  const listing = new Map();
+  for (const dir of dirs) {
+    let manifest = null;
+    try { manifest = JSON.parse(await readFile(path.join(dir, 'canvas.json'), 'utf8')); } catch { manifest = null; }
+    frames.set(dir, new Map((manifest?.artboards ?? []).map((a) => [a.file, a])));
+    listing.set(dir, (await readdir(dir)).filter((f) => f.endsWith('.dc.html')).sort());
+  }
+  const generated = async (dir, file) => (await readFile(path.join(dir, file), 'utf8')).slice(0, 4096).includes(GENERATED_MARKER);
+  const apps = (brand.applications ?? []).filter((a) => a && typeof a === 'object');
+  const listed = apps.map((a) => a.file).filter((f) => typeof f === 'string' && f.endsWith('.dc.html'));
+
+  const chosen = [];
+  const taken = new Set();
+  const take = (dir, file) => { chosen.push({ dir, file }); taken.add(path.join(dir, file)); };
+  if (listed.length) {
+    for (const file of [...new Set(listed)]) {
+      const dir = dirs.find((d) => listing.get(d).includes(file));
+      if (dir) take(dir, file);
+    }
+    for (const dir of dirs) for (const file of listing.get(dir)) if (/^Mockup/.test(file) && !taken.has(path.join(dir, file))) take(dir, file);
+  } else {
+    for (const dir of dirs) {
+      for (const file of listing.get(dir)) {
+        if (/^Mockup/.test(file) || !(await generated(dir, file))) take(dir, file);
+      }
+    }
+  }
+  const leftOut = [];
+  for (const dir of dirs) {
+    for (const file of listing.get(dir)) {
+      if (taken.has(path.join(dir, file)) || await generated(dir, file)) continue;
+      leftOut.push(path.relative(brandDir, path.join(dir, file)));
+    }
+  }
+
   const chrome = findChrome();
   const out = [];
-  for (const file of (await readdir(canvasDir)).filter((f) => f.endsWith('.dc.html')).sort()) {
-    const full = path.join(canvasDir, file);
-    const head = (await readFile(full, 'utf8')).slice(0, 4096);
+  for (const { dir, file } of chosen) {
+    const full = path.join(dir, file);
     const mockup = /^Mockup/.test(file);
-    if (!mockup && head.includes(GENERATED_MARKER)) continue;
     const stem = file.replace(/\.dc\.html$/, '');
     const source = await readFile(full, 'utf8');
-    const app = apps.find((a) => a && a.file === file);
+    const app = apps.find((a) => a.file === file);
     // A mockup's frame is the photograph's own, and `mockupBody` wrote it into
     // the artboard. Falling back to the 1440x900 desktop frame letterboxed a
     // 1400x582 composite into half a page of nothing.
     const drawn = mockup ? /<div style="position:relative;width:(\d+)px;height:(\d+)px/.exec(source) : null;
-    const frame = (drawn ? { w: Number(drawn[1]), h: Number(drawn[2]) } : null) ?? frames.get(file);
+    const frame = (drawn ? { w: Number(drawn[1]), h: Number(drawn[2]) } : null) ?? frames.get(dir).get(file);
     const entry = {
       file, stem, kind: mockup ? 'mockup' : 'proof',
       title: app?.name ?? (mockup ? stem.replace(/^Mockup/, '') : stem),
@@ -2315,8 +2362,8 @@ async function proofArtboards(brand, brandDir) {
       try {
         // The preview is written to a scratch directory, so a photograph the
         // artboard references by a relative path (a mockup's, for one) is
-        // resolved back to the canvas directory with a <base>.
-        const base = `<base href="${pathToFileURL(canvasDir + path.sep).href}">`;
+        // resolved back to the artboard's own directory with a <base>.
+        const base = `<base href="${pathToFileURL(dir + path.sep).href}">`;
         const preview = toPreviewHtml(source, { width: entry.w, height: entry.h, label: file });
         const htmlPath = path.join(tmp, `${stem}.preview.html`);
         await writeFile(htmlPath, /<head[^>]*>/i.test(preview) ? preview.replace(/<head[^>]*>/i, (m) => `${m}${base}`) : `${base}${preview}`);
@@ -2334,7 +2381,90 @@ async function proofArtboards(brand, brandDir) {
     }
     out.push(entry);
   }
+  return { boards: out, leftOut };
+}
+
+/**
+ * The finished illustration library, loaded for the book: every file
+ * `brandi illustration add` recorded, as a data URI, in the order recorded.
+ */
+async function loadIllustrationLibrary(brand, brandDir) {
+  const projectRoot = path.resolve(brandDir, '..');
+  const MAX = 4 * 1024 * 1024;
+  const out = [];
+  for (const item of brand.identity?.illustration?.library ?? []) {
+    if (!item || typeof item.file !== 'string' || path.isAbsolute(item.file)) continue;
+    const full = path.resolve(projectRoot, item.file);
+    const mime = ILLUSTRATION_TYPES[path.extname(full).slice(1).toLowerCase()];
+    let src = null;
+    if (mime && existsSync(full) && await reallyInside(full, projectRoot)) {
+      const s = await stat(full);
+      if (s.isFile() && s.size <= MAX) src = `data:${mime};base64,${(await readFile(full)).toString('base64')}`;
+    }
+    out.push({ ...item, src });
+  }
   return out;
+}
+
+const ILLUSTRATION_TYPES = { svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+
+/**
+ * `brandi illustration`: the finished illustration library.
+ *
+ * Illustration a person approves is part of the identity, like the mark, not a
+ * generated sample. On a real run the whole library was drawn, coloured by a
+ * script and filed under brand/illustration, and none of it reached the book or
+ * the handover, because nothing recorded it. This records it: the book prints
+ * every drawing, the handover carries every file, and the companion skill names
+ * where they are.
+ */
+async function cmdIllustration(flags, positional) {
+  const [sub, ...files] = positional;
+  const { file, brand } = await needBrand(flags);
+  const projectRoot = path.resolve(path.dirname(file), '..');
+  brand.identity ??= {};
+  brand.identity.illustration ??= {};
+  const library = brand.identity.illustration.library ?? [];
+
+  if (!sub || sub === 'list') {
+    return emit(
+      library.length
+        ? [`${plural(library.length, 'illustration')} in the library:`, ...library.map((i) => `  ${i.file}${i.set ? `  (${i.set})` : ''}${i.title ? `  ${i.title}` : ''}`)].join('\n')
+        : 'The illustration library is empty. Record finished drawings with: brandi illustration add <files...> --set "<the set>"',
+      { library },
+    );
+  }
+  if (!files.length) return fail(`usage: brandi illustration ${sub} <files...>${sub === 'add' ? ' [--set "Christmas"] [--title "..."]' : ''}`);
+
+  const resolved = [];
+  for (const f of files) {
+    const full = path.resolve(f);
+    if (!existsSync(full)) return fail(`No such file: ${f}`);
+    if (!(await reallyInside(full, projectRoot))) return fail(`${f} is outside the project, so the book and the handover could not carry it.`);
+    resolved.push(path.relative(projectRoot, full));
+  }
+
+  if (sub === 'remove') {
+    const gone = new Set(resolved);
+    brand.identity.illustration.library = library.filter((i) => !gone.has(i.file));
+    await saveBrand(file, brand);
+    return emit(`Removed ${plural(library.length - brand.identity.illustration.library.length, 'illustration')}. ${plural(brand.identity.illustration.library.length, 'illustration')} left.`, { library: brand.identity.illustration.library });
+  }
+  if (sub !== 'add') return fail('usage: brandi illustration [add|remove|list] <files...>');
+
+  const refused = resolved.filter((f) => !ILLUSTRATION_TYPES[path.extname(f).slice(1).toLowerCase()]);
+  if (refused.length) return fail(`The book prints SVG, PNG, JPEG and WebP. Not: ${refused.join(', ')}`);
+  const set = typeof flags.set === 'string' ? flags.set : null;
+  const title = typeof flags.title === 'string' ? flags.title : null;
+  const kept = library.filter((i) => !resolved.includes(i.file));
+  const added = resolved.map((f) => ({ file: f, ...(set ? { set } : {}), ...(title && resolved.length === 1 ? { title } : {}) }));
+  brand.identity.illustration.library = [...kept, ...added];
+  await saveBrand(file, brand);
+  emit(
+    `Recorded ${plural(added.length, 'illustration')}${set ? ` in "${set}"` : ''}. The library has ${plural(brand.identity.illustration.library.length, 'drawing')}.\n`
+      + 'The book prints them after the Illustration page, and the handover carries the files.',
+    { added, library: brand.identity.illustration.library },
+  );
 }
 
 async function cmdBook(flags) {
@@ -2348,12 +2478,18 @@ async function cmdBook(flags) {
   // over as many A4 sheets as they need, so its page count is only known once
   // a PDF exists. Until then the count is reported as sections.
   let sections = null;
+  let leftOut = [];
   if (print) {
     html = renderBrandBook({ brand, system, assets });
     sections = (html.match(/<section class="page"/g) ?? []).length;
     pages = null;
   } else {
-    const deck = renderBrandDeck({ brand, system, assets, artboards: await proofArtboards(brand, dir), media: await loadApprovedMedia(brand, dir) });
+    const proof = await proofArtboards(brand, dir);
+    leftOut = proof.leftOut;
+    const deck = renderBrandDeck({
+      brand, system, assets, artboards: proof.boards,
+      media: await loadApprovedMedia(brand, dir), illustrations: await loadIllustrationLibrary(brand, dir),
+    });
     html = deck.html;
     pages = deck.pages.filter((p) => !p.absent).length;
   }
@@ -2386,8 +2522,9 @@ async function cmdBook(flags) {
   emit(
     `Wrote ${written.join('\n       ')}\n       ${count}, ${print ? 'A4 print book' : '1920x1080 deck'}.` +
       (named && embedded < named ? `\n\n${named - embedded} of ${named} logo files could not be embedded, so the logo chapter names them instead of showing them.` : '') +
+      (leftOut.length ? `\n\nLeft out of Brand in use, because no application lists them and they are not mockups:\n  ${leftOut.join('\n  ')}\nList an application's file under applications to put it in the book.` : '') +
       (print ? '' : '\nThe A4 print book is still available: brandi book --print.'),
-    { ok: true, files: written, pdf: pdfPath, logosEmbedded: embedded, logosNamed: named, format, pages, sections },
+    { ok: true, files: written, pdf: pdfPath, logosEmbedded: embedded, logosNamed: named, format, pages, sections, leftOut },
   );
 }
 
@@ -2561,6 +2698,7 @@ const COMMANDS = {
   fonts: cmdFonts,
   logo: cmdLogo,
   images: cmdImages,
+  illustration: cmdIllustration,
   mockup: cmdMockup,
   media: cmdMedia,
   assets: cmdAssets,

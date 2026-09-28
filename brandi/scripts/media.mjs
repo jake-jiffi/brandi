@@ -957,6 +957,7 @@ function ideationSlots(forge, notes, rotation = IDEATION_MODELS) {
       `${s.architectureName}. ${s.registerName ? `${s.registerName} lettering.` : ''}`,
       s.symbolApproach ? `Symbol: ${s.symbolApproach}. ${s.symbolBrief ?? ''}` : 'No symbol: the lettering carries it alone.',
       s.signals ? `It should signal: ${s.signals}` : null,
+      text(forge.brand?.style) ? `Draw it in the brand's own hand. ${forge.brand.style}` : null,
       'Flat solid black on pure white. One ink. No gradient, shading, texture, 3D, mockup, background scene or tagline.',
       `If the name is set, spell it exactly "${name}". Centred, with generous margin.`,
       has(s.mustNotBe) ? `Avoid: ${s.mustNotBe.join('; ')}.` : null,

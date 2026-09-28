@@ -412,6 +412,21 @@ export async function checkPromises({ brand, root = process.cwd(), canvasDir = n
           'Draw it, or take it out of the application list. The list is a promise about what has been proven.');
       }
     }
+
+    // Two things a person remembers a brand book by, and the two a real run
+    // left out: the brand on real things, and the drawings they loved.
+    if (boards.size) {
+      const mockups = [...boards].filter((f) => /^Mockup/.test(f));
+      if (!mockups.length && !(id.mockups ?? []).length) {
+        add('warn', 'no-real-world-proof', 'Nothing puts the brand on a real thing: no mockup on a photograph or a scene.',
+          'Put it on a billboard, a piece of merch and a card at least. List each as an application with a surface (signage, merch, card), get a scene from `brandi media plan` or a supplied photograph, and composite the real mark with `brandi mockup build`.');
+      }
+      const il = id.illustration;
+      if (il?.style && !(il.library ?? []).length) {
+        add('warn', 'illustration-not-recorded', 'The brand has an illustration style and no recorded drawings, so the book describes the style and shows none of it.',
+          'Record the finished drawings with `brandi illustration add <files...> --set "<the set>"`. The book prints them and the handover carries them.');
+      }
+    }
   }
 
   const order = { error: 0, warn: 1, info: 2 };
@@ -422,6 +437,26 @@ export async function checkPromises({ brand, root = process.cwd(), canvasDir = n
 // ---------------------------------------------------------------------------
 // The companion skill
 // ---------------------------------------------------------------------------
+
+/**
+ * Illustration, when the brand has it: the style in its own words and where
+ * the finished library is, so the next session reuses the drawings rather than
+ * generating a new set in a different hand.
+ */
+function illustrationSection(brand) {
+  const il = brand.identity?.illustration;
+  if (!il || (!il.style && !(il.library ?? []).length)) return '';
+  const library = il.library ?? [];
+  const sets = [...new Set(library.map((i) => i.set).filter(Boolean))];
+  const folders = [...new Set(library.map((i) => String(i.file).split('/').slice(0, -1).join('/')).filter(Boolean))];
+  return `
+## Illustration
+
+${il.style ?? '[The illustration style has not been recorded yet. Read brand.json.]'}
+${library.length ? `
+The finished library is ${library.length} drawing${library.length === 1 ? '' : 's'}${sets.length ? `, in these sets: ${sets.join(', ')}` : ''}. The files are in \`${folders.join('`, `')}\`, and \`identity.illustration.library\` in brand.json lists every one. Use a drawing from the library before drawing a new one. A new one is drawn to the style above and recorded with \`brandi illustration add <file> --set "<the set>"\`.
+` : ''}`;
+}
 
 const yamlString = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
@@ -500,7 +535,7 @@ reason is reported as its own finding. If a face is missing, say so rather than 
 - Radius stance: **${system.meta.shape}**. ${system.meta.shapeNote}
 - Spacing: ${system.meta.spaceBase}px base. Use \`--space-*\` tokens, named by pixel value.
 - Motion: **${system.meta.motion}**. ${system.meta.motionNote} Honour \`prefers-reduced-motion\`.
-
+${illustrationSection(brand)}
 ## Voice
 
 ${attributes || '- [Voice attributes have not been recorded yet. Read brand.json.]'}

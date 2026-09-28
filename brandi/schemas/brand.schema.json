@@ -1348,6 +1348,29 @@
               "items": {
                 "type": "string"
               }
+            },
+            "library": {
+              "type": "array",
+              "description": "The finished illustration library: files a person approved, recorded with `brandi illustration add`. The book prints them and the handover carries them.",
+              "items": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "description": "Path from the project root."
+                  },
+                  "set": {
+                    "type": "string",
+                    "description": "The set or occasion it belongs to, for example Christmas."
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         }

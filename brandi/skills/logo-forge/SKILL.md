@@ -90,22 +90,38 @@ under stated assumptions is useful; a round that never happened is not.
 "$A" logo plan --count 12
 ```
 
+Every slot brief carries the chosen direction and its drawing style from `brand.json`, so the
+round varies the idea and keeps the hand. Write `identity.illustration.style` first if the brand
+illustrates: a mark that could not sit beside the illustrations is off-brief, however good it is.
+
 Twelve is the default and the right number. Fewer than eight is not a range; more than sixteen is
 a wall nobody reads. It writes one brief per slot to `brand/logo/brief/slots/round-01/`.
 
 Read two or three of them so you know what you are dispatching. Do not edit them.
 
-### Sparks from image models (optional, and it adds a stop)
+### Sparks from image models (the default when Higgsfield is ready)
 
-When Higgsfield is installed (`"$A" media status`), the round can start from sparks: each slot
-brief rendered by a different image model, black on white, before anybody draws. Two sources of
-variety at once: the briefs cannot converge, and no two sparks share a model's house style.
+When Higgsfield is ready (`"$A" media status`), the round starts from sparks without being asked:
+each slot brief rendered by a different image model, black on white, before anybody draws. Two
+sources of variety at once: the briefs cannot converge, and no two sparks share a model's house
+style. A person reacts to pictures far faster than to descriptions. On one run the owner rejected
+a whole drawn round and had to ask for this wall; everything they liked came out of it.
 
 ```bash
 "$A" media plan --kinds ideation     # one spark slot per concept slot, models rotated from the live catalogue
 "$A" media cost && "$A" media run
 "$A" media board --kind ideation     # publish it like any board
 "$A" media pick idea-C1-1 idea-D2-2  # the ones the person thinks are worth pursuing
+```
+
+Each prompt carries the brand's own hand when `identity.illustration.style` is written, so the wall
+is sketched in the family the brand already draws in. When the brand has a finished illustration
+library, add two or three sparks that take a library drawing as their style reference:
+
+```bash
+"$A" media add idea-house-1 --kind ideation --count 2 \
+  --refs '{"image_references":["brand/illustration/png/illo-birthday.png"]}' \
+  --prompt "A logo mark for \"<name>\" drawn in exactly this hand: the same line, the same weight. Black on white."
 ```
 
 Check each spark against its own slot's refusals before the person sees the wall; image models

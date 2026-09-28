@@ -254,6 +254,41 @@ export async function buildHandoff({ brandDir, outDir, brand, system }) {
     present.push({ ...part, size: m ? `${m.files === 1 ? human(m.bytes) : `${m.files} files, ${human(m.bytes)}`}` : null });
   }
 
+  // The illustration library is a list of files, not a folder, because a run
+  // files its drawings wherever its tools write them. Each one inside the brand
+  // directory is copied under its set, so the package holds the drawings the
+  // book shows.
+  const library = brand.identity?.illustration?.library ?? [];
+  if (library.length) {
+    const part = {
+      id: 'illustration',
+      dest: 'illustration',
+      title: 'The illustration library',
+      who: 'A designer making the next set, and whoever lays out a page, a sticker or a card.',
+      what: 'Every finished drawing, filed by set, as the book shows them. New ones are drawn to the rules on the book\'s Illustration page.',
+      make: 'brandi illustration add <files...> --set "<the set>"',
+    };
+    const outside = [];
+    let copied = 0;
+    for (const item of library) {
+      if (!item || typeof item.file !== 'string' || path.isAbsolute(item.file)) continue;
+      const source = path.resolve(brandDir, '..', item.file);
+      if (!existsSync(source) || !await insideBrand(source)) { outside.push(item.file); continue; }
+      const folder = item.set ? String(item.set).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'library' : 'library';
+      const dest = path.join(outDir, 'illustration', folder, path.basename(source));
+      await mkdir(path.dirname(dest), { recursive: true });
+      await cp(source, dest, { dereference: true });
+      copied++;
+    }
+    if (copied) {
+      const m = await measure(path.join(outDir, 'illustration'));
+      present.push({ ...part, size: m ? `${m.files} files, ${human(m.bytes)}` : null });
+    }
+    if (outside.length) {
+      absent.push({ ...part, what: `${outside.length} recorded drawing${outside.length === 1 ? ' is' : 's are'} missing or outside the brand directory, so not packaged: ${outside.join(', ')}.` });
+    }
+  }
+
   const html = indexPage({
     brandName: brand.meta?.name ?? 'Brand',
     version: brand.meta?.version ?? null,

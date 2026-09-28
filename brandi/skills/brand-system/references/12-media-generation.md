@@ -6,7 +6,9 @@ spoken brand line, the mark in 3D, and logo sparks from several image models. Br
 through `brandi media`.
 
 It is optional. A brand built without it is complete. Check for it once, suggest it once, and never
-make anything wait on it.
+make anything wait on it. When it is there, two things happen without being asked: the logo round
+opens on a spark wall in the brand's own hand, and proof ends on real scenes (a billboard, merch, a
+card and whatever else `applications` puts on a physical surface) with the real mark composited on.
 
 Three rules hold everything below together.
 
@@ -14,7 +16,8 @@ Three rules hold everything below together.
   approved files reach the book and the handover.
 - **The mark is never generated.** Image models redraw letterforms and invent detail. The real
   vector mark is composited onto generated scenes, and a sting ends on a frame rendered from the
-  master. Logo sparks exist only as references the forge redraws in vector.
+  master. A logo spark is a sketch: the one a person picks is traced or redrawn as a vector concept,
+  and the spark itself is never approved into the brand.
 - **Credits are money.** Every run is priced before anything is created, and a run that would pass
   the plan's budget is refused before a single job starts.
 
@@ -177,7 +180,9 @@ $A mockup grid brand/media/scene/scene-shopfront-1.png
 ```
 
 Read the corners, record them under `identity.mockups` with the scene as the photo and a caption
-that says it is generated, and `$A mockup build` composites the real artwork.
+that says it is generated, and `$A mockup build` composites the real artwork. Deal these at Proof
+without being asked, one per physical application, and look at every one at full size before
+picking: a clean, square, evenly lit panel is what makes the composite look real.
 
 For the **sting**, describe the motion in the terms of the motion principle and the motion
 signature, and say it ends still on the end frame. Never ask the model to draw the mark: the start

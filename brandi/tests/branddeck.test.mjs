@@ -481,13 +481,26 @@ describe('the command line', () => {
       name: 'Tall', fonts: null, systemNote: 'authored',
       body: '<div style="background:#E8F7EE;width:600px;height:1400px"></div>',
     }));
-    await writeFile(path.join(canvas, 'canvas.json'), JSON.stringify({ artboards: [{ file: 'MockupVan.dc.html', x: 0, y: 0, w: 600, h: 400 }, { file: 'Poster.dc.html', x: 700, y: 0, w: 600, h: 400 }, { file: 'Tall.dc.html', x: 1400, y: 0, w: 600, h: 400 }] }));
+    // A territory sketch nobody listed as an application: the book leaves it out and says so.
+    await writeFile(path.join(canvas, 'DirectionA.dc.html'), artboard({
+      name: 'DirectionA', fonts: null, systemNote: 'authored',
+      body: '<div style="background:#000;width:600px;height:400px"></div>',
+    }));
+    await writeFile(path.join(canvas, 'canvas.json'), JSON.stringify({ artboards: [{ file: 'MockupVan.dc.html', x: 0, y: 0, w: 600, h: 400 }, { file: 'Poster.dc.html', x: 700, y: 0, w: 600, h: 400 }, { file: 'Tall.dc.html', x: 1400, y: 0, w: 600, h: 400 }, { file: 'DirectionA.dc.html', x: 2100, y: 0, w: 600, h: 400 }] }));
+    // Brand in use prints the applications brand.json lists, and every mockup.
+    const brandFile = path.join(dir, 'brand', 'brand.json');
+    const original = await readFile(brandFile, 'utf8');
+    const listed = JSON.parse(original);
+    listed.applications = [...listed.applications, { name: 'Poster', file: 'Poster.dc.html' }, { name: 'Tall', file: 'Tall.dc.html' }];
+    await writeFile(brandFile, JSON.stringify(listed, null, 2));
     const r = await cli(['book']);
+    await writeFile(brandFile, original);
     assert.equal(r.pages, FIXTURE_PAGES + 3, 'one page per artboard, after the applications page');
+    assert.deepEqual(r.leftOut, [path.join('canvas', 'DirectionA.dc.html')], 'the unlisted sketch is left out, and named');
     const html = await readFile(path.join(dir, 'brand', 'brand-book.html'), 'utf8');
     assert.match(html, /alt="Mockup: Van"/);
     assert.match(html, /alt="Artboard: Poster"/);
-    assert.match(html, /3 drawn: MockupVan\.dc\.html, Poster\.dc\.html, Tall\.dc\.html/);
+    assert.match(html, /3 drawn: Poster\.dc\.html, Tall\.dc\.html, MockupVan\.dc\.html/);
     const data = /<img src="data:image\/png;base64,([^"]+)" alt="Mockup: Van"/.exec(html)[1];
     const png = decodePng(Buffer.from(data, 'base64'));
     let reds = 0;

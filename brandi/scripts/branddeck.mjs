@@ -736,6 +736,44 @@ function samplesPage(ctx, { id, chapter, title, n, rail, items }) {
   });
 }
 
+// Two rows of four. Drawings are square, so a row is as tall as a column is
+// wide, and a third row ran off the page and over the footer.
+const LIBRARY_PER_PAGE = 8;
+
+/**
+ * One page of the illustration library: the drawings as they are, on paper,
+ * each named with its set, so a designer can find the Christmas stocking
+ * without opening a folder.
+ */
+function libraryPage(ctx, { id, title, n, items, total, shown = total, first }) {
+  const cols = 4;
+  const sets = [...new Set(items.map((i) => i.set).filter(Boolean))];
+  const tiles = items.map((it) => {
+    // The set names a drawing better than its file name does ("Birthday", not
+    // "illo birthday"), so the file name is the last resort.
+    const name = it.title ?? it.set ?? it.file.split('/').pop().replace(/\.[a-z]+$/i, '').replace(/[-_]+/g, ' ');
+    const also = it.title && it.set ? ` &middot; ${esc(it.set)}` : '';
+    const art = it.src
+      ? `<img src="${it.src}" alt="${esc(name)}" style="width:100%;height:100%;min-height:0;object-fit:contain;display:block">`
+      : `<p class="mono" style="font-size:14px">${todo(`the file ${esc(it.file)}, which could not be read`)}</p>`;
+    return `<figure class="illustration-item" data-set="${esc(it.set ?? '')}" style="margin:0;display:flex;flex-direction:column;gap:8px;min-height:0">
+      <div class="card" style="flex:1;min-height:0;padding:18px;justify-content:center;align-items:center;background:var(--paper)">${art}</div>
+      <figcaption style="font-size:14px;line-height:1.35;color:var(--muted)"><strong style="color:var(--ink)">${esc(name)}</strong>${also}</figcaption>
+    </figure>`;
+  });
+  return contentPage(ctx, {
+    id, chapter: 'Brand assets', title, n,
+    rail: railText(
+      first
+        ? `${total} finished drawing${total === 1 ? '' : 's'} in the brand's own hand. Use them as they are; new ones are drawn to the rules on the page before.${shown < total ? ` The first ${shown} are shown here; the handover carries all ${total}.` : ''}`
+        : 'The library, continued.',
+      sets.length ? `<strong>Sets on this page.</strong> ${sets.map(esc).join(', ')}.` : null,
+      `<strong>Files.</strong> <span class="mono" style="font-size:14px">${esc([...new Set(items.map((i) => i.file.split('/').slice(0, -1).join('/')))].join(', ') || '.')}</span>`,
+    ),
+    canvas: `<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:24px">${tiles.join('')}</div>`,
+  });
+}
+
 /**
  * A simple diagram of a signature move whose rule can be drawn: an image that
  * leaves the frame on two edges, a band across the frame, or a shape held in
@@ -1805,6 +1843,18 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         });
       },
     });
+    // The finished library: the drawings themselves, not a description of them.
+    // Six pages at most. Every drawing is embedded in the book, and a library of
+    // hundreds would make a document nobody can open; the handover has them all.
+    const library = (ctx.illustrations ?? []).slice(0, LIBRARY_PER_PAGE * 6);
+    const totalDrawings = (ctx.illustrations ?? []).length;
+    for (let i = 0; i < library.length; i += LIBRARY_PER_PAGE) {
+      const first = i === 0;
+      const pid = first ? 'illustration-library' : `illustration-library-${i / LIBRARY_PER_PAGE + 1}`;
+      const title = first ? 'The illustration library' : 'The illustration library, continued';
+      const items = library.slice(i, i + LIBRARY_PER_PAGE);
+      page({ chapter: 'assets', id: pid, title, render: (n) => libraryPage(ctx, { id: pid, title, n, items, total: totalDrawings, shown: library.length, first }) });
+    }
     if (approvedOf('illustration').length) {
       page({
         chapter: 'assets', id: 'illustration-samples', title: 'Illustration in practice',
@@ -2159,7 +2209,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
  *   {file, stem, title, kind: 'proof'|'mockup', png: data URI|null, reason, w, h, purpose, notes}
  * @returns {{html: string, pages: object[]}} the document and the page list in order
  */
-export function renderBrandDeck({ brand, system, assets = {}, artboards = [], media = [] }) {
+export function renderBrandDeck({ brand, system, assets = {}, artboards = [], media = [], illustrations = [] }) {
   const name = brand.meta?.name ?? 'Unnamed brand';
   const sem = system.semantic.light;
   const r = (k) => resolveToken(sem[k], system, 'light');
@@ -2187,7 +2237,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [], me
     },
   };
   const ctx = {
-    brand, system, assets, artboards, media, tokens, r, name,
+    brand, system, assets, artboards, media, illustrations, tokens, r, name,
     version: brand.meta?.version ?? '0.1.0',
     logo: logoContext(brand, assets, tokens),
   };
