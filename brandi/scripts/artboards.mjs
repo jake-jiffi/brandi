@@ -26,7 +26,7 @@ export function googleFontsUrl(families, { weights = WEIGHTS.map((w) => w.value)
   const list = [...new Set(families.filter(Boolean).map((f) => (Array.isArray(f) ? f[0] : f)))];
   if (!list.length) return null;
   const q = list
-    .map((f) => `family=${encodeURIComponent(String(f).trim()).replace(/%20/g, '+')}:wght@${weights.join(';')}`)
+    .map((f) => `family=${encodeURIComponent(String(f).trim()).replace(/%20/g, '+')}:ital,wght@${[0, 1].flatMap((i) => weights.map((w) => `${i},${w}`)).join(';')}`)
     .join('&');
   return `https://fonts.googleapis.com/css2?${q}&display=swap`;
 }
@@ -80,6 +80,7 @@ body {
   background: ${page};
   color: ${ink};
   font-family: ${body};
+  font-synthesis: none;
   font-size: 14px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;

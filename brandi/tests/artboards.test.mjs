@@ -24,8 +24,9 @@ describe('googleFontsUrl', () => {
   test('builds a valid css2 url from the faces in use', () => {
     const url = A.googleFontsUrl(['Bitter', 'Karla']);
     assert.match(url, /^https:\/\/fonts\.googleapis\.com\/css2\?/);
-    assert.match(url, /family=Bitter:wght@400;500;700/);
-    assert.match(url, /family=Karla:wght@400;500;700/);
+    // Italics are requested too: without them the browser slants the upright and calls it italic.
+    assert.match(url, /family=Bitter:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700/);
+    assert.match(url, /family=Karla:ital,wght@0,400;0,500;0,700;1,400;1,500;1,700/);
     assert.match(url, /&display=swap$/);
   });
 

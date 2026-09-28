@@ -72,6 +72,7 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
+  font-synthesis: none;
   font-family: var(--body);
   font-size: 15px;
   line-height: 1.6;

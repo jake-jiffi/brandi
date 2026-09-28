@@ -162,7 +162,7 @@ function deckCss(system, tokens) {
 html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body {
   margin: 0; background: var(--ground); color: var(--ink);
-  font-family: var(--body); font-size: 20px; line-height: 1.5;
+  font-family: var(--body); font-size: 20px; line-height: 1.5; font-synthesis: none;
   -webkit-font-smoothing: antialiased; text-wrap: pretty; overflow-x: hidden;
 }
 .deck { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px; }
