@@ -839,6 +839,21 @@ export const REFINEMENT_TASKS = Object.freeze([
 ]);
 
 /**
+ * The first task for a mark traced from a reference the person picked.
+ *
+ * A trace keeps what the image model drew, tremor and all. What the person
+ * wanted was the drawing, so the clean-up changes nothing a person would see
+ * except the accidents, and it is dealt before the other four so there is a
+ * faithful, clean version of their pick in the round whatever else happens.
+ */
+export const TRACE_CLEANUP_TASK = Object.freeze({
+  suffix: 'c',
+  name: 'The clean-up',
+  task: 'This mark is a trace of a drawing the person picked because they wanted that drawing. Keep it: every curve, terminal, join, gap and proportion stays where it is. Straighten only what was plainly meant to be straight, even out a stroke weight that wavers by accident, and drop nodes the shape does not need. Lay your result over the trace before you stop.',
+  gate: 'Laid over the trace, nobody can point to a difference except a wobble that has gone.',
+});
+
+/**
  * The slots for refining one chosen concept.
  *
  * Every brief carries the path to the file being refined, because unlike a
@@ -850,6 +865,7 @@ export function refinementSlots(candidate, { tasks = REFINEMENT_TASKS } = {}) {
     id: `${candidate.id}${t.suffix}`,
     refines: candidate.id,
     refinesFile: candidate.file ?? null,
+    traceOf: candidate.traceOf ?? null,
     family: candidate.family ?? null,
     familyName: t.name,
     question: t.task,
@@ -888,6 +904,7 @@ export function refinementBrief(slot, brief = {}) {
     `You are refining concept ${slot.refines}, which is at:`,
     slot.refinesFile ? `  ${slot.refinesFile}` : '  [the chosen concept]',
     '',
+    ...(slot.traceOf ? [`It is a trace of ${slot.traceOf}, the drawing the person picked. Look at both.`, ''] : []),
     'Open it and look at it before you change anything. This is not your idea and',
     'you are not being asked for a new one. A refinement that somebody cannot',
     'recognise as the same mark has failed, however good it is.',
@@ -969,6 +986,7 @@ export function slotBrief(slot, brief = {}) {
 }
 
 export default {
+  TRACE_CLEANUP_TASK,
   ARCHITECTURES,
   REGISTERS,
   SYMBOL_APPROACHES,

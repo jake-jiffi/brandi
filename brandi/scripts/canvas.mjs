@@ -1,6 +1,6 @@
 /**
  * Brandi canvas layer: emit and validate Design Component artboards for
- * Claude Code's `/design` canvas.
+ * Claude's Design canvas, an Artifact type.
  *
  * The division of labour here is deliberate.
  *
@@ -22,6 +22,7 @@
  */
 
 const SUPPORT_LINE = '<script src="./support.js"></script>';
+const DC_SCRIPT_ATTRS = 'type="text/x-dc" data-dc-script';
 
 /** Frame sizes the canvas and the real world agree on. */
 export const FRAMES = Object.freeze({
@@ -122,7 +123,7 @@ export function artboard(spec) {
       if (!/^https:\/\/fonts\.googleapis\.com\//.test(href)) {
         throw new RangeError(
           `The canvas can only load fonts from fonts.googleapis.com. Got ${href}. ` +
-            'Embed anything else as a @font-face data: URI inside the artboard.',
+            'Anything else is uploaded to the canvas as an asset and named in an @font-face rule by its /_blob/ url.',
         );
       }
       return `    <link rel="stylesheet" href="${escapeAttr(href)}">`;
@@ -134,7 +135,6 @@ export function artboard(spec) {
   // the hint was silently dropped.
   const propsPayload = { ...(props ?? {}), ...(preview ? { $preview: preview } : {}) };
   const propsAttr = Object.keys(propsPayload).length ? ` data-props='${encodeProps(propsPayload)}'` : '';
-  const needsScript = Boolean(props || logic || preview);
 
   const parts = [];
   parts.push('<!doctype html>');
@@ -160,13 +160,13 @@ export function artboard(spec) {
   parts.push('</helmet>');
   parts.push(body.trim());
   parts.push('</x-dc>');
-  if (needsScript) {
-    parts.push(`<script data-dc-script${propsAttr}>`);
-    parts.push('class Component extends DCLogic {');
-    parts.push(indent(logic ?? '', 2));
-    parts.push('}');
-    parts.push('</script>');
-  }
+  // Always present, static artboards included: the Design canvas expects the
+  // block on every artboard and fails silently without it.
+  parts.push(`<script ${DC_SCRIPT_ATTRS}${propsAttr}>`);
+  parts.push('class Component extends DCLogic {');
+  parts.push(indent(logic ?? '', 2));
+  parts.push('}');
+  parts.push('</script>');
   parts.push('</body>');
   parts.push('</html>');
   parts.push('');
@@ -337,6 +337,70 @@ export function canvasManifest(entries, {
   return manifest;
 }
 
+// ---------------------------------------------------------------------------
+// The Design canvas
+// ---------------------------------------------------------------------------
+
+/**
+ * One artboard as the Design canvas takes it.
+ *
+ * The canvas wants the logic block on every artboard, typed `text/x-dc`, and
+ * renders wrongly without saying so when either is missing. Artboards written
+ * before that, and artboards authored by hand, often have neither, so the fix is
+ * made once here, on the way out, rather than in every author's head.
+ */
+export function forDesignCanvas(source) {
+  let out = source.replace(/<script\b([^>]*\bdata-dc-script\b[^>]*)>/g, (tag, attrs) =>
+    (/\btype\s*=/.test(attrs) ? tag : `<script type="text/x-dc"${attrs}>`));
+  if (!/<script\b[^>]*\bdata-dc-script\b/.test(out)) {
+    const block = `<script ${DC_SCRIPT_ATTRS}>\nclass Component extends DCLogic {\n}\n</script>\n`;
+    out = /<\/body>/i.test(out) ? out.replace(/<\/body>/i, `${block}</body>`) : `${out}\n${block}`;
+  }
+  return out;
+}
+
+/**
+ * Brandi's canvas.json, written as the Design canvas's own index (version 3).
+ *
+ * Brandi keeps its own manifest shape because the validator, the preview and
+ * the logo boards all read it. This is the translation at the edge: `boards`
+ * keyed by file, `order` back to front with Main first, annotations as notes.
+ * `createdOnFiles` is carried over from an earlier index when there is one,
+ * because the canvas treats it as the record of when the canvas was made.
+ */
+export function designIndex({ manifest, title, createdOnFiles = null, now = new Date() }) {
+  if (!title) throw new TypeError('a canvas needs a title');
+  if (!manifest?.artboards?.length) throw new TypeError('a canvas needs at least one artboard');
+  const boards = {};
+  for (const a of manifest.artboards) {
+    boards[a.file] = {
+      x: a.x, y: a.y, w: a.w, h: a.h,
+      ...(a.title ? { title: a.title } : {}),
+      ...(a.page ? { page: a.page } : {}),
+      ...(a.expand ? { expand: a.expand } : {}),
+      ...(a.print ? { print: a.print } : {}),
+      ...(a.is_interactive ? { is_interactive: true } : {}),
+    };
+  }
+  const files = manifest.artboards.map((a) => a.file);
+  const order = files.includes('Main.dc.html') ? ['Main.dc.html', ...files.filter((f) => f !== 'Main.dc.html')] : files;
+  const notes = {};
+  for (const n of manifest.annotations ?? []) {
+    notes[n.id] = { x: n.x, y: n.y, text: n.text, w: n.w, ...(n.page ? { page: n.page } : {}) };
+  }
+  return {
+    v: 3,
+    createdOnFiles: createdOnFiles ?? { v: 1, at: now.toISOString() },
+    title,
+    launch: manifest.launch ?? { view: 'canvas' },
+    pages: manifest.pages ?? [],
+    boards,
+    order,
+    notes,
+    designSystems: [],
+  };
+}
+
 /**
  * Frames that do not overlap but sit too close for the canvas chrome.
  *
@@ -442,7 +506,7 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
   for (const dcScript of dcScripts) {
     const [, attrs, code] = dcScript;
     if (!code.trim()) {
-      err('An empty <script data-dc-script> block will error.', 'Omit the script entirely for a static artboard.');
+      err('An empty <script data-dc-script> block will error.', 'A static artboard declares `class Component extends DCLogic {}` and nothing else.');
     } else if (!/class\s+Component\s+extends\s+DCLogic/.test(code)) {
       err('The logic block must declare `class Component extends DCLogic`.', null);
     }
@@ -506,12 +570,12 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     const value = src[2] ?? src[3] ?? src[4];
     if (/^data:/.test(value)) {
       err(
-        'An image src starts with data:, which double-wraps and renders broken.',
-        'Store the image as a bare base64 files entry and reference it by filename.',
+        'An image src is a data: URI, which the Design canvas does not take.',
+        'Save the image as a file in the canvas folder and name it by filename: `brandi canvas` publishes it beside the artboard.',
       );
     }
     if (/^https?:\/\//.test(value)) {
-      err(`An image is loaded from ${value}, but the canvas has no network egress.`, 'Embed it as a files entry.');
+      err(`An image is loaded from ${value}, but the canvas has no network egress.`, 'Save it as a file in the canvas folder and name it by filename.');
     }
     if (!/alt\s*=/.test(tag)) {
       warn(`An image has no alt attribute: ${tag.slice(0, 60)}`, 'Add alt="" for decoration, or a real description.');
@@ -529,7 +593,7 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     if (FONT_HOSTS.test(m[1])) continue;
     err(
       `CSS loads ${m[1]}, and the canvas has no network egress.`,
-      'Inline it: images as a bare base64 files entry, everything else as literal CSS.',
+      'Inline it: an image as a file in the canvas folder named by filename, everything else as literal CSS.',
     );
   }
   for (const m of source.matchAll(/@import\s+(?:url\(\s*)?['"]?(https?:\/\/[^)'"\s;]+)/gi)) {
@@ -630,7 +694,7 @@ export function validateCanvas({ artboards, manifest, brandFonts = [] }) {
   if (!artboards.some((a) => a.file === 'Main.dc.html')) {
     warnings.push({
       file: 'Main.dc.html',
-      message: 'No Main artboard. The seeder warns about this and falls back to the first artboard alphabetically as the entry.',
+      message: 'No Main artboard, so the canvas warns and opens on whichever artboard sorts first.',
       fix: 'Name the leading deliverable Main.dc.html so the entry artboard is a decision. During a direction round, Main is the contents page.',
     });
   }
@@ -669,5 +733,5 @@ export function validateCanvas({ artboards, manifest, brandFonts = [] }) {
 
 export default {
   artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding,
-  encodeProps, decodeProps, FRAMES, BANNED_FONTS, DEFAULT_FONTS,
+  forDesignCanvas, designIndex, encodeProps, decodeProps, FRAMES, BANNED_FONTS, DEFAULT_FONTS,
 };

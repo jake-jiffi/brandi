@@ -1,5 +1,5 @@
 /**
- * The concept round as artboards, for the `/design` canvas.
+ * The concept round as artboards, for the Design canvas.
  *
  * This is where a person actually decides, so the design of these boards is a
  * design decision in itself, and the decision is: the boards stay out of the
@@ -271,6 +271,7 @@ ${candidates.map((c) => {
   return `    <div class="cell">
       <div class="cell__art">${boxed(c.svg, { prefix: `r-${c.id}`, colour: INK, box, label: `Concept ${c.id}` })}</div>
       <span class="cell__id">${esc(c.id)}</span>
+      ${c.original ? '<p class="cell__meta"><b>The original.</b> Everything after it on this board refines it.</p>' : ''}
       <p class="cell__meta"><b>${esc(c.architectureName ?? c.architecture ?? '')}</b><br>${esc(c.registerName ?? c.register ?? '')}${c.symbolApproach ? ` &middot; ${esc(c.symbolApproach)}` : ''}</p>
       ${c.signals ? `<p class="cell__meta">${esc(c.signals)}</p>` : ''}
       ${c.inCategory !== undefined ? `<p class="cell__meta" style="color:#6B6B6B;">${c.inCategory ? 'Inside the category convention' : 'Breaks the category convention'}</p>` : ''}
@@ -405,16 +406,20 @@ ${audits.map(rowFor).join('\n')}
  * computed from the content rather than a guess, because a frame smaller than
  * its artboard clips and that is not recoverable without a re-seed.
  */
-export function conceptRoundBoards({ plan, candidates, audits = [], brandName = 'Brand' }) {
+export function conceptRoundBoards({ plan, candidates, audits = [], brandName = 'Brand', originals = [] }) {
   if (!candidates.length) throw new TypeError('a concept round needs at least one candidate');
   const filled = audits.length ? audits : candidates.map((c) => ({ id: c.id, verdict: 'contender', findings: [], contexts: [] }));
 
-  const columns = candidates.length <= 4 ? candidates.length : candidates.length <= 9 ? 3 : 4;
+  // A refinement round shows the mark it refines first, on every board a person
+  // compares on. Options on a thing are judged against the thing.
+  const shown = [...originals.map((o) => ({ ...o, original: true })), ...candidates];
+  const shownAudits = [...originals.map((o) => ({ ...(o.audit ?? {}), id: o.id })), ...filled];
+  const columns = shown.length <= 4 ? shown.length : shown.length <= 9 ? 3 : 4;
   const wide = FRAMES.desktopTall.w;
 
-  const range = rangeBoard({ candidates, audits: filled, brandName, columns });
-  const favicons = faviconBoard({ candidates, brandName });
-  const reverse = reverseBoard({ candidates, brandName, columns });
+  const range = rangeBoard({ candidates: shown, audits: shownAudits, brandName, columns });
+  const favicons = faviconBoard({ candidates: shown, brandName });
+  const reverse = reverseBoard({ candidates: shown, brandName, columns });
   const audit = auditBoard({ candidates, audits: filled, brandName });
   const index = indexBoard({ plan, candidates, audits: filled, brandName });
 
@@ -432,6 +437,40 @@ export function conceptRoundBoards({ plan, candidates, audits = [], brandName = 
   ];
 }
 
+
+/**
+ * A traced concept beside the reference it came from, and the two laid over each
+ * other.
+ *
+ * The comparison the person makes when they picked a drawing is "is this still
+ * my drawing". A session that built this board by hand once patched it in place
+ * and showed the old mark in half its cells, so it is generated like the rest.
+ */
+export function referenceBoard({ traces, brandName, box = 320 }) {
+  const body = `<div class="board">
+${head(`${brandName} / reference`, 'The drawing that was picked, and its trace',
+  'Left, the reference as it was made. Middle, the trace, as the vector the round measures. Right, the two laid over each other: black where both have ink, red where only the reference does, blue where only the trace does.')}
+  <div style="display:flex;flex-direction:column;gap:40px;">
+${traces.map((t) => `    <div style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:32px;align-items:center;">
+      <img src="${esc(t.referenceFile)}" alt="The reference ${esc(t.id)} was traced from" style="width:100%;height:${box}px;object-fit:contain;">
+      <div style="display:flex;justify-content:center;">${boxed(t.svg, { prefix: `ref-${t.id}`, colour: INK, box, label: `Trace ${t.id}` })}</div>
+      <img src="${esc(t.overlayFile)}" alt="${esc(t.id)} laid over its reference" style="width:100%;height:${box}px;object-fit:contain;">
+      <p class="cell__meta" style="grid-column:1 / -1;margin:0;"><b>${esc(t.id)}</b> overlaps ${esc(t.source)} by ${(t.overlap * 100).toFixed(1)}%.</p>
+    </div>`).join('\n')}
+  </div>
+</div>`;
+
+  return {
+    height: 320 + traces.length * (box + 112),
+    source: artboard({
+      name: 'Reference',
+      body,
+      css: boardCss(),
+      fonts: BOARD_FONTS,
+      systemNote: `Each traced concept beside its reference, ${GENERATED} round and the trace records.\nDo not hand-edit: logo board rebuilds it.`,
+    }),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // The colour stage
@@ -711,6 +750,7 @@ ${sections}
 }
 
 export default {
+  referenceBoard,
   inlineSvg,
   indexBoard,
   rangeBoard,

@@ -1,6 +1,6 @@
 /**
- * The two modules that touch the outside world: finding the ephemeral /design
- * helper, and rendering an artboard to something a person can look at.
+ * The module that touches the outside world: rendering an artboard to
+ * something a person can look at.
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,45 +9,8 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import * as D from '../scripts/design-locate.mjs';
 import * as P from '../scripts/preview.mjs';
 import { artboard } from '../scripts/canvas.mjs';
-
-describe('design-locate', () => {
-  test('finds every copy of the design skill on this machine, newest first', async () => {
-    const found = await D.findDesignSkills();
-    // The helper only exists once /design has run in a session. Both outcomes
-    // are legitimate, so assert on the shape rather than on presence.
-    assert.ok(Array.isArray(found));
-    for (const f of found) {
-      assert.ok(existsSync(f.helper), `${f.helper} was reported but does not exist`);
-      assert.ok(existsSync(f.template), `${f.template} was reported but does not exist`);
-      assert.match(f.helper, /seed-canvas\.mjs$/);
-      assert.ok(typeof f.version === 'string' && f.version.length > 0);
-    }
-    for (let i = 1; i < found.length; i++) {
-      assert.ok(found[i - 1].mtime >= found[i].mtime, 'results must be newest first');
-    }
-  });
-
-  test('locate returns the newest, or null, and never throws', async () => {
-    const one = await D.locateDesignHelper();
-    const all = await D.findDesignSkills();
-    if (all.length === 0) assert.equal(one, null);
-    else assert.equal(one.helper, all[0].helper);
-  });
-
-  test('says what to do when it finds nothing, rather than failing silently', () => {
-    assert.match(D.NOT_FOUND_MESSAGE, /\/design/);
-    assert.match(D.NOT_FOUND_MESSAGE, /temporary directory/);
-    assert.ok(D.NOT_FOUND_MESSAGE.split('\n').length > 3, 'the message should actually explain itself');
-  });
-
-  test('never reports the same directory twice', async () => {
-    const found = await D.findDesignSkills();
-    assert.equal(new Set(found.map((f) => f.dir)).size, found.length);
-  });
-});
 
 describe('preview', () => {
   const src = artboard({

@@ -16,7 +16,7 @@
  *   node preview.mjs <file.dc.html> [--width N] [--height N] [--png false]
  *   node preview.mjs --dir <folder> --out <folder> [--png false]
  *
- * This is the fallback for a session with no /design canvas, so it has to show
+ * This is the fallback for a session with no Design canvas, so it has to show
  * the artboards as they are, not as a default guess: every artboard is rendered
  * at its own frame, from the canvas.json beside it, then its own $preview hint,
  * then 1200x2400. One file named on its own resolves the same way as a whole
@@ -91,7 +91,7 @@ export function toPreviewHtml(source, { width, height, label, base } = {}) {
 </style>`;
   let out = source.replace('<script src="./support.js"></script>', shim.trim());
   // The logic block is classic script referencing a class the runtime defines.
-  out = out.replace(/<script data-dc-script[\s\S]*?<\/script>/g, '');
+  out = out.replace(/<script\b[^>]*\bdata-dc-script\b[\s\S]*?<\/script>/g, '');
   if (label) {
     out = out.replace('<body>', `<body>\n<!-- preview of ${label} -->`);
   }

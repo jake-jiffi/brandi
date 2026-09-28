@@ -640,11 +640,11 @@ describe('addendum: claims the tooling makes about itself', () => {
     assert.equal(/<li><\/li>/.test(html), false, 'an unusable entry produces no bullet, not an empty one');
   });
 
-  test('the Main-less seed claim matches what the helper actually does', async () => {
-    // Settled empirically against helper 2.1.251: it warns and falls back to the
-    // first artboard. Nothing in the docs may call it a hard requirement.
+  test('the Main-less claim matches what the canvas actually does', async () => {
+    // A canvas with no Main opens on whichever artboard sorts first. Nothing in
+    // the docs may call Main a hard requirement.
     const recipe = await readFile(path.join(import.meta.dirname, '..', 'skills', 'brand-system', 'references', '05-canvas-recipes.md'), 'utf8');
-    assert.match(recipe, /WARNS rather than refuses/);
+    assert.match(recipe, /Without one the entry is whichever sorts first/);
     const r = K.validateCanvas({ artboards: [{ file: 'DirectionA.dc.html', source: K.artboard({ name: 'DirectionA', body: '<p>x</p>' }) }] });
     const w = r.warnings.find((x) => /No Main artboard/.test(x.message));
     assert.ok(w);

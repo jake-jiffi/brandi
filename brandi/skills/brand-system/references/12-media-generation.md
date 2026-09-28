@@ -207,14 +207,29 @@ The rotation is built from the live catalogue: the best of every capable image f
 sparks are not one model's house style twelve times. Check each spark against its own slot's
 refusals before anybody picks it.
 
-A picked spark goes to the forge's draw step. The drawing agent gets its own slot brief and its own
-spark, nothing else, and redraws the idea as a vector mark under the brief's constraints. It does not
-trace. Where the spark breaks the brief, the brief wins. Import that slot's file on its own, with a
-model string naming both, because one import call gives every file in it the same string:
+When they pick, ask what they picked: this drawing, or its idea. The logo-forge skill has both
+paths. The short version:
 
-```bash
-$A logo import brand/logo/concepts/round-01/C1.svg --model "claude-opus-5, redrawn from a Higgsfield spark"
-```
+- **This drawing.** `$A logo trace <spark.png> --crop x,y,w,h` makes it a clean vector concept of
+  the round, scored against the spark with an overlay. Options on it come from `logo pick` and
+  `logo refine`, and from image-model variations that take the spark as their reference image:
+
+  ```bash
+  $A media add vary-c2-weight --kind ideation --count 2 \
+    --refs '{"image_references":["brand/media/ideation/idea-C2-2.png"]}' \
+    --prompt "The same K, same construction, same rounded terminals, one step heavier. Black on white."
+  ```
+
+  Tested on a real spark: both variations kept the construction, the terminals and the wordmark,
+  and changed the weight. Trace the one they pick.
+- **Its idea.** The slot's drawing agent gets its own brief and the spark, nothing else, and redraws
+  the idea under the brief. Where the spark breaks the brief, the brief wins. Import that file on
+  its own, with a model string naming both, because one import call gives every file in it the
+  same string:
+
+  ```bash
+  $A logo import brand/logo/concepts/round-01/C1.svg --model "<the agents' model id>, redrawn from a Higgsfield spark"
+  ```
 
 When a concept becomes the master, the generation manifest lists every picked spark with its model
 and job id. Image models can reproduce marks that already exist, so those sparks go into the

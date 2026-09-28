@@ -12,12 +12,12 @@ A="$(command -v brandi || true)"
 ```
 ```bash
 "$A" validate --dir brand/canvas
-"$A" canvas --dir brand/canvas --title "$ARGUMENTS" --out brand-canvas.html
+"$A" canvas --dir brand/canvas --title "$ARGUMENTS" --json
 ```
 
-Fix every validation error before seeding. If the design helper is missing, invoke the `design`
-skill once so Claude Code extracts it, then retry.
+Fix every validation error first. Then follow "Publishing a canvas" in the `brand-system` skill:
+the command writes the canvas folder and prints the `Artifact` calls that send it.
 
-Publish the seeded file with the `Artifact` tool using `contract: "0.1.31"` and the same favicon the
-canvas already has. If this canvas was published before, pass its existing URL so it updates in
-place rather than creating a second one.
+If this canvas was published before, send the changed artboards to its existing url so it updates
+in place rather than creating a second one. Without that url, `Artifact` with action `list` finds
+it by title.

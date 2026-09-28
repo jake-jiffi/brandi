@@ -242,12 +242,15 @@ describe('the canvas recipe agrees with the canvas code', () => {
     assert.ok(references['05-canvas-recipes.md'].includes('<script src="./support.js"></script>'));
   });
 
-  test('the publish sequence lives in the skills, pinned to one contract version, and the recipe points at it', () => {
-    const pinned = '0.1.31';
-    assert.ok(skillFiles['brand-system'].includes(pinned));
-    assert.ok(skillFiles['logo-forge'].includes(pinned));
+  test('the publish sequence lives in the skills, goes through the Design type, and the recipe points at it', () => {
+    for (const skill of ['brand-system', 'logo-forge']) {
+      assert.ok(skillFiles[skill].includes('Design type'), `${skill} does not publish through the Design type`);
+      // The canvas used to be seeded by a helper and pinned to a contract. The
+      // Design type sets its own contract, and a stale pin refuses the publish.
+      assert.equal(/0\.1\.31|seed-canvas|design helper|favicon of one/.test(skillFiles[skill]), false, `${skill} still describes the old seeder`);
+    }
     assert.ok(references['05-canvas-recipes.md'].includes('Publishing a canvas'));
-    assert.equal(references['05-canvas-recipes.md'].includes(pinned), false, 'a second copy of the sequence drifts');
+    assert.equal(references['05-canvas-recipes.md'].includes('type_url'), false, 'a second copy of the sequence drifts');
   });
 
   test('the recipe lists exactly the sheets the generator writes', async () => {
@@ -629,8 +632,8 @@ describe('the README states numbers that are true', () => {
   // `test(` call site, so adding one trips this and forces whoever added it to
   // re-run the suite and refresh all three numbers. A test added inside an
   // existing loop is the one case that slips through.
-  const SUITE_TESTS = 1899;
-  const STATIC_TEST_CALLS = 1605;
+  const SUITE_TESTS = 1927;
+  const STATIC_TEST_CALLS = 1633;
   let readme;
   // The worked example the README counts pages for: the deck `brandi book`
   // builds from tests/fixtures/muddy-paws.json. It is built here rather than

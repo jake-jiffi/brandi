@@ -1,5 +1,5 @@
 ---
-description: Build or continue a complete brand and design system, with visual rounds on the /design canvas
+description: Build or continue a complete brand and design system, with visual rounds on the Design canvas
 argument-hint: [brand name, a URL, a description, or nothing at all]
 ---
 

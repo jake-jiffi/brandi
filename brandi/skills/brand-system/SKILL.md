@@ -1,6 +1,6 @@
 ---
 name: brand-system
-description: Build a complete, durable brand and design system, from a logo and a vague idea or from nothing at all, to the standard a good branding agency would deliver. Runs a guided journey with visual rounds on the /design canvas and ships a brand book, DTCG design tokens, CSS and Tailwind, and a companion skill that keeps future work on brand. Use when someone wants a brand, a rebrand, a design system, brand guidelines, a style guide, a colour palette, a type system, brand voice, or a brand book. Trigger on "build a brand", "brand guidelines", "design system", "brand book", "style guide", "our colours", "brand voice", "make this on brand", or when someone has a logo and a business and no system around either. Also use to audit or extend a brand that already exists.
+description: Build a complete, durable brand and design system, from a logo and a vague idea or from nothing at all, to the standard a good branding agency would deliver. Runs a guided journey with visual rounds on the Design canvas and ships a brand book, DTCG design tokens, CSS and Tailwind, and a companion skill that keeps future work on brand. Use when someone wants a brand, a rebrand, a design system, brand guidelines, a style guide, a colour palette, a type system, brand voice, or a brand book. Trigger on "build a brand", "brand guidelines", "design system", "brand book", "style guide", "our colours", "brand voice", "make this on brand", or when someone has a logo and a business and no system around either. Also use to audit or extend a brand that already exists.
 ---
 
 # Brand system
@@ -176,8 +176,8 @@ hero composition, the palette, the type pairing, one signature move. Deciding a 
 need finished pixels, and spending an hour polishing three options you will throw two of away is
 how this phase goes wrong.
 
-**Also write `Main.dc.html`.** It is the artboard a focused open lands on. Without one the seeder
-warns and falls back to whichever artboard sorts first, which is not a decision. At this stage Main
+**Also write `Main.dc.html`.** It is the entry artboard, the one the canvas opens on. Without one
+the entry is whichever artboard sorts first, which is not a decision. At this stage Main
 is a contents page: the brand name, the three direction names with their
 one-line pitches, and the question being asked. When a direction is chosen, Main becomes the
 deliverable and the sketches move to a second page. `$A validate` warns when Main is missing.
@@ -221,7 +221,8 @@ evidence beats a general rule. Keep it by writing a reason next to it,
 `/* anti-slop-waiver: their corporate licence, in use since 2019 */`, and by recording the choice
 with `$A decision`. A waiver with no reason after it is reported as its own finding, because a
 waiver nobody had to argue for is how a rule set quietly stops meaning anything. The canvas can only
-load fonts from Google Fonts, so pick from there or embed a face as a data URI.
+load fonts from Google Fonts, so pick from there. A face that is not there is uploaded to the
+canvas as an asset with the `Artifact` tool and named in `@font-face` by the url it returns.
 
 Then the mark gets its colour, and not before. `$A logo colour` refuses to run until a person has
 approved a master and the palette has resolved, so this is the order whether or not anybody
@@ -264,7 +265,7 @@ real `Main.dc.html` over it, `sheets` leaves yours alone and says so on the next
 Then **author** the artboards that prove the system survives contact with real work. When you
 replace the generated `Main.dc.html`, `sheets` will report it as unsized, because the frame it had
 belonged to the contents page. Set the real frame in `canvas.json`: a frame smaller than its
-content clips, and clipping is not recoverable without a re-seed. Minimum set:
+content clips, and clipping is not recoverable without a republish. Minimum set:
 
 **The set depends on the answer to intake question 2.** It always did, and the mandated list used to
 ignore it: the intake says a word-of-mouth business needs a card, a sign and a vehicle before a
@@ -386,22 +387,32 @@ files are. Point at the companion skill and say what it does.
 
 ## Publishing a canvas
 
+The canvas is the Design Artifact type: a canvas someone can open, comment on and edit by hand.
 Always in this order. The validator exists because the format fails silently.
 
 1. `$A validate --dir brand/canvas` and fix every error.
-2. `$A canvas --dir brand/canvas --title "Acme brand" --out acme-brand.html`
-   The title and filename are content, not plumbing: name them as the client would.
-   If it reports that the design helper is missing, invoke the `design` skill once so Claude Code
-   extracts it, then retry.
-3. Publish the seeded file with the `Artifact` tool: `file_path` is the path it printed,
-   `contract: "0.1.31"`, a one-line `description`, and a `favicon` of one or two emoji. On a first
-   publish, load `artifact-capabilities` and declare exactly what that user's roster lists.
-4. Republish to the same path with the same favicon and the same contract, and no `capabilities`.
+2. `$A canvas --dir brand/canvas --title "Acme brand" --json`
+   The title is content, not plumbing: name it as the client would. It writes the canvas folder
+   under `brand/.publish/` and prints the Artifact calls that send it. It refuses an image over 15MB
+   and says how to shrink it.
+3. A new canvas: the `Artifact` quickstart with intent `design` names the Design type's
+   `type_url`. Publish with that `type_url`, the same title, `auto_open: "after_first_write"`, and
+   nothing else: no `file_path`, `contract`, `favicon` or `capabilities`. Keep the url it returns.
+4. Make each call the command printed, in order, to that url: `root`, `file_path` and `files`
+   exactly as printed.
 
 Show the link and a sentence or two on what you drafted and assumed. Do not explain the editor.
 
-If there is no `design` skill or `Artifact` tool (Codex, or any session without them), stop after
-step 1 and render the artboards with `node <brandi>/scripts/preview.mjs --dir brand/canvas --out <dir>`;
+To change a canvas already published, edit the working files in `brand/canvas/`, run step 2 again,
+and send only the artboards you changed, to the same url. If the person has edited an artboard on
+the canvas by hand, read their version first (`Artifact` read with `path: "project/<file>"`) and
+carry their edits into `brand/canvas/`, or the republish throws their work away. Send the index (`project/canvas.json`)
+only when artboards were added, removed or moved: the person may have moved things on the canvas,
+and a fresh index puts them back. A new round (territories, a logo round, colour, proof) is a new
+canvas.
+
+If there is no `Artifact` tool (Codex, or any session without it), stop after step 1 and render the
+artboards with `node <brandi>/scripts/preview.mjs --dir brand/canvas --out <dir>`;
 it frames each artboard the way canvas.json records it and writes an index page beside the PNGs.
 Hand that page over instead of a link.
 

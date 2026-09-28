@@ -980,3 +980,133 @@ describe('findings from the adversarial review', () => {
     await assert.rejects(() => L.promoteToMaster(dir, 'ZZ9'), /This project has:/);
   });
 });
+
+describe('logo trace: a reference the person picked becomes a concept, and the options are on it', async () => {
+  const { encodePng } = await import('../scripts/png.mjs');
+  const { TRACE_CLEANUP_TASK } = await import('../scripts/logospec.mjs');
+
+  // A round-capped K: a stem, an arm and a free-standing leg, anti-aliased.
+  const near = (px, py, [ax, ay], [bx, by]) => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  };
+  const reference = () => {
+    const w = 320;
+    const h = 380;
+    const data = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        let c = 0;
+        for (let sy = 0; sy < 4; sy++) {
+          for (let sx = 0; sx < 4; sx++) {
+            const px = x + (sx + 0.5) / 4;
+            const py = y + (sy + 0.5) / 4;
+            if (near(px, py, [100, 50], [100, 330]) < 22 || near(px, py, [110, 200], [230, 60]) < 18 || near(px, py, [150, 230], [240, 330]) < 18) c++;
+          }
+        }
+        data[y * w + x] = Math.round(255 - (255 * c) / 16);
+      }
+    }
+    return encodePng({ width: w, height: h, channels: 1, data });
+  };
+
+  async function traced(name) {
+    const dir = await project(name);
+    await L.planRound(dir, { count: 8, brief: { name: 'Kinbox', category: 'family admin' } });
+    await mkdir(path.join(dir, 'brand', 'media', 'ideation'), { recursive: true });
+    await writeFile(path.join(dir, 'brand', 'media', 'ideation', 'idea-C1-2.png'), reference());
+    const state = await L.loadState(dir);
+    const from = state.rounds[0].slots[0].id;
+    const res = await L.traceReference(dir, 'brand/media/ideation/idea-C1-2.png', { from, architecture: 'symbol-only' });
+    return { dir, res, from };
+  }
+
+  test('the trace is a concept of the round, with where it came from on record', async () => {
+    const { dir, res, from } = await traced('trace1');
+    assert.equal(res.id, 'T1');
+    assert.ok(res.overlap > 0.98, `overlap ${res.overlap}`);
+    assert.deepEqual(res.clipped, []);
+    assert.ok(existsSync(path.join(dir, res.file)));
+    assert.ok(existsSync(path.join(dir, res.overlay)));
+    const entry = (await L.loadState(dir)).rounds[0];
+    const slot = entry.slots.find((s) => s.id === 'T1');
+    assert.equal(slot.origin, 'trace');
+    assert.equal(slot.traceOf, 'brand/media/ideation/idea-C1-2.png');
+    assert.equal(slot.tracedFrom, from);
+    assert.equal(slot.architecture, 'symbol-only');
+    const candidate = entry.candidates.find((c) => c.id === 'T1');
+    assert.match(candidate.provenance.generatedBy, /brandi logo trace, from brand\/media\/ideation\/idea-C1-2\.png/);
+    // The record points at the slot's brief, so a trace writes one rather than leaving it dangling.
+    assert.match(await readFile(path.join(dir, candidate.provenance.prompt), 'utf8'), /Traced from brand\/media\/ideation\/idea-C1-2\.png/);
+    assert.equal(candidate.trace.source, 'brand/media/ideation/idea-C1-2.png');
+  });
+
+  test('tracing again into the same id replaces the trace, but never a drawn concept', async () => {
+    const { dir, from } = await traced('trace2');
+    const again = await L.traceReference(dir, 'brand/media/ideation/idea-C1-2.png', { id: 'T1' });
+    assert.equal(again.id, 'T1');
+    assert.equal((await L.loadState(dir)).rounds[0].slots.filter((s) => s.id === 'T1').length, 1);
+    await assert.rejects(
+      () => L.traceReference(dir, 'brand/media/ideation/idea-C1-2.png', { id: from }),
+      /already a drawn slot/,
+    );
+  });
+
+  test('a reference that is not a PNG is refused with the way to convert it', async () => {
+    const dir = await project('trace3');
+    await L.planRound(dir, { count: 8, brief: { name: 'Kinbox' } });
+    await writeFile(path.join(dir, 'sketch.jpg'), Buffer.alloc(16));
+    await assert.rejects(() => L.traceReference(dir, 'sketch.jpg'), /not a PNG/);
+    await assert.rejects(() => L.traceReference(dir, '../outside.png'), /outside|leave|escape|project/i);
+  });
+
+  test('refining a trace deals the clean-up first, and the brief points at the reference', async () => {
+    const { dir } = await traced('trace4');
+    await L.pickDirections(dir, ['T1']);
+    const res = await L.planRefinement(dir);
+    assert.deepEqual(res.slots.map((s) => s.id), ['T1c', 'T1sm', 'T1p', 'T1w', 'T1sq']);
+    assert.equal(res.slots[0].task, TRACE_CLEANUP_TASK.task);
+    const brief = await readFile(res.slotFiles[0], 'utf8');
+    assert.match(brief, /It is a trace of brand\/media\/ideation\/idea-C1-2\.png, the drawing the person picked/);
+    assert.equal(/\n\n\n/.test(brief), false, 'no doubled blank lines');
+  });
+
+  test('a drawn concept still gets the usual four tasks and no reference line', async () => {
+    const { dir } = await traced('trace5');
+    const drawn = (await L.loadState(dir)).rounds[0].slots[0].id;
+    await drawAll(dir);
+    await L.importConcepts(dir, [path.join('brand', 'logo', 'concepts', 'round-01')], { model: 'test' });
+    await L.pickDirections(dir, [drawn]);
+    const res = await L.planRefinement(dir);
+    assert.equal(res.slots.length, 4);
+    assert.equal(/It is a trace of/.test(await readFile(res.slotFiles[0], 'utf8')), false);
+  });
+
+  test('the refinement boards show the original first', needsChrome, async () => {
+    const { dir } = await traced('trace6');
+    await L.auditRound(dir);
+    await L.pickDirections(dir, ['T1']);
+    const res = await L.planRefinement(dir);
+    await mkdir(res.conceptDir, { recursive: true });
+    const trace = await readFile(path.join(dir, 'brand', 'logo', 'concepts', 'round-01', 'T1.svg'), 'utf8');
+    for (const s of res.slots) await writeFile(path.join(res.conceptDir, `${s.id}.svg`), trace);
+    await L.importConcepts(dir, [path.relative(dir, res.conceptDir)], { model: 'test' });
+    await L.auditRound(dir);
+    await L.buildBoards(dir);
+    const canvasDir = path.join(dir, 'brand', 'logo', 'canvas');
+    const range = await readFile(path.join(canvasDir, 'Range.dc.html'), 'utf8');
+    const original = range.indexOf('The original.');
+    assert.ok(original > 0, 'the original is labelled');
+    assert.ok(original < range.indexOf('>T1c<'), 'and comes before the refinements');
+    // The trace is shown beside the drawing it came from, from files beside the board.
+    const reference = await readFile(path.join(canvasDir, 'Reference.dc.html'), 'utf8');
+    assert.match(reference, /src="reference-T1\.png"/);
+    assert.match(reference, /src="overlay-T1\.png"/);
+    assert.ok(existsSync(path.join(canvasDir, 'reference-T1.png')));
+    assert.ok(existsSync(path.join(canvasDir, 'overlay-T1.png')));
+    const manifest = JSON.parse(await readFile(path.join(canvasDir, 'canvas.json'), 'utf8'));
+    assert.ok(manifest.artboards.some((a) => a.file === 'Reference.dc.html'));
+  });
+});

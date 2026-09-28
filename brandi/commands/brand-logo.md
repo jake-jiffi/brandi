@@ -9,7 +9,7 @@ What the user said, which may be empty: $ARGUMENTS
 
 Start by running `logo status`. If a round already exists, resume it rather than dealing a new one.
 
-Four things the user cares about, so get them right:
+Five things the user cares about, so get them right:
 
 - **A real range, not twelve versions of one idea.** The slots are planned before anything is drawn
   and each agent sees only its own brief. Do not hand an agent the plan, the round, or another
@@ -19,6 +19,9 @@ Four things the user cares about, so get them right:
 - **Two or three directions kept alive, not a winner chosen.** A first round is decision material.
 - **A person approves the mark.** Never adopt one because the audit liked it, and never record an
   approval that did not happen.
+- **When they point at one drawing, give options on that drawing.** Ask whether they want the
+  drawing or its idea. If the drawing, `logo trace` it and refine the trace. Never answer with a
+  fresh round.
 
 If there is no `brand/brand.json`, you need two facts and no more: the name spelled exactly as it
 must be set, and what the business does in one line. Ask for both in a single question. If nobody

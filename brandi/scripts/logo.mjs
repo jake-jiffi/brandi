@@ -32,15 +32,17 @@
  *   node logo.mjs status
  */
 
-import { readFile, writeFile, mkdir, readdir, stat } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, stat, copyFile } from 'node:fs/promises';
 import { existsSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { planConcepts, slotBrief, refinementSlots, refinementBrief } from './logospec.mjs';
+import { planConcepts, slotBrief, refinementSlots, refinementBrief, REFINEMENT_TASKS, TRACE_CLEANUP_TASK, ARCHITECTURES } from './logospec.mjs';
+import { traceImage, parseCrop } from './logotrace.mjs';
+import { decodePng } from './png.mjs';
 import { describeSvg } from './svg.mjs';
 import { auditCandidates } from './logoaudit.mjs';
-import { conceptRoundBoards, fitFrames } from './logoboard.mjs';
+import { conceptRoundBoards, referenceBoard, fitFrames } from './logoboard.mjs';
 import { normaliseMaster, monoVariants, typesetWordmark, composeLockup, clearSpaceRule, minimumSizes, generationRecord, localDate } from './logogen.mjs';
 import { canvasManifest, BANNED_FONTS } from './canvas.mjs';
 import { loadBrand, saveBrand, addDecision, systemInputFromBrand } from './brandfile.mjs';
@@ -64,6 +66,7 @@ export const LAYOUT = Object.freeze({
   colourCanvas: 'brand/logo/canvas-colour',
   master: 'brand/logo/master',
   rights: 'brand/logo/rights',
+  traces: 'brand/logo/trials/trace',
 });
 
 const roundDir = (n) => `${LAYOUT.concepts}/round-${String(n).padStart(2, '0')}`;
@@ -245,7 +248,10 @@ export async function planRefinement(root, { ids = null, fromRound = null, round
   for (const id of chosen) {
     const candidate = from.candidates.find((c) => c.id === id);
     const slot = from.slots.find((s) => s.id === id) ?? {};
-    slots.push(...refinementSlots({ ...slot, ...candidate, id }));
+    // A trace is the drawing the person picked. Before anything else is asked
+    // of it, it gets the clean-up a designer would give it.
+    const tasks = slot.origin === 'trace' ? [TRACE_CLEANUP_TASK, ...REFINEMENT_TASKS] : REFINEMENT_TASKS;
+    slots.push(...refinementSlots({ ...slot, ...candidate, id }, { tasks }));
   }
 
   const entry = {
@@ -277,6 +283,105 @@ export async function planRefinement(root, { ids = null, fromRound = null, round
   await mkdir(within(root, roundDir(n)), { recursive: true });
   await saveState(root, state);
   return { state, round: n, refines: from.round, chosen, slots, slotFiles: written, conceptDir: within(root, roundDir(n)) };
+}
+
+/**
+ * Trace a reference the person picked into a concept of the round.
+ *
+ * A picked spark used to go to a drawing agent told to redraw its idea under a
+ * brief, and the brief won wherever the two disagreed. On a real engagement
+ * that meant five rounds before the person got the drawing they had pointed at.
+ * When someone says "this one", the drawing is the answer and the options come
+ * from refining it, so the trace becomes a concept of its own: audited, on the
+ * boards, pickable, and refinable like any other, with where it came from on
+ * record.
+ */
+export async function traceReference(root, file, { crop = null, id = null, from = null, architecture = null, round = null, model = null, tolerance = null } = {}) {
+  const state = await loadState(root);
+  if (!state) throw new Error('no logo round has been planned yet. Run `logo plan` first.');
+  const n = round ?? latestRound(state)?.round;
+  const entry = roundOf(state, n);
+  if (!entry) throw new Error(`there is no round ${n}`);
+
+  const source = within(root, file);
+  if (!existsSync(source)) throw new Error(`no such file: ${file}`);
+  if (!/\.png$/i.test(source)) {
+    throw new Error(`${file} is not a PNG. Convert it first (on macOS: sips -s format png <file> --out <file>.png).`);
+  }
+  const png = await readFile(source);
+  const { width, height } = decodePng(png);
+  const cropBox = parseCrop(crop, width, height);
+  const traced = traceImage(png, { crop: cropBox, tolerance });
+
+  const parent = from ? entry.slots.find((s) => s.id.toLowerCase() === String(from).toLowerCase()) : null;
+  if (from && !parent) throw new Error(`round ${n} has no slot called ${from}`);
+  if (architecture && !ARCHITECTURES.some((a) => a.id === architecture)) {
+    throw new Error(`--architecture is one of: ${ARCHITECTURES.map((a) => a.id).join(', ')}`);
+  }
+  const taken = new Set(entry.slots.map((s) => s.id.toLowerCase()));
+  let slotId = id;
+  if (!slotId) {
+    let k = 1;
+    while (taken.has(`t${k}`)) k++;
+    slotId = `T${k}`;
+  }
+  if (!/^[A-Za-z][A-Za-z0-9]{0,11}$/.test(slotId)) throw new Error(`a concept id is a letter then letters or digits, not "${slotId}"`);
+  const existing = entry.slots.find((s) => s.id.toLowerCase() === slotId.toLowerCase());
+  if (existing && existing.origin !== 'trace') {
+    throw new Error(`${slotId} is already a drawn slot in round ${n}. Trace into a new id, so the drawn concept is not replaced.`);
+  }
+
+  const rel = path.relative(path.resolve(root), source);
+  const { id: _parentId, origin: _o, traceOf: _t, ...inherited } = parent ?? {};
+  entry.slots = entry.slots.filter((s) => s.id !== slotId).concat({
+    ...inherited,
+    id: slotId,
+    origin: 'trace',
+    traceOf: rel,
+    crop: cropBox,
+    tracedFrom: parent?.id ?? null,
+    architecture: architecture ?? null,
+    architectureName: ARCHITECTURES.find((a) => a.id === architecture)?.name ?? 'Traced from the reference',
+    familyName: 'Traced from the reference',
+    question: 'The reference the person picked, as a clean vector. The drawing itself, not a new idea.',
+  });
+  await saveState(root, state);
+
+  // Every concept's record points at its slot brief, so a trace gets one too.
+  const briefDir = within(root, `${LAYOUT.slots}/round-${String(n).padStart(2, '0')}`);
+  await mkdir(briefDir, { recursive: true });
+  await writeFile(path.join(briefDir, `${slotId}.md`), [
+    `# Concept ${slotId}: traced from the reference`,
+    '',
+    `Traced from ${rel}${cropBox ? `, cropped to ${[cropBox.x, cropBox.y, cropBox.w, cropBox.h].map((v) => Math.round(v)).join(',')}` : ''}.`,
+    parent ? `It carries the brief of slot ${parent.id}.` : null,
+    'The person picked this drawing because they wanted the drawing. It is not a brief for a new idea.',
+    '',
+  ].filter((l) => l !== null).join('\n'));
+
+  const dir = within(root, LAYOUT.traces);
+  await mkdir(dir, { recursive: true });
+  const svgFile = path.join(dir, `${slotId}.svg`);
+  const overlayFile = path.join(dir, `${slotId}-overlay.png`);
+  await writeFile(svgFile, `${traced.svg}\n`);
+  await writeFile(overlayFile, traced.overlay);
+
+  const imported = await importConcepts(root, [path.relative(path.resolve(root), svgFile)], {
+    round: n,
+    model: model ?? `brandi logo trace, from ${rel}`,
+  });
+  const after = await loadState(root);
+  const candidate = roundOf(after, n).candidates.find((c) => c.id === slotId);
+  candidate.trace = {
+    source: rel,
+    crop: cropBox,
+    overlap: Math.round(traced.overlap * 10000) / 10000,
+    curves: traced.curves,
+    lines: traced.lines,
+    overlay: path.relative(path.resolve(root), overlayFile),
+  };
+  await saveState(root, after);
+  return { round: n, id: slotId, file: imported.imported[0]?.file, ...candidate.trace, outlines: traced.outlines, clipped: traced.clipped };
 }
 
 /**
@@ -476,12 +581,37 @@ export async function buildBoards(root, { round = null } = {}) {
   const candidates = await loadCandidates(root, entry);
   const audits = entry.candidates.map((c) => ({ ...c.audit, id: c.id }));
 
+  // In a refinement round, the concepts being refined go on the boards first.
+  let originals = [];
+  if (entry.kind === 'refinement') {
+    const parent = roundOf(state, entry.refines);
+    const ids = new Set(entry.slots.map((s) => s.refines).filter(Boolean));
+    if (parent) originals = (await loadCandidates(root, parent)).filter((c) => ids.has(c.id));
+  }
+
   const plan = { ...entry, slots: entry.slots };
-  let boards = conceptRoundBoards({ plan, candidates, audits, brandName: state.brand.name ?? 'Brand' });
-  boards = await fitFrames(boards);
+  let boards = conceptRoundBoards({ plan, candidates, audits, originals, brandName: state.brand.name ?? 'Brand' });
 
   const dir = within(root, LAYOUT.canvas);
   await mkdir(dir, { recursive: true });
+
+  // A traced concept is shown beside the drawing it came from. The images are
+  // copied next to the boards, which is where the canvas looks for them.
+  const traced = [...originals, ...candidates].filter((c) => c.trace);
+  if (traced.length) {
+    const traces = [];
+    for (const c of traced) {
+      const referenceFile = `reference-${c.id}.png`;
+      const overlayFile = `overlay-${c.id}.png`;
+      await copyFile(within(root, c.trace.source), path.join(dir, referenceFile));
+      await copyFile(within(root, c.trace.overlay), path.join(dir, overlayFile));
+      traces.push({ id: c.id, svg: c.svg, overlap: c.trace.overlap, source: c.trace.source, referenceFile, overlayFile });
+    }
+    const board = referenceBoard({ traces, brandName: state.brand.name ?? 'Brand' });
+    boards.splice(1, 0, { file: 'Reference.dc.html', source: board.source, w: 1440, h: board.height });
+  }
+  boards = await fitFrames(boards);
+
   for (const b of boards) await writeFile(path.join(dir, b.file), b.source);
   // A fresh open lands on the whole canvas rather than one artboard, because
   // the point of the round is the range and a focused open shows one mark.
@@ -1251,7 +1381,9 @@ const USAGE = `brandi logo: generate, measure and choose a mark
   wordmark --font "Family" [--weight 700] [--case upper|lower] [--text "X"]
            [--size 200] [--tracking -15] [--out file.svg]
   lockup   --symbol a.svg --wordmark b.svg [--stacked] [--gap 0.5] [--symbol-ratio 1.15]
-  import   <dir|file.svg...> [--round N] [--model "claude-opus-5"]
+  trace    <reference.png> [--crop x,y,w,h] [--id T1] [--from <slot>] [--architecture symbol-only]
+           [--round N] [--tolerance px] [--model "..."]   a picked spark or sketch, as a vector concept
+  import   <dir|file.svg...> [--round N] [--model "<the drawing agents' model id>"]
   audit    [--round N]
   board    [--round N]
   pick     <id> [<id>...] [--round N]
@@ -1329,6 +1461,32 @@ export async function main(argv) {
         'Each brief points at the exact file it is refining, and says so. This is not a',
         'second concept round: an agent that comes back with a new idea has failed the task.',
       ].join('\n'));
+      break;
+    }
+
+    case 'trace': {
+      const file = positional[0];
+      if (!file) throw new Error('logo trace needs the reference: brandi logo trace <image.png> [--crop x,y,w,h]');
+      const opt = (k) => (flags.has(k) && flags.get(k) !== true ? flags.get(k) : null);
+      const res = await traceReference(root, file, {
+        crop: opt('crop'),
+        id: opt('id'),
+        from: opt('from'),
+        architecture: opt('architecture'),
+        round: flags.has('round') ? intFlag(flags, 'round') : null,
+        model: opt('model'),
+        tolerance: flags.has('tolerance') ? intFlag(flags, 'tolerance') : null,
+      });
+      say(res, [
+        `Traced ${res.source} into ${res.id}, round ${res.round}: ${(res.overlap * 100).toFixed(1)}% overlap with the reference,`,
+        `${res.curves} curves and ${res.lines} lines in ${res.outlines} outline${res.outlines === 1 ? '' : 's'}.`,
+        `Concept: ${res.file}`,
+        `Overlay: ${res.overlay} (black both, red only the reference, blue only the trace). Look at it.`,
+        res.clipped.length ? `\nThe crop cuts through the mark on the ${res.clipped.join(' and ')} edge${res.clipped.length > 1 ? 's' : ''}, so the trace is cut there too. Widen the crop and trace again.` : '',
+        res.overlap < 0.95 ? '\nUnder 95% means the crop caught something else, or the reference is too faint or too small. Check the overlay before going on.' : '',
+        '',
+        `Next: \`logo audit\` and \`logo board\`, then \`logo pick ${res.id}\` and \`logo refine\` for options on this exact drawing.`,
+      ].filter(Boolean).join('\n'));
       break;
     }
 
@@ -1566,6 +1724,7 @@ export default {
   briefFromBrand,
   planRound,
   planRefinement,
+  traceReference,
   guessName,
   importConcepts,
   loadCandidates,

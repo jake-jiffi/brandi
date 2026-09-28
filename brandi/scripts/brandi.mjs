@@ -17,7 +17,7 @@
  *   brandi canvas --dir <dir> --title "Acme brand" --out acme-brand.html
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf] [--print]     the brand book: a 16:9 deck, or the A4 print book with --print
- *   brandi logo <plan|refine|wordmark|lockup|import|audit|board|pick|master|colour|status>
+ *   brandi logo <plan|refine|trace|wordmark|lockup|import|audit|board|pick|master|colour|status>
  *   brandi images <dir> [--check]      measure supplied photography before planning
  *   brandi mockup grid <photo>         read a surface's corners off a real photograph
  *   brandi mockup build                composite the brand onto the recorded surfaces
@@ -38,8 +38,6 @@
 import { readFile, writeFile, mkdir, mkdtemp, readdir, rm, stat, copyFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { existsSync } from 'node:fs';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -51,11 +49,10 @@ import { buildSystem, assertPublishable } from './system.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
-import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES } from './canvas.mjs';
+import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES, forDesignCanvas, designIndex } from './canvas.mjs';
 import { extractColors } from './color.mjs';
-import { locateDesignHelper, NOT_FOUND_MESSAGE } from './design-locate.mjs';
 import { renderBrandBook, renderBrandDeck, pdfChromeArgs } from './brandbook.mjs';
-import { toPreviewHtml, screenshot, findChrome, runChrome } from './preview.mjs';
+import { toPreviewHtml, screenshot, findChrome, runChrome, declaredFrame } from './preview.mjs';
 import { emitGuardianSkill, checkFiles, checkPromises, linkForCodex, GENERATED_MARKER } from './guardian.mjs';
 import { buildAssetPack } from './assets.mjs';
 import { regionsOf, resolveColourway, renderColourway } from './logocolour.mjs';
@@ -71,7 +68,6 @@ import {
   fitParams, NEEDS, KINDS as MEDIA_KINDS, trialModels, trialSlot,
 } from './media.mjs';
 
-const run = promisify(execFile);
 // fileURLToPath, not url.pathname: pathname percent-encodes spaces, so a
 // checkout under "My Projects" silently resolves to a path that does not exist.
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -984,14 +980,22 @@ async function cmdValidate(flags, positional) {
 // canvas
 // ---------------------------------------------------------------------------
 
+/**
+ * Write the files a Design canvas is published from.
+ *
+ * The canvas is an Artifact type now, not a helper extracted into a temporary
+ * directory, so there is nothing to seed. A canvas is a folder: `project/`
+ * holding the index, every artboard and the images they name by relative path.
+ * This writes that folder and says exactly what to hand the Artifact tool.
+ */
+const CANVAS_FILE_BYTES = 15 * 1024 * 1024;
+const CANVAS_CALL_BYTES = 12 * 1024 * 1024;
+
 async function cmdCanvas(flags) {
   const dir = path.resolve(flags.dir ?? 'brand/canvas');
   const title = typeof flags.title === 'string' ? flags.title : null;
   if (!title) return fail('A canvas needs a --title. Name it as the client would, not "Design Canvas".');
-  const outFile = path.resolve(flags.out ?? `${slugify(title)}.html`);
-
-  const helper = await locateDesignHelper();
-  if (!helper) return fail(NOT_FOUND_MESSAGE);
+  if (!existsSync(dir)) return fail(`No such directory: ${dir}`);
 
   const files = (await readdir(dir)).filter((f) => f.endsWith('.dc.html'));
   if (!files.length) return fail(`No .dc.html artboards in ${dir}`);
@@ -1015,44 +1019,126 @@ async function cmdCanvas(flags) {
     );
   }
 
-  const images = (await readdir(dir)).filter((f) => /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(f));
-  const args = [
-    helper.helper,
-    '--template', helper.template,
-    '--out', outFile,
-    '--title', title,
-  ];
-  for (const f of files) args.push('--artboard', path.join(dir, f));
-  for (const f of images) args.push('--image', path.join(dir, f));
-  if (manifest) args.push('--canvas', path.join(dir, 'canvas.json'));
-
-  let seedOut;
-  try {
-    seedOut = await run(process.execPath, args, { cwd: dir, timeout: 120000 });
-  } catch (e) {
-    return fail(`The canvas helper refused the seed:\n${e.stderr || e.stdout || e.message}`);
+  // No manifest yet (a territories round is often a freshly written folder):
+  // each artboard's own $preview gives its frame, and a desktop frame covers
+  // one that declares nothing.
+  if (!manifest) {
+    const entries = files.map((f) => {
+      const declared = declaredFrame(artboards.find((a) => a.file === f).source);
+      return { file: f, ...(declared ?? { w: FRAMES.desktop.w, h: FRAMES.desktop.h }) };
+    });
+    const main = entries.findIndex((e) => e.file === 'Main.dc.html');
+    if (main > 0) entries.unshift(...entries.splice(main, 1));
+    manifest = canvasManifest(entries, { launch: { view: 'canvas' } });
   }
 
-  let checkOut;
-  try {
-    checkOut = await run(process.execPath, [helper.helper, '--check', outFile], { timeout: 60000 });
-  } catch (e) {
-    return fail(`The seeded canvas did not pass its own check:\n${e.stderr || e.stdout || e.message}`);
+  const images = (await readdir(dir)).filter((f) => /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(f));
+  // The canvas refuses a path with a space or a leading dot, and says so only
+  // at publish time, after the orchestrator has built every call around it.
+  const badNames = [...files, ...images].filter((f) => !/^[A-Za-z0-9_][A-Za-z0-9_.-]*$/.test(f));
+  if (badNames.length) {
+    return fail(`The canvas cannot take these file names (letters, digits, _ . - only, no spaces): ${badNames.join(', ')}`);
   }
+  // An image an artboard names that is not in the folder renders as a broken
+  // image, and the canvas says nothing about it.
+  const localRefs = (source) => [...source.matchAll(/(?:src\s*=\s*"|url\(\s*['"]?)([^"')\s]+)/g)]
+    .map((m) => m[1].replace(/^\.\//, ''))
+    .filter((r) => !/^(https?:|data:|\/_blob\/|#|support\.js$)/.test(r) && !r.includes('{{'));
+  const missing = [...new Set(artboards.flatMap((a) => localRefs(a.source).filter((r) => !images.includes(r)).map((r) => `${a.file} names ${r}`)))];
+  if (missing.length && !flags.force) {
+    return fail(`Images the artboards name that are not in ${path.relative(process.cwd(), dir) || '.'}:\n  ${missing.join('\n  ')}\nPut each file beside the artboards, or fix the name.`);
+  }
+  // One publish call carries 16MB and one file 15MB. A generated scene saved at
+  // full size is 19MB on its own, and the refusal would only come at publish.
+  const bytes = new Map();
+  for (const f of images) bytes.set(f, (await stat(path.join(dir, f))).size);
+  const tooBig = images.filter((f) => bytes.get(f) > CANVAS_FILE_BYTES);
+  if (tooBig.length) {
+    return fail(
+      `Too large for the canvas (15MB a file): ${tooBig.map((f) => `${f} ${(bytes.get(f) / 1048576).toFixed(1)}MB`).join(', ')}.\n`
+      + 'An artboard never shows an image wider than its frame, so write a copy at 2560px on the long side over the original '
+      + '(on macOS: sips -Z 2560 <file>) and run this again.',
+    );
+  }
+
+  const root = path.resolve(flags.out ?? path.join(near ? path.dirname(near.file) : 'brand', '.publish', slugify(title)));
+  const project = path.join(root, 'project');
+  const indexPath = path.join(project, 'canvas.json');
+
+  // What the last run from this folder published: its index keeps the canvas's
+  // creation record, and an artboard that has since gone must be removed from
+  // the canvas explicitly, because a publish keeps every file it is not sent.
+  let createdOnFiles = null;
+  let previous = [];
+  try {
+    createdOnFiles = JSON.parse(await readFile(indexPath, 'utf8')).createdOnFiles ?? null;
+    previous = (await readdir(project)).filter((f) => f !== 'canvas.json');
+  } catch { /* a first publish from this folder */ }
+  await rm(project, { recursive: true, force: true });
+  await mkdir(project, { recursive: true });
+
+  const index = designIndex({ manifest, title, createdOnFiles });
+  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
+  for (const a of artboards) {
+    const source = forDesignCanvas(a.source);
+    await writeFile(path.join(project, a.file), source);
+    bytes.set(a.file, Buffer.byteLength(source));
+  }
+  for (const f of images) await copyFile(path.join(dir, f), path.join(project, f));
+  const removed = previous.filter((f) => !files.includes(f) && !images.includes(f));
+
+  // The calls, in the order the canvas asks for: the index and the entry
+  // artboard with its images first, so the canvas opens on something, then
+  // every other artboard beside the images it names, packed under the limit.
+  const imagesOf = (source) => images.filter((f) => source.includes(`"${f}"`) || source.includes(`'${f}'`) || source.includes(`(${f})`));
+  const entry = index.order[0];
+  const groups = index.order.filter((f) => files.includes(f)).map((f) => [f, ...imagesOf(artboards.find((a) => a.file === f).source)]);
+  const sent = new Set();
+  const calls = [];
+  let current = null;
+  const add = (group, { fresh = false } = {}) => {
+    for (const f of group.filter((x) => !sent.has(x))) {
+      const size = bytes.get(f) ?? 0;
+      if (!current || fresh || (current.files.length && current.bytes + size > CANVAS_CALL_BYTES)) {
+        current = { files: [], bytes: 0 };
+        calls.push(current);
+        fresh = false;
+      }
+      current.files.push(f);
+      current.bytes += size;
+      sent.add(f);
+    }
+  };
+  for (const g of groups) add(g, { fresh: g[0] === entry });
+  add(images.filter((f) => !sent.has(f)));
+  const abs = (f) => path.join(project, f);
+  const rel = (p) => path.relative(process.cwd(), p) || '.';
+  const publishCalls = calls.map((c, i) => {
+    const map = Object.fromEntries(c.files.map((f) => [`project/${f}`, `project/${f}`]));
+    if (i === calls.length - 1) for (const f of removed) map[`project/${f}`] = null;
+    if (i === 0) return { root, file_path: indexPath, files: map };
+    delete map[`project/${c.files[0]}`];
+    return { root, file_path: abs(c.files[0]), files: map };
+  });
 
   emit(
     [
-      `Seeded ${path.relative(process.cwd(), outFile)}`,
-      `  ${plural(files.length, 'artboard')}, ${plural(images.length, 'image')}, helper ${helper.version}`,
-      seedOut.stdout.trim(),
-      seedOut.stderr.trim() ? `warnings: ${seedOut.stderr.trim()}` : '',
-      checkOut.stdout.trim(),
-      check.warnings.length ? `\n${check.warnings.length} craft warnings, see: brandi validate --dir ${path.relative(process.cwd(), dir)}` : '',
+      `Wrote the "${title}" canvas to ${rel(root)}`,
+      `  ${plural(files.length, 'artboard')}, ${plural(images.length, 'image')}, ${plural(publishCalls.length, 'publish call')}`,
+      removed.length ? `  ${plural(removed.length, 'file')} gone since the last run, sent as null so the canvas drops them: ${removed.join(', ')}` : '',
+      check.warnings.length ? `  ${check.warnings.length} craft warnings, see: brandi validate --dir ${rel(dir)}` : '',
       '',
-      'Now publish it with the Artifact tool: file_path is the path above,',
-      'contract "0.1.31", and a favicon of one or two emoji.',
+      'Publish it with the Artifact tool, from the Design type:',
+      `  0. A new canvas: publish with the Design type's type_url, title "${title}",`,
+      '     auto_open "after_first_write" and nothing else. Keep the url it returns.',
+      ...publishCalls.map((c, i) => `  ${i + 1}. url: that url, root: "${c.root}", file_path: "${c.file_path}", files: ${JSON.stringify(c.files)}`),
+      'Republishing to a canvas that exists: skip step 0, send only the artboards that changed,',
+      'and the index only when artboards were added, removed or moved.',
     ].filter(Boolean).join('\n'),
-    { ok: true, file: outFile, artboards: files, images, warnings: check.warnings },
+    {
+      ok: true, title, root, calls: publishCalls,
+      artboards: files, images, removed, warnings: check.warnings,
+    },
   );
 }
 

@@ -16,13 +16,17 @@ describe('artboard()', () => {
     assert.match(a, /<helmet>[\s\S]*<\/helmet>/);
   });
 
-  test('a static artboard carries no logic block', () => {
-    assert.equal(/<script data-dc-script/.test(minimal()), false);
+  test('a static artboard still carries a typed logic block, with an empty class', () => {
+    // The Design canvas expects the block on every artboard and says nothing
+    // when it is missing.
+    const a = minimal();
+    assert.match(a, /<script type="text\/x-dc" data-dc-script>\s*class Component extends DCLogic \{\s*\}\s*<\/script>/);
+    assert.equal(K.validateArtboard(a).ok, true);
   });
 
   test('a props artboard carries a single-quoted data-props attribute', () => {
     const a = minimal({ props: { accent: { editor: 'color', default: '#1F6F4A' } } });
-    assert.match(a, /<script data-dc-script data-props='/);
+    assert.match(a, /<script type="text\/x-dc" data-dc-script data-props='/);
     assert.match(a, /class Component extends DCLogic/);
   });
 
@@ -112,7 +116,7 @@ describe('validateArtboard: the silent failures', () => {
 
   test('catches a data: prefixed image', () => {
     const r = bad('<img src="data:image/png;base64,AAAA" alt="">');
-    assert.ok(r.errors.some((e) => /double-wraps/.test(e.message)));
+    assert.ok(r.errors.some((e) => /data: URI/.test(e.message)));
   });
 
   test('catches an image loaded over the network', () => {
@@ -511,5 +515,180 @@ describe('canvasManifest: pages are laid out independently', () => {
     for (const columns of [1, 2, 3, 4]) {
       assert.deepEqual(K.findOverlaps(K.canvasManifest(mixed, { columns, pages })), [], `overlap at ${columns} columns`);
     }
+  });
+});
+
+describe('the Design canvas', () => {
+  const legacy = [
+    '<!doctype html>', '<html>', '<head>', '  <script src="./support.js"></script>', '</head>', '<body>',
+    '<x-dc><div style="padding:32px">Hi</div></x-dc>',
+  ];
+
+  test('an artboard with no logic block gets an empty one before </body>', () => {
+    const out = K.forDesignCanvas([...legacy, '</body>', '</html>'].join('\n'));
+    assert.match(out, /<script type="text\/x-dc" data-dc-script>\nclass Component extends DCLogic \{\n\}\n<\/script>\n<\/body>/);
+    assert.equal(K.validateArtboard(out).ok, true);
+  });
+
+  test('an untyped logic block is typed, with its props left exactly as they were', () => {
+    const props = `data-props='{"a":{"editor":"color","default":"#111111"}}'`;
+    const src = [...legacy, `<script data-dc-script ${props}>class Component extends DCLogic {}</script>`, '</body>', '</html>'].join('\n');
+    const out = K.forDesignCanvas(src);
+    assert.ok(out.includes(`<script type="text/x-dc" data-dc-script ${props}>`));
+    assert.equal((out.match(/data-dc-script/g) ?? []).length, 1, 'no second block is added');
+  });
+
+  test('a typed block is left alone, so running it twice changes nothing', () => {
+    const once = K.forDesignCanvas([...legacy, '</body>', '</html>'].join('\n'));
+    assert.equal(K.forDesignCanvas(once), once);
+  });
+
+  test('the index is version 3: boards keyed by file, Main first in order, notes by id', () => {
+    const manifest = K.canvasManifest([
+      { file: 'Palette.dc.html', w: 1200, h: 900, page: 'spec' },
+      { file: 'Main.dc.html', w: 1440, h: 1600, page: 'work', is_interactive: true },
+    ], {
+      pages: [{ id: 'work', name: 'Design' }, { id: 'spec', name: 'Specification' }],
+      annotations: [{ id: 'why', x: 0, y: -300, w: 400, text: 'Why this direction', page: 'work' }],
+      launch: { view: 'canvas', page: 'work' },
+    });
+    const index = K.designIndex({ manifest, title: 'Acme brand', now: new Date('2026-09-28T00:00:00Z') });
+    assert.equal(index.v, 3);
+    assert.deepEqual(index.createdOnFiles, { v: 1, at: '2026-09-28T00:00:00.000Z' });
+    assert.equal(index.title, 'Acme brand');
+    assert.deepEqual(index.order, ['Main.dc.html', 'Palette.dc.html']);
+    assert.deepEqual(Object.keys(index.boards).sort(), ['Main.dc.html', 'Palette.dc.html']);
+    assert.equal(index.boards['Main.dc.html'].is_interactive, true);
+    assert.equal(index.boards['Palette.dc.html'].page, 'spec');
+    assert.deepEqual(index.notes.why, { x: 0, y: -300, text: 'Why this direction', w: 400, page: 'work' });
+    assert.deepEqual(index.launch, { view: 'canvas', page: 'work' });
+    assert.deepEqual(index.designSystems, []);
+  });
+
+  test('an earlier creation record is kept rather than replaced', () => {
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }]);
+    const createdOnFiles = { v: 1, at: '2026-01-01T00:00:00.000Z' };
+    assert.deepEqual(K.designIndex({ manifest, title: 'T', createdOnFiles }).createdOnFiles, createdOnFiles);
+  });
+
+  test('refuses an index with no title or no artboards', () => {
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }]);
+    assert.throws(() => K.designIndex({ manifest, title: '' }), TypeError);
+    assert.throws(() => K.designIndex({ manifest: { artboards: [] }, title: 'T' }), TypeError);
+  });
+});
+
+describe('brandi canvas: the folder a Design canvas is published from', async () => {
+  const { mkdtemp, mkdir, writeFile, readFile, rm, truncate } = await import('node:fs/promises');
+  const { existsSync } = await import('node:fs');
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const os = await import('node:os');
+  const path = (await import('node:path')).default;
+  const { fileURLToPath } = await import('node:url');
+  const run = promisify(execFile);
+  const BRANDI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'scripts', 'brandi.mjs');
+
+  const board = (name, img = '') => K.artboard({
+    name,
+    body: `<div style="width:600px;height:400px;background:#FFFFFF;padding:24px;display:flex;flex-direction:column;gap:12px">${img ? `<img src="${img}" alt="">` : ''}<p style="margin:0">${name}</p></div>`,
+    preview: { width: 600, height: 400 },
+  });
+  const canvas = async (cwd, args) => {
+    try {
+      const { stdout } = await run(process.execPath, [BRANDI, 'canvas', ...args, '--json'], { cwd });
+      return { code: 0, out: JSON.parse(stdout) };
+    } catch (e) {
+      return { code: e.code, out: `${e.stdout}${e.stderr}` };
+    }
+  };
+  const fresh = async (boards) => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-canvas-cmd-'));
+    await mkdir(path.join(dir, 'brand', 'canvas'), { recursive: true });
+    for (const [file, source] of Object.entries(boards)) await writeFile(path.join(dir, 'brand', 'canvas', file), source);
+    return dir;
+  };
+
+  test('writes the index, the artboards and their images under brand/.publish, and prints the calls', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main', 'hero.png'), 'Other.dc.html': board('Other') });
+    await writeFile(path.join(dir, 'brand', 'canvas', 'hero.png'), Buffer.alloc(64));
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme brand']);
+    assert.equal(code, 0, String(out));
+    const project = path.join(dir, 'brand', '.publish', 'acme-brand', 'project');
+    const index = JSON.parse(await readFile(path.join(project, 'canvas.json'), 'utf8'));
+    assert.equal(index.v, 3);
+    assert.deepEqual(index.order, ['Main.dc.html', 'Other.dc.html']);
+    assert.ok(existsSync(path.join(project, 'hero.png')));
+    assert.match(await readFile(path.join(project, 'Main.dc.html'), 'utf8'), /type="text\/x-dc" data-dc-script/);
+    assert.equal(out.calls.length, 1);
+    // Compared by suffix: macOS reports the temporary directory through /private.
+    assert.ok(out.calls[0].file_path.endsWith(path.join('brand', '.publish', 'acme-brand', 'project', 'canvas.json')));
+    assert.deepEqual(Object.keys(out.calls[0].files).sort(), ['project/Main.dc.html', 'project/Other.dc.html', 'project/hero.png']);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('an artboard gone since the last run is sent as null, and the creation record survives', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main'), 'Other.dc.html': board('Other') });
+    const first = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    const created = JSON.parse(await readFile(path.join(dir, 'brand', '.publish', 'acme', 'project', 'canvas.json'), 'utf8')).createdOnFiles;
+    await rm(path.join(dir, 'brand', 'canvas', 'Other.dc.html'));
+    const second = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.equal(first.code, 0);
+    assert.equal(second.code, 0, String(second.out));
+    assert.deepEqual(second.out.removed, ['Other.dc.html']);
+    assert.equal(second.out.calls.at(-1).files['project/Other.dc.html'], null);
+    const again = JSON.parse(await readFile(path.join(dir, 'brand', '.publish', 'acme', 'project', 'canvas.json'), 'utf8'));
+    assert.deepEqual(again.createdOnFiles, created);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('refuses an image over 15MB, before writing anything, and says how to shrink it', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main', 'scene.png') });
+    const big = path.join(dir, 'brand', 'canvas', 'scene.png');
+    await writeFile(big, '');
+    await truncate(big, 16 * 1024 * 1024);
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.notEqual(code, 0);
+    assert.match(out, /Too large for the canvas/);
+    assert.match(out, /scene\.png/);
+    assert.equal(existsSync(path.join(dir, 'brand', '.publish')), false);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('splits a heavy canvas into calls under the limit, index and Main first', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main', 'a.png'), 'Other.dc.html': board('Other', 'b.png') });
+    for (const f of ['a.png', 'b.png']) {
+      const p = path.join(dir, 'brand', 'canvas', f);
+      await writeFile(p, '');
+      await truncate(p, 8 * 1024 * 1024);
+    }
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.equal(code, 0, String(out));
+    assert.equal(out.calls.length, 2);
+    assert.match(out.calls[0].file_path, /canvas\.json$/);
+    const first = Object.keys(out.calls[0].files);
+    assert.ok(first.includes('project/Main.dc.html') && first.includes('project/a.png'), 'the entry and its image go first');
+    // Every file goes exactly once, and the two 8MB images never share a call.
+    const sentIn = out.calls.map((c) => [c.file_path.split('/project/')[1], ...Object.keys(c.files).map((k) => k.slice(8))].filter((f) => f !== 'canvas.json'));
+    assert.deepEqual(sentIn.flat().sort(), ['Main.dc.html', 'Other.dc.html', 'a.png', 'b.png']);
+    assert.ok(!sentIn.some((c) => c.includes('a.png') && c.includes('b.png')));
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('refuses an artboard that names an image the folder does not have', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main', './gone.jpg') });
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.notEqual(code, 0);
+    assert.match(out, /Main\.dc\.html names gone\.jpg/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('refuses a file name the canvas cannot take', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main') });
+    await writeFile(path.join(dir, 'brand', 'canvas', 'my photo.png'), Buffer.alloc(8));
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.notEqual(code, 0);
+    assert.match(out, /my photo\.png/);
+    await rm(dir, { recursive: true, force: true });
   });
 });

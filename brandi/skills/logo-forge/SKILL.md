@@ -1,6 +1,6 @@
 ---
 name: logo-forge
-description: Generate a real range of logo concepts and take one through to a production master. Deals concept slots that cannot converge, drives parallel agents to draw them, measures every candidate mechanically before anybody says what they like, presents them on a /design canvas, and turns the chosen direction into outlined vector masters with clear space, minimum sizes and a provenance record. Use when someone needs a logo, a mark, a wordmark, a monogram, a lockup, a symbol, a favicon, a brand mark, or has no logo at all and needs one. Trigger on "design a logo", "we need a logo", "make me a mark", "logo concepts", "logo options", "wordmark", "monogram", "lockup", "brand mark", "rebrand the logo", "our logo is terrible", or when a brand build reaches the point of needing a mark and none exists. Runs inside the brand-system journey at the start of Identity, and also stands alone.
+description: Generate a real range of logo concepts and take one through to a production master. Deals concept slots that cannot converge, drives parallel agents to draw them, measures every candidate mechanically before anybody says what they like, presents them on a Design canvas, traces a sketch the person picks into a clean vector and gives options on that exact drawing, and turns the chosen direction into outlined vector masters with clear space, minimum sizes and a provenance record. Use when someone needs a logo, a mark, a wordmark, a monogram, a lockup, a symbol, a favicon, a brand mark, or has no logo at all and needs one. Trigger on "design a logo", "we need a logo", "make me a mark", "logo concepts", "logo options", "wordmark", "monogram", "lockup", "brand mark", "rebrand the logo", "our logo is terrible", "options on this one", "variations of this logo", "trace this sketch", "vectorise this", or when a brand build reaches the point of needing a mark and none exists. Runs inside the brand-system journey at the start of Identity, and also stands alone.
 ---
 
 # Logo forge
@@ -41,7 +41,8 @@ anything you hand to another agent.
 "$A" logo plan     --count 12 [--seed x] [--name "X"] [--category "X"] [--oneLiner "X"]
 "$A" logo wordmark --font "Bitter" --weight 700 [--case upper] [--tracking -15]
 "$A" logo lockup   --symbol s.svg --wordmark w.svg [--stacked]
-"$A" logo import   brand/logo/concepts/round-01 --model "claude-opus-5"
+"$A" logo trace    brand/media/ideation/idea-C2-2.png --crop x,y,w,h [--from C2] [--architecture symbol-only]
+"$A" logo import   brand/logo/concepts/round-01 --model "<the drawing agents' model id>"
 "$A" logo audit
 "$A" logo board
 "$A" logo pick     A2 C1 D3
@@ -108,16 +109,84 @@ variety at once: the briefs cannot converge, and no two sparks share a model's h
 ```
 
 Check each spark against its own slot's refusals before the person sees the wall; image models
-sometimes draw the cliche they were told to avoid. Sparks are sketches. They are never imported,
-never audited as marks and never approved: `media approve` refuses them.
+sometimes draw the cliche they were told to avoid. A spark is never approved into the brand:
+`media approve` refuses them.
 
-A picked spark changes one thing in step 3: that slot's agent gets the spark file as well as its
-own brief, and nothing else. Skip this stop and the round runs exactly as before.
+**When they pick, ask what they picked.** Straight after the pick, one `AskUserQuestion` with one
+question per picked spark: *this drawing, or its idea?* Skip it for a spark they have already
+answered for ("I like C2-2" about how it looks is "this drawing"). The two answers take different
+paths, and guessing wrong costs rounds.
+
+- **This drawing.** Trace it (below). The trace is the concept. Every option after that is an
+  option on it.
+- **Its idea.** The slot's agent gets the spark with its brief in step 3 and redraws the idea under
+  the brief.
+
+Once they have picked, step 3 draws only the slots picked for their idea. When every pick is "this
+drawing", there is no drawing step: trace, audit, board, and the options come from refining the
+trace.
+
+### A reference they picked: trace it, then give options on it
+
+This path covers a picked spark, and equally a sketch, a photo of a napkin or any image the person
+hands over and says "like this one".
+
+```bash
+"$A" logo trace brand/media/ideation/idea-C2-2.png --crop 0.34,0.17,0.33,0.39 --from C2
+```
+
+Look at the image first and crop to the mark with a margin of paper all round. Fractions of the
+image are fine. `--from` carries the slot's brief with it. `--architecture symbol-only` when the
+crop is a symbol out of a lockup sketch. It writes the trace as a concept of the round, with its
+overlap with the reference and an overlay PNG: black where both have ink, red where only the
+reference does, blue where only the trace does. Read the overlay before going on. It warns when the
+crop cuts through the mark. Under 95% means the crop caught something else.
+
+If the sketch has lettering they like, set the name in the nearest real face with `logo wordmark`
+and put the candidates beside the sketch's lettering. Wordmarks are set, not traced. Trace the
+lettering only when no face comes close, and say that is what happened.
+
+Then `audit`, `board` and publish. `board` adds a Reference artboard: the picked image, the trace
+and the overlay side by side, which is the comparison the person is making. A trace can fail the 16 pixel
+test, because an image model draws for a poster. That is the 16 pixel refinement's job. Never a
+reason to drop the person's pick.
+
+When they confirm it is the drawing, the options come from refining it, never from a new concept
+round:
+
+```bash
+"$A" logo pick T1
+"$A" logo refine
+```
+
+A trace gets five refinement tasks, not four. The first is the clean-up: straighten what was
+plainly meant to be straight, even out an accidental wobble, change nothing else. The refinement
+boards show the trace first, labelled as the original, so every option is judged against the thing
+they picked.
+
+With Higgsfield there, add image-model variations of the spark itself. Each gets the spark as its
+reference image and a prompt that names the one thing to vary:
+
+```bash
+"$A" media add vary-c2-weight --kind ideation --count 2 \
+  --refs '{"image_references":["brand/media/ideation/idea-C2-2.png"]}' \
+  --prompt "The same K, same construction, same rounded terminals, one step heavier. Black on white."
+```
+
+Trace whichever one they pick, the same way. Every variation is a spark, never a mark.
+
+Two rules for this path, from a real engagement that cost five rounds:
+
+- **Options on one thing are options on that thing.** Fresh concepts, "in the style of" rebuilds
+  and parametric look-alikes are a different question from the one they asked.
+- **Never hand-build a board.** `logo board` rebuilds every board from the files on disk. A board
+  patched by hand showed the old mark in half its cells, and the person saw it before anyone
+  else did.
 
 ### 3. Draw (parallel agents, and this is the part that matters)
 
-Dispatch **one agent per slot**, or one agent per two slots if you want to halve the cost. Use
-Opus. Each agent gets:
+Dispatch **one agent per slot**, or one agent per two slots if you want to halve the cost, with
+the `Agent` tool and `model: "opus"`. Each agent gets:
 
 - The contents of **its own slot brief only**. Never the plan, never another slot, never the
   round. This is the anti-convergence mechanism and it is trivially easy to break by helpfully
@@ -144,7 +213,7 @@ Every agent is told, verbatim:
 > Return only: the path you wrote, one sentence on what the mark signals, and one sentence on what
 > it deliberately is not.
 
-For a slot with a picked spark, add, verbatim:
+For a slot whose picked spark is wanted for its idea, add, verbatim:
 
 > `<spark path>` is a raster sketch from an image model. Redraw its idea as a vector mark under
 > your brief. Do not trace it: build it on the construction grid from the craft reference. Where
@@ -152,8 +221,8 @@ For a slot with a picked spark, add, verbatim:
 > lost the reason it was picked.
 
 Then import that slot's file on its own, with a model string naming both, so its provenance record
-carries it: `"$A" logo import brand/logo/concepts/round-01/C1.svg --model "claude-opus-5, redrawn
-from a Higgsfield spark"`. One import call gives every file in it the same string. When a redrawn concept becomes
+carries it: `"$A" logo import brand/logo/concepts/round-01/C1.svg --model "<the agents' model id>,
+redrawn from a Higgsfield spark"`. One import call gives every file in it the same string. When a redrawn concept becomes
 the master, the generation manifest lists the picked sparks with their models and job ids. They
 belong in the similarity search, because an image model can reproduce a mark that already exists.
 
@@ -169,7 +238,7 @@ from a language model are the single most reliable way to make a wordmark look m
 ### 4. Measure, then present (no questions)
 
 ```bash
-"$A" logo import brand/logo/concepts/round-01 --model "claude-opus-5"
+"$A" logo import brand/logo/concepts/round-01 --model "<the drawing agents' model id>"
 "$A" logo audit
 "$A" logo board
 ```
@@ -183,17 +252,19 @@ five artboards.
 or the draw instructions are wrong, not the concepts. Fix that and rerun rather than presenting a
 round with two survivors.
 
-Then publish the canvas, exactly as `brand-system` does it:
+Then publish the canvas, exactly as `brand-system` does it under "Publishing a canvas":
 
 1. `$A validate --dir brand/logo/canvas` and fix every error.
-2. `$A canvas --dir brand/logo/canvas --title "<Brand> logo concepts" --out <brand>-logo.html`
-3. Publish with the `Artifact` tool: `contract: "0.1.31"`, a one-line description, a favicon of one
-   or two emoji. On a first publish, load `artifact-capabilities` and declare what that user's
-   roster lists.
-4. Republish to the same path with the same favicon and contract, and no `capabilities`.
+2. `$A canvas --dir brand/logo/canvas --title "<Brand> logo round 1" --json`. It writes the canvas
+   folder and prints the Artifact calls.
+3. A new canvas: `Artifact` quickstart with intent `design` gives the Design type's `type_url`.
+   Publish with that `type_url`, the title, `auto_open: "after_first_write"` and nothing else.
+4. Make each call the command printed, in order, to the url step 3 returned.
 
-If there is no `design` skill or `Artifact` tool (Codex, or any session without them), stop after
-step 1 and render the boards with `node <brandi>/scripts/preview.mjs --dir brand/logo/canvas --out <dir>`;
+A later round of the same forge is a new canvas. A change to this round goes to the same url.
+
+If there is no `Artifact` tool (Codex, or any session without it), stop after step 1 and render the
+boards with `node <brandi>/scripts/preview.mjs --dir brand/logo/canvas --out <dir>`;
 it frames each artboard the way canvas.json records it and writes an index page beside the PNGs.
 Hand that page over instead of a link.
 
@@ -235,9 +306,13 @@ concept agent must not see anything else in the round; a **refinement agent must
 thing, the mark it is refining**, and the brief already names the file. Tell each one plainly that a
 refinement nobody recognises as the same mark has failed, however good it is.
 
-Then `import`, `audit`, `board`, publish, and let them choose. The audit knows this is a refinement
-round: two refinements of one parent are supposed to look alike, so it only reports them when they
-are the same artwork, which means the task was not done.
+Then `import`, `audit`, `board`, publish, and let them choose. The boards put each original first,
+so the refinements are judged against it. The audit knows this is a refinement round: two
+refinements of one parent are supposed to look alike, so it only reports them when they are the
+same artwork, which means the task was not done.
+
+When they say "closer to the original", the answer is another refinement of the same parent, not a
+new round. When they point at one cell and say "that, but", refine that cell.
 
 Where a direction needs a symbol and a wordmark locked up, compose rather than draw:
 
@@ -311,6 +386,9 @@ it from the master.
 
 **A person picks.** Never adopt a generated mark because the audit liked it. The audit rules things
 out; it never rules anything in.
+
+**When they point at one thing, give options on that thing.** A picked drawing is traced and
+refined. It is never handed to an agent to reinterpret, and never answered with a fresh range.
 
 **Black first, and the tool enforces it.** You have to love the mark as a silhouette before colour
 enters. The concept round is black on white because a silhouette that only works in colour is a mark

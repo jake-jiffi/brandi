@@ -11,8 +11,9 @@ a brand book, DTCG design tokens, and a companion skill that keeps every future 
 
 You need [Claude Code](https://claude.com/claude-code) or Codex. Everything else is built in: Brandi
 has no npm dependencies at all. The two hosts are not equal. Claude Code gets all of it, including
-the `/design` canvas and the published artifact. Codex gets the skills, the command line and every
-file Brandi writes. Its visual rounds arrive as PNG previews rather than a canvas.
+the Design canvas, an Artifact you can open, comment on and edit by hand. Codex gets the skills,
+the command line and every file Brandi writes. Its visual rounds arrive as PNG previews rather than
+a canvas.
 
 **1. Clone it,** in a terminal:
 
@@ -155,7 +156,15 @@ here for exactly that reason.
 **Then a refinement round, which is not a second concept round.** Each kept direction gets the same
 four tasks: the 16-pixel redraw on the pixel grid, proportion, weight, and the square alternate.
 Every brief points at the file it is refining and says that a refinement nobody recognises has
-failed.
+failed. The boards show the original first, so every option is judged against it.
+
+**Pick a drawing, get options on that drawing.** When someone points at a sketch, a generated spark
+or a photo of a napkin and says "this one", `brandi logo trace` turns it into a clean vector concept
+in one command: sub-pixel edges, curves fitted with as few nodes as the tolerance allows, straight
+edges made straight, and an overlap score with an overlay against the reference. On the Kinbox
+spark it scored 98.9% in under a second, and 96.9% against the master that took five rounds by
+hand. The trace then gets a clean-up task ahead of the usual four, and image-model variations can
+take the spark itself as their reference.
 
 **A person picks.** Always. `master` normalises the artwork, derives the mono and reversed
 renditions, computes the clear-space rule and the minimum sizes from the real geometry, and records
@@ -190,8 +199,9 @@ model that drifts off the mark is caught before anybody picks it.
 
 **Logo sparks, if you want them.** Each of the forge's concept briefs goes to a different image
 model, so a wall of twelve is not one model's house style twelve times. A person picks the sparks
-worth pursuing. The forge redraws each one in vector, and the generation manifest records where the
-idea came from. A spark can be picked. It can never be approved into the brand.
+worth pursuing, and says whether they want the drawing or its idea. The drawing is traced; the idea
+is redrawn under its brief. The generation manifest records where either came from. A spark can be
+picked. It can never be approved into the brand.
 
 **Models are chosen live.** Brandi reads Higgsfield's catalogue and matches models to jobs by what
 they take, not what they are called: a sting needs start and end frames, illustration needs hard
@@ -261,7 +271,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-1899 tests. They include property tests over the colour and type engines against hundreds of random
+1927 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.
