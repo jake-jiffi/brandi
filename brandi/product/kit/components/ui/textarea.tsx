@@ -22,4 +22,14 @@ const Textarea = React.forwardRef(function Textarea({ className, ...props }: Rea
   )
 })
 
-export { Textarea }
+// Patched (07-starter.md, textarea): the same edge drawn on a box that holds a bare textarea beside its send button,
+// for a composer (AskBar, AskPanel, Conversation): the box takes the 2px focus edge from the textarea inside it.
+const textareaBox =
+  "flex w-full min-w-0 rounded-control border border-line-control bg-surface text-text has-[textarea:focus-visible]:border-focus has-[textarea:focus-visible]:shadow-[0_0_0_1px_var(--focus)] has-[textarea:disabled]:cursor-not-allowed has-[textarea:disabled]:opacity-50"
+
+// Patched (07-starter.md, textarea): the textarea inside a textareaBox. No edge and no outline of its own, because the
+// box draws the focus edge, and no handle, because it grows with its lines. 16px text on touch.
+const textareaBare =
+  "block w-full min-w-0 resize-none bg-transparent type-body text-text placeholder:text-text-subtle focus-visible:outline-hidden disabled:cursor-not-allowed pointer-coarse:type-body-lg"
+
+export { Textarea, textareaBox, textareaBare }
