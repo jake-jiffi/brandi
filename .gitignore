@@ -27,3 +27,6 @@ private/
 
 # Session logs a browser-automation tool writes into the working directory.
 .playwright-mcp/
+
+# Generated in every product by tools/build-index.mjs
+brandi/product/kit/components/system/index.ts

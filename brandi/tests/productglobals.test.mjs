@@ -51,7 +51,7 @@ describe('toStarterGlobals', () => {
   });
 
   test('uses next/font\'s variable for the brand\'s faces, and the plain stack where the brand has none', () => {
-    assert.match(css, /--font-sans: var\(--font-brand-sans\), ui-sans-serif/);
+    assert.match(css, /--font-sans: var\(--font-brand-sans, Karla\), ui-sans-serif/, 'the face is the variable\'s fallback, so a board without next/font still gets it');
     const noMono = buildProductTokens(buildSystem({ primary: '#1F6F4A', type: { display: 'Bitter', body: 'Karla' } }));
     const out = toStarterGlobals(noMono);
     assert.match(out, /--font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;/);

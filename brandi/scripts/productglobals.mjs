@@ -60,15 +60,18 @@ const GENERIC_FAMILY = /^(ui-[a-z-]+|system-ui|-apple-system|serif|sans-serif|mo
 
 /**
  * The --font-* line for one role. When the stack starts with the brand's face,
- * next/font's variable stands in for it and the rest stay as fallbacks. When the
- * brand has no face for the role, the stack is used as it is: dropping its first
- * entry would throw away a real fallback.
+ * next/font's variable stands in for it and the rest stay as fallbacks. The face
+ * itself is the variable's own fallback: where next/font has not run (a canvas
+ * board, a component preview) an undefined variable would void the whole stack
+ * and the browser would fall back to its default serif. When the brand has no
+ * face for the role, the stack is used as it is: dropping its first entry would
+ * throw away a real fallback.
  */
 function fontLine(role, variable, stack, fallback) {
   const parts = String(stack ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   if (!parts.length) return `  --font-${role}: ${fallback};`;
   if (GENERIC_FAMILY.test(parts[0])) return `  --font-${role}: ${parts.join(', ')};`;
-  return `  --font-${role}: var(${variable}), ${parts.slice(1).join(', ') || fallback};`;
+  return `  --font-${role}: var(${variable}, ${parts[0]}), ${parts.slice(1).join(', ') || fallback};`;
 }
 
 const cssVal = (v) => {
