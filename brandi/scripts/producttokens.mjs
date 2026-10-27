@@ -362,8 +362,9 @@ function themeValues(system, mode, roles, ai, brandInk) {
   v['on-brand'] = labelOn(v.brand).hex;
   v['brand-hover'] = stateOf(v.brand, v['on-brand'], 0.05);
 
-  // Focus clears 3:1 on every ground it can sit on.
-  v.focus = decided('focus') ?? solve('focus', B[8], grounds, FLOORS['non-text']);
+  // Focus clears 3:1 on every ground it can sit on, the selected tints included: a list row is often
+  // selected and focused at once, and a dark focus colour once held 2.8:1 on the dark selected tint.
+  v.focus = decided('focus') ?? solve('focus', B[8], [...grounds, v.selected, v['selected-strong']], FLOORS['non-text']);
 
   // Highlight: "this needs you". A fill, never text. The brand's accent is the
   // colour it keeps for where an eye needs to land, which is this job exactly,
@@ -541,7 +542,7 @@ function contrastFor(name, { railDecided }) {
     case 'primary': return nonText(['surface', 'canvas']);
     case 'on-primary': return textOn(['primary', 'primary-hover', 'primary-pressed']);
     case 'on-brand': return textOn(['brand', 'brand-hover']);
-    case 'focus': return nonText(SURFACES);
+    case 'focus': return nonText([...SURFACES, 'selected', 'selected-strong']);
     case 'on-highlight': return textOn(['highlight']);
     case 'on-danger': return textOn(['danger-solid']);
     case 'chart-compare': return nonText(['surface']);
