@@ -250,3 +250,16 @@ describe('toProductCss and the shape the generators read', () => {
     assert.equal(plain.type.groups[0].styles[0].fontWeight, 700);
   });
 });
+
+describe('an audit of a tokens file it did not write', () => {
+  test('a pair naming a role the file does not define is a reported failure, and every other pair is still measured', () => {
+    const t = P.buildProductTokens(buildSystem({ primary: '#1F6F4A', type: { display: 'Bitter', body: 'Karla' } }), { name: 'Acme' });
+    const full = P.auditProductTokens(t).pairs;
+    t.color.tokens = t.color.tokens.filter((x) => x.name !== 'tag-grey');
+    const audit = P.auditProductTokens(t);
+    const missing = audit.fails.filter((f) => /unknown colour token: tag-grey/.test(f.problem ?? ''));
+    assert.ok(missing.length > 0, 'the dangling pair is reported');
+    assert.equal(audit.ok, false);
+    assert.ok(audit.pairs >= full - missing.length - 20, 'the rest are still measured');
+  });
+});

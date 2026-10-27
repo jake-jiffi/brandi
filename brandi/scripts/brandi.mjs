@@ -49,6 +49,7 @@
  *   brandi product specs              check platform specs and report their coverage
  *   brandi product standards          the monthly standards check, and its report
  *   brandi product drift              canvas against system against code
+ *   brandi product sync --from <dir>  pull a shipped product back into the system
  *
  * Every command prints a short human summary, and `--json` prints the machine
  * form instead, so the skill can read a result without parsing prose.
@@ -72,6 +73,7 @@ import { runGates, judgeRound, roundMarkdown, WIDTHS } from './productgates.mjs'
 import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
+import { compareProduct, syncReport, applyTokens, provenance } from './productsync.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2805,7 +2807,13 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       the starter, globals.css, every copy of the bundle by checksum, the
       components and props mounted on boards, the starter's components against
       the catalogue, board sizes, raw colours typed into boards, and local-only
-      files in the canvas folder. Exits 1 on any difference.`;
+      files in the canvas folder. Exits 1 on any difference.
+
+  brandi product sync --from <shipped product> [--apply]
+      Pull a shipped product back into the system: roles added, changed and
+      removed, components new, changed (by their props) and removed. --apply
+      copies the shipped tokens in as they are, records the repo, commit and
+      method, and audits them. Nothing is deleted: removals are listed.`;
 
 async function productSource(flags) {
   if (typeof flags.input === 'string') {
@@ -2819,7 +2827,7 @@ async function productSource(flags) {
 
 function productAuditLines(audit) {
   const lines = [auditSummary(audit)];
-  for (const f of audit.fails) lines.push(`  fail  ${f.theme.padEnd(5)} ${f.fg} on ${f.bg}: ${f.ratio}:1, below ${f.min}:1`);
+  for (const f of audit.fails) lines.push(f.problem ? `  fail  ${f.theme.padEnd(5)} ${f.fg} on ${f.bg}: ${f.problem}` : `  fail  ${f.theme.padEnd(5)} ${f.fg} on ${f.bg}: ${f.ratio}:1, below ${f.min}:1`);
   for (const n of audit.notes) lines.push(`  note  ${n}`);
   if (audit.warnings.length) lines.push('', `${plural(audit.warnings.length, 'warning')}:`);
   for (const w of audit.warnings) lines.push(`  ${w.theme.padEnd(5)} ${w.area.padEnd(13)} ${w.message}`);
@@ -3003,6 +3011,23 @@ async function cmdProduct(flags, positional) {
     const result = await driftCheck({ productDir, starter });
     emit(driftReport(result), { ok: !result.differences.length, differences: result.differences, unchecked: result.unchecked });
     if (result.differences.length) process.exitCode = 1;
+    return;
+  }
+  if (sub === 'sync') {
+    if (typeof flags.from !== 'string') return fail('sync needs --from <path to the shipped product>.');
+    const shipped = path.resolve(flags.from);
+    if (!existsSync(shipped)) return fail(`No such folder: ${flags.from}`);
+    const productDir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
+    const diff = await compareProduct({ shipped, system: existsSync(path.join(starter, 'system', 'tokens.json')) ? starter : productDir });
+    const prov = provenance(shipped);
+    const lines = [syncReport(diff, prov)];
+    let applied = null;
+    if (flags.apply) {
+      try { applied = applyTokens(diff, { productDir, prov }); } catch (e) { return fail(e.message); }
+      lines.push('', `Copied the shipped tokens into product/tokens.json. ${applied.summary}.`, applied.fails.length ? 'A shipped contrast miss is a finding to raise with its team, not a value to keep quietly: see brandi product audit.' : '');
+    }
+    emit(lines.filter(Boolean).join('\n'), { ok: true, provenance: prov, roles: diff.roles, components: diff.components, applied });
     return;
   }
   return fail(`Unknown product subcommand "${sub}".\n\n${PRODUCT_USAGE}`);

@@ -812,8 +812,17 @@ export function auditProductTokens(tokens) {
     for (const t of tokens.color.tokens) {
       for (const c of t.contrast ?? []) {
         for (const on of c.on) {
-          let fg = resolveColour(tokens, t.name, theme);
-          const bg = resolveColour(tokens, on, theme);
+          // A pair that names a role the file does not define (a shipped product's tokens can) is a
+          // failure to report, not a reason to stop measuring every other pair.
+          let fg;
+          let bg;
+          try {
+            fg = resolveColour(tokens, t.name, theme);
+            bg = resolveColour(tokens, on, theme);
+          } catch (e) {
+            rows.push({ theme, fg: t.name, bg: on, ratio: null, min: c.min, kind: c.kind, ok: false, problem: e.message });
+            continue;
+          }
           if (isTranslucent(fg)) fg = composite(fg, bg);
           const ratio = contrastRatio(fg, bg);
           rows.push({ theme, fg: t.name, bg: on, ratio: Math.round(ratio * 100) / 100, min: c.min, kind: c.kind, ok: ratio >= c.min });
