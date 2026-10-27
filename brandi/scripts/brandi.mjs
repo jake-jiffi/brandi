@@ -2938,8 +2938,9 @@ async function cmdProduct(flags, positional) {
       const lines = [];
       const gates = await runGates({ productDir, starter, round, routes, only: typeof flags.only === 'string' ? flags.only.split(',') : null, log: (l) => { lines.push(l); if (!flags.json) process.stderr.write(`${l}\n`); } });
       const judged = judgeRound(gates);
-      emit([`Round ${round} machine gates:`, ...judged.verdicts.filter((v) => ['Tokens', 'Detector', 'Accessibility', 'Record'].includes(v.gate)).map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
-        { ok: judged.verdicts.filter((v) => ['Tokens', 'Detector', 'Accessibility', 'Record'].includes(v.gate)).every((v) => v.pass), round, gates });
+      const machine = judged.verdicts.filter((v) => ['Tokens', 'Drift', 'Detector', 'Accessibility', 'Record'].includes(v.gate));
+      emit([`Round ${round} machine gates:`, ...machine.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
+        { ok: machine.every((v) => v.pass), round, gates });
       return;
     }
     const gatesFile = path.join(roundsDir, `round-${round}`, 'gates.json');

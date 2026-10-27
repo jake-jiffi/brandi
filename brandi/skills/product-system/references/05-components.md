@@ -16,11 +16,11 @@ marked "to build, not yet proven", and none of them is finished until a round ha
 
 Three framing decisions, stated once so they are not re-argued per component:
 
-1. **The bundle is the contract, and the starter matches it.** Every component exists twice. The
-   previews and the canvas mount a script bundle under the system's own namespace. The starter
-   carries the same component in shadcn, dressed to match. Production never imports the bundle.
-   Where the starter has no component yet, the README is the spec and the preview is the picture
-   (`07-starter.md`).
+1. **One implementation, built twice.** Every component is written once, in the starter's
+   `components/system/`, on the shadcn primitives in `components/ui/`. The product ships those
+   files, and the canvas bundle is built from the same files, with React pointed at the page's copy.
+   A board then shows exactly what production renders. The reference built every component twice
+   and kept the copies in step by scripts, and they still drifted (`07-starter.md`).
 2. **Data components take data, not markup.** Tables take column types, charts take series lists,
    lists take their rows as items. A board on the canvas and a page in production then describe the
    same thing.
@@ -265,19 +265,22 @@ board.
 rhythm. All three were fixed in the components: the steps log lost its box, heading levels became a
 prop, and the attribution line became the answer's heading.
 
-### 2.13 Two implementations, one behaviour
+### 2.13 One implementation, two builds
 
-- A component is done when both the bundle and the starter have it. The reference's starter lacked
-  RadioGroup, SegmentedControl and the assistant cards, and neither implementation had a combobox or
-  a date picker. Do not repeat that gap.
-- The type file describes every prop and compiles under strict TypeScript, together with sample
-  usage.
-- Scripted checks prove the behaviour in both: keyboard paths, focus return, Escape order, focus
-  after an action, the phone drawer and action bar, touch sizes, reduced motion and forced colours.
-  The reference finished with 97 checks on the bundle and 126 on the starter.
+- A component is done when its file in `components/system/` builds into both the product and the
+  canvas bundle, and its definition is complete. The reference built every component twice, its
+  starter lacked RadioGroup, SegmentedControl and the assistant cards, and neither copy had a
+  combobox or a date picker. One source closes that gap by construction.
+- The two builds run on different React versions: the product on the starter's, the canvas on React
+  18.3.1 from the page. So every component forwards its ref, uses no API only React 19 has, and
+  imports nothing from Next.js. The kit's `CONVENTIONS.md` has the full list.
+- The type file describes every prop and compiles under strict TypeScript.
+- Scripted checks prove the behaviour on the built components in a real browser with a real
+  keyboard: keyboard paths, focus return, Escape order, focus after an action, the phone drawer and
+  action bar, touch sizes, reduced motion and forced colours. The reference finished with 97 checks
+  on its bundle and 126 on its starter.
 - Every rule marked Review gets a scripted check, so it cannot regress quietly.
-- Run each stateful check on a fresh page. A test page left with a modal open broke every check after
-  it.
+- Each check runs on a fresh page. A test page left with a modal open broke every check after it.
 
 ---
 
@@ -1582,77 +1585,63 @@ value.
 
 ## 6. One definition, every output
 
-A component's README, its preview and its scan pages come from one definition. Edit the definition,
-run the generator, and all three change together. Never edit a generated file: the next run
-silently undoes the correction.
-
-Brandi's command line does not generate component docs. Write the generator into the product
-folder, and say in the round record that it is yours, not a Brandi command.
+Each component's definition sits beside it, in `components/system/<name>.def.mjs`. Its README, its
+Design System preview, its preview board and its entry in the type file all come from it, through
+`$A product bundle`. Edit the definition, rebuild, and every output changes together. Never edit a
+generated file: the next build silently undoes the correction.
 
 ### 6.1 What a definition holds
 
 | Field | Feeds |
 |---|---|
-| Name and group | The README's title, the preview card's group, the catalogue |
-| Job | The README's first line |
-| Named options, props, behaviour, layout, states, copy, rules | The README's sections, in the order of section 5 |
-| Preview | The component tree, with its sample data, that `preview.html` and both scan pages render |
-| Card height | The preview card on the Design System page |
-| Checks | The names of the scripted checks that prove its review rules *(practice)* |
+| `name`, `group` | The README's title, the card's group, the catalogue |
+| `job` | The README's first line, which the Design System shows as the summary |
+| `status` | `proven` for the reference's components, `to build` for section 4's, which the README marks |
+| `props` | The README's props table and the type file |
+| `tables`, `notes` | The README's sections, in the order of section 5 |
+| `examples` | Board markup mounting through `NS.<Export>`: the preview board, the Design System preview, and the README's canvas example |
+| `checks` | The scripted checks, run in Chrome with a real keyboard |
+| `frame`, `card`, `state`, `logic` | The preview's size, the card's height, and the board's own state and element props |
 
-The reference kept every definition in one source file, with a separate writer. One file per
-component diffs more cleanly *(practice)*. Either works, as long as each component has exactly one.
+The kit's `CONVENTIONS.md` and `button.def.mjs` show the shape.
 
-### 6.2 What the generator writes
+### 6.2 What the bundle step writes
 
 ```text
-product/components/          suggested layout
-  defs/<Name>.mjs            the definitions: the only files you edit
-  build.mjs                  the generator
-  <Name>/README.md           generated
-  <Name>/preview.html        generated: the card header, then the preview tree
-  scan/light/<Name>.html     generated: the preview inside Root, light, with the system files
-  scan/dark/<Name>.html      generated: the same, in dark
+product/components/
+  <Name>/README.md                   generated
+  <Name>/preview.html                generated: the card header, the examples, the runtime inline
+  previews/<Name>Preview.dc.html     generated: the examples on a board, with a dark tweak
+  bundle.js, bundle.css              built from the starter's own components
+  manifest.json, index.d.ts          every export, and the types for every prop
 ```
 
 - `<Name>/README.md` and `<Name>/preview.html` match the Design System artifact's
   `project/components/` layout, so publishing them is a copy (`12-design-system-artifact.md`).
 - The preview's first line is the card header the Design System type reads: the group and the
   height. Check its format against the type's instructions at publish time.
-- A preview never sets its own theme. The card viewer shows it in both, and each scan page sets one.
+- A Design System preview never sets its own theme: the card viewer shows it in both. The preview
+  board takes `?props={"dark":true}`, so the gates scan both themes from one board.
+- Each preview is a document of its own, with one main landmark and a visually hidden heading, so a
+  page-level accessibility scan reads it as a page.
 - A preview is a product surface. The detector and the writing rules apply to it as they do to a
   screen.
-- A scan page is the preview inside Root at one theme, with the tokens' CSS, the bundle's CSS and
-  the bundle in its head, so it renders on its own. The detector cannot set a theme, which is why
-  there is a page per theme. Scan each at 1440, 820 and 390 wide (`08-quality-gates.md`).
-- A preview opened on its own is blank, because the card viewer supplies those three files. Open
-  the scan page instead.
 
-### 6.3 The em-dash check
+### 6.3 What the bundle step refuses
 
-The generator refuses to write any file that contains an em dash, and names the file and the line:
-
-```js
-const EM_DASH = String.fromCharCode(0x2014); // never the literal character in this file
-const line = text.split('\n').findIndex((l) => l.includes(EM_DASH));
-if (line !== -1) throw new Error(`${file}:${line + 1}: em dash. Use a comma, a full stop or brackets.`);
-```
-
-It runs on every build, over everything the generator writes. The written system's banned-words
-check runs in the same place, because publishing needs both to pass on every generated file
-(`12-design-system-artifact.md`).
+`$A product bundle` stops, naming the file, on a definition with an em dash, a job that is not one
+sentence, an example that does not mount through `NS.<Export>`, a check that names an example that
+does not exist, a definition for a component the bundle does not export, a type file that does not
+compile under strict TypeScript, or a bundle holding a literal `</script`.
 
 ### 6.4 Keeping the copies honest
 
-- The bundle, its CSS and the tokens are copied into the Design System artifact and onto the
-  canvas. Compare the checksums of every copy after every build. In the reference, a missed copy
-  made a fix invisible in the screenshots.
-- Never patch a generated file. If a pipeline must, take the file out of the generator's copy step
-  first, and patch by a unique anchor that asserts exactly one match. In the reference, a
-  regenerated file overwrote a patch, and a patch whose anchor appeared twice failed.
-- The bundle build writes a component manifest: every exported component and its props. The drift
-  check reads it (`09-operate.md`).
-- *(practice)* Compare the definitions with the manifest and the type file on every build, and fail
-  when a component or prop exists in one and not the others.
-- Render every preview to PNG in both themes and tile them into contact sheets for reviewers. The
-  reference's first craft review worked from 24 of them.
+- The bundle, its CSS and the tokens are copied into the Design System artifact, onto the canvas and
+  beside the preview boards. `$A product drift` compares every copy by checksum. In the reference, a
+  missed copy made a fix invisible in the screenshots.
+- Never patch a generated file. Fix the definition, the component or the tokens, and rebuild.
+- The manifest lists every export. `$A product drift` fails when a board mounts a component or a prop
+  the definitions do not have, or when the starter has a component with no card.
+- `$A product gates` renders every preview in both themes and runs the detector, axe and the checks on
+  them. Render them to PNG with `preview.mjs` and tile them for reviewers: the reference's first craft
+  review worked from 24 contact sheets.

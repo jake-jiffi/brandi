@@ -12,6 +12,7 @@ const clean = () => ({
   widths: [...WIDTHS],
   versions: { brandi: '1.22.0', detector: { path: '/x/impeccable', version: '0.1.18+engine' }, 'axe-core': '4.14.0', playwright: '1.64.1' },
   tokens: { summary: 'colour tokens 80 | pairs checked 186 | fails 0', fails: 0, pairs: 186 },
+  drift: { differences: [], unchecked: ['Screens by eye'] },
   detector: { pages: 120, findings: [], errors: [], skipped: null },
   axe: { pages: 120, violations: 0, errors: 0, results: [] },
   checks: { passed: 210, failed: [] },
@@ -41,6 +42,8 @@ describe('a round held against the bar', () => {
       [(g) => { g.axe.violations = 2; }, 'Accessibility'],
       [(g) => { g.checks.failed.push({ check: 'Dialog: Escape order', reason: 'x' }); }, 'Accessibility'],
       [(g) => { g.versions.detector = null; }, 'Record'],
+      [(g) => { g.drift.differences.push({ area: 'prop', where: 'Main.dc.html', found: 'Acme.Button tone=', expected: 'the definition has no tone' }); }, 'Drift'],
+      [(g) => { delete g.drift; }, 'Drift'],
     ];
     for (const [mutate, gate] of cases) {
       const g = clean();
@@ -59,6 +62,12 @@ describe('a round held against the bar', () => {
     assert.equal(short.verdicts.find((v) => v.gate === 'Craft').pass, false, '33 of 40');
     const open = judgeRound(clean(), { critique: critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3], [{ severity: 'P2', title: 'Clipped title' }]), rules: rules([]) });
     assert.equal(open.verdicts.find((v) => v.gate === 'Craft').pass, false, 'an open P2');
+  });
+
+  test('a finding fixed in the round or accepted as a deviation is not open', () => {
+    const c = critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3], [{ severity: 'P1', title: 'Focus lost after approve', status: 'fixed' }, { severity: 'P2', title: '14px body on phones', status: 'accepted' }]);
+    assert.equal(judgeRound(clean(), { critique: c, rules: rules([{ severity: 'High', title: 'x', status: 'fixed' }]) }).met, true);
+    assert.equal(judgeRound(clean(), { critique: c, rules: rules([{ severity: 'High', title: 'x', status: 'open' }]) }).met, false);
   });
 
   test('a Medium rules finding fails; a Low does not', () => {

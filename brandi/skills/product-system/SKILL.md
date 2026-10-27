@@ -51,6 +51,14 @@ $A product tokens                     # every product role in both themes, solve
 $A product tokens --input input.json  # the same, for a brand Brandi has never built
 $A product audit                      # measure every pair a tokens file declares, in both themes
 $A product globals                    # the starter's globals.css, from the tokens
+$A product starter                    # the product kit as a Next.js starter, dressed in the tokens
+$A product bundle                     # the canvas bundle from the starter's components, and every card
+$A product gates                      # the machine gates for a round: tokens, detector, axe, checks
+$A product round --round N            # the round held against the whole bar, with the judged gates
+$A product specs                      # check the platform specs and their coverage
+$A product standards --fetch          # the monthly standards check and its report
+$A product drift                      # canvas against system against code
+$A product sync --from <dir>          # pull a shipped product back into the system
 $A system                             # the resolved brand system the product layer builds on
 ```
 
@@ -73,7 +81,16 @@ It reads decided roles from `product/product.json`:
 ```
 
 Anything not decided is derived and solved to pass. A decided role is never moved: when it fails,
-the audit says so and you resolve it with the person, then record the outcome. `$A check` and
+the audit says so and you resolve it with the person, then record the outcome. The same file names
+the system: `productName`, `namespace` (the canvas folder), `global` (the bundle's namespace),
+`locale`, `currency`, `lang` and `platforms` (the platforms each component needs a spec for). Left
+out, they come from the brand's name and an Australian market.
+
+The starter is one implementation built twice. Its components are the product's, and `$A product
+bundle` builds the canvas bundle from the same files, so a board shows what production renders.
+`$A product bundle` needs `npm install` in `product/starter` first: it uses the starter's own esbuild
+and Tailwind. `$A product gates` needs the same install, for Playwright and axe, and the pinned
+detector (`IMPECCABLE_BIN`, else the newest verified engine under `~/.impeccable/bin`). `$A check` and
 `$A fonts` need a brand file (`brand/brand.json`). On a brand that has none, confirm the fonts load
 by rendering a preview instead.
 
@@ -172,6 +189,11 @@ and a live preview in both themes (`references/05-components.md`); the AI core s
 spec per platform for every component that can appear there (`references/11-platform-layer.md`).
 Native code is generated on demand, never kept by default.
 
+`$A product starter`, then `npm install` in the starter, then `$A product bundle`. The kit carries
+the whole catalogue already built, each component with its definition; fit it to the brand through
+the tokens, the brand's marks in `lib/brand.ts` and the type, never by editing a component's look
+per brand. `$A product specs` reports any component and platform pair still without a spec.
+
 ### 6. Patterns and proof (VISUAL, the stress test)
 
 The core page patterns (home, records, list and detail, record, report, settings, create and edit,
@@ -182,8 +204,9 @@ naming its weakness, then the pick on record. Draw at 1440, 820 and 390, in ligh
 
 ### 7. Gates (rounds until the bar is met, then sign-off)
 
-Run the deterministic checks yourself first, then one reviewer per gate, each in its own context,
-reporting only what it can back with evidence. Fix everything or record a decision, then verify the
+Run the deterministic checks yourself first: `$A product drift`, then `$A product gates`. Then one
+reviewer per judged gate (the craft critique, the rules review), each in its own context, reporting
+only what it can back with evidence, and `$A product round` holds the round against the bar. Fix everything or record a decision, then verify the
 fixes in the next round: fixes break things, and a verification round is where you find out.
 `references/08-quality-gates.md` has the method, the reviewer brief and the record.
 
@@ -216,12 +239,14 @@ The system is never finished. Five modes, each a round of its own
 (`references/09-operate.md`):
 
 - **module**: a new product area, through options, pages, states and gates, then its new components
-  promoted into the system.
-- **sync**: pull a shipped product back into the system.
-- **drift**: canvas against system against code, every round.
-- **round**: run the gates, version the system and write the changelog.
-- **standards**: check each platform's guidance and the web stack for changes, say what they mean
-  for the system, and update the specs. Monthly, and before every new module.
+  promoted into the system. Run `standards` first.
+- **sync**: pull a shipped product back into the system, with `$A product sync --from <dir>`.
+- **drift**: canvas against system against code, every round, with `$A product drift`.
+- **round**: `$A product gates`, the judged reviews, `$A product round`, then the version and the
+  changelog.
+- **standards**: check each platform's guidance and the web stack for changes with
+  `$A product standards --fetch`, say what they mean for the system, and update the specs. Monthly,
+  and before every new module. The schedule itself is the system owner's to set up.
 
 ## The bar
 

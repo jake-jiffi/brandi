@@ -22,6 +22,7 @@ import { pathToFileURL } from 'node:url';
 
 import { auditProductTokens, auditSummary } from './producttokens.mjs';
 import { previewArtboard, manifestFrames, declaredFrame, findChrome } from './preview.mjs';
+import { driftCheck } from './productdrift.mjs';
 
 export const WIDTHS = Object.freeze([1440, 820, 390]);
 export const BAR = Object.freeze({
@@ -67,7 +68,19 @@ export function toolVersions({ starter, detector }) {
     }
   })();
   const chrome = findChrome();
+  const plugin = (name) => {
+    try {
+      const root = path.join(os.homedir(), '.claude', 'plugins', 'cache', name);
+      const versions = readdirSync(root, { withFileTypes: true }).filter((d) => d.isDirectory()).flatMap((d) => readdirSync(path.join(root, d.name)).map((v) => path.join(root, d.name, v)));
+      const found = versions.map((dir) => { try { return JSON.parse(readFileSync(path.join(dir, '.claude-plugin', 'plugin.json'), 'utf8')).version; } catch { return null; } }).filter(Boolean);
+      return found.sort((a, b) => a.localeCompare(b, 'en', { numeric: true })).at(-1) ?? null;
+    } catch {
+      return null;
+    }
+  };
   return {
+    'impeccable skill': plugin('impeccable'),
+    'ui-ux-pro-max': plugin('ui-ux-pro-max-skill'),
     brandi,
     node: process.version,
     chrome: chrome ? versionOf(chrome) : null,
@@ -169,6 +182,8 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   const tokens = JSON.parse(readFileSync(path.join(productDir, 'tokens.json'), 'utf8'));
   const audit = auditProductTokens(tokens);
   log(`tokens: ${auditSummary(audit)}`);
+  const drift = await driftCheck({ productDir, starter });
+  log(`drift: ${drift.differences.length} differences`);
 
   const pages = await collectPages({ productDir, outDir: pagesDir, widths, only });
   for (const r of routes) for (const width of widths) for (const theme of ['light', 'dark']) pages.push({ kind: 'route', label: r.label ?? r.url, url: r.url, width, height: 900, theme });
@@ -200,6 +215,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     versions: toolVersions({ starter, detector }),
     widths,
     tokens: { summary: auditSummary(audit), fails: audit.fails.length, pairs: audit.pairs },
+    drift: { differences: drift.differences, unchecked: drift.unchecked },
     detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null },
     axe: { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, results: (axe.results ?? []).filter((r) => r.violations.length || r.error) },
     checks: { passed: checks.passed, failed: checks.failed },
@@ -218,6 +234,9 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
   const verdicts = [];
   const add = (gate, pass, detail) => verdicts.push({ gate, pass, detail });
   add('Tokens', gates.tokens.fails === 0, gates.tokens.summary);
+  const differences = gates.drift?.differences;
+  add('Drift', Array.isArray(differences) && differences.length === 0,
+    !Array.isArray(differences) ? 'no drift check recorded for this round' : differences.length ? `${differences.length} differences between the canvas, the system and the code` : 'canvas, system and code agree; screens checked by eye are noted in the record');
   add('Detector', !gates.detector.skipped && gates.detector.findings.length === 0 && gates.detector.errors.length === 0,
     gates.detector.skipped ?? `${gates.detector.findings.length} findings across ${gates.detector.pages} renders at ${gates.widths.join(', ')}, light and dark`);
   add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0,
@@ -226,14 +245,14 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
     const scores = critique.heuristics ?? [];
     const total = scores.reduce((n, h) => n + h.score, 0);
     const low = scores.filter((h) => h.score < BAR.craftMinimum);
-    const open = (critique.findings ?? []).filter((f) => BAR.critiqueOpen.includes(f.severity));
+    const open = (critique.findings ?? []).filter((f) => BAR.critiqueOpen.includes(f.severity) && !['fixed', 'accepted'].includes(f.status));
     add('Craft', scores.length === 10 && total >= BAR.craftTotal && !low.length && !open.length,
       `${total}/40 on ${scores.length} heuristics${low.length ? `; under ${BAR.craftMinimum}: ${low.map((h) => h.name).join(', ')}` : ''}${open.length ? `; open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : ''}`);
   } else {
     add('Craft', false, 'no critique recorded for this round');
   }
   if (rules) {
-    const open = (rules.findings ?? []).filter((f) => BAR.rulesOpen.includes(f.severity));
+    const open = (rules.findings ?? []).filter((f) => BAR.rulesOpen.includes(f.severity) && !['fixed', 'accepted'].includes(f.status));
     add('Rules', open.length === 0, open.length ? `open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : `no Critical, High or Medium open (${(rules.findings ?? []).length} findings in all)`);
   } else {
     add('Rules', false, 'no rules review recorded for this round');
@@ -256,6 +275,11 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     lines.push('', '## axe', '');
     for (const r of gates.axe.results) lines.push(`- ${r.label} at ${r.width}, ${r.theme}: ${r.error ?? r.violations.map((v) => `${v.id} (${v.impact})`).join(', ')}`);
   }
+  if (gates.drift?.differences?.length) {
+    lines.push('', '## Drift', '');
+    for (const d of gates.drift.differences) lines.push(`- ${d.area}: ${d.where}${d.found ? ` ${d.found}` : ''}, ${d.expected}`);
+  }
+  for (const u of gates.drift?.unchecked ?? []) lines.push('', `Not checked automatically: ${u}`);
   if (gates.checks.failed.length) {
     lines.push('', '## Failed checks', '');
     for (const f of gates.checks.failed) lines.push(`- ${f.check}: ${f.reason}`);

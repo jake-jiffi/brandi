@@ -13,15 +13,18 @@ The starter ships inside the Design System artifact, under `project/starter/`
 
 Three framing decisions, made once here so no project argues them again:
 
-1. **The system's components are the contract, and production never imports them.** The bundle
-   the previews and the canvas mount is the visual and behavioural spec. The starter's shadcn
-   components are dressed to match it.
+1. **One implementation, built twice.** The starter's components are the system's components. The
+   product ships them, and `tools/build-canvas.mjs` builds the canvas bundle from the same files,
+   so a board on the canvas shows exactly what production renders (`05-components.md`).
 2. **One generator writes `globals.css`.** The skill runs it and the starter ships a copy, so the
-   system and every product regenerate the same file the same way.
-3. **The generator patches pristine shadcn output.** Nobody patches a component by hand in a
-   product. A product that re-adds a component copies the starter's version back.
+   system and every product regenerate the same file the same way. The canvas bundle's stylesheet
+   is that same `globals.css`, compiled.
+3. **The kit carries shadcn already patched.** The primitives are vendored from shadcn's registry by
+   a script that makes the mechanical changes every one needs, and the per-component patches in
+   section 3 are edits marked in the file, which a re-vendor leaves alone. Nobody patches a
+   component in a product: a product that re-adds a component copies the kit's version back.
 
-Versions are never pinned in this file (section 8).
+Versions live in the kit's `package.json`, pinned exactly and tested together (section 8).
 
 ## 1. What is in it
 
@@ -29,13 +32,14 @@ Versions are never pinned in this file (section 8).
 
 | Kind | What | How it changes |
 | --- | --- | --- |
-| Generated | `app/globals.css`, from `tokens.json`. The shadcn components the starter only adjusts, patched from pristine shadcn output | Regenerate. A hand edit is undone by the next run |
-| Hand-written | The shadcn components replaced outright (in the last system: button, badge, alert, sonner and command), the composites, the root layout, the page-level states, the hooks and `lib/format.ts` | Edit the generator's hand-written sources, then regenerate the starter |
-| Example | `examples/`, the example product | Copied into an app to run it. A real product replaces it |
+| Generated | `app/globals.css`, `app/fonts.ts`, `system/tokens.json`, `system/system.json`, `lib/format-locale.js`, `lib/product.ts`, `tools/build-globals.mjs` and `components/system/index.ts` | `$A product starter` rewrites them on every run. A hand edit is undone by the next run |
+| Kit | `components/ui/` (shadcn, patched), `components/system/` (the system's components and their definitions), `lib/`, `hooks/`, `canvas/` and `tools/` | Copied on the first run, then the product's. `$A product starter --kit` copies them again |
+| Example | The example product's routes and sample data | A real product replaces it |
 
-A few things are the product's own to set: its name in `lib/product.ts`, the font files under
-`app/fonts/`, and the characters, illustrations and favicon under `public/`. The tight-viewBox
-wordmark files ship with the starter in `public/brand/`, for email and Open Graph.
+A few things are the product's own to set: its name and locale in `product/product.json` (which
+`$A product starter` writes into `lib/product.ts` and `lib/format-locale.js`), the font files, and the
+characters, illustrations and favicon under `public/`. The tight-viewBox wordmark files ship in
+`public/brand/`, for email and Open Graph.
 
 The example product shows the patterns working end to end. Home has figures and a chart. A records
 page has search and filters in the URL, bulk actions on the rows on screen, and an export. One
@@ -49,33 +53,41 @@ To run it, copy its `app/(app)`, `components` and `lib` folders into the app.
 ```
 starter/
   app/
-    globals.css            generated from tokens.json
-    fonts.ts               the brand's faces through next/font/local
-    layout.tsx             locale, theme, tooltips, toasts, route focus, the title template
-    loading.tsx            the page-level states
-    error.tsx
-    not-found.tsx
+    globals.css               generated from tokens.json
+    fonts.ts                  generated: the brand's faces through next/font
+    layout.tsx                locale, theme, tooltips, toasts, route focus, the title template
+    loading.tsx, error.tsx, not-found.tsx
   components/
-    ui/                    shadcn, patched (section 3)
-    <namespace>/           the composites (section 4)
-    theme-provider.tsx
+    ui/                       shadcn, patched (section 3)
+    system/                   the system's components, each with its definition
+  canvas/
+    entry.tsx, root.tsx       what the canvas bundle exports, and the board provider
+    shims/                    React and ReactDOM resolved to the page's copy
   hooks/
-    use-mobile.ts          the drawer threshold
-    use-shortcuts.ts       whether single-key shortcuts are on
+    use-mobile.ts, use-shortcuts.ts
   lib/
-    format.ts              the number formatter
-    product.ts             the product's name
-    utils.ts               re-exports cn
-  public/brand/            the wordmark as files
-  tools/build-globals.mjs  the generator, shipped
-  tests/                   the checks in section 6
-  examples/                the example product
+    format.js, format.d.ts    the one number formatter, shared by both builds
+    format-locale.js          generated: the market's locale and currency
+    icons.ts                  the icon vocabulary
+    link.tsx                  plain <a> on a board, next/link in the product
+    product.ts                generated: the product's name and language
+    brand.ts                  the brand's marks and character
+  system/
+    tokens.json, system.json  generated: the tokens, and the namespace and global
+  tools/
+    build-globals.mjs         the generator, shipped
+    build-canvas.mjs          the canvas bundle, from these components
+    build-index.mjs           components/system/index.ts
+    check-components.mjs      every definition's scripted checks, in Chrome
+    axe-pages.mjs             axe on a list of pages
+  public/brand/               the wordmark as files
 ```
 
-`<namespace>` is the system's namespace in lower case. `app/fonts.ts` sets the variables the
-generated theme reads: `--font-brand-sans`, `--font-brand-display` and `--font-brand-mono`. Load
-upright styles only, unless a product really needs italics. An italic file nobody uses is a wasted
-preload.
+`app/fonts.ts` sets the variables the generated theme reads: `--font-brand-sans`,
+`--font-brand-display` and `--font-brand-mono`. A face the system ships as a file loads through
+next/font/local, a hosted face through next/font/google, each with only the weights the type styles
+use. Load upright styles only, unless a product really needs italics. An italic file nobody uses is
+a wasted preload.
 
 ### How the tokens become `globals.css`
 
@@ -144,37 +156,33 @@ ones.
 
 ## 2. Starting a product
 
-The system's Building it section carries these steps, with the exact commands and the versions
-they were tested with (`04-written-system.md`). The fresh-install check runs them on an empty
-project (section 6).
+The system's Building it section carries these steps (`04-written-system.md`). The fresh-install
+check runs them on an empty folder before every publish (section 6).
 
-1. Create the app with shadcn's create command, using the Next.js template, the Radix base and the
-   preset the starter records.
-2. Turn on Cache Components in `next.config.ts` (the last starter also turned on Partial
-   Prefetching). Navigations then show the next page's frame at once while its data streams in.
-   The starter is built for it, and still builds with it off.
-3. Add every shadcn component the starter dresses, with `--overwrite`. `command` brings
-   `input-group` and cmdk with it.
-4. Copy the starter over the app. It replaces `app/globals.css`, `app/layout.tsx`, the components
-   from step 3 and `hooks/use-mobile.ts`. It adds the composites, the page-level states and the
-   generator.
-5. Copy the font files into `app/fonts/`, within each face's licence (`02-brand-to-product.md`).
-   Copy the brand's pictures and favicon into `public/` with their names unchanged.
-6. Delete the template's `app/page.tsx`. Pages go in a route group whose layout holds the shell,
-   `app/(app)/layout.tsx`, so the rail stays mounted between pages. Sign-in, and anything else
-   without the rail, lives outside the group.
-7. Set the product's name in `lib/product.ts`. Leave the title template in the root layout
-   (section 5).
-8. The build and the linter pass with no changes, the type check is clean, and `next dev` shows no
-   warnings.
+```
+$A product starter
+cd product/starter && npm install
+$A product bundle
+npm run typecheck && npm run build
+```
 
-The last starter dressed 27 shadcn components. Twenty-five were added: alert, avatar, badge, card,
-chart, checkbox, command, dialog, dropdown-menu, field, input, kbd, label, progress, select,
-separator, sheet, sidebar, skeleton, sonner, switch, table, tabs, textarea and tooltip. The template
-brought `button`, and `command` brought `input-group`.
+1. `$A product starter` copies the kit and writes the generated files from the system. A second run
+   rewrites only those, so a product's own work survives.
+2. `npm install` installs the pinned stack. Nothing outside the starter's folder changes.
+3. `$A product bundle` builds the canvas bundle from the starter's components and writes every
+   card. It needs the install, because it uses the starter's own esbuild and Tailwind.
+4. The type check and the build pass with no changes, and `next dev` shows no warnings.
+5. Pages go in a route group whose layout holds the shell, `app/(app)/layout.tsx`, so the rail stays
+   mounted between pages. Sign-in, and anything else without the rail, lives outside the group.
 
-It left RadioGroup, SegmentedControl (`radio-group` and `toggle-group`), Combobox and DatePicker for
-later. The system builds components ahead of need, so add and patch these to match their cards.
+The kit vendors 41 primitives from shadcn's registry: accordion, alert, avatar, badge, breadcrumb,
+button, button-group, calendar, card, checkbox, collapsible, command, dialog, dropdown-menu, empty,
+field, hover-card, input, input-group, item, kbd, label, native-select, pagination, popover,
+progress, radio-group, scroll-area, select, separator, sheet, skeleton, sonner, spinner, switch,
+table, tabs, textarea, toggle, toggle-group and tooltip. The vendoring script, kept with the kit,
+rewrites the registry's imports, swaps its icon placeholders for Lucide, takes out the classes that
+hide the system's focus outline, and converts each wrapper to `React.forwardRef`, because the canvas
+runs React 18, which drops a ref passed any other way.
 
 ## 3. The patches
 
@@ -225,7 +233,7 @@ clipped.
 | sonner | Bottom centre, clear of the phone action bar. 5 seconds, 8 with Undo. Hovering or Alt T pauses them. A focus outline in the toast's own text colour. Undo is 44px on touch | The default focus shadow vanishes on the inverse surface. Undo is the only way back from a bulk action |
 | table | The head on `surface-subtle` in the eyebrow style, rows at the system's row height, tabular figures | Matches the DataTable card |
 | progress | Passes `value` through to Radix | Upstream dropped it, so screen readers heard an empty bar |
-| chart, skeleton | Token colours. Axis text styled through `.recharts-cartesian-axis-tick-value` in `text-subtle`, with tabular figures. A focus outline on the chart surface. Tooltip values through the formatter | The class the chart library uses now (section 5) |
+| skeleton | Token colours, and no shimmer under reduced motion | Matches the Skeleton card |
 
 ## 4. The composites
 
@@ -287,7 +295,7 @@ reads. That agrees while the shell fills the window.
 | `PageHeader` | Breadcrumbs, the title, one line of description capped at the measure, meta badges (status, the sample-data badge), actions, `primaryAction`, and tabs as children. The title is the page's one `h1`, focusable from script only (`tabIndex={-1}`, `data-slot="page-title"`). `primaryAction` sits last among the actions and moves to the shell's foot bar on phones. `focusPageTitle()` puts focus on the title after an action removes the control people pressed, unless focus is already somewhere useful |
 | `Breadcrumbs` | From two levels deep. A `nav` named Breadcrumb over an ordered list. The last item is the current page (`aria-current="page"`), and every link has a 24px target. A name cut short keeps a route to the full text that works without a mouse. The last starter relied on `title`, which needs one (`03-fundamentals-first.md`) |
 | `MetricCard`, `Delta` | MetricCard shows what is counted, the figure through the formatter, the change, what it is compared with, and a footnote. Its state is `ready`, `loading`, or `unavailable` when a source is down, which says so instead of drawing a zero nobody measured. A container query drops the figure to the smaller style when the card itself is narrow. In Delta the arrow gives the direction and the colour the judgement, and screen readers hear both in words ("Up 6.2%, better vs last month"). Costs and churn are `goodWhen="down"`. Rates change in points |
-| `ChartFigure` | A chart's frame: a heading that names it, and the takeaway in one sentence, which is also the figure's accessible description. Then the chart, with Recharts' accessibility layer so arrow keys move through the points. Then the same numbers as a visually hidden table whose first column names each row. Charts sit on a surface, because the series colours are checked at 3:1 against it. Series use `var(--chart-1)` to `var(--chart-6)` in fixed order |
+| `ChartFigure` | A chart's frame: a heading that names it, and the takeaway in one sentence, which is also the figure's accessible description. Then the chart, the system's own SVG, where arrow keys move through the points and each value is announced. Then the same numbers as a visually hidden table whose first column names each row. Charts sit on a surface, because the series colours are checked at 3:1 against it. Series use `var(--chart-1)` to `var(--chart-6)` in fixed order |
 | `EmptyState` | A picture, a title, a line of body and actions. The picture marks the state and the words carry the meaning, so it is decorative (`alt=""`). It loads at once unless the state is compact, because it is often the largest thing on screen. `headingLevel={1}` when the empty state is the whole page, so the page keeps one `h1`. A brand with no characters or illustrations passes none |
 | `ErrorSummary` | After a failed save, a titled list of problems at the top of the form, each a link that focuses its field. It takes focus when it appears (`role="alert"`, `tabIndex={-1}`, named by its title), so screen readers read it first. Messages match the field errors word for word |
 | `CommandMenu` | Rendered by the shell. Pages (the rail's links), Actions (with a key shown when an action has one), and Ask, always last, when the product has an assistant. Matching is a plain "contains" on labels and keywords, so results keep the order people learnt. The first result is chosen from the first keystroke, and the input's `aria-activedescendant` follows it (cmdk only sets it after an arrow key). A live region gives the count. Every opening starts empty. Running a command closes the menu and the phone drawer |
@@ -335,10 +343,11 @@ Each is a rule, then the cause that taught it. All of them come from the last bu
 - **Take every file the generator patches out of its pass-through copy.** The last generator
   patched `label.tsx`, then overwrote it with the pristine copy later in the same run. Give each
   patch a test that checks the output still carries it.
-- **Style chart text through the class the chart library uses today.** Recharts 3 renamed its axis
-  tick element. shadcn's colour override stopped matching, and dark mode shipped axis labels at
-  3.07:1. The starter targets `.recharts-cartesian-axis-tick-value`. Any chart library upgrade
-  re-runs the axis contrast test in both themes.
+- **A chart library's class names are not a contract.** Recharts 3 renamed its axis tick element,
+  shadcn's colour override stopped matching, and dark mode shipped axis labels at 3.07:1. That is
+  part of why the system draws its charts in SVG itself. A product that adds a chart library styles
+  its text through the class the library uses today, and re-runs the axis contrast check in both
+  themes after every upgrade.
 - **Check SVG text with its own test.** Neither axe nor the token audit reads text drawn in SVG, so
   chart labels can fail in one theme while everything else reports clean.
 
@@ -397,22 +406,21 @@ Each is a rule, then the cause that taught it. All of them come from the last bu
 The last system kept its suites in its build tree, in session storage, outside any repo. The
 starter carries them, so the system's rounds and every product repo run the same checks.
 
-- **The behaviour suite.** A browser script against the built app. The last starter's ran 126
-  checks. It covers keyboard paths, focus after every action, the phone drawer and the action bar,
-  touch sizes, forced colours, reduced motion, chart axis contrast in both themes, tab state in the
-  URL, and toasts. Run each stateful check on a fresh page. One page left with a modal open broke
-  the checks after it.
+- **The behaviour suite.** `tools/check-components.mjs` runs every definition's checks on the built
+  components in Chrome, with a real keyboard, touch emulation, reduced motion and forced colours on
+  request. The example product's routes get their own checks: the phone drawer and the action bar,
+  focus after every action, tab state in the URL, and toasts. Each check runs on a fresh page. One
+  page left with a modal open broke the checks after it.
 - **Chart axis contrast, in both themes.** Read the computed fill of every axis label and measure
   it against the chart's surface, light and dark, at 4.5:1. Axe and the token audit can't see this
   text (section 5).
 - **The detector** on every route and state at the bar's widths, light and dark
-  (`08-quality-gates.md`). The theme is chosen at run time and the detector can't set it, so the
-  dark pass needs a temporary dark build. Set the default theme to dark, rebuild, run the detector,
-  then restore light and rebuild. The detector skips a 404 page: say so in the record rather than
-  counting it clean.
+  (`08-quality-gates.md`). The detector can't set a theme, so a route takes `?theme=dark` and a board
+  takes `?props={"dark":true}`, and `$A product gates` scans both. The detector skips a 404 page: say
+  so in the record rather than counting it clean.
 - **Screenshots** at three widths in both themes, each with a sideways-scroll check.
-- **Number-format parity** with the bundle's formatter, every style against the same values
-  (`03-fundamentals-first.md`).
+- **The formatter's case table.** Both builds import one `lib/format.js`, and the table (every style
+  against the same values) proves it keeps the contract (`03-fundamentals-first.md`).
 - **The fresh-install check.** Run section 2 on an empty project, by script, before every publish
   (`12-design-system-artifact.md`). The build and the linter pass with no changes, the type check is
   clean, and `next dev` shows no warnings.
@@ -447,15 +455,11 @@ A product repo starts from the starter and gets these with it.
 
 ## 8. Versions
 
-This file pins nothing, because a pinned version here would be wrong within months. The starter
-records the versions it was built and tested with, together, in the system's Building it section.
-That covers the framework, React, Tailwind, the shadcn CLI and preset, Radix, cmdk, next-themes,
-Sonner, the icon set, the chart library and tw-animate-css.
-
-At build time the skill checks what is current, builds on the current releases, and records them.
-Each round's record pins them again (`08-quality-gates.md`), and `standards` checks the stack
-monthly (`09-operate.md`). A library upgrade re-runs the full gates: the chart tick rename in
-section 5 is what an unchecked upgrade costs.
+This file pins nothing, because a pinned version here would be wrong within months. The kit's
+`package.json` pins every package exactly, tested together, and the system's Building it section
+names them. Each round's record writes down every tool that ran (`08-quality-gates.md`), and
+`standards` checks the stack monthly (`09-operate.md`). A library upgrade re-runs the full gates:
+the chart tick rename in section 5 is what an unchecked upgrade costs.
 
 Before using a framework API remembered from an older version, read the docs that ship with the
 installed framework, in `node_modules/next/dist/docs/`.

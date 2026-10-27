@@ -46,7 +46,7 @@ changes.
 | Brand-to-product decisions | `product/product.json` and the decisions made with `02-brand-to-product.md` | From brand book to product; the README's colour, type and shape rules |
 | Tokens and their audit | `product/tokens.json`, `product/contrast-audit.json` | Every token name; every ratio quoted as a reason; the chart series |
 | Components, AI patterns, starter | What `05-components.md`, `10-ai-catalogue.md` and `07-starter.md` produced | The README's components and usage; the assistant's rules; Building it |
-| Gate records | `reviews/round-N/record.md` | Quality gates; the review record in Definition of done |
+| Gate records | `product/rounds/round-N/record.md` | Quality gates; the review record in Definition of done |
 
 **Routes B and C.** With no `brand.json`, read the same things from the brand's guidelines, its
 website and, on route C, the shipped product's own strings. Note the source beside each rule. On

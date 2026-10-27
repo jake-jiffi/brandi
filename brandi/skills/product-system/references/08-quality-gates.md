@@ -41,8 +41,9 @@ more, and do not lower the bar to finish.
 
 ## How a round runs
 
-1. **Deterministic checks first.** The detector on every preview, route, state and board at 1440,
-   820 and 390, light and dark; axe; both behaviour suites; the token audit; the drift check. Fix what
+1. **Deterministic checks first.** `$A product gates` runs the token audit, the drift check, the
+   detector on every preview and board (and a running starter's routes, with `--route`) at 1440, 820
+   and 390, light and dark, axe on every one of those renders, and every scripted check. Fix what
    they find before the reviewers start.
 2. **Reviewers in parallel, each in its own context and its own folder.** Each reads its own skill's
    instructions and references first, then judges against the system's docs and the bar.
@@ -50,9 +51,9 @@ more, and do not lower the bar to finish.
    path, or it is not a finding. Reviewers fix nothing, never start or stop servers, and work only in
    their own folder.
 4. **Save every report.** Reviewers usually cannot write files, so their reports come back as
-   messages. Write each one to `reviews/round-N/<gate>.md` the moment it arrives. The last build kept
+   messages. Write each one to `product/rounds/round-N/<gate>.md` the moment it arrives. The last build kept
    only round one's reports as files; the rest survived only in a conversation that later compacted.
-5. **Write the fix plan before fixing.** `reviews/round-N/fix-plan.md`: every finding, fixed or
+5. **Write the fix plan before fixing.** `product/rounds/round-N/fix-plan.md`: every finding, fixed or
    recorded with a decision, before the next round starts.
 6. **Verify in the next round.** The next round checks the previous round's findings item by item:
    fixed, partly fixed or not fixed, each with evidence. Fixes break things. In the last build, two of
@@ -105,7 +106,8 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
 
 ## Pin the tools
 
-Write these into every round's record, and re-run the full gates when any of them changes:
+`$A product gates` writes these into the round's `gates.json` itself, and the record prints them.
+Re-run the full gates when any of them changes:
 
 - The Impeccable skill version and the detector engine version (`impeccable engine-probe` prints it).
   More than one engine can be installed side by side, and the launcher the plugin uses may resolve an
@@ -128,7 +130,19 @@ tool. A deviation nobody wrote down is a defect.
 
 ## The round record
 
-One file per round, `reviews/round-N/record.md`, and a summary row in the quality-gates section:
+One folder per round, `product/rounds/round-N/`. `$A product gates` writes `gates.json`; write each
+reviewer's report beside it, then turn the two judged reports into the files the round reads:
+
+```json
+{ "heuristics": [{ "name": "Visibility of system status", "score": 4 }],
+  "findings": [{ "severity": "P2", "title": "Title clipped at 390 in dark", "status": "open" }] }
+```
+
+`critique.json` holds all ten heuristics; `rules.json` holds `findings` alone, with ui-ux-pro-max's
+severities. A finding's `status` is `open`, `fixed` (verified in this round) or `accepted` (a recorded
+deviation). Then `$A product round --round N --critique critique.json --rules rules.json --sign-off
+"<name>"` holds every gate against the bar and writes `record.md` and `record.json`. It exits 1 until
+the bar is met. The record carries, with a summary row in the quality-gates section:
 
 - Round number, date, and what was in scope.
 - Tools and versions.

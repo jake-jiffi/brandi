@@ -63,7 +63,8 @@ the component definition or the pattern. Never patch a copy.
 
 The full method is in `08-quality-gates.md`. A round ends with:
 
-- the record (`reviews/round-N/record.md`) and a summary row in the quality-gates section;
+- the record (`product/rounds/round-N/record.md`, written by `$A product round`) and a summary row
+  in the quality-gates section;
 - a version bump (a new component or role is a minor version; a breaking rename is a major one);
 - a changelog entry saying what changed and why;
 - one publish batch per artifact, after the person approves. Publishing piecemeal through a round is
