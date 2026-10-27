@@ -20,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 import { toStarterGlobals } from './productglobals.mjs';
+import { relativeLuminance } from './color.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
 import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
 import { brandSources, brandConstant, brandModule, shrinkStill } from './productbrand.mjs';
@@ -54,6 +55,21 @@ const pascal = (s) => String(s).normalize('NFKD').replace(/[̀-ͯ]/g, '').split(
  * market's locale and currency, the language its copy is in, and its version. product.json can set
  * any of them; the rest come from the brand's name.
  */
+/** "dark" when the light theme's rail is darker than its strong text, as a navy rail is; "light" otherwise. */
+export function railTone(tokens) {
+  const all = new Map((tokens.color?.tokens ?? []).map((t) => [t.name, t]));
+  const light = (name, seen = new Set()) => {
+    const v = all.get(name)?.value;
+    const raw = v && typeof v === 'object' ? v.light : v;
+    const alias = typeof raw === 'string' && /^\{([a-z0-9-]+)\}$/.exec(raw);
+    return alias && !seen.has(alias[1]) ? light(alias[1], new Set([...seen, name])) : raw;
+  };
+  const rail = light('rail');
+  const text = light('rail-text-strong');
+  if (!rail || !text) return 'light';
+  return relativeLuminance(rail) < relativeLuminance(text) ? 'dark' : 'light';
+}
+
 export function systemIdentity(config = {}, { brandName } = {}) {
   const name = config.productName ?? brandName ?? config.name ?? 'Product';
   const namespace = config.namespace ?? (slug(brandName ?? name) || 'product');
@@ -69,6 +85,8 @@ export function systemIdentity(config = {}, { brandName } = {}) {
     locale,
     currency: config.currency ?? 'AUD',
     lang: config.lang ?? locale,
+    // How the product name is set in the lockup: "label" (the default) or "eyebrow" (small, bold, upper case).
+    lockupName: config.lockup?.name === 'eyebrow' ? 'eyebrow' : 'label',
   };
 }
 
@@ -132,7 +150,7 @@ export function generatedFiles(tokens, identity) {
     ['system/system.json', `${JSON.stringify({ ...identity, fontsUrl: hostedFontsUrl(tokens) }, null, 2)}\n`],
     ['app/globals.css', toStarterGlobals(tokens)],
     ['lib/format-locale.js', `// The market's locale and currency. \`brandi product starter\` writes this file from the system.\nexport const LOCALE = ${JSON.stringify(identity.locale)}\nexport const CURRENCY = ${JSON.stringify(identity.currency)}\n`],
-    ['lib/product.ts', `// The product's name and language, set once. \`brandi product starter\` writes this file.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)} } as const\n`],
+    ['lib/product.ts', `// The product's name and language, set once, and two things read off the system. \`brandi product starter\` writes this file.\n// railTone: whether the rail is dark in the light theme, so the rail's lockup takes the mark drawn for dark grounds.\n// lockupName: how the product name is set beside the mark, a brand-to-product decision.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)}, railTone: ${JSON.stringify(railTone(tokens))}, lockupName: ${JSON.stringify(identity.lockupName ?? 'label')} } as const\n`],
     ['app/fonts.ts', fontsModule(tokens)],
     ['tools/build-globals.mjs', readFileSync(GLOBALS_SOURCE, 'utf8')],
   ]);
@@ -291,6 +309,12 @@ export async function buildBundle({ starter, productDir }) {
     for (const f of ['tokens.json']) copyFileSync(path.join(starter, 'system', f), path.join(ds, f));
     const css = path.join(productDir, 'tokens.css');
     if (existsSync(css)) copyFileSync(css, path.join(ds, 'tokens.css'));
+    // tokens.css names its faces as fonts/<file>, so the files go beside it, as a canvas holds them.
+    const fonts = path.join(productDir, 'fonts');
+    if (existsSync(fonts)) {
+      mkdirSync(path.join(ds, 'fonts'), { recursive: true });
+      for (const f of readdirSync(fonts).filter((x) => /\.(woff2?|otf|ttf)$/i.test(x))) copyFileSync(path.join(fonts, f), path.join(ds, 'fonts', f));
+    }
   }
   return { system, manifest, components: defs.map((d) => ({ name: d.name, group: d.group, status: d.status, checks: d.checks?.length ?? 0 })), previews };
 }

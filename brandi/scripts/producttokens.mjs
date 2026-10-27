@@ -925,7 +925,9 @@ const cssValue = (v) => {
 export function toProductCss(tokens) {
   const lines = [`/* ${tokens.name}, generated from tokens.json by brandi product. Change the tokens, then regenerate. */`];
   for (const f of tokens.type?.fonts ?? []) {
-    lines.push(`@font-face { font-family: "${f.family}"; src: url("${f.file}") format("woff2"); font-weight: ${f.weight}; font-style: ${f.style}; font-display: swap; }`);
+    // The format follows the file: an OTF declared as woff2 is skipped by a strict browser.
+    const format = { woff2: 'woff2', woff: 'woff', otf: 'opentype', ttf: 'truetype' }[String(f.file).split('.').pop().toLowerCase()] ?? 'woff2';
+    lines.push(`@font-face { font-family: "${f.family}"; src: url("${f.file}") format("${format}"); font-weight: ${f.weight}; font-style: ${f.style}; font-display: swap; }`);
   }
   const block = (selector, theme) => {
     const out = [`${selector} {`];

@@ -306,3 +306,14 @@ describe('the shape of what a person can press', () => {
     assert.equal(radius({ action: '6px' })['radius-action'], '6px');
   });
 });
+
+describe('the faces a system ships as files', () => {
+  test('each @font-face names the format its file is in', () => {
+    const tokens = P.buildProductTokens(buildSystem({ primary: '#1F6F4A', accentCount: 1 }), {
+      fonts: [{ family: 'Brand Sans', file: 'fonts/BrandSans.woff2', weight: '400 700', style: 'normal' }, { family: 'Brand Display', file: 'fonts/BrandDisplay.otf', weight: '400', style: 'normal' }],
+    });
+    const css = P.toProductCss(tokens);
+    assert.match(css, /url\("fonts\/BrandSans\.woff2"\) format\("woff2"\)/);
+    assert.match(css, /url\("fonts\/BrandDisplay\.otf"\) format\("opentype"\)/, 'an OTF declared as woff2 is skipped by a strict browser');
+  });
+});
