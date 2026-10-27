@@ -2790,7 +2790,7 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       review (ui-ux-pro-max) into the round, hold every gate against the bar,
       and write record.md and record.json. Exits 1 until the bar is met.
 
-  brandi product specs [--dir product/platform]
+  brandi product specs [--dir product/platform] [--components <list|file>] [--platforms <list>]
       Check every platform spec (the stamp, all thirteen fields, every value
       citing a key the stamp lists and the reference's registry holds), and
       report which component and platform pairs have no spec. The platforms
@@ -2897,7 +2897,7 @@ async function cmdProduct(flags, positional) {
     let identity;
     try { identity = systemIdentity(config, { brandName: brandName ?? tokens.name?.replace(/ product system$/, '') }); } catch (e) { return fail(e.message); }
     const out = path.resolve(typeof flags.out === 'string' ? flags.out : path.join('product', 'starter'));
-    const res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts') });
+    const res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform') });
     const rel = path.relative(process.cwd(), out);
     emit([
       `${res.fresh ? 'Wrote' : 'Refreshed'} the ${identity.name} starter in ${rel}: namespace ${identity.namespace}, global ${identity.global}, ${identity.locale} ${identity.currency}.`,
@@ -2969,8 +2969,12 @@ async function cmdProduct(flags, positional) {
     try { config = JSON.parse(await readFile(path.join(productDir, 'product.json'), 'utf8')); } catch { /* defaults */ }
     if (sub === 'specs') {
       const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
-      const components = existsSync(path.join(starter, 'components', 'system')) ? (await loadDefinitions(path.join(starter, 'components', 'system'))).map((d) => d.name) : [];
-      const platforms = (config.platforms ?? ['web']).filter((p) => PLATFORMS.includes(p));
+      // --components and --platforms name the set directly (a comma list, or a file with one name per
+      // line), for specs written before a starter exists.
+      const listFlag = async (v) => (typeof v !== 'string' ? null : existsSync(path.resolve(v)) ? (await readFile(path.resolve(v), 'utf8')).split(/\s+/).filter(Boolean) : v.split(',').map((x) => x.trim()).filter(Boolean));
+      const components = (await listFlag(flags.components))
+        ?? (existsSync(path.join(starter, 'components', 'system')) ? (await loadDefinitions(path.join(starter, 'components', 'system'))).map((d) => d.name) : []);
+      const platforms = ((await listFlag(flags.platforms)) ?? config.platforms ?? ['web']).filter((p) => PLATFORMS.includes(p));
       const problems = specs.flatMap((sp) => checkSpec(sp, { sources, components: components.length ? components : null }));
       const cov = coverage(specs, { components, platforms });
       const stale = specs.filter((sp) => /^stale/.test(sp.stamp?.status ?? ''));

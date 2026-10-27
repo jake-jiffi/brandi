@@ -23,6 +23,7 @@ import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, prev
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const KIT = path.resolve(here, '..', 'product', 'kit');
 export const GLOBALS_SOURCE = path.join(here, 'productglobals.mjs');
+export const PLATFORM_SPECS = path.resolve(here, '..', 'product', 'platform');
 
 // Files and folders a product makes for itself, never copied from the kit.
 const NOT_FROM_KIT = new Set(['node_modules', '.next', 'system', 'next-env.d.ts', 'tsconfig.tsbuildinfo']);
@@ -124,7 +125,7 @@ export function generatedFiles(tokens, identity) {
  * Write or refresh a starter. A fresh folder gets the whole kit; an existing one gets only the
  * generated files unless `refreshKit`. Font files the tokens ship are copied in from `fontsDir`.
  */
-export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null }) {
+export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null }) {
   const fresh = !existsSync(path.join(out, 'package.json'));
   const written = [];
   if (fresh || refreshKit) {
@@ -148,6 +149,12 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
       copyFileSync(from, path.join(out, 'app', 'fonts', path.basename(f.file)));
       written.push(`app/fonts/${path.basename(f.file)}`);
     }
+  }
+  // The platform specs travel with the kit: a product starts from the kit's and owns its copies,
+  // because each product's stamps move on their own schedule.
+  if (platformOut && existsSync(PLATFORM_SPECS) && !existsSync(platformOut)) {
+    cpSync(PLATFORM_SPECS, platformOut, { recursive: true });
+    written.push(path.relative(path.dirname(out), platformOut) || 'platform');
   }
   const { writeIndex } = await import(pathToFileURL(path.join(out, 'tools', 'build-index.mjs')).href);
   writeIndex(out);

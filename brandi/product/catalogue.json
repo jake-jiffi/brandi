@@ -1,0 +1,617 @@
+{
+  "about": "Every component the product kit carries: the reference build's catalogue (05-components.md section 3), the default set (section 4.1) and the assistant's core (10-ai-catalogue.md section 5). Range selection is a DataTable behaviour, documented on its card. Role-aware surfaces are a rule every assistant pattern keeps, not a component.",
+  "components": [
+    {
+      "name": "Root",
+      "group": "Foundations",
+      "status": "proven",
+      "entry": "05 section 3, Root"
+    },
+    {
+      "name": "Icon",
+      "group": "Foundations",
+      "status": "proven",
+      "entry": "05 section 3, Icon"
+    },
+    {
+      "name": "Logo",
+      "group": "Brand",
+      "status": "proven",
+      "entry": "05 section 3, Logo"
+    },
+    {
+      "name": "ProductLockup",
+      "group": "Brand",
+      "status": "proven",
+      "entry": "05 section 3, ProductLockup"
+    },
+    {
+      "name": "Character",
+      "group": "Brand",
+      "status": "proven",
+      "entry": "05 section 3, Character"
+    },
+    {
+      "name": "Button",
+      "group": "Actions",
+      "status": "proven",
+      "entry": "05 section 3, Button"
+    },
+    {
+      "name": "IconButton",
+      "group": "Actions",
+      "status": "proven",
+      "entry": "05 section 3, IconButton"
+    },
+    {
+      "name": "TextLink",
+      "group": "Actions",
+      "status": "proven",
+      "entry": "05 section 3, TextLink"
+    },
+    {
+      "name": "ButtonGroup",
+      "group": "Actions",
+      "status": "proven",
+      "entry": "05 section 3, ButtonGroup"
+    },
+    {
+      "name": "SegmentedControl",
+      "group": "Actions",
+      "status": "proven",
+      "entry": "05 section 3, SegmentedControl"
+    },
+    {
+      "name": "FilterChip",
+      "group": "Actions",
+      "status": "proven",
+      "entry": "05 section 3, FilterChip"
+    },
+    {
+      "name": "Field",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, Field"
+    },
+    {
+      "name": "TextInput",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, TextInput"
+    },
+    {
+      "name": "TextArea",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, TextArea"
+    },
+    {
+      "name": "SearchField",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, SearchField"
+    },
+    {
+      "name": "Select",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, Select"
+    },
+    {
+      "name": "Checkbox",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, Checkbox"
+    },
+    {
+      "name": "RadioGroup",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, RadioGroup"
+    },
+    {
+      "name": "Switch",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, Switch"
+    },
+    {
+      "name": "FileDrop",
+      "group": "Inputs",
+      "status": "proven",
+      "entry": "05 section 3, FileDrop"
+    },
+    {
+      "name": "ErrorSummary",
+      "group": "Forms",
+      "status": "proven",
+      "entry": "05 section 3, ErrorSummary"
+    },
+    {
+      "name": "FormSection",
+      "group": "Forms",
+      "status": "proven",
+      "entry": "05 section 3, FormSection"
+    },
+    {
+      "name": "FormRow",
+      "group": "Forms",
+      "status": "proven",
+      "entry": "05 section 3, FormRow"
+    },
+    {
+      "name": "FormActions",
+      "group": "Forms",
+      "status": "proven",
+      "entry": "05 section 3, FormActions"
+    },
+    {
+      "name": "Avatar",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Avatar"
+    },
+    {
+      "name": "AvatarGroup",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, AvatarGroup"
+    },
+    {
+      "name": "Kbd",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Kbd"
+    },
+    {
+      "name": "Spinner",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Spinner"
+    },
+    {
+      "name": "Badge",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Badge"
+    },
+    {
+      "name": "SampleBadge",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, SampleBadge"
+    },
+    {
+      "name": "Tag",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Tag"
+    },
+    {
+      "name": "Delta",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Delta"
+    },
+    {
+      "name": "Progress",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Progress"
+    },
+    {
+      "name": "Tooltip",
+      "group": "Status",
+      "status": "proven",
+      "entry": "05 section 3, Tooltip"
+    },
+    {
+      "name": "Card",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, Card"
+    },
+    {
+      "name": "MetricCard",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, MetricCard"
+    },
+    {
+      "name": "DataTable",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, DataTable"
+    },
+    {
+      "name": "Pagination",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, Pagination"
+    },
+    {
+      "name": "List",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, List"
+    },
+    {
+      "name": "ListRow",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, ListRow"
+    },
+    {
+      "name": "DescriptionList",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, DescriptionList"
+    },
+    {
+      "name": "Timeline",
+      "group": "Data",
+      "status": "proven",
+      "entry": "05 section 3, Timeline"
+    },
+    {
+      "name": "BarChart",
+      "group": "Charts",
+      "status": "proven",
+      "entry": "05 section 3, BarChart"
+    },
+    {
+      "name": "LineChart",
+      "group": "Charts",
+      "status": "proven",
+      "entry": "05 section 3, LineChart"
+    },
+    {
+      "name": "HBarChart",
+      "group": "Charts",
+      "status": "proven",
+      "entry": "05 section 3, HBarChart"
+    },
+    {
+      "name": "ShareBar",
+      "group": "Charts",
+      "status": "proven",
+      "entry": "05 section 3, ShareBar"
+    },
+    {
+      "name": "Sparkline",
+      "group": "Charts",
+      "status": "proven",
+      "entry": "05 section 3, Sparkline"
+    },
+    {
+      "name": "ChartFigure",
+      "group": "Charts",
+      "status": "proven",
+      "entry": "07 section 4, ChartFigure"
+    },
+    {
+      "name": "Alert",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, Alert"
+    },
+    {
+      "name": "Banner",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, Banner"
+    },
+    {
+      "name": "Toast",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, Toast"
+    },
+    {
+      "name": "EmptyState",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, EmptyState"
+    },
+    {
+      "name": "LoadingState",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, LoadingState"
+    },
+    {
+      "name": "Skeleton",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, Skeleton"
+    },
+    {
+      "name": "Thinking",
+      "group": "Feedback",
+      "status": "proven",
+      "entry": "05 section 3, Thinking"
+    },
+    {
+      "name": "Dialog",
+      "group": "Overlays",
+      "status": "proven",
+      "entry": "05 section 3, Dialog"
+    },
+    {
+      "name": "Sheet",
+      "group": "Overlays",
+      "status": "proven",
+      "entry": "05 section 3, Sheet"
+    },
+    {
+      "name": "Menu",
+      "group": "Overlays",
+      "status": "proven",
+      "entry": "05 section 3, Menu"
+    },
+    {
+      "name": "CommandMenu",
+      "group": "Overlays",
+      "status": "proven",
+      "entry": "05 section 3, CommandMenu"
+    },
+    {
+      "name": "AppShell",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, AppShell"
+    },
+    {
+      "name": "Sidebar",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, Sidebar"
+    },
+    {
+      "name": "NavGroup",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, NavGroup"
+    },
+    {
+      "name": "NavItem",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, NavItem"
+    },
+    {
+      "name": "PageHeader",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, PageHeader"
+    },
+    {
+      "name": "Breadcrumbs",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, Breadcrumbs"
+    },
+    {
+      "name": "Tabs",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, Tabs"
+    },
+    {
+      "name": "SideNav",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, SideNav"
+    },
+    {
+      "name": "Toolbar",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, Toolbar"
+    },
+    {
+      "name": "Spacer",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, Spacer"
+    },
+    {
+      "name": "Stepper",
+      "group": "Navigation",
+      "status": "proven",
+      "entry": "05 section 3, Stepper"
+    },
+    {
+      "name": "AskBar",
+      "group": "The assistant",
+      "status": "proven",
+      "entry": "05 section 3, AskBar"
+    },
+    {
+      "name": "AIAnswer",
+      "group": "The assistant",
+      "status": "proven",
+      "entry": "05 section 3, AIAnswer"
+    },
+    {
+      "name": "AISteps",
+      "group": "The assistant",
+      "status": "proven",
+      "entry": "05 section 3, AISteps"
+    },
+    {
+      "name": "AIProposal",
+      "group": "The assistant",
+      "status": "proven",
+      "entry": "05 section 3, AIProposal"
+    },
+    {
+      "name": "Source",
+      "group": "The assistant",
+      "status": "proven",
+      "entry": "05 section 3, Source"
+    },
+    {
+      "name": "Combobox",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 Combobox"
+    },
+    {
+      "name": "MultiSelect",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 Multi-select"
+    },
+    {
+      "name": "DatePicker",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 Date, time and range pickers"
+    },
+    {
+      "name": "TimePicker",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 Date, time and range pickers"
+    },
+    {
+      "name": "DateRangePicker",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 Date, time and range pickers"
+    },
+    {
+      "name": "NumberInput",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 Number input"
+    },
+    {
+      "name": "FileList",
+      "group": "Inputs",
+      "status": "to build",
+      "entry": "4.1 File list"
+    },
+    {
+      "name": "SignInFields",
+      "group": "Forms",
+      "status": "to build",
+      "entry": "4.1 Sign-in fields"
+    },
+    {
+      "name": "PlanPicker",
+      "group": "Forms",
+      "status": "to build",
+      "entry": "4.1 Plan picker"
+    },
+    {
+      "name": "Popover",
+      "group": "Overlays",
+      "status": "to build",
+      "entry": "4.1 Popover and toggletip"
+    },
+    {
+      "name": "Toggletip",
+      "group": "Overlays",
+      "status": "to build",
+      "entry": "4.1 Popover and toggletip"
+    },
+    {
+      "name": "NotificationCentre",
+      "group": "Overlays",
+      "status": "to build",
+      "entry": "4.1 Notification centre"
+    },
+    {
+      "name": "Board",
+      "group": "Data",
+      "status": "to build",
+      "entry": "4.1 Board"
+    },
+    {
+      "name": "Schedule",
+      "group": "Data",
+      "status": "to build",
+      "entry": "4.1 Calendar and schedule"
+    },
+    {
+      "name": "EditableCell",
+      "group": "Data",
+      "status": "to build",
+      "entry": "4.1 Editable cells"
+    },
+    {
+      "name": "Conversation",
+      "group": "Data",
+      "status": "to build",
+      "entry": "4.1 Conversation"
+    },
+    {
+      "name": "Accordion",
+      "group": "Data",
+      "status": "to build",
+      "entry": "4.1 Accordion"
+    },
+    {
+      "name": "PhoneTabBar",
+      "group": "Navigation",
+      "status": "to build",
+      "entry": "4.1 Phone tab bar"
+    },
+    {
+      "name": "PhoneTopBar",
+      "group": "Navigation",
+      "status": "to build",
+      "entry": "4.1 Phone top bar"
+    },
+    {
+      "name": "WorkspaceSwitcher",
+      "group": "Navigation",
+      "status": "to build",
+      "entry": "4.1 Workspace switcher"
+    },
+    {
+      "name": "OnboardingChecklist",
+      "group": "Feedback",
+      "status": "to build",
+      "entry": "4.1 Onboarding checklist"
+    },
+    {
+      "name": "ToastRegion",
+      "group": "Feedback",
+      "status": "to build",
+      "entry": "4.1 Toast region"
+    },
+    {
+      "name": "Email",
+      "group": "Feedback",
+      "status": "to build",
+      "entry": "4.1 Email kit"
+    },
+    {
+      "name": "StatusLine",
+      "group": "The assistant",
+      "status": "to build",
+      "entry": "10 section 5, Status line"
+    },
+    {
+      "name": "AskPanel",
+      "group": "The assistant",
+      "status": "to build",
+      "entry": "10 section 5, Ask panel"
+    },
+    {
+      "name": "RuleLine",
+      "group": "The assistant",
+      "status": "to build",
+      "entry": "10 section 4.7"
+    },
+    {
+      "name": "AIDraftedMarker",
+      "group": "The assistant",
+      "status": "to build",
+      "entry": "10 section 4.3"
+    }
+  ]
+}
