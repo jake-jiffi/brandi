@@ -42,7 +42,7 @@ const ITEM_SIZE: Record<SegmentedControlSize, string> = {
 }
 
 // The thumb's corners sit inside the track's, 2px in.
-const INNER_RADIUS = "rounded-[calc(var(--radius-control)-2px)]"
+const INNER_RADIUS = "rounded-[calc(var(--radius-action)-2px)]"
 
 /** Two to five views of the same content, as a radio group. Changes the view at once. */
 export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedControlProps>(function SegmentedControl(
@@ -74,7 +74,7 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
       data-size={size}
       data-disabled={disabled ? "" : undefined}
       className={cn(
-        "group/segmented relative inline-grid w-fit auto-cols-fr grid-flow-col items-stretch gap-0 rounded-control bg-surface-sunken p-0.5 ring-1 ring-line ring-inset",
+        "group/segmented relative inline-grid w-fit auto-cols-fr grid-flow-col items-stretch gap-0 rounded-action bg-surface-sunken p-0.5 ring-1 ring-line ring-inset",
         className
       )}
       onKeyDown={(event) => {

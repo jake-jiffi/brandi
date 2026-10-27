@@ -295,3 +295,14 @@ describe('faces the system ships as files', () => {
   });
 });
 
+
+describe('the shape of what a person can press', () => {
+  test('a pill by default, the control radius or a value of its own when the brand says so', () => {
+    const system = buildSystem({ primary: '#1F6F4A', accentCount: 1 });
+    const radius = (shape) => Object.fromEntries(P.buildProductTokens(system, { shape }).radius.tokens.map((t) => [t.name, t.value]));
+    assert.equal(radius(undefined)['radius-action'], '9999px', 'if it is a pill, you can press it');
+    const control = radius({ action: 'control' });
+    assert.equal(control['radius-action'], control['radius-control'], 'buttons that match the inputs');
+    assert.equal(radius({ action: '6px' })['radius-action'], '6px');
+  });
+});

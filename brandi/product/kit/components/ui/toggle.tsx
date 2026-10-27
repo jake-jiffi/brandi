@@ -13,7 +13,7 @@ import { Toggle as TogglePrimitive } from "radix-ui"
 // selected-strong with a selected-line edge, the control heights with touch sizes, and a disabled state
 // that keeps pointer events, so a tooltip can still say why. Focus is the base styles' outline.
 const toggleVariants = cva(
-  "group/toggle inline-flex items-center justify-center gap-1.5 rounded-control type-label whitespace-nowrap text-text-strong transition-colors select-none hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger-line aria-pressed:bg-selected-strong [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/toggle inline-flex items-center justify-center gap-1.5 rounded-action type-label whitespace-nowrap text-text-strong transition-colors select-none hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger-line aria-pressed:bg-selected-strong [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

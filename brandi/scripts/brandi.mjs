@@ -2913,6 +2913,7 @@ async function cmdProduct(flags, positional) {
       displayForTitles: config.displayForTitles ?? true,
       brandColours: config.brandColours ?? null,
       fonts: config.fonts ?? [],
+      shape: config.shape ?? {},
       source,
     });
     const audit = auditProductTokens(tokens);

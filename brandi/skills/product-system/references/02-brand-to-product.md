@@ -115,6 +115,9 @@ respect the terms: a face licensed for the brand's own work only stays inside th
 pill, you can press it", so only buttons, chips, segmented controls and switches are pills, and
 people learn the shape. Radii come from the brand's shape stance, renamed for product jobs (`radius-sm`
 for badges, `radius-control` for inputs, `radius-md` for cards, `radius-lg` for panes and dialogs).
+Whatever a person can press takes `radius-action`: the pill unless product.json says otherwise,
+`"shape": { "action": "control" }` for buttons that match the inputs, or a value of its own. Record
+the choice in the brand-to-product section either way.
 
 **Spacing aligned to the code.** A 4px scale whose names match Tailwind's, so `p-5` in code is
 `space-5` in a design. A brand scale where `space-5` means 24px makes every handover a translation.

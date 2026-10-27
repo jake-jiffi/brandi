@@ -611,8 +611,12 @@ const FALLBACK = {
 };
 const quote = (family) => (/\s/.test(family) ? `"${family}"` : family);
 
-/** Radii from the brand's shape stance, renamed for the jobs a product gives them. */
-function productRadii(system) {
+/**
+ * Radii from the brand's shape stance, renamed for the jobs a product gives them. `action` is the
+ * shape of whatever a person can press: the pill by default ("if it is a pill, you can press it"),
+ * the control radius when the brand's buttons match its inputs, or a value of its own.
+ */
+function productRadii(system, { action = 'pill' } = {}) {
   const by = Object.fromEntries((system.radius ?? []).map((r) => [r.name, r.px]));
   const r = (n) => `${Math.round(by[n] ?? 0)}px`;
   return [
@@ -622,6 +626,7 @@ function productRadii(system) {
     { name: 'radius-md', value: r('lg'), usage: 'Cards, menus and toasts.' },
     { name: 'radius-lg', value: r('xl'), usage: 'Panes, dialogs, sheets and the rail.' },
     { name: 'radius-xl', value: r('2xl'), usage: 'Sign-in and onboarding frames.' },
+    { name: 'radius-action', value: action === 'pill' ? '9999px' : action === 'control' ? r('md') : String(action), usage: action === 'pill' ? 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. If it is a pill, you can press it.' : 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. Record the rule in the brand-to-product section.' },
     { name: 'radius-pill', value: '9999px', usage: 'Whatever the system decides is pressable and pill-shaped. Record the rule in the brand-to-product section.' },
   ];
 }
@@ -654,7 +659,7 @@ export function checkFonts(fonts) {
   });
 }
 
-export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, source = null, fonts: fontFiles = [] } = {}) {
+export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, source = null, fonts: fontFiles = [], shape = {} } = {}) {
   if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved Brandi system');
 
   // Decided values arrive as people write them: "#fff" as often as "#FFFFFF",
@@ -754,7 +759,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
       tokens: [[0.5, 2], [1, 4], [1.5, 6], [2, 8], [3, 12], [4, 16], [5, 20], [6, 24], [8, 32], [10, 40], [12, 48], [16, 64]]
         .map(([n, px]) => ({ name: `space-${n}`, value: `${px}px` })),
     },
-    radius: { note: 'From the brand\'s shape stance, renamed for the jobs a product gives them.', tokens: productRadii(system) },
+    radius: { note: 'From the brand\'s shape stance, renamed for the jobs a product gives them.', tokens: productRadii(system, shape) },
     shadow: { note: 'Ink-tinted and quiet in light; deeper and plain in dark.', tokens: shadow },
     size: {
       note: 'Controls grow on touch screens: 40, 44 and 48, and nothing pressable is under 40px there.',
