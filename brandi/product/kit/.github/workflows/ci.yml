@@ -1,0 +1,100 @@
+# The product's gates on every change: the generated theme is current, the code lints, type-checks and builds,
+# every component's checks pass, and the built app passes its route checks, axe on every route and state, and
+# the pinned Impeccable detector at 1440, 820 and 390 in light and dark. Any finding fails the run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  # The detector engine the system's rounds recorded. Change it here, and nowhere else, when a round moves it on.
+  IMPECCABLE_VERSION: "0.1.18"
+  STARTER_URL: http://localhost:3000
+
+jobs:
+  gates:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install
+        # The lock file, once the product has one, so every run installs exactly what was tested.
+        run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Chrome for the checks
+        # The runner image carries Google Chrome; Playwright's own Chromium stands in where it does not.
+        run: command -v google-chrome || npx playwright install --with-deps chromium
+
+      - name: Generated theme matches the tokens
+        run: npm run globals:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Component checks
+        # On the previews `brandi product bundle` renders into canvas/previews, with the bundle rebuilt here, so the
+        # checks run on the components as they are in this commit. Stale or missing previews fail the run.
+        run: |
+          npm run canvas
+          npm run check
+
+      - name: Start the built app
+        run: |
+          npx next start -p 3000 > "$RUNNER_TEMP/next.log" 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fs -o /dev/null "$STARTER_URL/"; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/next.log"
+          exit 1
+
+      - name: Route checks
+        run: node tools/check-starter.mjs --base "$STARTER_URL"
+
+      - name: Accessibility, every route and state
+        run: node tools/axe-pages.mjs --routes tools/routes.json --base "$STARTER_URL"
+
+      - name: Detector engine, checked against its published sha256
+        run: |
+          dir="$RUNNER_TEMP/impeccable"
+          mkdir -p "$dir"
+          cd "$dir"
+          release="https://github.com/pbakaus/impeccable/releases/download/engine-v${IMPECCABLE_VERSION}"
+          curl -fsSLO "$release/impeccable-linux-x64"
+          curl -fsSLO "$release/impeccable-linux-x64.sha256"
+          sha256sum -c impeccable-linux-x64.sha256
+          chmod +x impeccable-linux-x64
+          echo "IMPECCABLE_BIN=$dir/impeccable-linux-x64" >> "$GITHUB_ENV"
+
+      - name: Chrome without its sandbox, for the detector
+        # The detector runs as root, where Chrome refuses to start inside its sandbox.
+        run: |
+          chrome="$(command -v google-chrome || node -e 'console.log(require("playwright").chromium.executablePath())')"
+          printf '#!/bin/sh\nexec "%s" --no-sandbox "$@"\n' "$chrome" | sudo tee /usr/local/bin/chrome-no-sandbox > /dev/null
+          sudo chmod +x /usr/local/bin/chrome-no-sandbox
+
+      - name: Detector, every route at 1440, 820 and 390, light and dark
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/local/bin/chrome-no-sandbox
+        run: sudo --preserve-env=IMPECCABLE_BIN,PUPPETEER_EXECUTABLE_PATH,STARTER_URL env "PATH=$PATH" node tools/detect.mjs --base "$STARTER_URL"

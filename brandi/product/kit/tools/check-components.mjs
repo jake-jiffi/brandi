@@ -4,22 +4,32 @@
  * keyboard: Playwright driving the installed Chrome, so nothing is downloaded. Every check gets a
  * fresh page, because a modal left open by one check breaks every check after it.
  *
- *   node tools/check-components.mjs --previews <dir> [--only Button,Dialog] [--json results.json]
+ *   node tools/check-components.mjs [--previews <dir>] [--only Button,Dialog] [--json results.json]
  *
  * <dir> holds each component's rendered preview (<Name>Preview.preview.html, written by Brandi's
  * preview.mjs). A check receives { page, scope, expect, theme, brand }: scope is the example's section,
  * and brand is { name, product }, the names the bundle was built with.
  * Prints {"passed": n, "failed": [...]} and exits 1 when anything failed.
+ *
+ * Without --previews it reads canvas/previews, which `brandi product bundle` renders along with
+ * definitions.json: { "sha256", "files" }, the hash of the definitions the previews came from. That
+ * folder must exist, carry the file, and match the definitions as they are now, or every check
+ * fails at once: a stale preview would test components that no longer exist. When canvas/dist holds
+ * this starter's own build (`npm run canvas`), its bundle replaces the copy the previews mount, so
+ * the checks run on the code as it is. A folder named with --previews is one its caller has just
+ * rendered (Brandi's try loop and its gates), checked against its definitions.json when it has one.
  */
 
 import { chromium } from "playwright"
-import { existsSync, readdirSync, writeFileSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const arg = (k) => { const i = process.argv.indexOf(k); return i >= 0 ? process.argv[i + 1] : undefined }
-const previews = path.resolve(arg("--previews") ?? "canvas/previews")
+const ownPreviews = path.join(root, "canvas", "previews")
+const previews = arg("--previews") ? path.resolve(arg("--previews")) : ownPreviews
 const only = arg("--only")?.split(",").map((s) => s.trim()).filter(Boolean)
 
 function makeExpect() {
@@ -30,10 +40,47 @@ function makeExpect() {
 }
 
 const dir = path.join(root, "components", "system")
+const files = readdirSync(dir).filter((x) => x.endsWith(".def.mjs")).sort()
 const defs = []
-for (const f of readdirSync(dir).filter((x) => x.endsWith(".def.mjs")).sort()) {
+for (const f of files) {
   const def = (await import(pathToFileURL(path.join(dir, f)).href)).default
   if (!only || only.includes(def.name)) defs.push(def)
+}
+
+// The hash `brandi product bundle` records: each definition in filename order, as "<filename>\n<contents>\n".
+const hash = createHash("sha256")
+for (const f of files) hash.update(`${f}\n${readFileSync(path.join(dir, f), "utf8")}\n`)
+const current = hash.digest("hex")
+const stamp = path.join(previews, "definitions.json")
+let stale = null
+if (!existsSync(previews) || (previews === ownPreviews && !existsSync(stamp))) {
+  stale = "Run brandi product bundle to render the previews"
+} else if (existsSync(stamp)) {
+  let recorded = null
+  try {
+    recorded = JSON.parse(readFileSync(stamp, "utf8"))
+  } catch {
+    // An unreadable record proves nothing about the previews, so it counts as out of date.
+  }
+  if (recorded?.sha256 !== current) stale = "The previews are older than the definitions: run brandi product bundle"
+}
+if (stale) {
+  const result = { passed: 0, failed: [{ check: "previews", reason: `${stale} (${path.relative(process.cwd(), previews) || "."})` }] }
+  if (arg("--json")) writeFileSync(path.resolve(arg("--json")), `${JSON.stringify({ ...result, passedChecks: [] }, null, 2)}\n`)
+  // Written before exiting, so a piped reader gets the whole line.
+  await new Promise((resolve) => process.stdout.write(`${JSON.stringify(result)}\n`, resolve))
+  process.exit(1)
+}
+
+// The previews mount the system from ds/<namespace>/components, a copy of the bundle as it was when they
+// were rendered. Once this starter has built its own (`npm run canvas` writes canvas/dist), that copy is
+// refreshed first, so the checks always run on the components as they are now.
+const dist = path.join(root, "canvas", "dist")
+if (previews === ownPreviews && existsSync(path.join(dist, "bundle.js"))) {
+  const { namespace } = JSON.parse(readFileSync(path.join(root, "system", "system.json"), "utf8"))
+  const installed = path.join(previews, "ds", namespace, "components")
+  mkdirSync(installed, { recursive: true })
+  for (const f of ["bundle.js", "bundle.css"]) copyFileSync(path.join(dist, f), path.join(installed, f))
 }
 
 let browser

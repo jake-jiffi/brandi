@@ -1,3 +1,17 @@
 [
-  { "path": "/", "label": "Home" }
+  { "path": "/", "label": "Home" },
+  { "path": "/jobs", "label": "Jobs" },
+  { "path": "/jobs?status=needs-you,overdue", "label": "Jobs, filtered" },
+  { "path": "/jobs?q=no-such-job", "label": "Jobs, no results" },
+  { "path": "/jobs/J-1042", "label": "Job" },
+  { "path": "/jobs/J-1042?tab=quote", "label": "Job, quote" },
+  { "path": "/jobs/J-1042?tab=activity", "label": "Job, activity" },
+  { "path": "/jobs/J-1047?tab=quote", "label": "Job, not quoted" },
+  { "path": "/jobs/J-0000", "label": "Job, no longer exists" },
+  { "path": "/jobs/J-1050", "label": "Job, could not load" },
+  { "path": "/invoices", "label": "Invoices, source down" },
+  { "path": "/settings", "label": "Settings" },
+  { "path": "/help", "label": "Help" },
+  { "path": "/kit", "label": "Kit" },
+  { "path": "/no-such-page", "label": "Page not found" }
 ]
