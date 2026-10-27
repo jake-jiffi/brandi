@@ -34,7 +34,8 @@ describe('toStarterGlobals', () => {
   test('removes Tailwind\'s palette and never turns brand-* values into utilities', () => {
     const theme = section('@theme inline {', '/* 5.');
     assert.match(theme, /--color-\*: initial;/);
-    assert.equal(/--color-brand-/.test(theme), false);
+    assert.equal(/--color-brand-(?!hover:)/.test(theme), false, 'no brand value becomes a utility');
+    assert.match(theme, /--color-brand-hover: var\(--brand-hover\);/, 'brand-hover is a role, so hover:bg-brand-hover works');
     assert.match(theme, /--color-text-muted: var\(--text-muted\);/);
   });
 

@@ -679,8 +679,8 @@ describe('the README states numbers that are true', () => {
   // `test(` call site, so adding one trips this and forces whoever added it to
   // re-run the suite and refresh all three numbers. A test added inside an
   // existing loop is the one case that slips through.
-  const SUITE_TESTS = 2057;
-  const STATIC_TEST_CALLS = 1751;
+  const SUITE_TESTS = 2062;
+  const STATIC_TEST_CALLS = 1756;
   let readme;
   // The worked example the README counts pages for: the deck `brandi book`
   // builds from tests/fixtures/muddy-paws.json. It is built here rather than

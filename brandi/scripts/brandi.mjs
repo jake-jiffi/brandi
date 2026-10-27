@@ -44,6 +44,7 @@
  *   brandi product bundle [--starter product/starter]
  *                                     the canvas bundle from the starter's own components, and
  *                                     every component's card and preview from its definition
+ *   brandi product boards             foundation and component boards from the tokens and definitions
  *   brandi product gates [--round N]  the machine gates for a round, every tool version recorded
  *   brandi product round --round N    the round held against the bar, with the judged gates
  *   brandi product specs              check platform specs and report their coverage
@@ -74,6 +75,7 @@ import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchM
 import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
 import { compareProduct, syncReport, applyTokens, provenance } from './productsync.mjs';
+import { writeBoards as writeProductBoards } from './productboards.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -959,7 +961,10 @@ async function cmdValidate(flags, positional) {
   // signature and no photograph. Those are the contradictions a client finds
   // first, so they belong in the same pass.
   let promises = { ok: true, findings: [] };
-  if (near) {
+  // A product canvas carries screens, not the brand's applications: the brand's promises (a flyer, a
+  // shopfront, a van) are held against the brand canvas only.
+  const productCanvas = artboards.some((a) => /(?:href|src)="(?:\.\.\/)*ds\//.test(a.source));
+  if (near && !productCanvas) {
     promises = await checkPromises({ brand: near.brand, root: path.dirname(path.dirname(near.file)), canvasDir: dir });
   }
   const lines = [`Checked ${plural(files.length, 'artboard')} in ${path.relative(process.cwd(), dir)}`];
@@ -2779,6 +2784,13 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       definition, and install the system beside the canvas boards. Needs npm
       install in the starter first.
 
+  brandi product boards [--starter product/starter] [--no-measure]
+      The canvas boards the system generates for itself into product/canvas:
+      colour, type, shape and icons from the tokens, one board per component
+      group from the definitions' examples, a dark twin beside each, a
+      contents Main, and canvas.json rows under title notes. Heights are
+      measured in a browser. Authored boards are never touched.
+
   brandi product gates [--round N] [--only Button,Dialog] [--route <url> ...]
       The machine gates for a round: the token audit, the pinned detector at
       1440, 820 and 390 in light and dark, axe, and every scripted check, on
@@ -2922,6 +2934,15 @@ async function cmdProduct(flags, positional) {
       `${res.components.reduce((n, c) => n + c.checks, 0)} scripted checks in the definitions.`,
       `Cards in ${path.relative(process.cwd(), path.join(productDir, 'components'))}, preview boards in ${path.relative(process.cwd(), res.previews)}, the system installed under canvas/ds/${res.system.namespace}/.`,
     ].join('\n'), { ok: true, system: res.system, exports: res.manifest.exports, components: res.components, files });
+    return;
+  }
+  if (sub === 'boards') {
+    const productDir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
+    if (!existsSync(path.join(starter, 'system', 'system.json'))) return fail('No starter yet. Run `brandi product starter`, then `brandi product bundle`.');
+    if (!existsSync(path.join(productDir, 'canvas', 'ds'))) return fail('The system is not installed beside the canvas boards yet. Run `brandi product bundle` first.');
+    const res = await writeProductBoards({ productDir, starter, measure: !flags['no-measure'], log: (l) => process.stderr.write(`${l}\n`) });
+    emit([`Wrote ${plural(res.boards.length, 'generated board')} into ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}${res.measured ? `, ${res.measured} measured in a browser` : ', unmeasured'}.`, res.shifted ? `Authored boards moved down ${res.shifted}px to clear the generated rows.` : '', `Validate with \`brandi validate --dir ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}\`.`].filter(Boolean).join('\n'), { ok: true, ...res, manifest: undefined });
     return;
   }
   if (sub === 'gates' || sub === 'round') {

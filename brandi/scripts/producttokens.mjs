@@ -655,6 +655,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
     })),
   ]).map((c) => ({
     name: `brand-${c.name}`,
+    brand: true,
     value: { light: c.hex.toLowerCase(), dark: c.hex.toLowerCase() },
     usage: "The brand book's exact value. Roles alias it; interface code never uses it directly.",
     contrast: [],

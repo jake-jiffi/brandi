@@ -55,6 +55,13 @@ export const SHADCN = Object.freeze([
 
 const STATIC_FAMILIES = ['spacing', 'radius', 'size', 'zIndex', 'duration', 'easing', 'opacity'];
 
+/**
+ * A brand value: the brand book's exact colour, which interface code never uses directly. Tokens
+ * mark them; an older file without the mark is read by name, sparing brand-hover, which is a role.
+ */
+const BRAND_PREFIXED_ROLES = new Set(['brand-hover']);
+const isBrandValue = (t) => t.brand === true || (t.brand === undefined && t.name.startsWith('brand-') && !BRAND_PREFIXED_ROLES.has(t.name));
+
 /** Families that are a system or generic fallback, never the brand's own face. */
 const GENERIC_FAMILY = /^(ui-[a-z-]+|system-ui|-apple-system|serif|sans-serif|monospace|Georgia|"Times New Roman"|Arial|"Segoe UI"|Menlo|Consolas|"SF Mono")$/i;
 
@@ -175,11 +182,11 @@ ${block(shadcn.map(([a, b]) => [a, `{${b}}`]))}
 
 /* 4. Tailwind theme -------------------------------------------------------- */
 @theme inline {
-  /* Only role tokens become utilities. brand-* stay CSS variables, so nobody writes text-brand-primary. */
+  /* Only role tokens become utilities. Brand values stay CSS variables, so nobody writes text-brand-primary. */
   --color-*: initial;
   --color-transparent: transparent;
   --color-current: currentColor;
-${colours.filter((t) => !t.name.startsWith('brand-')).map((t) => `  --color-${t.name}: var(--${t.name});`).join('\n')}
+${colours.filter((t) => !isBrandValue(t)).map((t) => `  --color-${t.name}: var(--${t.name});`).join('\n')}
 ${shadcn.filter(([a]) => !names.has(a)).map(([a]) => `  --color-${a}: var(--${a});`).join('\n')}
 
   --radius-*: initial;
