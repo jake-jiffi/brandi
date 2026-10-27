@@ -109,7 +109,8 @@ if (!process.argv.includes('--no-detect')) {
 }
 
 if (!process.argv.includes('--no-checks') && defs.some((d) => d.checks?.length)) {
-  step('checks', process.execPath, ['tools/check-components.mjs', '--previews', previews, ...(only ? ['--only', only.join(',')] : [])], { timeout: 600000 });
+  // The whole catalogue runs some 850 checks, past ten minutes on a busy machine.
+  step('checks', process.execPath, ['tools/check-components.mjs', '--previews', previews, ...(only ? ['--only', only.join(',')] : [])], { timeout: only ? 600000 : 2700000 });
 }
 process.stdout.write(failed ? '\nSomething failed: see above.\n' : '\nAll green.\n');
 if (failed) process.exitCode = 1;
