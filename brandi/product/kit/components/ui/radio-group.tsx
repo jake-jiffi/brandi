@@ -29,8 +29,11 @@ const RadioGroupItem = React.forwardRef(function RadioGroupItem({
   return (
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
+      // Patched (07-starter.md, checkbox and radio): an 18px circle bordered in line-control, so the off state
+      // is visible, a 24px hit area that grows to 44px on touch, and a danger edge when invalid. Focus is the
+      // base outline. The chosen dot is a border in forced colours, where a background would vanish.
       className={cn(
-        "group/radio-group-item peer relative flex aspect-square size-4 shrink-0 rounded-full border border-input group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary",
+        "group/radio-group-item peer relative flex size-4.5 shrink-0 items-center justify-center rounded-full border border-line-control bg-surface transition-colors after:absolute after:-inset-[3px] after:rounded-full pointer-coarse:after:-inset-[13px] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger data-[state=checked]:border-primary data-[state=checked]:bg-primary",
         className
       )}
       {...props}
@@ -38,9 +41,9 @@ const RadioGroupItem = React.forwardRef(function RadioGroupItem({
     >
       <RadioGroupPrimitive.Indicator
         data-slot="radio-group-indicator"
-        className="flex size-4 items-center justify-center"
+        className="flex size-full items-center justify-center"
       >
-        <span className="absolute top-1/2 left-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-foreground" />
+        <span className="size-2 rounded-full bg-on-primary forced-colors:border-4 forced-colors:border-solid" />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   )

@@ -28,12 +28,15 @@ const NativeSelect = React.forwardRef(function NativeSelect({
       <select
         data-slot="native-select"
         data-size={size}
-        className="h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-transparent py-1 pr-8 pl-2.5 text-sm shadow-xs transition-[color,box-shadow] select-none selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground disabled:pointer-events-none disabled:cursor-not-allowed aria-invalid:border-destructive data-[size=sm]:h-8 dark:bg-input/30 dark:hover:bg-input/50 dark:aria-invalid:border-destructive/50"
+        // Patched (07-starter.md, select trigger): the input's edge (line-control border, a 2px focus edge in place
+        // of the outline, a danger edge that stays danger when focused), 32 or 36px, 40 or 44px with 16px text on
+        // touch, so iOS never zooms.
+        className="h-9 w-full min-w-0 appearance-none rounded-control border border-line-control bg-surface py-1 pr-9 pl-3 type-body text-text select-none hover:bg-surface-subtle focus-visible:border-focus focus-visible:shadow-[0_0_0_1px_var(--focus)] focus-visible:outline-hidden disabled:cursor-not-allowed aria-invalid:border-danger aria-invalid:focus-visible:border-danger aria-invalid:focus-visible:shadow-[0_0_0_1px_var(--danger)] pointer-coarse:h-11 pointer-coarse:type-body-lg data-[size=sm]:h-8 data-[size=sm]:pointer-coarse:h-10"
         {...props}
       ref={ref}
       />
       <ChevronDownIcon
-        className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground select-none"
+        className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-text-muted select-none"
         aria-hidden="true"
         data-slot="native-select-icon"
       />

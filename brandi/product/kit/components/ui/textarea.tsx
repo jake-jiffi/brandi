@@ -9,8 +9,11 @@ const Textarea = React.forwardRef(function Textarea({ className, ...props }: Rea
   return (
     <textarea
       data-slot="textarea"
+      // Patched (07-starter.md, textarea): the input's edge (line-control border, a 2px focus edge, a danger edge
+      // that stays danger when focused, dashed when read-only). It starts at 96px, honours rows and resizes
+      // vertically. 16px text on touch. No viewport breakpoints.
       className={cn(
-        "flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-2.5 py-2 text-base shadow-xs transition-[color,box-shadow] placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive md:text-sm dark:bg-input/30 dark:aria-invalid:border-destructive/50",
+        "flex min-h-24 w-full resize-y rounded-control border border-line-control bg-surface px-3 py-2 type-body text-text placeholder:text-text-subtle focus-visible:border-focus focus-visible:shadow-[0_0_0_1px_var(--focus)] focus-visible:outline-hidden aria-invalid:border-danger aria-invalid:focus-visible:border-danger aria-invalid:focus-visible:shadow-[0_0_0_1px_var(--danger)] read-only:not-disabled:border-dashed disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:type-body-lg",
         className
       )}
       {...props}

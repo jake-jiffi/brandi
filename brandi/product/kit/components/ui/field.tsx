@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 
+import { CircleAlertIcon } from "lucide-react"
+
 const FieldSet = React.forwardRef(function FieldSet({ className, ...props }: React.ComponentProps<"fieldset">, ref: React.ForwardedRef<any>) {
   return (
     <fieldset
@@ -35,8 +37,9 @@ const FieldLegend = React.forwardRef(function FieldLegend({
     <legend
       data-slot="field-legend"
       data-variant={variant}
+      // Patched (07-starter.md, field): the legend in the label and heading styles, in text-strong.
       className={cn(
-        "mb-3 font-medium data-[variant=label]:text-sm data-[variant=legend]:text-base",
+        "mb-3 text-text-strong data-[variant=label]:type-label data-[variant=legend]:type-heading",
         className
       )}
       {...props}
@@ -59,8 +62,9 @@ const FieldGroup = React.forwardRef(function FieldGroup({ className, ...props }:
   )
 })
 
+// Patched (07-starter.md, field): an error never turns the whole field red; the error line carries it.
 const fieldVariants = cva(
-  "group/field flex w-full gap-3 data-[invalid=true]:text-destructive",
+  "group/field flex w-full gap-3",
   {
     variants: {
       orientation: {
@@ -113,10 +117,11 @@ const FieldLabel = React.forwardRef(function FieldLabel({
   ...props
 }: React.ComponentProps<typeof Label>, ref: React.ForwardedRef<any>) {
   return (
+    // Patched (07-starter.md, label): no leading-snug, which fought the label style's line height.
     <Label
       data-slot="field-label"
       className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 leading-snug group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5 has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border has-[>[data-slot=field]]:not-has-[:disabled,[data-disabled]]:hover:bg-muted/50 has-[>[data-slot=field]]:has-[:focus-visible]:border-ring has-[>[data-slot=field]]:has-[:focus-visible]:ring-3 has-[>[data-slot=field]]:has-[:focus-visible]:ring-ring/50 *:data-[slot=field]:p-3 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10",
+        "group/field-label peer/field-label flex w-fit gap-2 group-data-[disabled=true]/field:opacity-50 has-data-checked:border-primary/30 has-data-checked:bg-primary/5 has-[>[data-slot=field]]:rounded-md has-[>[data-slot=field]]:border has-[>[data-slot=field]]:not-has-[:disabled,[data-disabled]]:hover:bg-muted/50 has-[>[data-slot=field]]:has-[:focus-visible]:border-ring has-[>[data-slot=field]]:has-[:focus-visible]:ring-3 has-[>[data-slot=field]]:has-[:focus-visible]:ring-ring/50 *:data-[slot=field]:p-3 dark:has-data-checked:border-primary/20 dark:has-data-checked:bg-primary/10",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col",
         className
       )}
@@ -128,10 +133,11 @@ const FieldLabel = React.forwardRef(function FieldLabel({
 
 const FieldTitle = React.forwardRef(function FieldTitle({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
   return (
+    // Patched (07-starter.md, label): the label style in text-strong.
     <div
       data-slot="field-label"
       className={cn(
-        "flex w-fit items-center gap-2 text-sm font-medium group-data-[disabled=true]/field:opacity-50",
+        "flex w-fit items-center gap-2 type-label text-text-strong group-data-[disabled=true]/field:opacity-50",
         className
       )}
       {...props}
@@ -142,10 +148,11 @@ const FieldTitle = React.forwardRef(function FieldTitle({ className, ...props }:
 
 const FieldDescription = React.forwardRef(function FieldDescription({ className, ...props }: React.ComponentProps<"p">, ref: React.ForwardedRef<any>) {
   return (
+    // Patched (07-starter.md, field): hints in the meta style.
     <p
       data-slot="field-description"
       className={cn(
-        "text-left text-sm leading-normal font-normal text-muted-foreground group-has-data-horizontal/field:text-balance [[data-variant=legend]+&]:-mt-1.5",
+        "text-left type-meta text-text-muted group-has-data-horizontal/field:text-balance [[data-variant=legend]+&]:-mt-1.5",
         "last:mt-0 nth-last-2:-mt-1",
         "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className
@@ -226,15 +233,18 @@ const FieldError = React.forwardRef(function FieldError({
     return null
   }
 
+  // Patched (07-starter.md, field): errors in danger text with an icon as well as colour. role="alert" announces
+  // one that appears; a system component that keeps a polite live region of its own passes role={undefined}.
   return (
     <div
       role="alert"
       data-slot="field-error"
-      className={cn("text-sm font-normal text-destructive", className)}
+      className={cn("flex items-start gap-1.5 type-meta text-danger", className)}
       {...props}
       ref={ref}
     >
-      {content}
+      <CircleAlertIcon aria-hidden="true" focusable="false" className="mt-0.5 size-3.5 shrink-0" />
+      <div className="min-w-0">{content}</div>
     </div>
   )
 })

@@ -8,7 +8,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Checkbox as CheckboxPrimitive } from "radix-ui"
 
-import { CheckIcon } from "lucide-react"
+import { CheckIcon, MinusIcon } from "lucide-react"
 
 const Checkbox = React.forwardRef(function Checkbox({
   className,
@@ -17,8 +17,11 @@ const Checkbox = React.forwardRef(function Checkbox({
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"
+      // Patched (07-starter.md, checkbox): an 18px box bordered in line-control (3:1, so the off state is
+      // visible), a 24px hit area that grows to 44px on touch, a dash for some selected, a danger edge when
+      // invalid. Focus is the base outline. The check is drawn in currentColor, so forced colours keep it.
       className={cn(
-        "peer relative flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input shadow-xs transition-shadow group-has-disabled/field:opacity-50 group-has-[:focus-visible]/field-label:ring-0 group-has-[:focus-visible]/field-label:not-data-checked:border-input after:absolute after:-inset-x-3 after:-inset-y-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:aria-checked:border-primary dark:bg-input/30 dark:aria-invalid:border-destructive/50 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground group-has-[:focus-visible]/field-label:data-checked:border-primary dark:data-checked:bg-primary",
+        "peer group/checkbox relative flex size-4.5 shrink-0 items-center justify-center rounded-xs border border-line-control bg-surface text-on-primary transition-colors after:absolute after:-inset-[3px] pointer-coarse:after:-inset-[13px] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary",
         className
       )}
       {...props}
@@ -26,10 +29,10 @@ const Checkbox = React.forwardRef(function Checkbox({
     >
       <CheckboxPrimitive.Indicator
         data-slot="checkbox-indicator"
-        className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
+        className="grid place-content-center text-current [&>svg]:size-3.5"
       >
-        <CheckIcon
-        />
+        <CheckIcon aria-hidden="true" strokeWidth={3} className="group-data-[state=indeterminate]/checkbox:hidden" />
+        <MinusIcon aria-hidden="true" strokeWidth={3} className="hidden group-data-[state=indeterminate]/checkbox:block" />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   )

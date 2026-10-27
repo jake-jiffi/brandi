@@ -13,10 +13,11 @@ const Label = React.forwardRef(function Label({
   ...props
 }: React.ComponentProps<typeof LabelPrimitive.Root>, ref: React.ForwardedRef<any>) {
   return (
+    // Patched (07-starter.md, label): the label style in text-strong, so it stays readable beside an error.
     <LabelPrimitive.Root
       data-slot="label"
       className={cn(
-        "flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
+        "flex items-center gap-2 type-label text-text-strong select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50",
         className
       )}
       {...props}
