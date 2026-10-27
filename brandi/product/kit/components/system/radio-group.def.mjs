@@ -98,13 +98,17 @@ export default {
       async run({ page, scope, expect }) {
         await page.keyboard.press("Tab")
         expect.equal(await focused(page, "Fortnightly"), "Fortnightly", "Tab lands on the chosen option")
-        await page.keyboard.press("ArrowRight")
+        // Held a moment, as a key is: Radix selects on focus only while the arrow is still down, and a
+        // keydown and keyup sent back to back sometimes moved focus without choosing.
+        await page.keyboard.press("ArrowRight", { delay: 40 })
         expect.equal(await focused(page, "Monthly"), "Monthly", "Right moves focus")
-        expect.equal(await scope.getByRole("radio", { name: "Monthly" }).getAttribute("aria-checked"), "true", "and the choice")
-        await page.keyboard.press("ArrowDown")
+        const chose = await scope.getByRole("radio", { name: "Monthly", checked: true }).waitFor({ timeout: 2000 }).then(() => true, () => false)
+        expect(chose, "and the choice")
+        await page.keyboard.press("ArrowDown", { delay: 40 })
         expect.equal(await focused(page, "Weekly"), "Weekly", "Down wraps to the first")
-        await page.keyboard.press("ArrowLeft")
+        await page.keyboard.press("ArrowLeft", { delay: 40 })
         expect.equal(await focused(page, "Monthly"), "Monthly", "Left wraps back")
+        await scope.getByRole("radio", { name: "Monthly", checked: true }).waitFor({ timeout: 2000 }).catch(() => {})
         expect.equal(await scope.getByRole("radio", { name: "Fortnightly" }).getAttribute("aria-checked"), "false", "only one is chosen")
       },
     },

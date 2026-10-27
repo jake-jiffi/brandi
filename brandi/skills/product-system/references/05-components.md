@@ -141,7 +141,9 @@ component there, which the bar now asks for.
 
 ### 2.5 Touch
 
-Touch sizing follows the pointer, not the width: a touch screen of any size gets it.
+Touch sizing follows the pointer, and the phone layout: a touch screen of any size gets it, and so
+does anything inside an app shell under 640px of its own width, so a phone board drawn with a mouse
+shows the phone's sizes. The kit's `pointer-coarse:` variant carries both.
 
 | What | Size |
 |---|---|

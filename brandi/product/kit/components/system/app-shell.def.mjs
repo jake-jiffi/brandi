@@ -520,6 +520,18 @@ export default {
       },
     },
     {
+      name: "In the phone layout controls take the touch sizes with a mouse too, and a wide shell keeps the desktop sizes",
+      example: "phone",
+      async run({ page, scope, expect }) {
+        // A phone board on a canvas has a mouse, and drew 36px controls where a phone has 44px.
+        const bar = shell(scope, "live").locator('[data-slot="app-shell-action-bar"]')
+        expect.atLeast(await bar.getByRole("button").count(), 1, "the foot bar has its buttons")
+        for (const b of await bar.getByRole("button").all()) expect.atLeast(Math.round((await b.boundingBox()).height), 44, "a foot-bar button at 390")
+        const wide = page.locator('[data-shell="full"] [data-slot="page-header-actions"]').getByRole("button", { name: "Approve 3" })
+        expect.equal(Math.round((await wide.boundingBox()).height), 36, "the same button in the 1440 shell")
+      },
+    },
+    {
       name: "The drawer drawn for a design takes no Escape and adds no tab stop or focus guard",
       example: "phone",
       async run({ page, scope, expect }) {

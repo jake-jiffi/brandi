@@ -151,6 +151,16 @@ export function toStarterGlobals(tokens, { shadcn = SHADCN } = {}) {
 
 /* Dark mode follows a .dark class (next-themes) or data-theme="dark", like the design system. */
 @custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+/* Touch sizes on a touch screen of any width, and in the phone layout: inside an app shell under 640px
+   of its own width. A phone board on a canvas has a mouse, and drew desktop-sized controls. */
+@custom-variant pointer-coarse {
+  @media (pointer: coarse) {
+    @slot;
+  }
+  @container shell (max-width: 639.98px) {
+    @slot;
+  }
+}
 
 /* 2. Tokens ----------------------------------------------------------------- */
 :root,

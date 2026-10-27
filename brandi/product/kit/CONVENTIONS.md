@@ -54,7 +54,8 @@ this file wins.
   inside: `focus-visible:outline-offset-[-2px]`.
 - **Touch.** `pointer-coarse:` sizes things up: controls 40, 44 and 48px; anything pressable 40px at
   least; 24px hit areas for checkboxes, switches and inline links; 8px between targets; 16px input
-  text on touch.
+  text on touch. The globals make it match a coarse pointer and an app shell under 640px of its own
+  width, so a phone board drawn with a mouse shows the phone's sizes.
 - **Its own width.** Respond to the container, never the window: `@container` on the root and
   `@max-[640px]:` style variants (`@max-[N]` is narrower than N and `@min-[N]` is N or wider, so pair them on the
   same number; `@max-[639px]` beside `@min-[640px]` leaves a container between them matching neither).
