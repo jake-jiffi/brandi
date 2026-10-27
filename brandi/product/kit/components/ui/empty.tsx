@@ -6,12 +6,14 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
+// Patched (07-starter.md, empty): the system's corners, no dashed box (dashes mean "drop here"), and a group,
+// so the title and body can take the size the root names in data-size (page, section or compact).
 const Empty = React.forwardRef(function Empty({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
   return (
     <div
       data-slot="empty"
       className={cn(
-        "flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg border-dashed p-12 text-center text-balance",
+        "group/empty flex w-full min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-md p-12 text-center text-balance",
         className
       )}
       {...props}
@@ -31,13 +33,15 @@ const EmptyHeader = React.forwardRef(function EmptyHeader({ className, ...props 
   )
 })
 
+// Patched (07-starter.md, empty): the icon sits in flow in a quiet role colour, with no tile of its own. A
+// rounded tile above a heading is the generic feature-card template, and the detector flags it.
 const emptyMediaVariants = cva(
   "mb-2 flex shrink-0 items-center justify-center [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default: "bg-transparent",
-        icon: "flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground [&_svg:not([class*='size-'])]:size-6",
+        icon: "text-text-muted [&_svg:not([class*='size-'])]:size-6",
       },
     },
     defaultVariants: {
@@ -62,12 +66,20 @@ const EmptyMedia = React.forwardRef(function EmptyMedia({
   )
 })
 
-const EmptyTitle = React.forwardRef(function EmptyTitle({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
+// Patched (07-starter.md, empty): a real heading through `as`, so a page keeps its outline, in the system's
+// type: the display style for a page, the large heading in a section, the heading when compact. Each sits at
+// least a 1.25 step above its body, so the title is the one thing the eye lands on. Long unbroken words wrap
+// here and in the body.
+const EmptyTitle = React.forwardRef(function EmptyTitle({
+  className,
+  as: Heading = "div",
+  ...props
+}: React.ComponentProps<"div"> & { as?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "div" }, ref: React.ForwardedRef<any>) {
   return (
-    <div
+    <Heading
       data-slot="empty-title"
       className={cn(
-        "cn-font-heading text-lg font-medium tracking-tight",
+        "m-0 type-heading-lg wrap-break-word text-text-strong group-data-[size=page]/empty:type-title group-data-[size=compact]/empty:type-heading",
         className
       )}
       {...props}
@@ -76,12 +88,13 @@ const EmptyTitle = React.forwardRef(function EmptyTitle({ className, ...props }:
   )
 })
 
+// Patched (07-starter.md, empty): body text and links in role tokens, sized with the root.
 const EmptyDescription = React.forwardRef(function EmptyDescription({ className, ...props }: React.ComponentProps<"p">, ref: React.ForwardedRef<any>) {
   return (
     <div
       data-slot="empty-description"
       className={cn(
-        "text-sm/relaxed text-muted-foreground [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
+        "type-body wrap-break-word text-text-muted group-data-[size=page]/empty:type-body-lg group-data-[size=compact]/empty:type-meta [&>a]:text-link [&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-link-hover",
         className
       )}
       {...props}
@@ -90,12 +103,13 @@ const EmptyDescription = React.forwardRef(function EmptyDescription({ className,
   )
 })
 
+// Patched (07-starter.md, empty): the system's body type.
 const EmptyContent = React.forwardRef(function EmptyContent({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
   return (
     <div
       data-slot="empty-content"
       className={cn(
-        "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 text-sm text-balance",
+        "flex w-full max-w-sm min-w-0 flex-col items-center gap-4 type-body text-balance",
         className
       )}
       {...props}
