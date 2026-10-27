@@ -7,10 +7,17 @@
  * pass. A value the record does not hold keeps the kit's default, and the file says which.
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
 
 import { inkBounds, viewBox } from './svg.mjs';
+import { findChrome } from './preview.mjs';
+
+const run = promisify(execFile);
 
 export const RENDITIONS = ['full', 'full-on-dark', 'full-ink', 'symbol', 'symbol-on-dark', 'symbol-ink'];
 export const CHARACTER_STATES = ['welcome', 'working', 'done', 'caught-up', 'needs-person', 'nothing-found', 'could-not-load', 'help'];
@@ -79,6 +86,38 @@ export function clearSpaceRatio(rule) {
 }
 
 /**
+ * A pose still small enough to carry in the bundle, drawn down in headless Chrome to WebP. The canvas
+ * has no public folder, so a still referenced by path shows as a broken image on every board; an
+ * 800 KB character still at 320px comes back near 20 KB. Null without Chrome.
+ */
+export async function shrinkStill(file, { maxSide = 320, quality = 0.82, chrome = findChrome() } = {}) {
+  if (!chrome) return null;
+  const type = /\.webp$/i.test(file) ? 'image/webp' : /\.jpe?g$/i.test(file) ? 'image/jpeg' : 'image/png';
+  const dir = mkdtempSync(path.join(tmpdir(), 'brandi-still-'));
+  try {
+    const page = path.join(dir, 'still.html');
+    writeFileSync(page, `<!doctype html><body><img id="i" src="data:${type};base64,${readFileSync(file).toString('base64')}"><script>
+const i = document.getElementById('i');
+i.decode().then(() => {
+  const s = Math.min(1, ${maxSide} / Math.max(i.naturalWidth, i.naturalHeight));
+  const c = document.createElement('canvas');
+  c.width = Math.round(i.naturalWidth * s);
+  c.height = Math.round(i.naturalHeight * s);
+  c.getContext('2d').drawImage(i, 0, 0, c.width, c.height);
+  document.body.setAttribute('data-still', c.toDataURL('image/webp', ${quality}));
+  i.remove();
+});
+</script></body>`);
+    const { stdout } = await run(chrome, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--virtual-time-budget=10000', '--dump-dom', pathToFileURL(page).href], { timeout: 60000, maxBuffer: 64 * 1024 * 1024 });
+    return /data-still="(data:image\/webp;base64,[^"]+)"/.exec(stdout)?.[1] ?? null;
+  } catch {
+    return null;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/**
  * Where the marks come from: { from, name, files: { rendition: path }, inkFrom, logo, character, base }.
  * Null when nothing names a mark, and the kit's placeholder stays.
  */
@@ -109,7 +148,7 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
  * The generated part of lib/brand.ts, and any stills to copy into public/brand/. Throws, naming the
  * file, when a mark is missing or unsafe.
  */
-export function brandConstant(src, { publicDir = null } = {}) {
+export function brandConstant(src, { publicDir = null, stills = new Map() } = {}) {
   const read = (rel, what) => {
     const file = path.resolve(src.base, rel);
     if (!existsSync(file)) throw new Error(`${what}: ${rel} does not exist (from ${src.from}).`);
@@ -141,7 +180,7 @@ export function brandConstant(src, { publicDir = null } = {}) {
   if (logo.height < logo.minHeight) logo.height = logo.minHeight;
 
   let character = null;
-  const stills = [];
+  const copied = [];
   if (src.character?.poses) {
     const poses = (map) => {
       const out = {};
@@ -149,7 +188,8 @@ export function brandConstant(src, { publicDir = null } = {}) {
         if (!CHARACTER_STATES.includes(state)) throw new Error(`${src.from} gives the character a "${state}" pose; the states are ${CHARACTER_STATES.join(', ')}.`);
         if (/\.svg$/i.test(rel)) { out[state] = cleanSvg(read(rel, `the ${state} pose`).text, rel); continue; }
         const { file } = read(rel, `the ${state} pose`);
-        stills.push(file);
+        if (stills.has(file)) { out[state] = stills.get(file); continue; }
+        copied.push(file);
         out[state] = `/brand/${path.basename(file)}`;
       }
       return out;
@@ -157,9 +197,9 @@ export function brandConstant(src, { publicDir = null } = {}) {
     character = { name: src.character.name ?? src.name ?? 'Character', poses: poses(src.character.poses) };
     if (src.character.flat) character.flat = poses(src.character.flat);
   }
-  if (publicDir && stills.length) {
+  if (publicDir && copied.length) {
     mkdirSync(publicDir, { recursive: true });
-    for (const f of stills) copyFileSync(f, path.join(publicDir, path.basename(f)));
+    for (const f of copied) copyFileSync(f, path.join(publicDir, path.basename(f)));
   }
 
   const json = (v) => JSON.stringify(v);
@@ -181,7 +221,7 @@ export function brandConstant(src, { publicDir = null } = {}) {
     lines.push('  },');
   }
   lines.push('}', '');
-  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: stills.map((f) => path.basename(f)), character: Boolean(character) };
+  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: copied.map((f) => path.basename(f)), character: Boolean(character) };
 }
 
 /**
@@ -194,4 +234,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
+export default { shrinkStill, cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };

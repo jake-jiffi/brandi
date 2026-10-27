@@ -4,7 +4,9 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, BRAND_MARKER } from '../scripts/productbrand.mjs';
+import { cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, shrinkStill, BRAND_MARKER } from '../scripts/productbrand.mjs';
+import { encodePng } from '../scripts/png.mjs';
+import { findChrome } from '../scripts/preview.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
 
 const WIDE = '<?xml version="1.0"?><!-- exported --><svg xmlns="http://www.w3.org/2000/svg" width="200" height="50"><metadata>x</metadata><path onclick="steal()" d="M0 0h200v50H0z" fill="#123456"/></svg>';
@@ -82,5 +84,24 @@ describe('lib/brand.ts', () => {
     assert.equal((second.match(/export const BRAND/g) ?? []).length, 1);
     assert.match(second, /name: "Two"/);
     assert.equal(brandModule('export const BRAND = mine\n', 'anything'), null, "a file without either marker is the product's own");
+  });
+});
+
+describe('character stills', () => {
+  test('a large still is drawn down into the bundle, so a board on the canvas shows it', { skip: !findChrome() && 'no Chrome' }, async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-still-'));
+    const width = 1000;
+    const height = 1200;
+    const data = Buffer.alloc(width * height * 4);
+    for (let i = 0; i < data.length; i += 4) { data[i] = (i / 4) % width; data[i + 1] = 120; data[i + 2] = 200; data[i + 3] = 255; }
+    const file = path.join(dir, 'pose.png');
+    await writeFile(file, encodePng({ width, height, channels: 4, data }));
+    const uri = await shrinkStill(file);
+    assert.match(uri ?? '', /^data:image\/webp;base64,/);
+    assert.ok(uri.length * 0.75 < 200 * 1024, `inlined at ${Math.round(uri.length * 0.75 / 1024)} KB`);
+    const out = brandConstant({ from: 'product.json', name: 'Acme', files: {}, logo: {}, base: dir, character: { name: '[Character]', poses: { welcome: 'pose.png' } } }, { stills: new Map([[file, uri]]) });
+    assert.match(out.source, /"welcome": "data:image\/webp;base64,/);
+    assert.deepEqual(out.stills, [], 'nothing left to copy into public/');
+    await rm(dir, { recursive: true, force: true });
   });
 });

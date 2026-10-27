@@ -56,7 +56,8 @@ The marks go in product.json's `brand` block, paths relative to `product/`:
 Each SVG is inlined after a safety pass: no scripts, handlers or outside references, and no fixed
 size. Its viewBox is cut to the ink, because brand files carry clear space inside it and the product
 applies clear space in layout. An `-ink` rendition is turned to `currentColor` whatever its file's ink. A still (PNG, WebP) is
-copied to `public/brand/`. On route A with no block, the logo master in brand.json supplies `full`,
+drawn down to a small WebP inside the bundle, because the canvas has no public folder; without
+Chrome it is copied to `public/brand/` instead, and boards on the canvas will not show it. On route A with no block, the logo master in brand.json supplies `full`,
 `full-on-dark` (the reversed master) and `full-ink`, the clear space and the minimum size. A value
 the record lacks keeps the kit default, and the file says which. The tight-viewBox wordmark files ship in
 `public/brand/`, for email and Open Graph.

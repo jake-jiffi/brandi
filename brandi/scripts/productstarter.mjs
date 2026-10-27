@@ -21,7 +21,7 @@ import { spawnSync } from 'node:child_process';
 import { toStarterGlobals } from './productglobals.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
 import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
-import { brandSources, brandConstant, brandModule } from './productbrand.mjs';
+import { brandSources, brandConstant, brandModule, shrinkStill } from './productbrand.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const KIT = path.resolve(here, '..', 'product', 'kit');
@@ -168,7 +168,16 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   let brandMarks = null;
   if (src) {
     const file = path.join(out, 'lib', 'brand.ts');
-    const generated = brandConstant(src, { publicDir: path.join(out, 'public', 'brand') });
+    // Pose stills go into the bundle drawn down, so boards on the canvas show them too.
+    const stills = new Map();
+    for (const rel of [...Object.values(src.character?.poses ?? {}), ...Object.values(src.character?.flat ?? {})]) {
+      const still = path.resolve(src.base, rel);
+      if (/\.(png|jpe?g|webp)$/i.test(rel) && existsSync(still) && !stills.has(still)) {
+        const uri = await shrinkStill(still);
+        if (uri) stills.set(still, uri);
+      }
+    }
+    const generated = brandConstant(src, { publicDir: path.join(out, 'public', 'brand'), stills });
     // A starter made before the kit had lib/brand.ts takes the types from the kit's copy.
     const current = readFileSync(existsSync(file) ? file : path.join(kit, 'lib', 'brand.ts'), 'utf8');
     const next = brandModule(current, generated.source);
