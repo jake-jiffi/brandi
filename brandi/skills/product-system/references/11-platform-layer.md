@@ -588,6 +588,21 @@ Checked against Windows 11 26H2 [WIN-26] and Windows App SDK 2.5.1 [WIN-24].
 Run it once a month, and again whenever an owner ships a major release. It compares every marker in
 every stamp with the live source, then reports what moved and what that means for the system.
 
+```
+$A product specs
+$A product standards --fetch --markers markers.json --mark-stale
+```
+
+Specs live in `product/platform/<platform>/<Component>.md`, the stamp in a `yaml` fence and the
+fields as a table. `$A product specs` checks each one (the stamp, all thirteen fields, every value
+citing a key the stamp lists and section 1 holds) and names every component and platform pair
+without a spec, for the platforms `product/product.json` lists. `$A product standards --fetch` reads
+the markers the plain web serves: Apple's HIG and API JSON routes, Microsoft Learn's date, Android's
+footer, W3C status lines. Read the rest with a browser, Material's site above all, and pass them in
+a markers file (`{ "MAT-5": { "marker": "...", "level": "Review", "note": "the owner's words" } }`).
+It writes the report below to `product/platform/standards-<date>.md`; `--mark-stale` sets
+`status: stale since <date>` on every spec a moved marker touches.
+
 ### 5.1 What to fetch
 
 | Owner | Fetch | Read this marker | Note |
