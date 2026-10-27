@@ -13,9 +13,8 @@
  * - `symbol`, `symbol-on-dark`, `symbol-ink`: the symbol alone, for square and narrow places such as
  *   the collapsed rail.
  *
- * The brand's own outlined masters, with no scripts or event attributes. Flat fills only: Logo puts a
- * hidden copy of each rendition beside the visible one, and a hidden copy's gradient ids would
- * capture the visible one's references.
+ * The brand's own outlined masters, with no scripts, event attributes or outside references. Logo
+ * draws several renditions at once, so it makes each copy's ids (clip paths, gradients) its own.
  */
 export type MarkRendition = "full" | "full-on-dark" | "full-ink" | "symbol" | "symbol-on-dark" | "symbol-ink"
 

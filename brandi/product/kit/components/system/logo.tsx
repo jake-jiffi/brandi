@@ -29,13 +29,29 @@ function rendition(mark: LogoMark, color: LogoColor, ground: "light" | "dark" | 
   return m
 }
 
+// A mark's own ids (clip paths, gradients) are made unique to each copy. Logo draws several renditions
+// at once and a page can carry several logos, and a repeated id sends url(#id) to the wrong copy.
+function scopeIds(svg: string, scope: string) {
+  const ids = new Set([...svg.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]))
+  let out = svg
+  for (const id of ids) {
+    const safe = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    out = out
+      .replace(new RegExp(`(\\sid=")${safe}"`, "g"), `$1${scope}-${id}"`)
+      .replace(new RegExp(`url\\(#${safe}\\)`, "g"), `url(#${scope}-${id})`)
+      .replace(new RegExp(`(href=")#${safe}"`, "g"), `$1#${scope}-${id}"`)
+  }
+  return out
+}
+
 function Rendition({ name, className }: { name: MarkRendition; className: string }) {
+  const scope = React.useId().replace(/[^A-Za-z0-9]/g, "")
   return (
     <span
       data-slot="logo-rendition"
       data-rendition={name}
       className={cn("h-full [&>svg]:block [&>svg]:h-full [&>svg]:w-auto", className)}
-      dangerouslySetInnerHTML={{ __html: BRAND.marks[name] ?? "" }}
+      dangerouslySetInnerHTML={{ __html: scopeIds(BRAND.marks[name] ?? "", `m${scope}`) }}
     />
   )
 }

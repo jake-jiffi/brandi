@@ -21,6 +21,7 @@ import { spawnSync } from 'node:child_process';
 import { toStarterGlobals } from './productglobals.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
 import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
+import { brandSources, brandConstant, brandModule } from './productbrand.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const KIT = path.resolve(here, '..', 'product', 'kit');
@@ -127,7 +128,7 @@ export function generatedFiles(tokens, identity) {
  * Write or refresh a starter. A fresh folder gets the whole kit; an existing one gets only the
  * generated files unless `refreshKit`. Font files the tokens ship are copied in from `fontsDir`.
  */
-export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null }) {
+export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null, brand = null, brandRoot = null, productDir = null }) {
   const fresh = !existsSync(path.join(out, 'package.json'));
   const written = [];
   if (fresh || refreshKit) {
@@ -161,17 +162,28 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   const { writeIndex } = await import(pathToFileURL(path.join(out, 'tools', 'build-index.mjs')).href);
   writeIndex(out);
   written.push('components/system/index.ts');
+  const kept = [];
+  // The brand's marks and character, from its own files. Without any, the kit's placeholder stays.
+  const src = brandSources({ product, brand, productDir, brandRoot });
+  let brandMarks = null;
+  if (src) {
+    const file = path.join(out, 'lib', 'brand.ts');
+    const generated = brandConstant(src, { publicDir: path.join(out, 'public', 'brand') });
+    // A starter made before the kit had lib/brand.ts takes the types from the kit's copy.
+    const current = readFileSync(existsSync(file) ? file : path.join(kit, 'lib', 'brand.ts'), 'utf8');
+    const next = brandModule(current, generated.source);
+    if (next) { writeFileSync(file, next); written.push('lib/brand.ts'); brandMarks = { ...generated, from: src.from }; } else kept.push('lib/brand.ts');
+  }
   // Impeccable's context files. Rewritten while they carry the marker; once a person or Impeccable
   // has taken one over (the marker gone), it is theirs and left alone.
   const defs = await loadDefinitions(path.join(out, 'components', 'system'));
-  const kept = [];
   for (const [rel, content] of [['PRODUCT.md', productMd({ product, identity, brandName })], ['DESIGN.md', designMd({ tokens, identity, defs, brandName })]]) {
     const file = path.join(out, rel);
     if (existsSync(file) && !readFileSync(file, 'utf8').includes(CONTEXT_MARKER)) { kept.push(rel); continue; }
     writeFileSync(file, content);
     written.push(rel);
   }
-  return { fresh, written, kept };
+  return { fresh, written, kept, brand: brandMarks, placeholder: !src };
 }
 
 /**

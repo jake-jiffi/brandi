@@ -34,12 +34,30 @@ Versions live in the kit's `package.json`, pinned exactly and tested together (s
 | --- | --- | --- |
 | Generated | `app/globals.css`, `app/fonts.ts`, `system/tokens.json`, `system/system.json`, `lib/format-locale.js`, `lib/product.ts`, `tools/build-globals.mjs` and `components/system/index.ts` | `$A product starter` rewrites them on every run. A hand edit is undone by the next run |
 | Generated until taken over | `PRODUCT.md` and `DESIGN.md` | Rewritten while they end on the generated marker, kept once it is deleted (section 7) |
+| Generated from the brand's files | `lib/brand.ts` | Its types stay; its `BRAND` comes from the marks product.json's `brand` block names, or from brand.json's logo master. Without either, the kit's placeholder mark stays and the starter says so |
 | Kit | `components/ui/` (shadcn, patched), `components/system/` (the system's components and their definitions), `lib/`, `hooks/`, `canvas/` and `tools/` | Copied on the first run, then the product's. `$A product starter --kit` copies them again |
 | Example | The example product's routes and sample data | A real product replaces it |
 
 A few things are the product's own to set: its name and locale in `product/product.json` (which
 `$A product starter` writes into `lib/product.ts` and `lib/format-locale.js`), the font files, and the
-characters, illustrations and favicon under `public/`. The tight-viewBox wordmark files ship in
+characters, illustrations and favicon under `public/`.
+
+The marks go in product.json's `brand` block, paths relative to `product/`:
+
+```json
+"brand": {
+  "name": "Acme",
+  "marks": { "full": "assets/logo/full.svg", "full-on-dark": "assets/logo/reversed.svg", "full-ink": "assets/logo/black.svg", "symbol": "assets/logo/symbol.svg" },
+  "logo": { "height": 24, "minHeight": 16, "clearSpace": 0.5 },
+  "character": { "name": "[Character]", "poses": { "welcome": "assets/characters/wave.svg", "working": "assets/characters/working.png" } }
+}
+```
+
+Each SVG is inlined after a safety pass: no scripts, handlers or outside references, and no fixed
+size. An `-ink` rendition is turned to `currentColor` whatever its file's ink. A still (PNG, WebP) is
+copied to `public/brand/`. On route A with no block, the logo master in brand.json supplies `full`,
+`full-on-dark` (the reversed master) and `full-ink`, the clear space and the minimum size. A value
+the record lacks keeps the kit default, and the file says which. The tight-viewBox wordmark files ship in
 `public/brand/`, for email and Open Graph.
 
 The example product shows the patterns working end to end. Home has figures and a chart. A records

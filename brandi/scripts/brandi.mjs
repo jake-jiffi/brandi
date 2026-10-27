@@ -2957,18 +2957,28 @@ async function cmdProduct(flags, positional) {
     const configFile = path.join(path.dirname(file), 'product.json');
     const config = existsSync(configFile) ? JSON.parse(await readFile(configFile, 'utf8')) : {};
     let brandName = config.brandName ?? null;
-    if (!brandName) {
-      try { brandName = (await resolveSystem(flags, { gate: false })).brand.meta?.name ?? null; } catch { brandName = null; }
-    }
+    let brandRecord = null;
+    let brandRoot = null;
+    try {
+      const resolved = await resolveSystem(flags, { gate: false });
+      brandRecord = resolved.brand;
+      brandRoot = path.dirname(path.dirname(resolved.file));
+      brandName ??= resolved.brand.meta?.name ?? null;
+    } catch { /* route B: there is no brand file */ }
     let identity;
     try { identity = systemIdentity(config, { brandName: brandName ?? tokens.name?.replace(/ product system$/, '') }); } catch (e) { return fail(e.message); }
     const out = path.resolve(typeof flags.out === 'string' ? flags.out : path.join('product', 'starter'));
-    const res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform'), product: config, brandName });
+    let res;
+    try {
+      res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform'), product: config, brandName, brand: brandRecord, brandRoot, productDir: path.dirname(file) });
+    } catch (e) { return fail(e.message); }
     const rel = path.relative(process.cwd(), out);
     emit([
       `${res.fresh ? 'Wrote' : 'Refreshed'} the ${identity.name} starter in ${rel}: namespace ${identity.namespace}, global ${identity.global}, ${identity.locale} ${identity.currency}.`,
       ...res.written.map((w) => `  ${w}`),
       ...res.kept.map((k) => `  kept ${k}: it no longer carries the generated marker, so it is the product's own`),
+      res.brand ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
+      res.placeholder ? "lib/brand.ts still holds the kit's placeholder mark. Name the brand's marks in product.json (brand.marks) or record a logo master." : '',
       '',
       res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
     ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, kept: res.kept, starter: rel });
