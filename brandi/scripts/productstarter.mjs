@@ -179,7 +179,8 @@ export async function buildBundle({ starter, productDir }) {
   mkdirSync(components, { recursive: true });
   for (const f of ['bundle.js', 'bundle.css', 'manifest.json']) copyFileSync(path.join(dist, f), path.join(components, f));
   const manifest = JSON.parse(readFileSync(path.join(dist, 'manifest.json'), 'utf8'));
-  if (readFileSync(path.join(dist, 'bundle.js'), 'utf8').match(/<\/script/i)) throw new Error('bundle.js holds a literal </script, which the Design System refuses.');
+  const js = readFileSync(path.join(dist, 'bundle.js'), 'utf8');
+  if (/<\/script/i.test(js) || /<!--/.test(js)) throw new Error('bundle.js holds a literal </script or <!--, which the Design System refuses.');
 
   const defs = await loadDefinitions(path.join(starter, 'components', 'system'));
   const problems = defs.flatMap(checkDefinition);

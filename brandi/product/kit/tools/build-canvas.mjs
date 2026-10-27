@@ -17,9 +17,9 @@
 import { build } from "esbuild"
 import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { writeIndex } from "./build-index.mjs"
 
@@ -33,6 +33,16 @@ if (!/^[A-Z][A-Za-z0-9]*$/.test(system.global ?? "")) {
 
 writeIndex(root)
 mkdirSync(out, { recursive: true })
+
+// The Design System reads line 1 of bundle.js for the namespace and the components' display order.
+const GROUP_ORDER = ["Foundations", "Brand", "Actions", "Inputs", "Forms", "Status", "Data", "Charts", "Feedback", "Overlays", "Navigation", "The assistant"]
+const defs = []
+for (const f of readdirSync(path.join(root, "components", "system")).filter((x) => x.endsWith(".def.mjs")).sort()) {
+  const d = (await import(pathToFileURL(path.join(root, "components", "system", f)).href)).default
+  defs.push({ name: d.name, group: d.group })
+}
+defs.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) || a.name.localeCompare(b.name))
+const header = `/* @ds-bundle: ${JSON.stringify({ format: 4, namespace: system.global, components: [{ name: "Root" }, ...defs.filter((d) => d.name !== "Root").map((d) => ({ name: d.name }))] })} */`
 
 const shims = path.join(root, "canvas", "shims")
 const pageReact = {
@@ -68,10 +78,15 @@ await build({
   plugins: [pageReact],
   outfile: path.join(out, "bundle.js"),
   banner: {
-    js: `/* ${system.name} components ${system.version}. Namespace ${system.global}: mount with component-from-global-scope="${system.global}.<Export>", inside ${system.global}.Root. React 18 comes from the page. Built from the starter by tools/build-canvas.mjs. */`,
+    js: `${header}\n/* ${system.name} components ${system.version}. Namespace ${system.global}: mount with component-from-global-scope="${system.global}.<Export>", inside ${system.global}.Root. React 18 comes from the page. Built from the starter by tools/build-canvas.mjs. */`,
   },
   logLevel: "warning",
 })
+
+// A consumer inlines bundle.js in a <script>, so a literal </script or <!-- inside it would end or
+// escape the element. Anything like that left after esbuild is a build failure.
+const built = readFileSync(path.join(out, "bundle.js"), "utf8")
+if (/<\/script/i.test(built) || /<!--/.test(built)) throw new Error("bundle.js holds a literal </script or <!--, which a page inlining it cannot carry. Find the string in the component that produced it.")
 
 // bundle.css is this app's globals.css compiled, so the canvas and production share one stylesheet.
 const tailwind = path.join(root, "node_modules", ".bin", "tailwindcss")

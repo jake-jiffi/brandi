@@ -45,6 +45,7 @@
  *                                     the canvas bundle from the starter's own components, and
  *                                     every component's card and preview from its definition
  *   brandi product boards             foundation and component boards from the tokens and definitions
+ *   brandi product ds --title <name>  the Design System artifact, assembled for publishing
  *   brandi product gates [--round N]  the machine gates for a round, every tool version recorded
  *   brandi product round --round N    the round held against the bar, with the judged gates
  *   brandi product specs              check platform specs and report their coverage
@@ -76,6 +77,7 @@ import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
 import { compareProduct, syncReport, applyTokens, provenance } from './productsync.mjs';
 import { writeBoards as writeProductBoards } from './productboards.mjs';
+import { assembleDesignSystem } from './productds.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2791,6 +2793,14 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       contents Main, and canvas.json rows under title notes. Heights are
       measured in a browser. Authored boards are never touched.
 
+  brandi product ds --title "<name>" [--live <design-system.json>] [--blobs <file>] [--tagline "<line>"]
+      The Design System artifact, assembled under product/.publish/ds: the
+      written system (product/docs), tokens.json, every component card, the
+      bundle and types, the fonts, the starter (its package.json and
+      tsconfig.json renamed, since the type refuses them), a cover, and
+      design-system.json last. Prints the calls, and the pictures to upload
+      as assets; run it again with --blobs to record them.
+
   brandi product gates [--round N] [--only Button,Dialog] [--route <url> ...]
       The machine gates for a round: the token audit, the pinned detector at
       1440, 820 and 390 in light and dark, axe, and every scripted check, on
@@ -2943,6 +2953,27 @@ async function cmdProduct(flags, positional) {
     if (!existsSync(path.join(productDir, 'canvas', 'ds'))) return fail('The system is not installed beside the canvas boards yet. Run `brandi product bundle` first.');
     const res = await writeProductBoards({ productDir, starter, measure: !flags['no-measure'], log: (l) => process.stderr.write(`${l}\n`) });
     emit([`Wrote ${plural(res.boards.length, 'generated board')} into ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}${res.measured ? `, ${res.measured} measured in a browser` : ', unmeasured'}.`, res.shifted ? `Authored boards moved down ${res.shifted}px to clear the generated rows.` : '', `Validate with \`brandi validate --dir ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}\`.`].filter(Boolean).join('\n'), { ok: true, ...res, manifest: undefined });
+    return;
+  }
+  if (sub === 'ds') {
+    const productDir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
+    if (typeof flags.title !== 'string') return fail('ds needs --title, the system\'s name as people say it.');
+    if (!existsSync(path.join(productDir, 'components', 'bundle.js'))) return fail('No bundle yet. Run `brandi product bundle` first.');
+    const readJson = async (k) => (typeof flags[k] === 'string' ? JSON.parse(await readFile(path.resolve(flags[k]), 'utf8')) : null);
+    let res;
+    try {
+      res = assembleDesignSystem({ productDir, starter, outDir: path.join(productDir, '.publish', 'ds'), title: flags.title, live: await readJson('live'), blobs: (await readJson('blobs')) ?? {}, by: typeof flags.by === 'string' ? flags.by : undefined, tagline: typeof flags.tagline === 'string' ? flags.tagline : undefined });
+    } catch (e) { return fail(e.message); }
+    const rel = (p) => path.relative(process.cwd(), p);
+    emit([
+      `Assembled the ${flags.title} Design System: ${plural(res.files.length, 'file')} in ${plural(res.calls.length, 'publish call')}, the index last.`,
+      res.uploads.length ? `Upload these first, each with asset: true to the system's url, then run this again with --blobs <file> mapping "<Group>/<file>" to { id, size, type }:\n${res.uploads.map((u) => `  ${u.group}/${u.file}  ${rel(u.path)}`).join('\n')}` : '',
+      '',
+      'A new system: publish with the Design System type\'s type_url, the title, auto_open "after_first_write" and nothing else. Keep the url.',
+      ...res.calls.map((c, i) => `  ${i + 1}. url: that url, root: "${c.root}", file_path: "${c.file_path}", files: ${Object.keys(c.files).length} more`),
+      'An existing system: read project/design-system.json first and pass it as --live <file>.',
+    ].filter(Boolean).join('\n'), { ok: true, calls: res.calls, uploads: res.uploads, files: res.files });
     return;
   }
   if (sub === 'gates' || sub === 'round') {

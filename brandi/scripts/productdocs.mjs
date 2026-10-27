@@ -208,7 +208,7 @@ export function previewPage(def, system) {
     '</section>',
   ].join('\n')).join('\n');
   const vals = Object.assign({}, ...def.examples.map((ex) => ex.vals ?? {}));
-  const shim = readFileSync(SHIM_SOURCE, 'utf8').replace(/<\/script/gi, '<\\/script');
+  const shim = readFileSync(SHIM_SOURCE, 'utf8').replace(/<\/script/gi, '<\\/script').replace(/<!--/g, '<\\!--');
   return [
     `<!-- @dsCard group="${def.group}" height=${cardHeight(def)} -->`,
     '<!doctype html>',
@@ -226,8 +226,7 @@ export function previewPage(def, system) {
     '</main>',
     '</x-import>',
     '</x-dc>',
-    `<script type="text/x-dc" data-dc-script>\nclass Component extends DCLogic {\n  state = ${JSON.stringify(def.state ?? {})};\n  renderVals() {\n    return Object.assign(${JSON.stringify(vals)}${def.logic ? `, (() => { const self = this; return { ${resolveLogicNs(def.logic, ns)} }; })()` : ''});\n  }\n}\n</script>`,
-    `<script>\n${shim}\n</script>`,
+    `<script>\nwindow.__dcLogic = ${JSON.stringify(`class Component extends DCLogic {\n  state = ${JSON.stringify(def.state ?? {})};\n  renderVals() {\n    return Object.assign(${JSON.stringify(vals)}${def.logic ? `, (() => { const self = this; return { ${resolveLogicNs(def.logic, ns)} }; })()` : ''});\n  }\n}`).replace(/</g, '\\u003c')};\n${shim}\n</script>`,
     '</body>',
     '</html>',
     '',

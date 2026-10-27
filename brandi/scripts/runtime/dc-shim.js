@@ -233,11 +233,13 @@
       return h(React.Fragment, null, renderNodes(template, vals, ctx));
     };
     var script = doc.querySelector('script[data-dc-script]');
+    // A Design System preview is one root element and one script, so its logic arrives as a string.
+    var code = script && script.textContent.trim() ? script.textContent : (doc === document && typeof window.__dcLogic === 'string' ? window.__dcLogic : '');
     var Logic = null;
-    if (script && script.textContent.trim()) {
+    if (code) {
       // Classes need a real constructor to extend, so the base is wrapped as a class first.
       var Klass = new Function('Base', 'return class DCLogic extends Base {}')(Base);
-      Logic = new Function('DCLogic', 'React', '"use strict";\n' + script.textContent + '\n;return typeof Component === "function" ? Component : null;')(Klass, React);
+      Logic = new Function('DCLogic', 'React', '"use strict";\n' + code + '\n;return typeof Component === "function" ? Component : null;')(Klass, React);
     }
     var C = Logic || Base;
     C.displayName = name;
