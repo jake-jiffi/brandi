@@ -19,6 +19,7 @@
  */
 
 import { resolveToken } from './system.mjs';
+import { displayFallback } from './type.mjs';
 import { contrastRatio, apcaContrast, bestTextOn, simulateCvd } from './color.mjs';
 import { googleFontsUrl, parseRatio } from './artboards.mjs';
 import { PROVENANCE } from './brandfile.mjs';
@@ -46,7 +47,7 @@ function bookCss(system) {
   const s = system.semantic.light;
   const r = (k) => resolveToken(s[k], system, 'light');
   const f = system.type.fonts;
-  const display = f.display ? `'${f.display}', Georgia, serif` : 'Georgia, serif';
+  const display = f.display ? `'${f.display}', ${displayFallback(f.display)}` : 'Georgia, serif';
   const body = f.body ? `'${f.body}', system-ui, sans-serif` : 'system-ui, sans-serif';
   const mono = f.mono ? `'${f.mono}', ui-monospace, Menlo, monospace` : 'ui-monospace, Menlo, monospace';
   const ink = r('text.primary');

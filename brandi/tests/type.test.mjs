@@ -239,3 +239,15 @@ describe('floors', () => {
     assert.equal(T.FLOORS.targetComfortablePx, 44);
   });
 });
+
+describe('the fallback behind a display face', () => {
+  test('a condensed face falls back to a condensed sans, a sans to a sans, and anything else to a serif', () => {
+    // A condensed display face once fell back to Georgia, which turns a narrow headline wide.
+    assert.match(T.displayFallback('League Gothic'), /^Impact,/);
+    assert.match(T.displayFallback('Bebas Neue'), /^Impact,/);
+    assert.match(T.displayFallback('Space Grotesk'), /sans-serif$/);
+    assert.match(T.displayFallback('Bitter'), /^Georgia,.*serif$/);
+    assert.match(T.displayFallback(undefined), /^Georgia,/);
+  });
+});
+

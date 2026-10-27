@@ -694,6 +694,11 @@
                   },
                   "file": {
                     "type": "string"
+                  },
+                  "grounds": {
+                    "type": "array",
+                    "items": { "enum": ["light", "primary", "dark", "mono"] },
+                    "description": "The grounds this variant may sit on, when its name and use do not say: a logo that must not go on anything darker than 80% leaves out dark. The book draws it on these and names the variant made for the others."
                   }
                 }
               }

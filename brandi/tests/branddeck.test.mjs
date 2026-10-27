@@ -272,6 +272,28 @@ describe('the logo', () => {
     for (const g of ['light', 'primary', 'mono']) assert.match(onBlack, new RegExp(`data-ground="${g}"[^>]*>[\\s\\S]*?Not used on`), `and nowhere else (${g})`);
   });
 
+  test('a variant can list its grounds, and a ground it may not sit on names the variant made for it', () => {
+    const b = clone(brand);
+    b.identity.logo.variants = [
+      { name: 'Shield', file: 'muddy-paws-primary.svg', grounds: ['light', 'primary'] },
+      { name: 'Outline, on black', file: 'muddy-paws-outline-dark.svg' },
+    ];
+    const assets = { ...SCRATCH_ASSETS, 'assets/logos/muddy-paws-outline-dark.svg': { kind: 'svg', markup: '<svg id="on-black" viewBox="0 0 300 100"><rect width="300" height="100" fill="none" stroke="#6BBF3A"/></svg>' } };
+    const page = pageOf(renderBrandDeck({ brand: b, system, assets }).html, 'variants');
+    const shield = page.split('<div style="display:grid;grid-template-columns:200px').find((r) => r.includes('>Shield<')) ?? '';
+    assert.match(shield, /data-ground="primary"[^>]*>[\s\S]*?id="the-mark"/, 'drawn on the brand colour, as it lists');
+    assert.match(shield, /data-ground="dark"[^>]*>[\s\S]*?Not used on dark\. Use Outline, on black/, 'and on dark it names the variant made for black');
+  });
+
+  test('the contents fills its columns one at a time to a fixed height, and takes a fourth column before it overflows', () => {
+    const contents = (b) => /<nav class="toc"[^>]*>/.exec(renderBrandDeck({ brand: b, system }).html)[0];
+    assert.match(contents(brand), /--toc-cols:3;--toc-h:\d+px/);
+    const long = clone(brand);
+    long.governance.decisions = Array.from({ length: 160 }, (_, i) => ({ date: '2026-10-28', decision: `Decision ${i + 1} ${'with a long enough reason to fill its row '.repeat(3)}`, rationale: 'Because.' }));
+    long.applications = Array.from({ length: 40 }, (_, i) => ({ name: `Surface number ${i + 1}`, surface: 'web' }));
+    assert.match(contents(long), /--toc-cols:(3|4)/);
+  });
+
   test("the corner mark is never drawn under the logo's own minimum, and a brand's cover variant goes straight on its colour", () => {
     const b = clone(brand);
     b.identity.logo.minSizes = [{ variant: 'Primary horizontal', screenPx: 150 }];

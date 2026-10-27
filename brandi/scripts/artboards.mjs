@@ -13,6 +13,7 @@
 import { artboard, FRAMES } from './canvas.mjs';
 import { contrastRatio, apcaContrast, simulateCvd, bestTextOn } from './color.mjs';
 import { resolveToken, WEIGHTS } from './system.mjs';
+import { displayFallback } from './type.mjs';
 
 const esc = (s) =>
   String(s ?? '')
@@ -35,7 +36,7 @@ const MONO_STACK = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monos
 
 function fontStacks(system) {
   const f = system.type.fonts;
-  const display = f.display ? `'${f.display}', Georgia, serif` : 'Georgia, serif';
+  const display = f.display ? `'${f.display}', ${displayFallback(f.display)}` : 'Georgia, serif';
   const body = f.body ? `'${f.body}', system-ui, sans-serif` : 'system-ui, sans-serif';
   const mono = f.mono ? `'${f.mono}', ${MONO_STACK}` : MONO_STACK;
   return { display, body, mono };

@@ -33,6 +33,7 @@
  * entry written `hover@surface` is the hover wash laid over the surface.
  */
 
+import { displayFallback } from './type.mjs';
 import {
   toOklch, oklchToHex, gamutMapOklch, oklchToOklab, oklabToOklch,
   contrastRatio, cvdSafePair, tonalRamp, dataVizPalette,
@@ -645,6 +646,7 @@ function typeGroups({ displayForTitles, displayCase = null }) {
 }
 
 const FALLBACK = {
+  // The serif is only for a face with no name; a named one takes displayFallback's reading of it.
   display: 'Georgia, "Times New Roman", serif',
   sans: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif',
   mono: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
@@ -770,7 +772,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
 
   const fonts = system.type?.fonts ?? {};
   const families = {
-    display: [fonts.display, FALLBACK.display].filter(Boolean).map((f, i) => (i === 0 && fonts.display ? quote(f) : f)).join(', '),
+    display: [fonts.display, fonts.display ? displayFallback(fonts.display) : FALLBACK.display].filter(Boolean).map((f, i) => (i === 0 && fonts.display ? quote(f) : f)).join(', '),
     sans: [fonts.body, FALLBACK.sans].filter(Boolean).map((f, i) => (i === 0 && fonts.body ? quote(f) : f)).join(', '),
     mono: [fonts.mono, FALLBACK.mono].filter(Boolean).map((f, i) => (i === 0 && fonts.mono ? quote(f) : f)).join(', '),
   };

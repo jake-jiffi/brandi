@@ -276,3 +276,19 @@ export default {
   typeScale, fluid, lineHeightFor, letterSpacingFor, measure,
   textSpacingStressCss, ptToPx, pxToPt,
 };
+
+// Faces condensed by design. A serif standing in for one turns a narrow headline wide and soft.
+const CONDENSED_FACE = /\b(league gothic|bebas|oswald|anton|teko|fjalla|antonio|six caps|big shoulders|pathway gothic|archivo narrow|roboto condensed|barlow condensed|saira (extra )?condensed|condensed|compressed|narrow)\b/i;
+const SANS_FACE = /\b(sans|grotesk|grotesque|gothic|geometric)\b/i;
+
+/**
+ * The fallback stack behind a display face, read from its name: a condensed sans for a condensed face,
+ * a sans for a sans, and a serif otherwise. A condensed display face once fell back to Georgia.
+ */
+export function displayFallback(face) {
+  const name = String(face ?? '');
+  if (CONDENSED_FACE.test(name)) return 'Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Narrow", sans-serif';
+  if (SANS_FACE.test(name)) return 'ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif';
+  return 'Georgia, "Times New Roman", serif';
+}
+

@@ -13,6 +13,7 @@
  */
 
 import { resolveToken } from './system.mjs';
+import { displayFallback } from './type.mjs';
 import { contrastRatio, wcagCheck, apcaContrast, bestTextOn, simulateCvd, parseHex } from './color.mjs';
 import { googleFontsUrl, parseRatio, primaryButtonLabel, iconPrimitives } from './artboards.mjs';
 import { PROVENANCE, localDate } from './brandfile.mjs';
@@ -249,7 +250,9 @@ td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-ali
 .pill { display: inline-flex; align-items: center; border: 1px solid var(--rule); padding: 4px 12px; font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; border-radius: 999px; }
 /* The contents steps its type down as the deck grows, so a brand that records
    enough to earn extra pages does not push the last chapter under the footer. */
-.toc { columns: 3; column-gap: 56px; }
+/* Filled a column at a time to a fixed height, as the page's own count packs it: balanced columns once put
+   more in the first than it could hold, under the footer. */
+.toc { columns: var(--toc-cols, 3); column-gap: 56px; column-fill: auto; height: var(--toc-h, auto); }
 .toc-chapter { break-inside: avoid; page-break-inside: avoid; padding-bottom: var(--toc-gap, 22px); }
 .toc a { display: flex; justify-content: space-between; gap: 16px; text-decoration: none; padding: var(--toc-pad, 4px) 0; font-size: var(--toc-entry, 16px); }
 .toc a.chapter { font-family: var(--display); font-weight: 700; font-size: var(--toc-chapter, 21px); padding-bottom: 6px; }
@@ -284,7 +287,7 @@ td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-ali
   table.pairing .glyph { width: 18px; height: 18px; }
   .footer { position: static; margin-top: 16px; padding: 0 20px 20px; }
   .corner-mark { display: none; }
-  .toc { columns: 1; }
+  .toc { columns: 1; height: auto; column-fill: balance; }
 }
 @media print {
   html { --s: 1 !important; }
@@ -1223,8 +1226,19 @@ function planPages(ctx) {
       // A variant's ground, from its name, its use and the role its file is recorded with.
       const roleOf = (v) => (logo.files ?? []).find((f) => f && typeof f === 'object' && f.path && v?.file && f.path.endsWith(v.file))?.role ?? '';
       const groundFor = (v) => groundOf({ name: v?.name, use: `${v?.use ?? ''} ${roleOf(v)}` });
+      // The grounds a variant may sit on: its own `grounds` list when it records one (a logo that must not
+      // go on anything darker than 80%, say), else what its name, use and file role say.
+      const GROUNDS = ['light', 'primary', 'dark', 'mono'];
+      const allowedFor = (v) => {
+        const listed = Array.isArray(v?.grounds) ? v.grounds.filter((g) => GROUNDS.includes(g)) : [];
+        if (listed.length) return { list: listed, made: true };
+        const g = groundFor(v);
+        return g === null ? { list: GROUNDS, made: false } : { list: g === 'reversed' ? ['primary', 'dark'] : g === 'mono' ? ['mono', 'light'] : [g], made: true };
+      };
       // The brand's own one-colour artwork, if it supplies one, named where another mark cannot be flattened.
-      const oneColour = variants.find((v) => groundFor(v) === 'mono' && assetOf(v));
+      const oneColour = variants.find((v) => allowedFor(v).made && allowedFor(v).list.includes('mono') && assetOf(v));
+      // A variant made for a ground, named in a cell where another may not go.
+      const madeFor = (key, except) => variants.find((v) => v !== except && allowedFor(v).made && allowedFor(v).list.includes(key) && assetOf(v));
       const grounds = [
         ['Light', 'light', 'var(--paper)', 'var(--ink)'],
         ['Primary', 'primary', 'var(--primary)', 'var(--on-primary)'],
@@ -1249,11 +1263,13 @@ function planPages(ctx) {
             const shown = assetOf(v);
             const art = shown ?? (L.file ? { kind: L.kind, markup: L.markup } : null);
             const single = inkCount(art) === 1;
-            const made = groundFor(v);
+            const { list: allowed, made } = allowedFor(v);
             const fallback = !shown && v.file && L.file;
             const cell = (key, groundName, colour) => {
-              const here = made === null || (made === 'reversed' ? ['primary', 'dark'] : made === 'mono' ? ['mono', 'light'] : [made]).includes(key);
-              if (!here) return note(`Not used on ${groundName}`);
+              if (!allowed.includes(key)) {
+                const alt = madeFor(key, v);
+                return note(alt ? `Not used on ${groundName}. Use ${esc(alt.name)}` : `Not used on ${groundName}`);
+              }
               // Supplied for its ground, it is drawn as it is.
               if ((shown && made) || key === 'light') return markFor(shown, v, {}, groundName);
               if (key === 'mono') {
@@ -2369,7 +2385,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [], me
     fail: r('danger.text'),
     radiusPx: (system.radius.find((x) => x.name === 'md') ?? system.radius[0]).px,
     fonts: {
-      display: f.display ? `'${f.display}', Georgia, serif` : 'Georgia, serif',
+      display: f.display ? `'${f.display}', ${displayFallback(f.display)}` : 'Georgia, serif',
       body: f.body ? `'${f.body}', system-ui, sans-serif` : 'system-ui, sans-serif',
       mono: f.mono ? `'${f.mono}', ui-monospace, Menlo, monospace` : 'ui-monospace, Menlo, monospace',
     },
@@ -2452,8 +2468,9 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [], me
     ['', 16, 21, 4, 22],
     ['--toc-entry:14px;--toc-chapter:18px;--toc-pad:3px;--toc-gap:16px', 14, 18, 3, 16],
     ['--toc-entry:12.5px;--toc-chapter:16px;--toc-pad:2px;--toc-gap:12px', 12.5, 16, 2, 12],
+    ['--toc-entry:11px;--toc-chapter:14px;--toc-pad:1px;--toc-gap:10px', 11, 14, 1, 10],
   ];
-  const packs = (heights, budget) => {
+  const packs = (heights, budget, columns) => {
     let column = 0;
     let used = 1;
     for (const h of heights) {
@@ -2461,12 +2478,17 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [], me
       if (h > budget) return false;
       column += h;
     }
-    return used <= 3;
+    return used <= columns;
   };
-  const tocScale = (tocSettings.find(([, entry, chapter, pad, gap]) => packs(
-    tocBlockLines.map((lines) => chapter * 1.5 + 6 + lines * (entry * 1.5 + pad * 2) + gap),
-    TOC_BUDGET,
-  )) ?? tocSettings.at(-1))[0];
+  // Three columns at the largest type that fits, then four; the browser fills them the same way.
+  const heightsAt = ([, entry, chapter, pad, gap]) => tocBlockLines.map((lines) => chapter * 1.5 + 6 + lines * (entry * 1.5 + pad * 2) + gap);
+  let tocFit = null;
+  for (const columns of [3, 4]) {
+    const setting = tocSettings.find((s) => packs(heightsAt(s), TOC_BUDGET, columns));
+    if (setting) { tocFit = { setting, columns }; break; }
+  }
+  tocFit ??= { setting: tocSettings.at(-1), columns: 4 };
+  const tocScale = [tocFit.setting[0], `--toc-cols:${tocFit.columns}`, `--toc-h:${TOC_BUDGET}px`].filter(Boolean).join(';');
   const contents = `<section class="page" id="contents" style="background:var(--tint-2);color:var(--ink)">
   <div class="full" style="gap:56px">
     <h1 style="font-size:72px">Contents</h1>
