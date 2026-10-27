@@ -17,12 +17,15 @@ export function Root({
   theme,
   background = "canvas",
   shortcuts = true,
+  touch = false,
   children,
 }: {
   /** Light or dark for the whole board. Leave it out where the host page sets the theme (a Design System preview). */
   theme?: "light" | "dark"
   background?: "canvas" | "surface" | "none"
   shortcuts?: boolean
+  /** Draws everything inside at touch sizes, overlays included: a phone board, viewed with a mouse. */
+  touch?: boolean
   children?: React.ReactNode
 }) {
   const nested = React.useContext(InsideRoot)
@@ -30,17 +33,19 @@ export function Root({
     if (nested) return
     const el = document.documentElement
     el.dataset.shortcuts = shortcuts ? "on" : "off"
+    // On the page as well, because a dialog, sheet or menu opens in a portal outside the board.
+    el.toggleAttribute("data-touch", touch)
     if (theme) {
       el.dataset.theme = theme
       el.classList.toggle("dark", theme === "dark")
       el.style.colorScheme = theme
       document.body.style.background = background === "none" ? "transparent" : `var(--${background})`
     }
-  }, [nested, theme, background, shortcuts])
+  }, [nested, theme, background, shortcuts, touch])
   return (
     <InsideRoot.Provider value={true}>
       <TooltipProvider delayDuration={300}>
-        <div data-slot="root" data-theme={theme} className={theme === "dark" ? "dark contents" : "contents"}>
+        <div data-slot="root" data-theme={theme} data-touch={touch ? "" : undefined} className={theme === "dark" ? "dark contents" : "contents"}>
           {children}
         </div>
       </TooltipProvider>

@@ -77,8 +77,12 @@ export interface DataTableColumn {
   items?: DataTableMenuEntry[] | ((row: DataTableRow) => DataTableMenuEntry[])
   /** Draws the cell. Plain data is the default; use this for what no type covers. */
   render?: (row: DataTableRow) => React.ReactNode
-  /** Where the column goes when the table becomes a list under 640px: the meta line (the default), the badge line, or nowhere. */
-  phone?: "meta" | "badge" | "hidden"
+  /**
+   * Where the column goes when the table becomes a list under 640px: the meta line (the default), the
+   * meta line with its name in front ("labelled": Net $73,368.09, so two figures can share the line),
+   * the badge line, or nowhere.
+   */
+  phone?: "meta" | "labelled" | "badge" | "hidden"
   /** A delta's number style (percent by default, points for a rate), or a progress figure's. */
   format?: NumberStyle
   /** A delta's better direction. */
@@ -534,7 +538,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
   }
 
   const phone = {
-    meta: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && (c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta")) === "meta"),
+    meta: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && ["meta", "labelled"].includes(c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta"))),
     badge: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && (c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta")) === "badge"),
     actions: cols.find((c) => typeOf(c) === "actions" && c.phone !== "hidden"),
   }
@@ -748,7 +752,12 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
       >
         {view === "rows"
           ? shown.map(({ row, key, name }) => {
-              const words = phone.meta.map((col) => phoneWords(col, row)).filter(Boolean)
+              const words = phone.meta
+                .map((col) => {
+                  const said = phoneWords(col, row)
+                  return said && col.phone === "labelled" ? `${col.label} ${said}` : said
+                })
+                .filter(Boolean)
               const badges = phone.badge.map((col) => badgeOf(row[col.key])).filter((b): b is ListRowBadge => b !== null)
               return (
                 <ListRow

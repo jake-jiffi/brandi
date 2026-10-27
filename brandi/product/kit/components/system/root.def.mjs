@@ -9,6 +9,7 @@ export default {
     { name: "theme", type: '"light" | "dark"', doc: "Light or dark for the whole board. Leave it out where the host page sets the theme, as a Design System preview does." },
     { name: "background", type: '"canvas" | "surface" | "none"', default: '"canvas"', doc: "The page colour behind the board, set with the theme." },
     { name: "shortcuts", type: "boolean", default: "true", doc: "False turns single-key shortcuts off inside, for speech-input and switch users." },
+    { name: "touch", type: "boolean", default: "false", doc: "Draws everything inside at the touch sizes, a portal's dialog or menu included. Set it on every board under 640px: the canvas is viewed with a mouse." },
   ],
   notes: {
     Behaviour: [
@@ -24,6 +25,13 @@ export default {
   },
   examples: [
     {
+      id: "touch",
+      title: "A region drawn as a phone",
+      markup: `<x-import component-from-global-scope="NS.Button">With a mouse</x-import>
+<x-import component-from-global-scope="NS.Root" touch="{{yes}}" background="none"><x-import component-from-global-scope="NS.Button">As on a phone</x-import></x-import>`,
+      vals: { yes: true },
+    },
+    {
       id: "region",
       title: "A dark region inside a light board",
       markup: `<x-import component-from-global-scope="NS.Button">From the page</x-import>
@@ -31,6 +39,15 @@ export default {
     },
   ],
   checks: [
+    {
+      name: "touch draws what is inside at the touch sizes, with a mouse",
+      example: "touch",
+      async run({ scope, expect }) {
+        const height = async (name) => Math.round((await scope.getByRole("button", { name }).boundingBox()).height)
+        expect.equal(await height("With a mouse"), 36, "outside, the mouse size")
+        expect.equal(await height("As on a phone"), 44, "inside, the phone's size")
+      },
+    },
     {
       name: "Root sets the board's theme and shortcut setting on the page, so a portal matches the board",
       example: "region",

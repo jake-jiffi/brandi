@@ -389,7 +389,10 @@ The family canvas left 40px between phone frames in a strip and 80px between tab
   fixed at `w` x `h`. Say which is which in the reviewer brief (`08-quality-gates.md`).
 - A board whose mounted controls work gets `"is_interactive": true`.
 - Phone boards carry no fake status bar and no fake keyboard (Brandi's recipe). Their targets
-  follow the system's touch sizes (`05-components.md`, section 2.5), not Brandi's 44px.
+  follow the system's touch sizes (`05-components.md`, section 2.5), not Brandi's 44px. The canvas
+  is viewed with a mouse, so every board under 640px sets Root's `touch`: it draws the whole board at
+  touch sizes, a portal's dialog or menu included. Pages inside an app shell under 640px get them
+  anyway.
 
 **Checking the widths.** The detector runs on every board in both themes (`08-quality-gates.md`).
 *(proposal)* Render a fluid board at 1440, 820 and 390. Render a fixed board at its own width,
