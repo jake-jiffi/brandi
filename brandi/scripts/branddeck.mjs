@@ -2061,30 +2061,35 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
   // notes, drawn or not; the pages after it show the ones that have been drawn.
   const apps = (brand.applications ?? []).filter((a) => a && (a.name || a.surface));
   page({ chapter: 'in-use', divider: true });
-  page({
-    chapter: 'in-use', id: 'applications', title: 'Applications',
-    ...(apps.length ? {} : absent('Applications', 'the applications this system will be tested on')),
-    render: (n) => contentPage(ctx, {
-      id: 'applications', chapter: 'Brand in use', title: 'Applications', n, fill: true,
-      rail: railText(
-        'Every surface the brand has to work on, what each is for, and the notes that decide how it is drawn. The pages that follow show the ones drawn so far.',
-        artboards.length
-          ? `<span class="mono">${artboards.length} drawn: ${artboards.map((a) => esc(a.file)).join(', ')}.</span>`
-          : todo('proof artboards. None were found in brand/canvas apart from the generated specification sheets'),
-        artboards.length ? null : 'Draw the applications as .dc.html artboards in brand/canvas, or composite the brand onto photographs with brandi mockup build. Regenerate the book and each one gets a page here.',
-      ),
-      canvas: `<div style="display:grid;grid-template-columns:repeat(${apps.length > 4 ? 3 : 2},minmax(0,1fr));gap:20px">
-        ${apps.slice(0, 9).map((a) => {
-    const drawn = a.file && artboards.some((b) => b.file === a.file);
-    return `<div class="card application-tile" style="padding:28px;gap:12px;min-height:200px">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><h3 style="font-size:24px">${esc(a.name ?? a.surface)}</h3><span class="pill" style="flex:none;${drawn ? 'background:var(--primary);color:var(--on-primary);border-color:var(--primary)' : ''}">${drawn ? 'drawn' : 'not yet drawn'}</span></div>
-          <span class="mono" style="color:var(--muted)">${[a.surface, frameLabel(a.frame), a.file].filter(has).map(esc).join(' / ')}</span>
-          ${has(a.purpose) ? `<p style="font-size:16px;color:var(--ink)">${esc(a.purpose)}</p>` : ''}
-          ${has(a.notes) ? `<p style="font-size:15px;color:var(--muted)">${esc(a.notes)}</p>` : ''}
-        </div>`;
-  }).join('')}
-      </div>`,
-    }),
+  // Four to a page: nine long notes ran over the footer, and the rest were cut without a word.
+  const APPS_PER_PAGE = 4;
+  const appChunks = apps.length ? Array.from({ length: Math.ceil(apps.length / APPS_PER_PAGE) }, (_, c) => apps.slice(c * APPS_PER_PAGE, (c + 1) * APPS_PER_PAGE)) : [[]];
+  appChunks.forEach((chunk, c) => {
+    page({
+      chapter: 'in-use', id: c ? `applications-${c + 1}` : 'applications', title: c ? 'Applications, continued' : 'Applications',
+      ...(apps.length ? {} : absent('Applications', 'the applications this system will be tested on')),
+      render: (n) => contentPage(ctx, {
+        id: c ? `applications-${c + 1}` : 'applications', chapter: 'Brand in use', title: c ? 'Applications, continued' : 'Applications', n, fill: true,
+        rail: c ? railText(`Applications ${c * APPS_PER_PAGE + 1} to ${c * APPS_PER_PAGE + chunk.length} of ${apps.length}.`) : railText(
+          'Every surface the brand has to work on, what each is for, and the notes that decide how it is drawn. The pages that follow show the ones drawn so far.',
+          artboards.length
+            ? `<span class="mono">${artboards.length} drawn: ${artboards.map((a) => esc(a.file)).join(', ')}.</span>`
+            : todo('proof artboards. None were found in brand/canvas apart from the generated specification sheets'),
+          artboards.length ? null : 'Draw the applications as .dc.html artboards in brand/canvas, or composite the brand onto photographs with brandi mockup build. Regenerate the book and each one gets a page here.',
+        ),
+        canvas: `<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px">
+          ${chunk.map((a) => {
+      const drawn = a.file && artboards.some((b) => b.file === a.file);
+      return `<div class="card application-tile" style="padding:28px;gap:12px;min-height:200px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><h3 style="font-size:24px">${esc(a.name ?? a.surface)}</h3><span class="pill" style="flex:none;${drawn ? 'background:var(--primary);color:var(--on-primary);border-color:var(--primary)' : ''}">${drawn ? 'drawn' : 'not yet drawn'}</span></div>
+            <span class="mono" style="color:var(--muted)">${[a.surface, frameLabel(a.frame), a.file].filter(has).map(esc).join(' / ')}</span>
+            ${has(a.purpose) ? `<p style="font-size:16px;color:var(--ink)">${esc(a.purpose)}</p>` : ''}
+            ${has(a.notes) ? `<p style="font-size:15px;color:var(--muted)">${esc(a.notes)}</p>` : ''}
+          </div>`;
+    }).join('')}
+        </div>`,
+      }),
+    });
   });
   artboards.forEach((a, i) => {
     // Numbered, so two stems that differ only in case or punctuation cannot
@@ -2165,34 +2170,49 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       });
     },
   });
-  page({
-    chapter: 'governance', id: 'decisions', title: 'Decisions and open questions',
-    render: (n) => {
-      const open = (gov.openQuestions ?? []).filter((q) => q.status === 'open');
-      const counts = Object.keys(PROVENANCE).map((k) => [k, (brand.evidence ?? []).filter((e) => e.provenance === k).length]).filter(([, c]) => c > 0);
-      return contentPage(ctx, {
-        id: 'decisions', chapter: 'Rules and decisions', title: 'Decisions and open questions', n, fill: true,
-        rail: railText(
-          'What was decided, why, and what nobody has answered yet. A change nobody wrote down becomes an inconsistency the next person has to guess about.',
-          `<strong>Where this came from.</strong> ${counts.length ? counts.map(([k, c]) => `${esc(PROVENANCE[k].label)} ${c}`).join(', ') : 'no evidence recorded'}. Every statement in this deck is traceable to one of those; anything assumed is a working assumption, not a finding.`,
-          has(gov.trademark?.notice) ? `<strong>Trademark.</strong> ${esc(gov.trademark.notice)}` : null,
-        ),
-        canvas: `<h2>Decision log</h2>
-        ${has(gov.decisions) ? table({
-          caption: 'The decision log: what was decided, when, and the reason recorded with it',
-          head: '<th>Date</th><th>Decision</th><th>Because</th>',
-          body: gov.decisions.slice(0, 6).map((d) => `<tr><td class="mono" style="white-space:nowrap">${esc(d.date)}</td><td style="font-size:15px">${esc(d.decision)}</td><td style="font-size:14px;color:var(--muted)">${esc(d.rationale)}</td></tr>`).join(''),
-        }) : `<p>${todo('a decision log')}</p>`}
-        <h2>Open questions</h2>
-        ${open.length ? table({
+  // Every decision and every open question, across as many pages as they need: the register is what the
+  // boards cite, and a cut at six decisions and five questions left q7 and q11 cited but never stated.
+  const DECISIONS_PER_PAGE = 9;
+  const QUESTIONS_PER_PAGE = 7;
+  const openQuestions = (gov.openQuestions ?? []).filter((q) => q.status === 'open');
+  const chunks = (list, size) => (list.length ? Array.from({ length: Math.ceil(list.length / size) }, (_, c) => list.slice(c * size, (c + 1) * size)) : [[]]);
+  chunks(gov.decisions ?? [], DECISIONS_PER_PAGE).forEach((rows, c) => {
+    page({
+      chapter: 'governance', id: c ? `decisions-${c + 1}` : 'decisions', title: c ? 'Decisions, continued' : 'Decisions',
+      render: (n) => {
+        const counts = Object.keys(PROVENANCE).map((k) => [k, (brand.evidence ?? []).filter((e) => e.provenance === k).length]).filter(([, cnt]) => cnt > 0);
+        return contentPage(ctx, {
+          id: c ? `decisions-${c + 1}` : 'decisions', chapter: 'Rules and decisions', title: c ? 'Decisions, continued' : 'Decisions', n, fill: true,
+          rail: c ? railText(`Decisions ${c * DECISIONS_PER_PAGE + 1} to ${c * DECISIONS_PER_PAGE + rows.length} of ${gov.decisions.length}.`) : railText(
+              'What was decided, why, and what nobody has answered yet. A change nobody wrote down becomes an inconsistency the next person has to guess about.',
+              `<strong>Where this came from.</strong> ${counts.length ? counts.map(([k, c]) => `${esc(PROVENANCE[k].label)} ${c}`).join(', ') : 'no evidence recorded'}. Every statement in this deck is traceable to one of those; anything assumed is a working assumption, not a finding.`,
+              has(gov.trademark?.notice) ? `<strong>Trademark.</strong> ${esc(gov.trademark.notice)}` : null,
+            ),
+          canvas: `<h2>Decision log</h2>
+          ${rows.length ? table({
+            caption: 'The decision log: what was decided, when, and the reason recorded with it',
+            head: '<th>Date</th><th>Decision</th><th>Because</th>',
+            body: rows.map((d) => `<tr><td class="mono" style="white-space:nowrap">${esc(d.date)}</td><td style="font-size:15px">${esc(d.decision)}</td><td style="font-size:14px;color:var(--muted)">${esc(d.rationale)}</td></tr>`).join(''),
+          }) : `<p>${todo('a decision log')}</p>`}`,
+        });
+      },
+    });
+  });
+  chunks(openQuestions, QUESTIONS_PER_PAGE).forEach((rows, c) => {
+    page({
+      chapter: 'governance', id: c ? `open-questions-${c + 1}` : 'open-questions', title: c ? 'Open questions, continued' : 'Open questions',
+      render: (n) => contentPage(ctx, {
+        id: c ? `open-questions-${c + 1}` : 'open-questions', chapter: 'Rules and decisions', title: c ? 'Open questions, continued' : 'Open questions', n, fill: true,
+        rail: railText(rows.length ? `What nobody has answered yet, and what is assumed until they do. ${openQuestions.length} open.` : 'Nothing is waiting on an answer.'),
+        canvas: `<h2>Open questions</h2>
+        ${rows.length ? table({
           caption: 'The open questions, what is assumed until each is answered, and who can answer it',
           head: '<th>Question</th><th>Assumed meanwhile</th><th>Who can answer</th>',
-          body: open.slice(0, 5).map((q) => `<tr><td style="font-size:15px">${esc(q.question)}</td><td style="font-size:14px">${esc(q.assumedMeanwhile ?? 'nothing')}</td><td style="font-size:14px;color:var(--muted)">${esc(q.whoCanAnswer ?? 'unassigned')}</td></tr>`).join(''),
+          body: rows.map((q) => `<tr><td style="font-size:15px">${esc(q.question)}</td><td style="font-size:14px">${esc(q.assumedMeanwhile ?? 'nothing')}</td><td style="font-size:14px;color:var(--muted)">${esc(q.whoCanAnswer ?? 'unassigned')}</td></tr>`).join(''),
         }) : '<p style="color:var(--muted)">None open.</p>'}`,
-      });
-    },
+      }),
+    });
   });
-
   return pages;
 }
 

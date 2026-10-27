@@ -47,7 +47,7 @@ const pageOf = (html, id) => new RegExp(`<section class="page" id="${id}"[^>]*>(
 const clone = (b) => JSON.parse(JSON.stringify(b));
 
 // The fixture's page count, and the count once artboards are supplied.
-const FIXTURE_PAGES = 54;
+const FIXTURE_PAGES = 56;
 
 describe('the deck is a 16:9 presentation, in the order the brief lists', () => {
   test('every page is one 1920x1080 section and the page list agrees with the markup', () => {
@@ -76,8 +76,8 @@ describe('the deck is a 16:9 presentation, in the order the brief lists', () => 
       'primary-typeface', 'secondary-typeface', 'hierarchy', 'type-scale', 'type-examples',
       'imagery', 'photography', 'icons', 'shape', 'device',
       'space-layout', 'motion', 'accessibility', 'implementation',
-      'applications',
-      'anti-patterns', 'decisions',
+      'applications', 'applications-2',
+      'anti-patterns', 'decisions', 'open-questions',
     ];
     const content = ids.filter((id) => !id.startsWith('chapter-') && !['cover', 'intro', 'contents', 'closing'].includes(id));
     assert.deepEqual(content, expected);
@@ -136,7 +136,8 @@ describe('R2-N-01: everything the print book carries reaches the deck', () => {
     assert.match(production, /3M 180mC-77/);
     assert.match(production, /Madeira Polyneon 1751/);
     for (const hex of system.dataViz.categorical) assert.ok(production.includes(hex), `chart colour ${hex}`);
-    const apps = pageOf(html, 'applications');
+    // Four to a page, so the fixture's five run onto a second page.
+    const apps = pageOf(html, 'applications') + pageOf(html, 'applications-2');
     for (const a of brand.applications) {
       assert.ok(apps.includes(a.name), `application "${a.name}"`);
       if (a.notes) assert.ok(apps.includes(a.notes.replace(/"/g, '&quot;')), `notes for "${a.name}"`);
@@ -1111,5 +1112,22 @@ describe('R5-05: an application frame reads as a size in both shapes', () => {
     assert.equal(tileOf(undefined), 'web / Main.dc.html');
     assert.equal(tileOf([]), 'web / Main.dc.html', 'an empty list is no frame at all');
     assert.equal(frameLabel([390, 844]), '390x844');
+  });
+});
+
+describe('the register and the applications, every one printed', () => {
+  test('decisions, open questions and applications run onto as many pages as they need, none cut', () => {
+    const b = clone(brand);
+    b.governance.decisions = Array.from({ length: 20 }, (_, i) => ({ date: '2026-10-28', decision: `Decision number ${i + 1}`, rationale: 'Because.' }));
+    b.governance.openQuestions = Array.from({ length: 9 }, (_, i) => ({ question: `Question number ${i + 1}?`, status: 'open', assumedMeanwhile: 'Nothing.' }));
+    b.applications = Array.from({ length: 9 }, (_, i) => ({ name: `Surface number ${i + 1}`, surface: 'web' }));
+    const html = renderBrandDeck({ brand: b, system }).html;
+    const pages = (prefix) => [...html.matchAll(new RegExp(`<section[^>]*id="(${prefix}(?:-\\d+)?)"`, 'g'))].map((m) => m[1]);
+    assert.deepEqual(pages('decisions'), ['decisions', 'decisions-2', 'decisions-3']);
+    assert.deepEqual(pages('open-questions'), ['open-questions', 'open-questions-2']);
+    assert.deepEqual(pages('applications'), ['applications', 'applications-2', 'applications-3']);
+    for (let i = 1; i <= 20; i++) assert.ok(html.includes(`Decision number ${i}<`), `decision ${i}`);
+    for (let i = 1; i <= 9; i++) assert.ok(html.includes(`Question number ${i}?`), `question ${i}`);
+    for (let i = 1; i <= 9; i++) assert.ok(html.includes(`Surface number ${i}<`), `application ${i}`);
   });
 });
