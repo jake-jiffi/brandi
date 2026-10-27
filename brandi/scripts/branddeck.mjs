@@ -406,6 +406,44 @@ export function table({ caption, head, body, style = '' }) {
   </table>`;
 }
 
+// The register's columns on a content page's canvas (1192px of text once its padding is off), fixed so a
+// row's height can be worked out before the page is drawn. The last column takes what is left.
+const REGISTER_W = PAGE_W - 560 - 96 - 72;
+const DECISION_COLS = { date: 120, decision: 620, because: REGISTER_W - 120 - 620 };
+const QUESTION_COLS = { question: 540, assumed: 440, who: REGISTER_W - 540 - 440 };
+// What a register table can fill: the canvas's 872px less the heading, its gap and the table head.
+export const REGISTER_HEIGHT = 760;
+
+/**
+ * A register row's height in page pixels, worked out from its cells: [text, column width, font size].
+ * Conservative on purpose, because a row that runs under the footer is cut from the PDF: a character is
+ * taken as 0.58em, a line as nine tenths full, and the line height as 1.5, plus the cell's padding and rule.
+ */
+export function registerRowHeight(cells) {
+  const tallest = Math.max(...cells.map(([text, width, size]) => {
+    const perLine = Math.max(1, Math.floor(((width - 12) / (size * 0.58)) * 0.9));
+    return Math.max(1, Math.ceil(String(text ?? '').length / perLine)) * size * 1.5;
+  }));
+  return Math.ceil(tallest) + 17;
+}
+
+/** Rows packed onto pages by height, in order, each page under the budget. A row taller than a page gets one to itself. */
+export function packRegister(rows, heightOf, budget = REGISTER_HEIGHT) {
+  const pages = [];
+  let page = { rows: [], start: 0, height: 0 };
+  rows.forEach((row, i) => {
+    const h = heightOf(row);
+    if (page.rows.length && page.height + h > budget) {
+      pages.push(page);
+      page = { rows: [], start: i, height: 0 };
+    }
+    page.rows.push(row);
+    page.height += h;
+  });
+  pages.push(page);
+  return pages;
+}
+
 /**
  * Tick and cross, drawn as paths rather than typed as U+2713 / U+2715, so the
  * PDF never falls back to a system font for them. A cross on a ground its
@@ -2172,18 +2210,17 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
   });
   // Every decision and every open question, across as many pages as they need: the register is what the
   // boards cite, and a cut at six decisions and five questions left q7 and q11 cited but never stated.
-  const DECISIONS_PER_PAGE = 9;
-  const QUESTIONS_PER_PAGE = 7;
+  // Rows are packed by their height, not their count: nine long decisions ran a page under its footer.
   const openQuestions = (gov.openQuestions ?? []).filter((q) => q.status === 'open');
-  const chunks = (list, size) => (list.length ? Array.from({ length: Math.ceil(list.length / size) }, (_, c) => list.slice(c * size, (c + 1) * size)) : [[]]);
-  chunks(gov.decisions ?? [], DECISIONS_PER_PAGE).forEach((rows, c) => {
+  const decisionPages = packRegister(gov.decisions ?? [], (d) => registerRowHeight([[d.decision, DECISION_COLS.decision, 15], [d.rationale, DECISION_COLS.because, 14]]));
+  decisionPages.forEach(({ rows, start }, c) => {
     page({
       chapter: 'governance', id: c ? `decisions-${c + 1}` : 'decisions', title: c ? 'Decisions, continued' : 'Decisions',
       render: (n) => {
         const counts = Object.keys(PROVENANCE).map((k) => [k, (brand.evidence ?? []).filter((e) => e.provenance === k).length]).filter(([, cnt]) => cnt > 0);
         return contentPage(ctx, {
           id: c ? `decisions-${c + 1}` : 'decisions', chapter: 'Rules and decisions', title: c ? 'Decisions, continued' : 'Decisions', n, fill: true,
-          rail: c ? railText(`Decisions ${c * DECISIONS_PER_PAGE + 1} to ${c * DECISIONS_PER_PAGE + rows.length} of ${gov.decisions.length}.`) : railText(
+          rail: c ? railText(`Decisions ${start + 1} to ${start + rows.length} of ${gov.decisions.length}.`) : railText(
               'What was decided, why, and what nobody has answered yet. A change nobody wrote down becomes an inconsistency the next person has to guess about.',
               `<strong>Where this came from.</strong> ${counts.length ? counts.map(([k, c]) => `${esc(PROVENANCE[k].label)} ${c}`).join(', ') : 'no evidence recorded'}. Every statement in this deck is traceable to one of those; anything assumed is a working assumption, not a finding.`,
               has(gov.trademark?.notice) ? `<strong>Trademark.</strong> ${esc(gov.trademark.notice)}` : null,
@@ -2191,23 +2228,26 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
           canvas: `<h2>Decision log</h2>
           ${rows.length ? table({
             caption: 'The decision log: what was decided, when, and the reason recorded with it',
-            head: '<th>Date</th><th>Decision</th><th>Because</th>',
+            style: 'table-layout:fixed',
+            head: `<th style="width:${DECISION_COLS.date}px">Date</th><th style="width:${DECISION_COLS.decision}px">Decision</th><th>Because</th>`,
             body: rows.map((d) => `<tr><td class="mono" style="white-space:nowrap">${esc(d.date)}</td><td style="font-size:15px">${esc(d.decision)}</td><td style="font-size:14px;color:var(--muted)">${esc(d.rationale)}</td></tr>`).join(''),
           }) : `<p>${todo('a decision log')}</p>`}`,
         });
       },
     });
   });
-  chunks(openQuestions, QUESTIONS_PER_PAGE).forEach((rows, c) => {
+  const questionPages = packRegister(openQuestions, (q) => registerRowHeight([[q.question, QUESTION_COLS.question, 15], [q.assumedMeanwhile ?? 'nothing', QUESTION_COLS.assumed, 14], [q.whoCanAnswer ?? 'unassigned', QUESTION_COLS.who, 14]]));
+  questionPages.forEach(({ rows, start }, c) => {
     page({
       chapter: 'governance', id: c ? `open-questions-${c + 1}` : 'open-questions', title: c ? 'Open questions, continued' : 'Open questions',
       render: (n) => contentPage(ctx, {
         id: c ? `open-questions-${c + 1}` : 'open-questions', chapter: 'Rules and decisions', title: c ? 'Open questions, continued' : 'Open questions', n, fill: true,
-        rail: railText(rows.length ? `What nobody has answered yet, and what is assumed until they do. ${openQuestions.length} open.` : 'Nothing is waiting on an answer.'),
+        rail: railText(!rows.length ? 'Nothing is waiting on an answer.' : c ? `Open questions ${start + 1} to ${start + rows.length} of ${openQuestions.length}.` : `What nobody has answered yet, and what is assumed until they do. ${openQuestions.length} open.`),
         canvas: `<h2>Open questions</h2>
         ${rows.length ? table({
           caption: 'The open questions, what is assumed until each is answered, and who can answer it',
-          head: '<th>Question</th><th>Assumed meanwhile</th><th>Who can answer</th>',
+          style: 'table-layout:fixed',
+          head: `<th style="width:${QUESTION_COLS.question}px">Question</th><th style="width:${QUESTION_COLS.assumed}px">Assumed meanwhile</th><th>Who can answer</th>`,
           body: rows.map((q) => `<tr><td style="font-size:15px">${esc(q.question)}</td><td style="font-size:14px">${esc(q.assumedMeanwhile ?? 'nothing')}</td><td style="font-size:14px;color:var(--muted)">${esc(q.whoCanAnswer ?? 'unassigned')}</td></tr>`).join(''),
         }) : '<p style="color:var(--muted)">None open.</p>'}`,
       }),

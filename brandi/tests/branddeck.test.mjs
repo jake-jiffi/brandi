@@ -14,7 +14,7 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PLACEHOLDER, PAGE_W, PAGE_H } from '../scripts/branddeck.mjs';
+import { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PLACEHOLDER, PAGE_W, PAGE_H, registerRowHeight, packRegister, REGISTER_HEIGHT } from '../scripts/branddeck.mjs';
 import { renderBrandBook } from '../scripts/brandbook.mjs';
 import { findChrome, runChrome } from '../scripts/preview.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -640,6 +640,10 @@ describe('the composition of every page, measured in a browser', () => {
     // and the contents step its type down, and both have to hold.
     heavy.voice.mechanics = Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`ruleNumber${i}Here`, `${long} Rule ${i + 1}.`]));
     heavy.governance.antiPatterns = Array.from({ length: 9 }, (_, i) => `${i + 1}. ${long}`);
+    // A real register runs long: decisions that take three lines to state and three more to justify. Paged
+    // by count, nine of these ran a page under its footer and cut a row off the PDF.
+    heavy.governance.decisions = Array.from({ length: 14 }, (_, i) => ({ date: '2026-10-28', decision: `Decision ${i + 1}. ${long} ${long}`, rationale: `${long} ${long} ${long}` }));
+    heavy.governance.openQuestions = Array.from({ length: 10 }, (_, i) => ({ question: `Question ${i + 1}. ${long} ${long}?`, status: 'open', assumedMeanwhile: `${long} ${long}`, whoCanAnswer: 'The owner, at the next review' }));
     await writeFile(path.join(dir, 'heavy.html'), renderBrandDeck({ brand: heavy, system: buildSystem(systemInputFromBrand(heavy)) }).html);
     // Three approved colourways, so the Colourways page has real rows to
     // measure. The mark is two inks so the colourway has two regions to map.
@@ -1123,11 +1127,35 @@ describe('the register and the applications, every one printed', () => {
     b.applications = Array.from({ length: 9 }, (_, i) => ({ name: `Surface number ${i + 1}`, surface: 'web' }));
     const html = renderBrandDeck({ brand: b, system }).html;
     const pages = (prefix) => [...html.matchAll(new RegExp(`<section[^>]*id="(${prefix}(?:-\\d+)?)"`, 'g'))].map((m) => m[1]);
-    assert.deepEqual(pages('decisions'), ['decisions', 'decisions-2', 'decisions-3']);
-    assert.deepEqual(pages('open-questions'), ['open-questions', 'open-questions-2']);
+    // Short rows pack densely: twenty one-line decisions take two pages, nine one-line questions one.
+    assert.deepEqual(pages('decisions'), ['decisions', 'decisions-2']);
+    assert.deepEqual(pages('open-questions'), ['open-questions']);
     assert.deepEqual(pages('applications'), ['applications', 'applications-2', 'applications-3']);
     for (let i = 1; i <= 20; i++) assert.ok(html.includes(`Decision number ${i}<`), `decision ${i}`);
     for (let i = 1; i <= 9; i++) assert.ok(html.includes(`Question number ${i}?`), `question ${i}`);
     for (let i = 1; i <= 9; i++) assert.ok(html.includes(`Surface number ${i}<`), `application ${i}`);
+  });
+
+  test('long rows are packed by height: no page holds more than the canvas, and the rail counts the rows it shows', () => {
+    const long = 'Warm water in every bay, a dryer that actually dries, and somebody on the floor who will show you how it works. ';
+    const b = clone(brand);
+    b.governance.decisions = Array.from({ length: 12 }, (_, i) => ({ date: '2026-10-28', decision: `Decision ${i + 1}. ${long.repeat(3)}`, rationale: long.repeat(4) }));
+    const html = renderBrandDeck({ brand: b, system }).html;
+    const ids = [...html.matchAll(/<section[^>]*id="(decisions(?:-\d+)?)"/g)].map((m) => m[1]);
+    assert.ok(ids.length > 2, `twelve long decisions need more than the two pages count-paging gave them: ${ids.join(', ')}`);
+    const heightOf = (d) => registerRowHeight([[d.decision, 620, 15], [d.rationale, 452, 14]]);
+    const packed = packRegister(b.governance.decisions, heightOf);
+    assert.equal(packed.length, ids.length, 'one page per packed group');
+    for (const pg of packed) assert.ok(pg.height <= REGISTER_HEIGHT || pg.rows.length === 1, `a page of ${pg.height}px`);
+    assert.match(html, new RegExp(`Decisions ${packed[1].start + 1} to ${packed[1].start + packed[1].rows.length} of 12\\.`), 'the second page counts its own rows');
+    assert.deepEqual(packed.flatMap((pg) => pg.rows), b.governance.decisions, 'every row, in order, once');
+  });
+
+  test('a row\'s height grows with its longest cell, and a row taller than a page still gets a page', () => {
+    assert.equal(registerRowHeight([['One line', 620, 15], ['One line', 452, 14]]), 40);
+    assert.ok(registerRowHeight([['x'.repeat(2000), 620, 15]]) > registerRowHeight([['x'.repeat(200), 620, 15]]));
+    const pages = packRegister([1, 2000, 3], (h) => h, 760);
+    assert.deepEqual(pages.map((pg) => pg.rows), [[1], [2000], [3]]);
+    assert.deepEqual(packRegister([], () => 10), [{ rows: [], start: 0, height: 0 }], 'an empty register is one page saying so');
   });
 });
