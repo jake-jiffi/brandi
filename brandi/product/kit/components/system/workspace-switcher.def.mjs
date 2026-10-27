@@ -64,10 +64,10 @@ export default {
       "At the foot of the rail the menu opens above the button, lined up with its left edge; outside a rail, below it. It is at least as wide as the button.",
     ],
     Rules: [
-      "(practice) The current workspace shows on every screen where the rail does. On a phone it is in the drawer, so name the workspace on the page when it matters there.",
+      "(practice) The current workspace shows on every screen where the rail does. Under 1024px of shell it is in the drawer, so name the workspace on the page when it matters there.",
       "Workspaces first, then the account's own actions after a separator, with sign out last.",
     ],
-    Open: ["On a phone the current workspace shows only with the drawer open. A product whose people switch often should name it on the page as well."],
+    Open: ["Under 1024px of shell the current workspace shows only with the drawer open. A product whose people switch often should name it on the page as well."],
   },
   frame: { width: 960, height: 1260 },
   examples: [

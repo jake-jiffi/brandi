@@ -14,7 +14,7 @@ const LONG = "[Invoice 1042 for the March grooming package and the late fee]"
 export default {
   name: "PhoneTopBar",
   group: "Navigation",
-  job: "A phone screen's top bar: the menu button and the lockup, or Back and the screen's title.",
+  job: "The top bar under 1024px of shell: the menu button and the lockup, or Back and the screen's title.",
   status: "to build",
   props: [
     { name: "title", type: "string", doc: "The screen's title, for a detail screen. One line, cut with an ellipsis; the page's heading below carries it whole." },
@@ -32,11 +32,11 @@ export default {
       "Back is a link named Back to [the screen above], through the system's link. From the focus model: after it navigates, focus moves to the new screen's main.",
     ],
     Layout: [
-      "56px tall on the rail's own colours, with a hairline under it: on a phone it does the rail's job. The menu button and Back are 36px, 44px on a touch screen.",
+      "56px tall on the rail's own colours, with a hairline under it: under 1024px of shell it does the rail's job. The menu button and Back are 36px, 44px on a touch screen.",
       "A title takes one line and is cut with an ellipsis. It repeats the page's heading, which carries it whole, so nothing is lost; give the screen a PageHeader under it.",
     ],
     Rules: [
-      "From AppShell: under 640px, list and detail become two screens. The list's bar holds the menu button and the lockup; a detail screen's bar holds Back and its title, with AppShell's topBar.",
+      "From AppShell: under 1024px, list and detail become two screens. The list's bar holds the menu button and the lockup; a detail screen's bar holds Back and its title, with AppShell's topBar.",
       "One or two actions at most at the far end, each an IconButton.",
     ],
   },

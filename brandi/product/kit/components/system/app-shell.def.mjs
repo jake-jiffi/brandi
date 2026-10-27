@@ -26,9 +26,9 @@ const active = (page) => page.evaluate(() => {
   const el = document.activeElement
   return { tag: el?.tagName ?? "", id: el?.id ?? "", name: el?.getAttribute("aria-label") ?? el?.textContent?.trim() ?? "", body: el === document.body }
 })
-async function openDrawer(page, scope) {
+async function openDrawer(page, scope, name = "live") {
   // Found by its slot, not its role: behind the open drawer it is hidden from the accessibility tree.
-  const menu = shell(scope, "live").locator('[data-slot="phone-top-bar-menu"]')
+  const menu = shell(scope, name).locator('[data-slot="phone-top-bar-menu"]')
   await menu.focus()
   await page.keyboard.press("Enter")
   const drawer = liveDrawer(page)
@@ -89,7 +89,7 @@ const page = (id) => `<x-import component-from-global-scope="NS.PageHeader" titl
   )
   .join("")}</ul>`
 const frame = (name, width, height, attrs, id) =>
-  `<div data-shell="${name}" class="overflow-hidden outline outline-line" style="width: ${width}px; height: ${height}px;"><x-import component-from-global-scope="NS.AppShell" style="display: block; height: 100%;" class="h-full" main-id="${id}" sidebar="{{ui.sidebar}}" product="[Front desk]" home="#home" ${attrs}>
+  `<div data-shell="${name}" class="shrink-0 overflow-hidden outline outline-line" style="width: ${width}px; height: ${height}px;"><x-import component-from-global-scope="NS.AppShell" style="display: block; height: 100%;" class="h-full" main-id="${id}" sidebar="{{ui.sidebar}}" product="[Front desk]" home="#home" ${attrs}>
 ${page(id)}
 </x-import></div>`
 const caption = (text) => `<p class="m-0 type-meta text-text-muted">${text}</p>`
@@ -100,14 +100,14 @@ export default {
   job: "The frame of every product: a skip link, the canvas, the rail and the main column.",
   status: "proven",
   props: [
-    { name: "sidebar", type: "ReactNode", doc: "A Sidebar. It is the rail from 640px, and the drawer's contents under that. Built in the board's script on a canvas." },
-    { name: "product", type: "string", default: "the name in lib/product.ts", doc: "The product's name, for the lockup in the phone top bar." },
+    { name: "sidebar", type: "ReactNode", doc: "A Sidebar. It is the rail from 1024px, and the drawer's contents under that. Built in the board's script on a canvas." },
+    { name: "product", type: "string", default: "the name in lib/product.ts", doc: "The product's name, for the lockup in the top bar under 1024px." },
     { name: "home", type: "string", doc: "Where the top bar's lockup links." },
-    { name: "navOpen", type: "boolean", doc: "Controls the phone drawer, with onNavOpenChange. Leave both out and the menu button opens it." },
+    { name: "navOpen", type: "boolean", doc: "Controls the drawer, with onNavOpenChange. Leave both out and the menu button opens it." },
     { name: "onNavOpenChange", type: "(open: boolean) => void", doc: "Called as the drawer opens and closes." },
     { name: "navInline", type: "boolean", default: "false", doc: "Draws the drawer open in place, for a design on a canvas: a still picture with no live layer, so the board keeps its Escape key and its tab order." },
-    { name: "topBar", type: "ReactNode", doc: "Replaces the phone top bar, for a detail screen: a PhoneTopBar with Back and the screen's title." },
-    { name: "tabBar", type: "ReactNode", doc: "A PhoneTabBar for the foot on a phone. With one, PageHeader's primary stays in the header." },
+    { name: "topBar", type: "ReactNode", doc: "Replaces the top bar, for a detail screen: a PhoneTopBar with Back and the screen's title." },
+    { name: "tabBar", type: "ReactNode", doc: "A PhoneTabBar for the foot under 640px. With one, PageHeader's primary stays in the header." },
     { name: "mainId", type: "string", default: '"main"', doc: "The main region's id, which the skip link and route focus target. One per page." },
     { name: "children", type: "ReactNode", doc: "A PageHeader, then panes and cards. The column scrolls; the rail stays put." },
   ],
@@ -117,8 +117,9 @@ export default {
       head: ["Width of the shell", "What it shows"],
       rows: [
         ["1280px and up", "The full rail, inset 8px from the edges, with the product lockup, labels and counts"],
-        ["640 to 1279px", "The rail as 72px of icons, each label a tooltip on hover and keyboard focus"],
-        ["Under 640px", "A top bar with the menu button and the lockup; the rail in a drawer from the left; a tab bar or the page's primary at the foot"],
+        ["1024 to 1279px", "The rail as 72px of icons, each label a tooltip on hover and keyboard focus"],
+        ["640 to 1023px", "The rail becomes a drawer from the left, behind a top bar that carries the menu button and the product lockup"],
+        ["Under 640px", "The phone layout: the top bar and the drawer, with a tab bar or the page's primary at the foot"],
       ],
     },
   ],
@@ -128,11 +129,11 @@ export default {
       "The drawer is a dialog named Navigation. It takes focus as it opens, on its Close navigation button, and keeps it: Tab and Shift Tab stay inside, and the page behind is hidden from screen readers. Escape, the close button and a tap on the scrim close it at once, and focus is back on the menu button the moment it closes.",
       "Choosing a destination in the drawer closes it, and focus lands on main, where a route change puts it: never on the menu button or the page body. In the product, RouteFocus moves focus to main after every client navigation, so main keeps its id and takes focus from script only.",
       "On a phone, PageHeader's primary moves to a bar at the foot, unless a tab bar has that place. The bars sit outside the scrolling column, so neither can hide whatever has focus.",
-      "The open drawer takes the theme of the shell it opened from. Widening the shell past 640px closes it, and focus goes to main, since the menu button goes with the phone layout.",
+      "The drawer serves every width under 1024px, so moving between the phone layout and the one above it leaves it open. Widening the shell to 1024px or more closes it, and focus goes to main, since the menu button goes with the top bar. The open drawer takes the theme of the shell it opened from.",
     ],
     Layout: [
       "It measures itself, not the window, so a board, a split view and a browser tab of the same width match: the look switches by container queries, which the server and a canvas draw before any script runs.",
-      "The rail stays put and the main column scrolls. The column's padding steps down with the shell: 32px, then 24px, then 16px on a phone.",
+      "The rail stays put and the main column scrolls. The column's padding steps down with the shell: 32px, then 24px under 1280px, then 16px on a phone.",
       "The drawer comes in from the left, inset 8px like the rail, up to 320px wide. Under reduced motion it fades in without sliding.",
     ],
     Rules: [
@@ -144,11 +145,8 @@ export default {
       "The drawer dropped focus and let it escape behind (round 2).",
       "An invisible tooltip swallowed Escape in the drawer, and the action bar could hide focus (round 3).",
     ],
-    Accepted: [
-      "Three layouts, not the four the reference names: the icons-only rail runs from 640 to 1279px of shell, so a tablet held upright (820px) keeps the rail instead of a drawer behind a top bar. At that width 72px of icons costs little, and the destinations stay one press away.",
-    ],
   },
-  frame: { width: 1488, height: 2820 },
+  frame: { width: 1488, height: 3440 },
   examples: [
     {
       id: "full",
@@ -159,8 +157,14 @@ export default {
     },
     {
       id: "icons",
-      title: "The rail as icons, with the labels as tooltips, at 820",
-      markup: frame("icons", 820, 760, "", "main-820"),
+      title: "The rail as icons, with the labels as tooltips, at 1100",
+      markup: frame("icons", 1100, 700, "", "main-1100"),
+      layout: "block",
+    },
+    {
+      id: "tablet",
+      title: "At 820, the rail becomes a drawer behind a top bar",
+      markup: frame("tablet", 820, 700, "", "main-820"),
       layout: "block",
     },
     {
@@ -195,26 +199,32 @@ export default {
   })()`,
   checks: [
     {
-      name: "Three layouts by the shell's own width: the full rail at 1440, icons at 820, the phone at 390 (round 1)",
+      name: "Four layouts by the shell's own width: the full rail at 1440, icons at 1100, a drawer behind a top bar at 820, the phone at 390 (round 1)",
       async run({ page, expect }) {
         const at = (name) => page.locator(`[data-shell="${name}"] [data-slot="app-shell"]`)
         expect.equal(await at("full").getAttribute("data-layout"), "full", "1440 is the full rail")
-        expect.equal(await at("icons").getAttribute("data-layout"), "icons", "820 is icons")
+        expect.equal(await at("icons").getAttribute("data-layout"), "icons", "1100 is icons")
+        expect.equal(await at("tablet").getAttribute("data-layout"), "drawer", "820 is the drawer behind a top bar")
         expect.equal(await at("live").getAttribute("data-layout"), "phone", "390 is the phone")
         const rail = (name) => page.locator(`[data-shell="${name}"] [data-slot="app-shell-rail"] [data-slot="sidebar"]`)
         expect.equal(Math.round((await rail("full").boundingBox()).width), 240, "the full rail is 240px")
         expect.equal(Math.round((await rail("icons").boundingBox()).width), 72, "the icons-only rail is 72px")
+        expect(!(await rail("tablet").isVisible()), "no rail at 820")
         expect(!(await rail("live").isVisible()), "no rail on the phone")
         const box = await rail("full").boundingBox()
         const frame = await at("full").boundingBox()
         expect(Math.abs(box.x - frame.x - 8) <= 1 && Math.abs(box.y - frame.y - 8) <= 1, "the rail is inset 8px")
-        expect(await page.locator('[data-shell="live"] [data-slot="phone-top-bar"]').isVisible(), "the phone has its top bar")
-        expect(!(await page.locator('[data-shell="full"] [data-slot="phone-top-bar"]').isVisible()), "the full rail has none")
+        const topBar = (name) => page.locator(`[data-shell="${name}"] [data-slot="phone-top-bar"]`)
+        expect(await topBar("tablet").isVisible() && await topBar("live").isVisible(), "820 and 390 have the top bar")
+        expect(!(await topBar("icons").isVisible()) && !(await topBar("full").isVisible()), "1100 and 1440 have none")
         expect(await page.locator('[data-shell="full"] [data-slot="product-lockup-name"]').first().isVisible(), "the full rail shows the product's name")
+        const actionBar = (name) => page.locator(`[data-shell="${name}"] [data-slot="app-shell-action-bar"]`)
+        expect(await actionBar("live").isVisible(), "the phone has the bar at the foot")
+        expect(!(await actionBar("tablet").isVisible()), "820 has none")
       },
     },
     {
-      name: "At 820 every icon on the rail shows its words as a tooltip on keyboard focus, and keeps them in its name",
+      name: "At 1100 every icon on the rail shows its words as a tooltip on keyboard focus, and keeps them in its name",
       example: "icons",
       async run({ page, scope, expect }) {
         const nav = scope.getByRole("navigation", { name: "Main" })
@@ -247,6 +257,87 @@ export default {
         await page.keyboard.press("Enter")
         const now = await active(page)
         expect.equal(now.id, "main-1440", "focus is on main")
+      },
+    },
+    {
+      name: "At 820 the top bar carries the menu button and the lockup, and the menu button opens the drawer from the keyboard, with focus on its close button",
+      example: "tablet",
+      async run({ page, scope, expect }) {
+        const bar = shell(scope, "tablet").locator('[data-slot="phone-top-bar"]')
+        expect.equal(await bar.getByRole("button", { name: "Open navigation" }).getAttribute("aria-haspopup"), "dialog", "the menu button is named Open navigation and opens a dialog")
+        expect.equal(await bar.getByRole("link", { name: "Product [Front desk]" }).count(), 1, "the lockup is beside it")
+        const { menu, drawer } = await openDrawer(page, scope, "tablet")
+        expect.equal(await page.getByRole("dialog", { name: "Navigation" }).count(), 1, "a dialog named Navigation")
+        expect.equal(await menu.getAttribute("aria-expanded"), "true", "the menu button says it is open")
+        expect.equal((await active(page)).name, "Close navigation", "focus is on Close navigation")
+        expect(await drawer.getByRole("navigation", { name: "Main" }).isVisible(), "the rail's navigation is inside")
+      },
+    },
+    {
+      name: "At 820 the drawer keeps focus: Tab and Shift Tab stay inside, and the page behind is hidden from screen readers (round 2)",
+      example: "tablet",
+      async run({ page, scope, expect }) {
+        const { drawer } = await openDrawer(page, scope, "tablet")
+        const inside = () => drawer.evaluate((d) => d.contains(document.activeElement))
+        for (let i = 0; i < 16; i++) {
+          await page.keyboard.press("Tab")
+          expect(await inside(), `focus is inside after Tab ${i + 1}`)
+        }
+        for (let i = 0; i < 4; i++) {
+          await page.keyboard.press("Shift+Tab")
+          expect(await inside(), `focus is inside after Shift Tab ${i + 1}`)
+        }
+        const hidden = await shell(scope, "tablet").locator('[data-slot="app-shell-main"]').evaluate((el) => Boolean(el.closest('[aria-hidden="true"], [inert]')))
+        expect(hidden, "the page behind is hidden from screen readers")
+      },
+    },
+    {
+      name: "At 820 Escape closes the drawer at once, and so does its close button, each with focus back on the menu button",
+      example: "tablet",
+      async run({ page, scope, expect }) {
+        let { menu, drawer } = await openDrawer(page, scope, "tablet")
+        await page.keyboard.press("Tab")
+        await page.keyboard.press("Escape")
+        expect.equal(await drawer.count(), 0, "Escape: the drawer is gone straight away")
+        expect(await menu.evaluate((el) => el === document.activeElement), "Escape: focus is on the menu button")
+        ;({ menu, drawer } = await openDrawer(page, scope, "tablet"))
+        await page.keyboard.press("Enter")
+        expect.equal(await drawer.count(), 0, "the close button: the drawer is gone")
+        expect(await menu.evaluate((el) => el === document.activeElement), "the close button: focus is on the menu button")
+      },
+    },
+    {
+      name: "At 820 choosing a destination in the drawer closes it, and focus lands on main, never the page body",
+      example: "tablet",
+      async run({ page, scope, expect }) {
+        await samePage(page)
+        const { drawer } = await openDrawer(page, scope, "tablet")
+        await drawer.getByRole("link", { name: "Invoices, 12 waiting on others" }).focus()
+        await page.keyboard.press("Enter")
+        await drawer.waitFor({ state: "detached" })
+        const now = await active(page)
+        expect(!now.body, "focus is not on the page body")
+        expect.equal(now.id, "main-820", "focus is on main, where a route change puts it")
+      },
+    },
+    {
+      name: "At 820 the primary stays in the header: the bar at the foot belongs to the phone layout",
+      example: "tablet",
+      async run({ scope, expect }) {
+        const tablet = shell(scope, "tablet")
+        expect.equal(await tablet.locator('[data-slot="page-header-actions"]').getByRole("button", { name: "Approve 3" }).count(), 1, "the primary is in the header")
+        expect(!(await tablet.locator('[data-slot="app-shell-foot"]').isVisible()), "nothing at the foot")
+      },
+    },
+    {
+      name: "Widening the shell to 1024px or more closes the drawer, and focus goes to main, never the page body",
+      example: "tablet",
+      async run({ page, scope, expect }) {
+        const { drawer } = await openDrawer(page, scope, "tablet")
+        await page.evaluate(() => (document.querySelector('[data-shell="tablet"]').style.width = "1100px"))
+        await drawer.waitFor({ state: "detached", timeout: 5000 })
+        expect.equal(await shell(scope, "tablet").locator('[data-slot="app-shell"]').getAttribute("data-layout"), "icons", "the shell is the icons layout now")
+        expect(await page.waitForFunction(() => document.activeElement?.id === "main-820", null, { timeout: 3000 }).then(() => true, () => false), "focus is on main")
       },
     },
     {
@@ -322,15 +413,17 @@ export default {
       },
     },
     {
-      name: "Widening the shell past 640px closes the drawer, and focus goes to main, never the page body",
+      name: "Widening from the phone to 820 leaves the drawer open, with focus inside it: both layouts use it",
       example: "phone",
       async run({ page, scope, expect }) {
         const { drawer } = await openDrawer(page, scope)
         await page.evaluate(() => (document.querySelector('[data-shell="live"]').style.width = "820px"))
-        await drawer.waitFor({ state: "detached", timeout: 5000 })
         const at = shell(scope, "live").locator('[data-slot="app-shell"]')
-        expect.equal(await at.getAttribute("data-layout"), "icons", "the shell is the icons layout now")
-        expect(await page.waitForFunction(() => document.activeElement?.id === "main-390", null, { timeout: 3000 }).then(() => true, () => false), "focus is on main")
+        expect(await page.waitForFunction(() => document.querySelector('[data-shell="live"] [data-slot="app-shell"]')?.dataset.layout === "drawer", null, { timeout: 3000 }).then(() => true, () => false), "the shell is the drawer layout now")
+        await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
+        expect.equal(await drawer.count(), 1, "the drawer is still open")
+        expect(await drawer.evaluate((d) => d.contains(document.activeElement)), "focus is still inside it")
+        expect.equal(await at.getAttribute("data-layout"), "drawer", "and the layout held")
       },
     },
     {
@@ -440,7 +533,7 @@ export default {
     {
       name: "main is the one region route focus moves to: a unique id, focusable from script only",
       async run({ page, expect }) {
-        for (const id of ["main-1440", "main-820", "main-390", "main-390-tabs", "main-390-open"]) {
+        for (const id of ["main-1440", "main-1100", "main-820", "main-390", "main-390-tabs", "main-390-open"]) {
           expect.equal(await page.locator(`[id="${id}"]`).count(), 1, `one ${id}`)
           const [tag, tabindex] = await page.locator(`[id="${id}"]`).evaluate((el) => [el.tagName, el.getAttribute("tabindex")])
           expect.equal(`${tag} ${tabindex}`, "MAIN -1", `${id} is main, focusable from script only`)

@@ -9,9 +9,12 @@ import { cn } from "@/lib/utils"
 import { useOverlayOpener } from "./dialog"
 import { PhoneTopBar } from "./phone-top-bar"
 
-/** The shell's three layouts, by its own width: the full rail from 1280px, icons from 640px, the phone under that. */
-export type ShellLayout = "full" | "icons" | "phone"
-const layoutFor = (width: number): ShellLayout => (width >= 1280 ? "full" : width >= 640 ? "icons" : "phone")
+/**
+ * The shell's four layouts, by its own width: the full rail from 1280px, the rail as icons from 1024px, the
+ * rail as a drawer behind a top bar from 640px, and the phone layout under that.
+ */
+export type ShellLayout = "full" | "icons" | "drawer" | "phone"
+const layoutFor = (width: number): ShellLayout => (width >= 1280 ? "full" : width >= 1024 ? "icons" : width >= 640 ? "drawer" : "phone")
 
 interface ShellState {
   layout: ShellLayout
@@ -24,27 +27,27 @@ export function useShell() {
   return React.useContext(shellContext)
 }
 
-/** Tells the Sidebar inside the phone drawer that it is there, and how to close it. */
+/** Tells the Sidebar inside the drawer that it is there, and how to close it. */
 export const drawerContext = React.createContext<{ onClose: () => void } | null>(null)
 
 // The drawer is the Sheet from the left, on the rail's own colours, never wider than a thumb's reach.
 const drawerClass = "max-w-80 overflow-hidden bg-rail text-rail-text"
 
 export interface AppShellProps {
-  /** A Sidebar. It is the rail from 640px, and the drawer's contents under that. Built in the board's script on a canvas. */
+  /** A Sidebar. It is the rail from 1024px, and the drawer's contents under that. Built in the board's script on a canvas. */
   sidebar?: React.ReactNode
-  /** The product's name, for the lockup in the phone top bar. */
+  /** The product's name, for the lockup in the top bar under 1024px. */
   product?: string
   /** Where the top bar's lockup links. */
   home?: string
-  /** Controls the phone drawer, with onNavOpenChange. Leave both out and the menu button opens it. */
+  /** Controls the drawer, with onNavOpenChange. Leave both out and the menu button opens it. */
   navOpen?: boolean
   onNavOpenChange?: (open: boolean) => void
   /** Draws the drawer open in place, for a design on a canvas: a still picture with no live layer, so the board keeps its Escape key and its tab order. */
   navInline?: boolean
-  /** Replaces the phone top bar, for a detail screen: a PhoneTopBar with Back and the screen's title. */
+  /** Replaces the top bar, for a detail screen: a PhoneTopBar with Back and the screen's title. */
   topBar?: React.ReactNode
-  /** A PhoneTabBar for the foot on a phone. With one, PageHeader's primary stays in the header. */
+  /** A PhoneTabBar for the foot under 640px. With one, PageHeader's primary stays in the header. */
   tabBar?: React.ReactNode
   /** The main region's id: what the skip link and route focus target. One per page. */
   mainId?: string
@@ -76,6 +79,8 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
+  // Under 1024px the rail is a drawer behind a top bar. Under 640px the phone layout adds the bar at the foot.
+  const drawered = layout === "drawer" || layout === "phone"
   const phone = layout === "phone"
 
   const [ownOpen, setOwnOpen] = React.useState(false)
@@ -87,7 +92,7 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
     },
     [onNavOpenChange]
   )
-  const live = phone && !navInline
+  const live = drawered && !navInline
   const menuRef = React.useRef<HTMLButtonElement | null>(null)
   const mainRef = React.useRef<HTMLElement | null>(null)
   // Focus goes back to the menu button the moment the drawer closes, by Escape, the scrim or its close button.
@@ -101,14 +106,14 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
     chose.current = false
     mainRef.current?.focus()
   }, [open])
-  // The drawer belongs to the phone layout, so widening the shell closes it, and focus, which was inside it,
-  // goes to main: the menu button that opened it has gone with the phone layout.
+  // The drawer belongs to the layouts under 1024px, so widening the shell past that closes it, and focus, which
+  // was inside it, goes to main: the menu button that opened it goes with the top bar.
   React.useEffect(() => {
-    if (phone || !open) return
+    if (drawered || !open) return
     chose.current = true
     setOpen(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phone])
+  }, [drawered])
   const onDrawerClick = (event: React.MouseEvent) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     if (!(event.target as Element).closest?.("a[href]")) return
@@ -141,8 +146,8 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
         {sidebar ? (
           <div
             data-slot="app-shell-rail"
-            // Inset 8px from the screen's edges, as the sheet is. 72px of icons from 640px, the full rail from 1280px.
-            className="hidden w-[calc(var(--rail-collapsed)+0.5rem)] shrink-0 py-2 pl-2 @min-[640px]/shell:flex @min-[1280px]/shell:w-[calc(var(--rail-width)+0.5rem)]"
+            // Inset 8px from the screen's edges, as the sheet is. 72px of icons from 1024px, the full rail from 1280px.
+            className="hidden w-[calc(var(--rail-collapsed)+0.5rem)] shrink-0 py-2 pl-2 @min-[1024px]/shell:flex @min-[1280px]/shell:w-[calc(var(--rail-width)+0.5rem)]"
           >
             {sidebar}
           </div>
@@ -150,8 +155,8 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
 
         {/* Drawn open for a design, the page behind the drawer is hidden, as it is from a screen reader when the
             drawer is live: the picture is the drawer and its scrim, with no words left under a layer. */}
-        <div data-slot="app-shell-column" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", navInline && "@max-[640px]/shell:invisible")}>
-          <div data-slot="app-shell-top" className="shrink-0 @min-[640px]/shell:hidden">
+        <div data-slot="app-shell-column" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", navInline && "@max-[1024px]/shell:invisible")}>
+          <div data-slot="app-shell-top" className="shrink-0 @min-[1024px]/shell:hidden">
             {topBar ?? (
               <PhoneTopBar
                 product={product}
@@ -204,7 +209,7 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
 
         {navInline && sidebar ? (
           // The open drawer as a still picture: no portal, focus trap or dismiss layer, so the board keeps its keys.
-          <div data-slot="app-shell-drawer-picture" className="absolute inset-0 z-(--z-sheet) @min-[640px]/shell:hidden">
+          <div data-slot="app-shell-drawer-picture" className="absolute inset-0 z-(--z-sheet) @min-[1024px]/shell:hidden">
             <div aria-hidden="true" className="absolute inset-0 bg-scrim" />
             <div
               role="dialog"

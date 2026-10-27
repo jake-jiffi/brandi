@@ -78,8 +78,8 @@ export default {
       "Eight top-level items at most, in groups under short uppercase labels, with settings and help in the footer.",
       "Only rail-* tokens and the highlight count live on the rail, and focus there uses rail-focus. Whether the rail carries the brand is a brand-to-product decision; without one it is a quiet surface.",
     ],
-    Review: ["An invisible tooltip swallowed Escape in the phone drawer (round 3): tooltips mount only on the icons-only rail."],
-    Accepted: ["Icons only from 640 to 1279px of shell, with the labels as tooltips. Full labels at that width take a fifth of a laptop screen from the work."],
+    Review: ["An invisible tooltip swallowed Escape in the drawer (round 3): tooltips mount only on the icons-only rail."],
+    Accepted: ["Icons only from 1024 to 1279px of shell, with the labels as tooltips. Full labels at that width take a fifth of a laptop screen from the work."],
   },
   frame: { width: 960, height: 1720 },
   examples: [

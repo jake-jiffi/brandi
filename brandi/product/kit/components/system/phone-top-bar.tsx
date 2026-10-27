@@ -29,13 +29,13 @@ export interface PhoneTopBarProps {
   className?: string
 }
 
-/** A phone screen's top bar: the menu button and the lockup, or Back and the screen's title. */
+/** The top bar under 1024px of shell: the menu button and the lockup, or Back and the screen's title. */
 export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(function PhoneTopBar(
   { title, back, onMenu, menuExpanded = false, menuRef, product, home, actions, className },
   ref
 ) {
   const Link = useLink()
-  // On the rail's own colours: on a phone this bar does the rail's job.
+  // On the rail's own colours: under 1024px of shell this bar does the rail's job.
   const control = "text-rail-text-strong hover:bg-rail-hover focus-visible:outline-rail-focus"
   return (
     <header

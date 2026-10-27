@@ -102,7 +102,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
   const rail = React.useMemo(() => ({ inRail: true, collapsed: isCollapsed }), [isCollapsed])
 
   // Command K or Control K opens search from anywhere, while typing too. The rail binds it, never its copy in the
-  // phone drawer, so one press runs it once.
+  // drawer, so one press runs it once.
   const key = shortcut.replace(/[⌘⌃⌥⇧\s]/g, "").toLowerCase()
   React.useEffect(() => {
     if (!onSearch || drawer || !key) return
