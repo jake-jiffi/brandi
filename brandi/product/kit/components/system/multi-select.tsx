@@ -198,6 +198,8 @@ export const MultiSelect = React.forwardRef<HTMLInputElement, MultiSelectProps>(
       data-slot="multi-select"
       data-size={size}
       data-state={isOpen ? "open" : "closed"}
+      // Disabled, the box says so, so the faded chosen values count as part of an inactive control.
+      aria-disabled={disabled || undefined}
       className={cn(inputBox, growingBox, "gap-1 pr-1", chosen.length ? "pl-1" : "pl-3")}
       // A press on the box, away from a token's button, puts the caret in the field.
       onMouseDown={(event) => {

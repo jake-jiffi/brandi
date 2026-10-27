@@ -147,6 +147,8 @@ export const AIAnswer = React.forwardRef<HTMLElement, AIAnswerProps>(function AI
   // The answer's first sentence, for the line that says it is ready. It is read when the line speaks, and only once
   // the work is done, so a streaming answer does not render twice for every word.
   const [first, setFirst] = React.useState("")
+  // After every render on purpose: the text is read off the page, and setFirst fires only when the sentence changed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useLayoutEffect(() => {
     if (working) return
     const text = textOf(body.current)

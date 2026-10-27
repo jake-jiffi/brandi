@@ -1,18 +1,5 @@
 // AskBar's one definition: its README, its preview board and its scripted checks all come from here.
 
-function recordLiveRegions() {
-  window.__liveChanges = []
-  const live = '[aria-live]:not([aria-live="off"]), [role="status"], [role="alert"], [role="log"]'
-  new MutationObserver((records) => {
-    const changed = new Set()
-    for (const r of records) {
-      const node = r.target.nodeType === 1 ? r.target : r.target.parentElement
-      const region = node && node.closest(live)
-      if (region) changed.add(region)
-    }
-    for (const region of changed) window.__liveChanges.push({ slot: region.getAttribute("data-slot"), text: (region.textContent || "").trim() })
-  }).observe(document, { subtree: true, childList: true, characterData: true })
-}
 const focused = (page) =>
   page.evaluate(() => ({
     slot: document.activeElement?.getAttribute("data-slot") ?? document.activeElement?.tagName.toLowerCase(),

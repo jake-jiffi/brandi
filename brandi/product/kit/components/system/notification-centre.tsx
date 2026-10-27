@@ -230,6 +230,7 @@ export const NotificationCentre = React.forwardRef<HTMLButtonElement, Notificati
                     <span data-slot="notification-text" className={cn("text-pretty", fresh ? "type-label text-text-strong" : "type-body text-text-muted")}>
                       {item.text}
                     </span>
+                    {/* A space between the lines, so the visible text reads as the name does (WCAG 2.5.3). */}{" "}
                     <span data-slot="notification-time" className="type-meta text-text-subtle">
                       {item.time}
                     </span>
@@ -242,8 +243,8 @@ export const NotificationCentre = React.forwardRef<HTMLButtonElement, Notificati
                 "flex w-full items-start gap-3 py-3 text-left transition-colors duration-(--duration-fast) hover:bg-hover focus-visible:outline-offset-[-2px]",
                 inset
               )
-              // An exact name: what happened, (unread) while it is, then when.
-              const named = `${item.text}${fresh ? " (unread)" : ""}, ${item.time}`
+              // An exact name that starts with what is on screen, in its order: what happened, when, then unread while it is.
+              const named = `${item.text}, ${item.time}${fresh ? ", unread" : ""}`
               return (
                 <li key={item.id} data-slot="notification" data-unread={fresh || undefined} className={cn(index > 0 && "border-t border-line")}>
                   {item.href ? (

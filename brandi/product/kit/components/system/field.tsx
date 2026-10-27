@@ -100,7 +100,9 @@ export const Field = React.forwardRef<HTMLDivElement, FieldProps>(function Field
 
   // Find the control inside whatever wraps it (a canvas wraps every component in a plain element), give it an
   // id if it has none, and point the label at the id it ends up with. A plain control (markup, or a library's)
-  // is wired here; a system control wires itself through the context.
+  // is wired here; a system control wires itself through the context. After every render on purpose: the control
+  // can change with no prop changing, and setControlId fires only when the id differs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useLayoutEffect(() => {
     const control = findControl(slot.current)
     if (!control) return

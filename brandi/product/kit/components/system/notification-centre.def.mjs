@@ -72,7 +72,7 @@ export default {
     Behaviour: [
       "A bell button opens it: a Popover on a wide screen, and a Sheet from the side on a phone, where the window is under 640px. Enter, Space or a press opens it; Escape closes it and focus goes back to the bell.",
       "The bell's name carries the unread count in words: Notifications, 3 unread. When the count changes, a polite status says so once: 1 new notification. 4 unread, then 3 unread as one is read, and No unread notifications.",
-      "Each notification is one link or button, named by what happened, (unread) while it is, and when. Opening one marks it read. One with somewhere to go closes the panel as it goes; one with nowhere to go is only marked read, and focus stays on it.",
+      "Each notification is one link or button, named by what happened and when, then unread while it is, so the name starts with what is on screen. Opening one marks it read. One with somewhere to go closes the panel as it goes; one with nowhere to go is only marked read, and focus stays on it.",
       "Mark all as read marks every unread one, and focus moves to the first notification, because the button goes.",
       "Shown open for a design, it is the Popover's still picture: no layer, so the board keeps its keys and tab order.",
     ],
@@ -176,8 +176,8 @@ export default {
         await page.keyboard.press("Enter")
         const panel = livePanel(page)
         await ready(panel)
-        const drafted = panel.getByRole("button", { name: "The assistant drafted the [June] pay run from the approved timesheets (unread), Today, 9:12 am" })
-        expect.equal(await drafted.count(), 1, "an unread notification says so in words, then when")
+        const drafted = panel.getByRole("button", { name: "The assistant drafted the [June] pay run from the approved timesheets, Today, 9:12 am, unread" })
+        expect.equal(await drafted.count(), 1, "an unread notification says when, then that it is unread")
         for (let i = 0; i < 6 && !(await drafted.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("Tab")
         expect(await drafted.evaluate((el) => el === document.activeElement), "Tab reaches the notification")
         await page.keyboard.press("Enter")

@@ -180,6 +180,7 @@ export function useTruncated(el: HTMLElement | null) {
   const [cut, setCut] = React.useState(false)
   // New words at the same width resize nothing, so measure after every render as well. Only a label still
   // on the page counts: wrapping a cut label in its Tooltip replaces it, and the old one measures zero.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useLayoutEffect(() => {
     if (el?.isConnected) setCut(el.scrollWidth > el.clientWidth + 1)
   })

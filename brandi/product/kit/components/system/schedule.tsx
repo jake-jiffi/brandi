@@ -242,11 +242,14 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
           {p.event.title}
         </span>
       </span>
+      {/* Spaces between the lines, so the visible text reads as the name does: "Grooming 9:00 to 10:00" (WCAG 2.5.3). */}
+      {p.span >= 0.75 ? " " : null}
       {p.span >= 0.75 ? (
         <span data-measure="" className={cn("min-w-0 text-text", view === "day" ? "type-meta" : "type-caption", p.span >= 1.5 ? fits : "truncate")}>
           {p.time}
         </span>
       ) : null}
+      {view === "day" && p.event.meta && p.span >= 1 ? " " : null}
       {view === "day" && p.event.meta && p.span >= 1 ? (
         <span data-measure="" className="truncate type-meta text-text">
           {p.event.meta}
@@ -321,7 +324,6 @@ export const Schedule = React.forwardRef<HTMLDivElement, ScheduleProps>(function
   ref
 ) {
   const Link = useLink() as React.ElementType
-  const ids = React.useId()
   const level = String(headingLevel) === "3" ? 3 : String(headingLevel) === "4" ? 4 : 2
   const Heading = `h${level}` as const
   const DayHeading = (["h3", "h4", "h5"] as const)[level - 2]
@@ -698,7 +700,7 @@ export const Schedule = React.forwardRef<HTMLDivElement, ScheduleProps>(function
                         <>
                           <span aria-hidden="true" className={cn("mt-1.5 size-2 shrink-0 rounded-full forced-color-adjust-none", DOT[p.slot])} />
                           <span className="flex min-w-0 flex-col">
-                            <span className="type-label text-text-strong">{p.event.title}</span>
+                            <span className="type-label text-text-strong">{p.event.title}</span>{" "}
                             <span className="type-meta text-text">
                               {p.time}
                               {p.event.meta ? `, ${p.event.meta}` : ""}

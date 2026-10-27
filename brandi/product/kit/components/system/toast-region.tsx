@@ -125,13 +125,15 @@ const Region = React.forwardRef<HTMLElement, ToastRegionProps>(function ToastReg
   // nothing moves under the pointer or vanishes while someone reaches for Undo; leaving starts them again.
   const shownKey = shown.map((t) => t.id).join("\n")
   React.useEffect(() => {
+    // One Map for the region's life, mutated in place; the cleanup reads the same one.
+    const all = clocks.current
     // Toasts dismissed from outside never pass through remove(), so their clocks are dropped here.
-    for (const id of clocks.current.keys()) if (!shown.some((t) => t.id === id)) clocks.current.delete(id)
+    for (const id of all.keys()) if (!shown.some((t) => t.id === id)) all.delete(id)
     if (paused) return
     const started = Date.now()
     const timers = shown.map((t) => {
-      let clock = clocks.current.get(t.id)
-      if (!clock) clocks.current.set(t.id, (clock = { left: lifetime(t), since: started }))
+      let clock = all.get(t.id)
+      if (!clock) all.set(t.id, (clock = { left: lifetime(t), since: started }))
       clock.since = started
       return window.setTimeout(() => remove(t.id), clock.left)
     })
@@ -139,7 +141,7 @@ const Region = React.forwardRef<HTMLElement, ToastRegionProps>(function ToastReg
       const stopped = Date.now()
       timers.forEach((timer) => window.clearTimeout(timer))
       for (const t of shown) {
-        const clock = clocks.current.get(t.id)
+        const clock = all.get(t.id)
         if (clock) clock.left = Math.max(0, clock.left - (stopped - clock.since))
       }
     }

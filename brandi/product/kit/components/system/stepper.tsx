@@ -56,8 +56,9 @@ export const Stepper = React.forwardRef<HTMLDivElement, StepperProps>(function S
           const state: StepState = i < current ? "complete" : i === current ? "current" : "upcoming"
           const last = i === list.length - 1
           const revisit = state === "complete" && (step.href || onStepClick)
-          // A pressable step gets an exact name, "[Label], Completed", and its description as a description.
-          const named = { "aria-label": `${step.label}, ${STATE_WORDS[state]}`, "aria-describedby": step.description ? `${id}-${i}` : undefined }
+          // A pressable step is named from its content, "[Label], Completed", and its description is its description:
+          // an aria-label left the description's visible words outside the name (WCAG 2.5.3).
+          const named = { "aria-describedby": step.description ? `${id}-${i}` : undefined }
 
           const indicator = (
             <span
@@ -87,7 +88,7 @@ export const Stepper = React.forwardRef<HTMLDivElement, StepperProps>(function S
                 <span className="sr-only">, {STATE_WORDS[state]}</span>
               </span>
               {step.description ? (
-                <span id={`${id}-${i}`} data-slot="stepper-description" className="type-meta text-text-muted">
+                <span id={`${id}-${i}`} aria-hidden={revisit ? "true" : undefined} data-slot="stepper-description" className="type-meta text-text-muted">
                   {step.description}
                 </span>
               ) : null}

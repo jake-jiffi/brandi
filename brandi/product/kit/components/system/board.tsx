@@ -115,7 +115,7 @@ export const Board = React.forwardRef<HTMLDivElement, BoardProps>(function Board
   const Link = useLink() as React.ElementType
   const ids = React.useId()
   const [one, many] = Array.isArray(noun) && noun.length === 2 ? noun : ["item", "items"]
-  const list = Array.isArray(cards) ? cards : []
+  const list = React.useMemo(() => (Array.isArray(cards) ? cards : []), [cards])
   const stages = Array.isArray(columns) ? columns : []
   const byId = React.useMemo(() => new Map(list.map((c) => [c.id, c])), [list])
 

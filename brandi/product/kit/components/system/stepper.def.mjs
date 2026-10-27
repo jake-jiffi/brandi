@@ -149,10 +149,10 @@ export default {
       example: "horizontal",
       async run({ page, scope, expect }) {
         await page.keyboard.press("Tab")
-        const first = scope.getByRole("button", { name: "Connect [accounting system], Completed" })
+        const first = scope.getByRole("button", { name: /^Connect \[accounting system\] ?, Completed$/ })
         expect(await first.evaluate((el) => document.activeElement === el), "Tab reaches the first finished step")
         const ax = await heard(page, first)
-        expect.equal(`${ax.role}: ${ax.name}`, "button: Connect [accounting system], Completed", "what a screen reader hears")
+        expect(/^button: Connect \[accounting system\] ?, Completed$/.test(`${ax.role}: ${ax.name}`), `what a screen reader hears: got "${ax.role}: ${ax.name}"`)
         await page.keyboard.press("Enter")
         await page.waitForFunction(() => document.querySelector('[data-example="horizontal"] [data-current]')?.getAttribute("data-current") === "0", null, { timeout: 3000 })
         const focus = await page.evaluate(() => ({ body: document.activeElement === document.body, inCurrent: !!document.activeElement?.closest('li[aria-current="step"]') }))
@@ -169,7 +169,8 @@ export default {
         expect.equal(await link.count(), 1, "the finished step is the one link")
         expect.equal(await link.getAttribute("href"), "#business-details", "it goes to the step's address")
         const ax = await heard(page, link)
-        expect.equal(`${ax.role}: ${ax.name}`, "link: Add [your business] details, Completed", "its name")
+        // A visually hidden part of a name can arrive with a space before it: "details , Completed" sounds the same.
+        expect(/^link: Add \[your business\] details ?, Completed$/.test(`${ax.role}: ${ax.name}`), `its name: got "${ax.role}: ${ax.name}"`)
         expect.equal(ax.description, "Name, address and tax number", "its description")
       },
     },

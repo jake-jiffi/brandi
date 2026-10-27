@@ -184,7 +184,6 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
           window.__escapes = []
           window.addEventListener("keydown", (e) => e.key === "Escape" && window.__escapes.push(e.defaultPrevented))
         })
-        const input = scope.getByRole("combobox", { name: "Start" })
         // A press on the label only focuses the input; Down opens the list.
         await scope.getByText("Start", { exact: true }).click()
         expect.equal(await page.evaluate(() => `${document.activeElement?.getAttribute("role")} ${document.querySelectorAll("[data-radix-popper-content-wrapper]").length}`), "combobox 0", "the label focused the input and opened nothing")

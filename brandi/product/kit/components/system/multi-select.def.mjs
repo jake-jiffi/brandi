@@ -214,7 +214,6 @@ ${field("Watchers", 'open="{{yes}}" query="ha" default-value="{{watching}}" opti
           window.__escapes = []
           window.addEventListener("keydown", (e) => e.key === "Escape" && window.__escapes.push(e.defaultPrevented))
         })
-        const input = scope.getByRole("combobox", { name: "Assignees" })
         // A press on the label only focuses the input; Down opens the list.
         await scope.getByText("Assignees", { exact: true }).click()
         expect.equal(await page.evaluate(() => `${document.activeElement?.getAttribute("role")} ${document.querySelectorAll("[data-radix-popper-content-wrapper]").length}`), "combobox 0", "the label focused the input and opened nothing")

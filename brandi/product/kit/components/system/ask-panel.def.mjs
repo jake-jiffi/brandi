@@ -1,9 +1,5 @@
 // AskPanel's one definition: its README, its preview board and its scripted checks all come from here.
 
-async function wait(page, ms) {
-  await page.clock.runFor(ms)
-  await page.waitForTimeout(120)
-}
 const focused = (page) =>
   page.evaluate(() => ({
     slot: document.activeElement?.getAttribute("data-slot") ?? document.activeElement?.tagName.toLowerCase(),
