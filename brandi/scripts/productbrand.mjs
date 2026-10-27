@@ -10,6 +10,8 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
+import { inkBounds, viewBox } from './svg.mjs';
+
 export const RENDITIONS = ['full', 'full-on-dark', 'full-ink', 'symbol', 'symbol-on-dark', 'symbol-ink'];
 export const CHARACTER_STATES = ['welcome', 'working', 'done', 'caught-up', 'needs-person', 'nothing-found', 'could-not-load', 'help'];
 export const LOGO_DEFAULTS = { height: 24, minHeight: 16, symbolMinHeight: 16, clearSpace: 0.25 };
@@ -37,6 +39,20 @@ export function cleanSvg(svg, where = 'a mark') {
   }
   tag = tag.replace(/\s(?:width|height)="[^"]*"/g, '');
   return s.replace(open[0], tag).trim();
+}
+
+/**
+ * The viewBox cut to the ink. Brand files carry their clear space inside the viewBox, so at 20px tall
+ * the letters come out 9px; the product applies clear space in layout instead.
+ */
+export function tighten(svg) {
+  const ink = inkBounds(svg);
+  const box = viewBox(svg);
+  if (!ink || !box || ink.width <= 0 || ink.height <= 0) return svg;
+  const slack = (box.width - ink.width) / box.width + (box.height - ink.height) / box.height;
+  if (slack < 0.02) return svg;
+  const r = (n) => Number(n.toFixed(2));
+  return svg.replace(/(<svg\b[^>]*\sviewBox=")[^"]*(")/i, `$1${r(ink.x)} ${r(ink.y)} ${r(ink.width)} ${r(ink.height)}$2`);
 }
 
 /** The one-ink rendition from a single-colour master: every ink becomes currentColor, so the mark takes the text colour. */
@@ -103,9 +119,9 @@ export function brandConstant(src, { publicDir = null } = {}) {
   for (const [rendition, rel] of Object.entries(src.files ?? {})) {
     if (!RENDITIONS.includes(rendition)) throw new Error(`${src.from} names a mark "${rendition}"; the renditions are ${RENDITIONS.join(', ')}.`);
     // An ink rendition is one colour by definition, so whatever its file's ink, it takes the text colour.
-    if (rel) marks[rendition] = (rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel));
+    if (rel) marks[rendition] = tighten((rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel)));
   }
-  if (src.inkFrom && !marks['full-ink']) marks['full-ink'] = toInk(cleanSvg(read(src.inkFrom, 'the one-ink mark').text, src.inkFrom));
+  if (src.inkFrom && !marks['full-ink']) marks['full-ink'] = tighten(toInk(cleanSvg(read(src.inkFrom, 'the one-ink mark').text, src.inkFrom)));
 
   const kept = [];
   const logo = {};
@@ -178,4 +194,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { cleanSvg, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
+export default { cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };

@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { cleanSvg, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, BRAND_MARKER } from '../scripts/productbrand.mjs';
+import { cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, BRAND_MARKER } from '../scripts/productbrand.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
 
 const WIDE = '<?xml version="1.0"?><!-- exported --><svg xmlns="http://www.w3.org/2000/svg" width="200" height="50"><metadata>x</metadata><path onclick="steal()" d="M0 0h200v50H0z" fill="#123456"/></svg>';
@@ -26,6 +26,15 @@ describe('a mark, made safe to inline', () => {
   test('the one-ink rendition takes the text colour, even where the master set no fill', () => {
     assert.equal(toInk('<svg viewBox="0 0 1 1"><path fill="#000" stroke="black" d="M0 0"/><path style="fill:#000;stroke:none" d="M0 0"/></svg>'),
       '<svg fill="currentColor" viewBox="0 0 1 1"><path fill="currentColor" stroke="currentColor" d="M0 0"/><path style="fill:currentColor;stroke:none" d="M0 0"/></svg>');
+  });
+
+  test('the viewBox is cut to the ink, so clear space inside a brand file does not shrink the letters', () => {
+    const padded = '<svg viewBox="0 0 200 100"><rect x="50" y="25" width="100" height="50" fill="#000"/></svg>';
+    assert.match(tighten(padded), /viewBox="50 25 100 50"/);
+    const tight = '<svg viewBox="0 0 100 50"><rect width="100" height="50" fill="#000"/></svg>';
+    assert.equal(tighten(tight), tight, 'a tight file is left as it is');
+    const moved = '<svg viewBox="0 0 100 100"><g transform="translate(10 20)"><rect width="30" height="40" fill="#000"/></g></svg>';
+    assert.match(tighten(moved), /viewBox="10 20 30 40"/, 'transforms count');
   });
 
   test("Brandi's clear-space sentence becomes the share of the logo's height", () => {
