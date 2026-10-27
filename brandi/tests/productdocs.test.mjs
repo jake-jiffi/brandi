@@ -77,6 +77,16 @@ describe('what one definition writes', () => {
     assert.match(dts, /interface Window \{ Acme: typeof Acme \}/);
   });
 
+  test('an attribute name is quoted, and a row documenting native props stays out of the types', () => {
+    const field = { ...button, name: 'Search', props: [
+      { name: 'aria-label', type: 'string', doc: 'A name other than the placeholder.' },
+      { name: 'value, defaultValue, onChange', type: 'native', doc: 'Every native input prop passes through.' },
+    ] };
+    const dts = typesFile([field], system);
+    assert.match(dts, /\n {4}"aria-label"\?: string\n/);
+    assert.equal(dts.includes('value, defaultValue'), false);
+  });
+
   test('functions a component carries on itself are declared on it', () => {
     const queue = { ...button, name: 'Queue', statics: [{ name: 'show', type: '(message: string) => string', doc: 'Adds one.' }] };
     const dts = typesFile([button, queue], system);

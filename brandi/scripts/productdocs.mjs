@@ -269,7 +269,13 @@ export function typesFile(defs, system, { icons = [], numberStyles = [] } = {}) 
   for (const def of defs) {
     for (const t of def.types ?? []) lines.push(`  ${t}`);
     lines.push('', tsDoc(def.job, '  ').trimEnd(), `  interface ${def.name}Props {`);
-    for (const p of def.props) lines.push(`${tsDoc(`${p.doc}${p.default ? ` Default ${p.default}.` : ''}`, '    ')}    ${p.name}${p.required ? '' : '?'}: ${p.type}`);
+    for (const p of def.props) {
+      // A row documenting several native props at once ("value, defaultValue, onChange") is for the
+      // README only. An attribute name with a hyphen is quoted, or the file does not parse.
+      const ident = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(p.name);
+      if ((!ident && !/^[a-z][a-z0-9]*(-[a-z0-9]+)+$/.test(p.name)) || p.type === 'native') continue;
+      lines.push(`${tsDoc(`${p.doc}${p.default ? ` Default ${p.default}.` : ''}`, '    ')}    ${ident ? p.name : JSON.stringify(p.name)}${p.required ? '' : '?'}: ${p.type}`);
+    }
     if (!def.props.some((p) => p.name === 'children')) lines.push('    children?: ReactNode');
     if (!def.props.some((p) => p.name === 'className')) lines.push('    className?: string');
     // Functions hung on the component itself, such as ToastRegion.show().

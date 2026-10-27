@@ -228,8 +228,16 @@ export async function buildBundle({ starter, productDir }) {
   writeFileSync(path.join(components, 'index.d.ts'), typesFile(defs, system, { icons: uniqueIcons, numberStyles: [...NUMBER_STYLES] }));
   const tsc = path.join(starter, 'node_modules', '.bin', 'tsc');
   if (existsSync(tsc)) {
-    const check = spawnSync(tsc, ['--noEmit', '--strict', '--skipLibCheck', '--jsx', 'react-jsx', '--moduleResolution', 'bundler', '--module', 'esnext', '--target', 'es2020', '--types', 'react', '--typeRoots', path.join(starter, 'node_modules', '@types'), path.join(components, 'index.d.ts')], { cwd: starter, encoding: 'utf8' });
-    if (check.status !== 0) throw new Error(`components/index.d.ts does not compile under strict TypeScript:\n${(check.stdout || check.stderr).trim().split('\n').slice(0, 12).join('\n')}`);
+    // Checked as a .ts copy: --skipLibCheck skips every .d.ts, so the file itself was only ever
+    // parsed, and a type no definition declares passed.
+    const copy = path.join(components, 'index.check.ts');
+    writeFileSync(copy, readFileSync(path.join(components, 'index.d.ts'), 'utf8'));
+    try {
+      const check = spawnSync(tsc, ['--noEmit', '--strict', '--skipLibCheck', '--jsx', 'react-jsx', '--moduleResolution', 'bundler', '--module', 'esnext', '--target', 'es2020', '--types', 'react', '--typeRoots', path.join(starter, 'node_modules', '@types'), copy], { cwd: starter, encoding: 'utf8' });
+      if (check.status !== 0) throw new Error(`components/index.d.ts does not compile under strict TypeScript:\n${(check.stdout || check.stderr).trim().split('\n').slice(0, 12).join('\n')}`);
+    } finally {
+      rmSync(copy, { force: true });
+    }
   }
 
   const previews = path.join(components, 'previews');

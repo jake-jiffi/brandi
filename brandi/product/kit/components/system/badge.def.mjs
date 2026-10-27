@@ -22,8 +22,10 @@ export default {
   group: "Status",
   job: "One or two words of state on a record, read and never pressed.",
   status: "proven",
+  // Declared here because other components' props use it (DescriptionList's badge).
+  types: ['type BadgeTone = "success" | "warning" | "danger" | "info" | "ai" | "highlight" | "neutral"'],
   props: [
-    { name: "tone", type: '"success" | "warning" | "danger" | "info" | "ai" | "highlight" | "neutral"', default: '"neutral"', doc: "What the state is to the person reading it. See Tones." },
+    { name: "tone", type: "BadgeTone", default: '"neutral"', doc: "What the state is to the person reading it. See Tones." },
     { name: "dot", type: "boolean", default: "false", doc: "A small dot in the badge's colour before the word." },
     { name: "icon", type: "IconName | boolean", doc: "An icon before the word: a name, or true for the tone's own icon." },
     { name: "size", type: '"sm" | "md"', default: '"md"', doc: "20 or 24px tall. sm in tables and dense rows." },
