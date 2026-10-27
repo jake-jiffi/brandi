@@ -5,17 +5,22 @@
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
+// Patched (07-starter.md, card): radius-md, a hairline and shadow-sm on the surface role, and `as`
+// for a section, an article or a list item.
 const Card = React.forwardRef(function Card({
   className,
   size = "default",
+  as = "div",
   ...props
-}: React.ComponentProps<"div"> & { size?: "default" | "sm" }, ref: React.ForwardedRef<any>) {
+}: React.ComponentProps<"div"> & { size?: "default" | "sm"; as?: "div" | "section" | "article" | "li" }, ref: React.ForwardedRef<any>) {
+  // Each takes the same attributes as a div; the cast keeps TypeScript from unioning four element types.
+  const Comp = as as "div"
   return (
-    <div
+    <Comp
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-xl bg-card py-(--card-spacing) text-sm text-card-foreground shadow-xs ring-1 ring-foreground/10 [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-xl *:[img:last-child]:rounded-b-xl",
+        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-md border border-line bg-surface py-(--card-spacing) text-text shadow-sm [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-md *:[img:last-child]:rounded-b-md",
         className
       )}
       {...props}
@@ -28,8 +33,9 @@ const CardHeader = React.forwardRef(function CardHeader({ className, ...props }:
   return (
     <div
       data-slot="card-header"
+      // Patched (07-starter.md, card): its corners follow the card's radius-md.
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-xl px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-md px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
         className
       )}
       {...props}
@@ -38,12 +44,21 @@ const CardHeader = React.forwardRef(function CardHeader({ className, ...props }:
   )
 })
 
-const CardTitle = React.forwardRef(function CardTitle({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
+// Patched (07-starter.md, card): the title is a real heading, an h2, with `as` for h3 and h4, so a card
+// sits in the page's outline under its one h1. Its size follows its level, so the outline shows on
+// screen too: heading-lg for a section of the page, heading for a card under one, heading-sm below.
+const TITLE_SIZE = { h2: "type-heading-lg", h3: "type-heading", h4: "type-heading-sm" } as const
+const CardTitle = React.forwardRef(function CardTitle({
+  className,
+  as: Heading = "h2",
+  ...props
+}: React.ComponentProps<"h2"> & { as?: "h2" | "h3" | "h4" }, ref: React.ForwardedRef<any>) {
   return (
-    <div
+    <Heading
       data-slot="card-title"
       className={cn(
-        "cn-font-heading text-base leading-normal font-medium group-data-[size=sm]/card:text-sm",
+        TITLE_SIZE[Heading],
+        "text-text-strong group-data-[size=sm]/card:type-heading-sm",
         className
       )}
       {...props}
@@ -56,7 +71,8 @@ const CardDescription = React.forwardRef(function CardDescription({ className, .
   return (
     <div
       data-slot="card-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      // Patched (07-starter.md, card): the body style in the muted role.
+      className={cn("type-body text-text-muted", className)}
       {...props}
       ref={ref}
     />
@@ -92,8 +108,9 @@ const CardFooter = React.forwardRef(function CardFooter({ className, ...props }:
   return (
     <div
       data-slot="card-footer"
+      // Patched (07-starter.md, card): its corners follow the card's radius-md.
       className={cn(
-        "flex items-center rounded-b-xl px-(--card-spacing) [.border-t]:pt-(--card-spacing)",
+        "flex items-center rounded-b-md px-(--card-spacing) [.border-t]:pt-(--card-spacing)",
         className
       )}
       {...props}

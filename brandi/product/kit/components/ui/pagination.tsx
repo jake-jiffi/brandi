@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 
 const Pagination = React.forwardRef(function Pagination({ className, ...props }: React.ComponentProps<"nav">, ref: React.ForwardedRef<any>) {
+  // Patched (07-starter.md, pagination): the landmark's name in sentence case, as it is spoken, and a
+  // container, so its parts respond to its own width rather than the window's.
   return (
     <nav
       role="navigation"
-      aria-label="pagination"
+      aria-label="Pagination"
       data-slot="pagination"
-      className={cn("mx-auto flex w-full justify-center", className)}
+      className={cn("@container mx-auto flex w-full justify-center", className)}
       {...props}
       ref={ref}
     />
@@ -86,7 +88,8 @@ const PaginationPrevious = React.forwardRef(function PaginationPrevious({
         data-icon="inline-start"
         className="cn-rtl-flip"
       />
-      <span className="hidden sm:block">{text}</span>
+      {/* Patched (07-starter.md, pagination): the label shows by the nav's own width, not the window's. */}
+      <span className="hidden @min-[480px]:block">{text}</span>
     </PaginationLink>
   )
 })
@@ -104,7 +107,8 @@ const PaginationNext = React.forwardRef(function PaginationNext({
       {...props}
       ref={ref}
     >
-      <span className="hidden sm:block">{text}</span>
+      {/* Patched (07-starter.md, pagination): the label shows by the nav's own width, not the window's. */}
+      <span className="hidden @min-[480px]:block">{text}</span>
       <ChevronRightIcon
         data-icon="inline-end"
         className="cn-rtl-flip"
