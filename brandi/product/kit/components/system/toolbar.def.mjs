@@ -13,7 +13,8 @@ const colourOf = (page, role) =>
 
 const boxes = async (locator) => Promise.all((await locator.all()).map((el) => el.boundingBox()))
 
-const FILTERS = `<x-import component-from-global-scope="NS.FilterChip" count="{{n12}}" attention="{{yes}}">Needs approval</x-import>
+const FILTERS = `<x-import component-from-global-scope="NS.SearchField" placeholder="Search [invoices]" shortcut="/" size="sm" class="w-56"></x-import>
+<x-import component-from-global-scope="NS.FilterChip" count="{{n12}}" attention="{{yes}}">Needs approval</x-import>
 <x-import component-from-global-scope="NS.FilterChip" count="{{n4}}">Draft</x-import>
 <x-import component-from-global-scope="NS.FilterChip" count="{{n31}}">Overdue</x-import>
 <x-import component-from-global-scope="NS.Spacer"></x-import>
@@ -52,7 +53,6 @@ export default {
       "Bulk actions act only on rows on screen, and the count says how many.",
     ],
     Review: ["Focus fell to the page body after clearing a selection (rounds 3 and 4, section 2.6): a scripted check presses Clear selection from the keyboard."],
-    Open: ["The board shows no search field: SearchField is built separately. Mount it first in the row once it is in the bundle."],
   },
   examples: [
     {
@@ -108,9 +108,9 @@ ${FILTERS}
       example: "filters",
       async run({ scope, expect }) {
         const row = await scope.locator('[data-slot="toolbar-row"]').boundingBox()
-        const first = await scope.locator('[data-slot="filter-chip"]').first().boundingBox()
+        const first = await scope.locator('[data-slot="search-field"]').first().boundingBox()
         const exportButton = await scope.getByRole("button", { name: "Export" }).boundingBox()
-        expect.equal(Math.round(first.x), Math.round(row.x), "the first chip at the start")
+        expect.equal(Math.round(first.x), Math.round(row.x), "the search, first in the row, at the start")
         expect.equal(Math.round(exportButton.x + exportButton.width), Math.round(row.x + row.width), "Export at the far end")
       },
     },
@@ -149,10 +149,9 @@ ${FILTERS}
         await clear.focus()
         await page.keyboard.press("Enter")
         await scope.locator('[data-slot="toolbar-selection"]').waitFor({ state: "detached", timeout: 3000 })
-        const where = await page.evaluate(() => ({ body: document.activeElement === document.body, slot: document.activeElement?.getAttribute("data-slot"), text: document.activeElement?.textContent }))
+        const where = await page.evaluate(() => ({ body: document.activeElement === document.body, placeholder: document.activeElement?.getAttribute("placeholder") }))
         expect(!where.body, "focus is not on the page body")
-        expect.equal(where.slot, "filter-chip", "focus is on the first filter")
-        expect((where.text ?? "").startsWith("Needs approval"), "the first filter is Needs approval")
+        expect.equal(where.placeholder, "Search [invoices]", "focus is on the first control in the filters, the search")
       },
     },
     {

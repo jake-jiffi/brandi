@@ -105,7 +105,7 @@ export default {
       title: "Could not load, no access, not found",
       layout: "block",
       markup: `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start;">
-<x-import component-from-global-scope="NS.EmptyState" icon="CircleAlert" title="We couldn't load invoices." actions="{{tryAgain}}">[Source] is not responding. Last checked at [9:42 am].</x-import>
+<x-import component-from-global-scope="NS.EmptyState" icon="CloudOff" title="We couldn't load invoices." actions="{{tryAgain}}">[Source] is not responding. Last checked at [9:42 am].</x-import>
 <x-import component-from-global-scope="NS.EmptyState" icon="Lock" title="You don't have access to pay runs." actions="{{backHome}}">Ask [Sam Lee], your admin, to give you access.</x-import>
 <x-import component-from-global-scope="NS.EmptyState" icon="Search" title="This invoice no longer exists." actions="{{backToList}}">It may have been deleted or merged with another.</x-import>
 </div>`,

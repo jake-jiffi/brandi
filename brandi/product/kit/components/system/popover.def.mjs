@@ -23,7 +23,7 @@ export default {
     { name: "icon", type: "IconName", doc: "An icon before the trigger's words." },
     { name: "variant", type: '"secondary" | "ghost"', default: '"secondary"', doc: "The trigger's look." },
     { name: "title", type: "string", doc: "A title at the top of the panel, which also names it." },
-    { name: "children", type: "ReactNode | (close) => ReactNode", doc: "The panel. A function gets close, for a Save that closes it." },
+    { name: "children", type: "ReactNode | ((close: () => void) => ReactNode)", doc: "The panel. A function gets close, for a Save that closes it." },
     { name: "placement", type: '"bottom" | "top" | "right" | "left"', default: '"bottom"', doc: "Where it opens. It flips to stay on screen." },
     { name: "align", type: '"start" | "center" | "end"', default: '"start"', doc: "Which edge of the trigger it lines up with." },
     { name: "open", type: "boolean", doc: "Design mode: shows it open, in place, for a board, without taking focus." },

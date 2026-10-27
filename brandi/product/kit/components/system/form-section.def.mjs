@@ -1,8 +1,7 @@
-// FormSection's one definition. The fields are stand-ins until Field and TextInput land in the kit.
-const field = (id, label) => `<div class="flex flex-col gap-1.5">
-<label for="${id}" class="type-label text-text-strong">${label}</label>
-<input id="${id}" name="${id}" type="text" autocomplete="off" class="h-9 w-full min-w-0 rounded-control border border-line-control bg-surface px-3 type-body text-text">
-</div>`
+// FormSection's one definition. The board's fields are the system's Field and TextInput.
+const field = (id, label) => `<div class="flex min-w-0 flex-col"><x-import component-from-global-scope="NS.Field" label="${label}">
+<x-import component-from-global-scope="NS.TextInput" id="${id}" name="${id}" autocomplete="off"></x-import>
+</x-import></div>`
 const actions = (primary) =>
   `<x-import component-from-global-scope="NS.FormActions"><x-import component-from-global-scope="NS.Button">Cancel</x-import><x-import component-from-global-scope="NS.Button" variant="primary">${primary}</x-import></x-import>`
 

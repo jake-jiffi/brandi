@@ -1,18 +1,10 @@
-// ErrorSummary's one definition. The fields on the board are stand-ins until Field and TextInput
-// land in the kit: a label, an input and the field's own error, wired by id as Field wires them.
-const INPUT = "h-9 w-full min-w-0 rounded-control border bg-surface px-3 type-body text-text"
-const fieldError = (id, error) =>
-  `<p id="${id}-error" class="flex items-center gap-1.5 type-meta text-danger"><x-import component-from-global-scope="NS.Icon" name="CircleAlert" size="{{s14}}"></x-import>${error}</p>`
-const field = (id, label, error) => `<div class="flex flex-col gap-1.5">
-<label for="${id}" class="type-label text-text-strong">${label}</label>
-<input id="${id}" name="${id}" type="text" autocomplete="off" class="${INPUT} ${error ? "border-danger" : "border-line-control"}"${error ? ` aria-invalid="true" aria-describedby="${id}-error"` : ""}>
-${error ? fieldError(id, error) : ""}
-</div>`
-const saveField = (id, label, error) => `<div class="flex flex-col gap-1.5">
-<label for="${id}" class="type-label text-text-strong">${label}</label>
-<input id="${id}" name="${id}" type="text" autocomplete="off" class="{{saveInput}}" aria-invalid="{{saved}}">
-<sc-if value="{{saved}}">${fieldError(id, error)}</sc-if>
-</div>`
+// ErrorSummary's one definition. The board's fields are the system's Field and TextInput, wired by id.
+const field = (id, label, error) => `<x-import component-from-global-scope="NS.Field" label="${label}"${error ? ` error="${error}"` : ""}>
+<x-import component-from-global-scope="NS.TextInput" id="${id}" name="${id}" autocomplete="off"></x-import>
+</x-import>`
+const saveField = (id, label, key) => `<x-import component-from-global-scope="NS.Field" label="${label}" error="{{${key}}}">
+<x-import component-from-global-scope="NS.TextInput" id="${id}" name="${id}" autocomplete="off"></x-import>
+</x-import>`
 
 const isFocused = (locator) => locator.evaluate((el) => el === document.activeElement)
 async function until(test, ms = 2000) {
@@ -51,7 +43,8 @@ export default {
   state: { saved: false },
   logic: `saved: self.state.saved,
 save: () => self.setState({ saved: true }),
-saveInput: self.state.saved ? "${INPUT} border-danger" : "${INPUT} border-line-control"`,
+contactNameError: self.state.saved ? "Enter the contact's name" : "",
+contactPhoneError: self.state.saved ? "Enter a phone number, like 0400 000 000" : ""`,
   examples: [
     {
       id: "failed",
@@ -64,7 +57,6 @@ ${field("billing-abn", "ABN", "Enter an ABN with 11 digits")}
 ${field("billing-email", "Billing email", "Enter an email address, like name@example.com")}
 </div>`,
       vals: {
-        s14: 14,
         failedErrors: [
           { id: "billing-abn", message: "Enter an ABN with 11 digits" },
           { id: "billing-email", message: "Enter an email address, like name@example.com" },
@@ -77,8 +69,8 @@ ${field("billing-email", "Billing email", "Enter an email address, like name@exa
       layout: "block",
       markup: `<div class="flex max-w-lg flex-col gap-5">
 <sc-if value="{{saved}}"><x-import component-from-global-scope="NS.ErrorSummary" errors="{{saveErrors}}"></x-import></sc-if>
-${saveField("contact-name", "Contact name", "Enter the contact's name")}
-${saveField("contact-phone", "Phone", "Enter a phone number, like 0400 000 000")}
+${saveField("contact-name", "Contact name", "contactNameError")}
+${saveField("contact-phone", "Phone", "contactPhoneError")}
 <x-import component-from-global-scope="NS.FormActions"><x-import component-from-global-scope="NS.Button" variant="primary" on-click="{{save}}">Save contact</x-import></x-import>
 </div>`,
       vals: {
@@ -133,7 +125,9 @@ ${saveField("contact-phone", "Phone", "Enter a phone number, like 0400 000 000")
       async run({ scope, expect }) {
         for (const link of await scope.locator('[data-slot="error-summary-link"]').all()) {
           const id = (await link.getAttribute("href")).slice(1)
-          expect.equal((await scope.locator(`#${id}-error`).innerText()).trim(), (await link.innerText()).trim(), `the error under ${id}`)
+          // Field names its error by its own id, and points the control at it.
+          const describedBy = await scope.locator(`#${id}`).getAttribute("aria-describedby")
+          expect.equal((await scope.locator(`[id="${describedBy}"]`).innerText()).trim(), (await link.innerText()).trim(), `the error under ${id}`)
         }
       },
     },

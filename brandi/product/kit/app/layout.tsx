@@ -4,7 +4,7 @@ import { Suspense } from "react"
 import { NextLinkProvider } from "@/components/app/next-link"
 import { RouteFocus } from "@/components/app/route-focus"
 import { THEME_FROM_URL, ThemeProvider } from "@/components/app/theme-provider"
-import { Toaster } from "@/components/ui/sonner"
+import { ToastRegion } from "@/components/system"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { PRODUCT } from "@/lib/product"
 
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <NextLinkProvider>
             <TooltipProvider delayDuration={300}>
               {children}
-              <Toaster />
+              <ToastRegion />
             </TooltipProvider>
           </NextLinkProvider>
         </ThemeProvider>

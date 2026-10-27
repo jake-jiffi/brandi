@@ -109,3 +109,24 @@ describe('the files the system owns in a starter', () => {
     assert.equal(readdirSync(KIT).includes('node_modules'), false);
   });
 });
+
+describe('the canvas build', () => {
+  test("a board's camel-cased aria and data attributes reach an element under their real names", async () => {
+    // The canvas hands a component aria-label as ariaLabel. The runtime shim puts it back for elements.
+    // The kit is "type": "module" and the shim is CommonJS for esbuild, so it is evaluated as esbuild sees it.
+    const created = [];
+    const window = { React: { createElement: (type, props) => { created.push({ type, props }); return null; }, Fragment: 'F' } };
+    const module = { exports: {} };
+    new Function('module', 'exports', 'window', await readFile(path.join(KIT, 'canvas', 'shims', 'jsx-runtime.js'), 'utf8'))(module, module.exports, window);
+    {
+      const runtime = module.exports;
+      runtime.jsx('button', { ariaLabel: 'Close', ariaLabelledby: 'title', dataTestid: 'x', 'aria-describedby': 'hint', children: 'X' });
+      assert.deepEqual(created[0].props, { 'aria-label': 'Close', 'aria-labelledby': 'title', 'data-testid': 'x', 'aria-describedby': 'hint', children: 'X' });
+      const Comp = () => null;
+      runtime.jsx(Comp, { ariaLabel: 'Kept' });
+      assert.deepEqual(created[1].props, { ariaLabel: 'Kept' }, 'a component still gets the prop it was given');
+      runtime.jsx('span', { 'aria-label': 'Real', ariaLabel: 'Camel' });
+      assert.equal(created[2].props['aria-label'], 'Real', 'a real attribute name wins over a camel-cased one');
+    }
+  });
+});

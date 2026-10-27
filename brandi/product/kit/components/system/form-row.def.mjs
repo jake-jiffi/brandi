@@ -1,8 +1,7 @@
-// FormRow's one definition. The fields are stand-ins until Field and TextInput land in the kit.
-const field = (id, label) => `<div class="flex flex-col gap-1.5" data-field="${id}">
-<label for="${id}" class="type-label text-text-strong">${label}</label>
-<input id="${id}" name="${id}" type="text" autocomplete="off" class="h-9 w-full min-w-0 rounded-control border border-line-control bg-surface px-3 type-body text-text">
-</div>`
+// FormRow's one definition. The board's fields are the system's Field and TextInput.
+const field = (id, label) => `<div class="flex min-w-0 flex-col" data-field="${id}"><x-import component-from-global-scope="NS.Field" label="${label}">
+<x-import component-from-global-scope="NS.TextInput" id="${id}" name="${id}" autocomplete="off"></x-import>
+</x-import></div>`
 
 const boxes = (scope) => scope.locator("[data-field]").evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON()))
 const oneRow = (b) => b.every((x) => Math.abs(x.top - b[0].top) < 1)
