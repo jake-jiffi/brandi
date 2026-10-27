@@ -32,7 +32,8 @@ for (const p of pages) {
     await page.addScriptTag({ content: axeSource })
     const r = await page.evaluate(async () => {
       // eslint-disable-next-line no-undef
-      const res = await axe.run(document, { resultTypes: ["violations"] })
+      // Label in name is WCAG 2.5.3, Level A, but axe ships it switched off as experimental.
+      const res = await axe.run(document, { resultTypes: ["violations"], rules: { "label-content-name-mismatch": { enabled: true } } })
       return res.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")) }))
     })
     results.push({ ...p, violations: r })

@@ -187,7 +187,7 @@ export const AskPanel = React.forwardRef<HTMLElement, AskPanelProps>(function As
               title={greeting}
               headingLevel={(level + 1) as 3}
               className="my-auto"
-              actions={ideas.map((idea) => ({ label: idea, variant: "ghost" as const, icon: "ArrowRight" as const, onClick: () => onSuggest?.(idea) }))}
+              actions={ideas.map((idea) => ({ label: idea, variant: "ghost" as const, icon: "CornerDownRight" as const, onClick: () => onSuggest?.(idea) }))}
             />
           )}
         </div>
@@ -221,7 +221,7 @@ export const AskPanel = React.forwardRef<HTMLElement, AskPanelProps>(function As
           />
           {/* Keyed apart: reusing the pressed Stop as a submit button would let the browser send the form from its click. */}
           {running && onStop ? (
-            <Button key="stop" type="button" size="sm" icon="Square" onClick={stop}>
+            <Button key="stop" type="button" size="sm" icon="CircleStop" onClick={stop}>
               {stopLabel}
             </Button>
           ) : (

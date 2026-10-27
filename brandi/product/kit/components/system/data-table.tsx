@@ -3,14 +3,6 @@
 import * as React from "react"
 
 import { Checkbox as CheckboxBox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatNumber, NUMBER_STYLES, type NumberStyle } from "@/lib/format"
 import type { IconName } from "@/lib/icons"
@@ -25,13 +17,13 @@ import { Checkbox } from "./checkbox"
 import { Delta, type DeltaGoodWhen } from "./delta"
 import { EditableCell, type EditableCellSave } from "./editable-cell"
 import { Icon } from "./icon"
-import { IconButton } from "./icon-button"
 import { List, stateView } from "./list"
 import { ListRow, type ListRowBadge } from "./list-row"
 import { Progress } from "./progress"
 import { Skeleton } from "./skeleton"
 import { Tag, type TagColor } from "./tag"
 import { Toolbar } from "./toolbar"
+import { Menu, type MenuEntry } from "./menu"
 
 /** A row is plain data, as an API returns it. */
 export type DataTableRow = Record<string, unknown>
@@ -236,70 +228,9 @@ function compareRows(a: DataTableRow, b: DataTableRow, col: DataTableColumn, dir
   return direction === "ascending" ? order : -order
 }
 
-// -- The row menu --
+// -- The row menu: the system's Menu, named for the record --
 
-type RowMenuEntry =
-  | { label: string; icon?: IconName; description?: string; shortcut?: string; danger?: boolean; disabled?: boolean; checked?: boolean; onSelect?: () => void }
-  | "separator"
-  | { group: string }
-
-/**
- * Stands in for Menu until it lands in the kit, with Menu's own props, so the swap is one import: an overflow
- * button named for the record, a menu in a portal that closes at once, and focus back on the button.
- */
-function RowMenu({ label, items }: { label: string; items: RowMenuEntry[] }) {
-  const [open, setOpen] = React.useState(false)
-  const trigger = React.useRef<HTMLButtonElement | null>(null)
-  const was = React.useRef(false)
-  React.useEffect(() => {
-    if (was.current && !open) {
-      const active = document.activeElement
-      if (!active || active === document.body) trigger.current?.focus()
-    }
-    was.current = open
-  }, [open])
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <IconButton ref={trigger} icon="Ellipsis" label={label} />
-      </DropdownMenuTrigger>
-      {/* Mounted only while open, so closing takes it away at once and its layer never holds the next Escape. */}
-      {open ? (
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={(event) => event.preventDefault()}
-          className="z-(--z-popover) w-auto min-w-44 rounded-md border border-line bg-surface-raised p-1 text-text shadow-lg ring-0"
-        >
-          {items.map((item, i) =>
-            item === "separator" ? (
-              <DropdownMenuSeparator key={i} className="bg-line" />
-            ) : "group" in item ? (
-              <DropdownMenuLabel key={i} className="px-2 py-1.5 type-eyebrow text-text-muted">
-                {item.group}
-              </DropdownMenuLabel>
-            ) : (
-              <DropdownMenuItem
-                key={i}
-                disabled={item.disabled}
-                onSelect={() => item.onSelect?.()}
-                className={cn(
-                  "h-9 gap-2 rounded-sm px-2 type-body text-text focus:bg-hover focus:text-text-strong focus:shadow-[inset_0_0_0_1px_var(--line-control)] pointer-coarse:h-11",
-                  item.danger && "text-danger focus:text-danger"
-                )}
-              >
-                {item.icon ? <Icon name={item.icon} /> : null}
-                {item.label}
-              </DropdownMenuItem>
-            )
-          )}
-        </DropdownMenuContent>
-      ) : null}
-    </DropdownMenu>
-  )
-}
-
-/** Binds the row into each action, so the menu's actions take no argument, as Menu's do. */
-function menuFor(col: DataTableColumn, row: DataTableRow): RowMenuEntry[] {
+function menuFor(col: DataTableColumn, row: DataTableRow): MenuEntry[] {
   let entries: unknown
   try {
     entries = typeof col.items === "function" ? col.items(row) : col.items
@@ -307,7 +238,7 @@ function menuFor(col: DataTableColumn, row: DataTableRow): RowMenuEntry[] {
     entries = []
   }
   if (!Array.isArray(entries)) return []
-  return entries.flatMap((entry): RowMenuEntry[] => {
+  return entries.flatMap((entry): MenuEntry[] => {
     if (entry === "separator") return ["separator"]
     if (isObject(entry) && typeof entry.group === "string") return [{ group: entry.group }]
     if (isObject(entry) && typeof entry.label === "string") {
@@ -504,7 +435,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
       }
       return naming && (typeof drawn === "string" || typeof drawn === "number") ? opener(row, drawn) : drawn ?? none
     }
-    if (type === "actions") return <RowMenu label={`More actions for ${name}`} items={menuFor(col, row)} />
+    if (type === "actions") return <Menu label={`More actions for ${name}`} items={menuFor(col, row)} align="end" />
     // The naming column holds the row's link or button and names the record, so it is never edited in place.
     if (col.editable && !naming) {
       return (
@@ -827,7 +758,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
                   meta={words.length ? words.join(" · ") : undefined}
                   badges={badges.length ? badges : undefined}
                   leading={selectable ? rowBox(key, name) : undefined}
-                  action={phone.actions ? <RowMenu label={`More actions for ${name}`} items={menuFor(phone.actions, row)} /> : undefined}
+                  action={phone.actions ? <Menu label={`More actions for ${name}`} items={menuFor(phone.actions, row)} align="end" /> : undefined}
                   href={rowHref?.(row)}
                   onClick={!rowHref && onRowClick ? () => onRowClick(row) : undefined}
                   className={chosen.includes(key) ? "bg-selected hover:bg-selected-strong" : undefined}

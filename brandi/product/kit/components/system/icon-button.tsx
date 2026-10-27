@@ -3,10 +3,10 @@
 import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import type { IconName } from "@/lib/icons"
 
 import { Icon } from "./icon"
+import { Tooltip } from "./tooltip"
 
 export type IconButtonVariant = "ghost" | "secondary" | "primary" | "danger"
 export type IconButtonSize = "sm" | "md" | "lg"
@@ -32,18 +32,13 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(f
   ref
 ) {
   return (
-    // Only true forces the tooltip open; false or unset leaves it to hover and focus, so it can never be silenced.
-    <Tooltip open={tooltipOpen ? true : undefined}>
-      <TooltipTrigger asChild>
-        <ButtonBase ref={ref} type={type ?? "button"} variant={VARIANT[variant]} size={SIZE[size]} aria-label={label} {...rest}>
-          <Icon name={icon} className={size === "lg" ? "size-5" : undefined} />
-        </ButtonBase>
-      </TooltipTrigger>
-      <TooltipContent sideOffset={4} collisionPadding={8} className="z-(--z-tooltip) rounded-sm bg-surface-inverse px-2 py-1 type-caption text-text-inverse">
-        {/* Radix points the trigger's description at the tooltip. Its words are the name again, so they are
-            hidden from screen readers and the label is heard once. */}
-        <span aria-hidden="true">{label}</span>
-      </TooltipContent>
+    // The system's Tooltip: hover, keyboard focus and a long press, and in a design a still picture with
+    // nothing listening. Only true shows it in place; unset leaves it to people, so it can never be silenced.
+    // Its words are the button's name, so it adds no description and the label is heard once.
+    <Tooltip content={label} open={tooltipOpen ? true : undefined}>
+      <ButtonBase ref={ref} type={type ?? "button"} variant={VARIANT[variant]} size={SIZE[size]} aria-label={label} {...rest}>
+        <Icon name={icon} className={size === "lg" ? "size-5" : undefined} />
+      </ButtonBase>
     </Tooltip>
   )
 })

@@ -308,7 +308,7 @@ export const AIAnswer = React.forwardRef<HTMLElement, AIAnswerProps>(function AI
                 key={`${i}-${s}`}
                 variant="ghost"
                 size="sm"
-                icon="ArrowRight"
+                icon="CornerDownRight"
                 onClick={() => onSuggest?.(s)}
                 className="h-auto min-h-8 py-1.5 text-left whitespace-normal pointer-coarse:h-auto pointer-coarse:min-h-10"
               >

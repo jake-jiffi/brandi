@@ -57,6 +57,8 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
     >
       {on ? <Icon name="Check" className="size-3.5" /> : icon ? <Icon name={icon} className="size-3.5" /> : null}
       <span data-slot="filter-chip-label">{children}</span>
+      {/* A space between the word and the count, so the visible text reads "Draft 1" and stays inside the name (WCAG 2.5.3). */}
+      {known ? " " : null}
       {known ? (
         <span
           aria-hidden="true"

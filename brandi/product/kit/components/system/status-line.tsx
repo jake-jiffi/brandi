@@ -94,7 +94,7 @@ const STATES: StatusLineState[] = ["idle", "working", "waiting", "done", "stoppe
 const MARK: Record<Exclude<StatusLineState, "idle" | "working">, { icon: IconName; tone: string }> = {
   waiting: { icon: "CircleDot", tone: "text-ai" },
   done: { icon: "CircleCheck", tone: "text-success" },
-  stopped: { icon: "Square", tone: "text-text-muted" },
+  stopped: { icon: "CircleStop", tone: "text-text-muted" },
   failed: { icon: "CircleAlert", tone: "text-danger" },
 }
 
@@ -284,7 +284,7 @@ export const StatusLine = React.forwardRef<HTMLDivElement, StatusLineProps>(func
         </span>
       ) : null}
       {state === "working" && onStop ? (
-        <Button size={size} icon="Square" onClick={press(onStop)}>
+        <Button size={size} icon="CircleStop" onClick={press(onStop)}>
           {stopLabel}
         </Button>
       ) : null}

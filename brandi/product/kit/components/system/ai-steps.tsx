@@ -43,7 +43,7 @@ type Phase = "running" | "waiting" | "failed" | "stopped" | "done"
 const SUMMARY_MARK: Record<Exclude<Phase, "running">, { icon: IconName; tone: string }> = {
   waiting: { icon: "CircleDot", tone: "text-ai" },
   failed: { icon: "CircleAlert", tone: "text-danger" },
-  stopped: { icon: "Square", tone: "text-text-muted" },
+  stopped: { icon: "CircleStop", tone: "text-text-muted" },
   done: { icon: "CircleCheck", tone: "text-success" },
 }
 
@@ -80,11 +80,11 @@ function rowState(status: AIStepStatus, stopped: boolean): { word: string; icon:
     case "done":
       return { word: "Done", icon: "CircleCheck", tone: "text-success" }
     case "running":
-      return stopped ? { word: "Stopped", icon: "Square", tone: "text-text-muted" } : { word: "Running", icon: "LoaderCircle", tone: "text-ai", spin: true }
+      return stopped ? { word: "Stopped", icon: "CircleStop", tone: "text-text-muted" } : { word: "Running", icon: "LoaderCircle", tone: "text-ai", spin: true }
     case "failed":
       return { word: "Failed", icon: "CircleAlert", tone: "text-danger" }
     case "skipped":
-      return { word: "Skipped", icon: "ChevronsRight", tone: "text-text-muted" }
+      return { word: "Skipped", icon: "CircleMinus", tone: "text-text-muted" }
     case "approval":
       return { word: "Waiting for your approval", icon: "CircleDot", tone: "text-ai" }
     default:
