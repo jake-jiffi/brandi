@@ -76,4 +76,11 @@ describe('what one definition writes', () => {
     assert.match(dts, /type ThingKind = "a" \| "b"/);
     assert.match(dts, /interface Window \{ Acme: typeof Acme \}/);
   });
+
+  test('functions a component carries on itself are declared on it', () => {
+    const queue = { ...button, name: 'Queue', statics: [{ name: 'show', type: '(message: string) => string', doc: 'Adds one.' }] };
+    const dts = typesFile([button, queue], system);
+    assert.match(dts, /const Queue: ComponentType<QueueProps> & \{\n[\s\S]*?show: \(message: string\) => string\n {2}\}/);
+    assert.match(dts, /const Button: ComponentType<ButtonProps>\n/, 'a component with none stays a plain component type');
+  });
 });

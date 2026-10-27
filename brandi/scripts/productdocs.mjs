@@ -272,7 +272,9 @@ export function typesFile(defs, system, { icons = [], numberStyles = [] } = {}) 
     for (const p of def.props) lines.push(`${tsDoc(`${p.doc}${p.default ? ` Default ${p.default}.` : ''}`, '    ')}    ${p.name}${p.required ? '' : '?'}: ${p.type}`);
     if (!def.props.some((p) => p.name === 'children')) lines.push('    children?: ReactNode');
     if (!def.props.some((p) => p.name === 'className')) lines.push('    className?: string');
-    lines.push('  }', `  const ${def.name}: ComponentType<${def.name}Props>`);
+    // Functions hung on the component itself, such as ToastRegion.show().
+    const statics = (def.statics ?? []).map((st) => `${tsDoc(st.doc ?? '', '    ')}    ${st.name}: ${st.type}`);
+    lines.push('  }', statics.length ? `  const ${def.name}: ComponentType<${def.name}Props> & {\n${statics.join('\n')}\n  }` : `  const ${def.name}: ComponentType<${def.name}Props>`);
   }
   lines.push('}', '', 'declare global {', `  interface Window { ${ns}: typeof ${ns} }`, '}', '', 'export {}', '');
   return lines.filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');

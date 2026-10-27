@@ -78,6 +78,10 @@ export default {
   group: "Feedback",
   job: "The queue that shows, times and pauses toasts.",
   status: "to build",
+  statics: [
+    { name: "show", type: "(message: ReactNode, options?: Omit<ToastItem, \"id\" | \"message\"> & { id?: string }) => string", doc: "Adds a toast to the queue from anywhere and returns its id. The same id replaces a queued toast." },
+    { name: "dismiss", type: "(id?: string) => void", doc: "Removes one toast, or every toast when no id is given." },
+  ],
   types: [
     'type ToastItem = { id: string; message: ReactNode; tone?: "neutral" | "success" | "warning" | "danger"; icon?: IconName; action?: string; onAction?: () => void }',
   ],
