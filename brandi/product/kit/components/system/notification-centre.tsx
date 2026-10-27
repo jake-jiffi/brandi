@@ -184,7 +184,9 @@ export const NotificationCentre = React.forwardRef<HTMLButtonElement, Notificati
       <div data-slot="notification-panel" className="flex min-h-0 flex-col">
         {inSheet ? null : (
           <div className="flex min-h-14 items-center justify-between gap-3 border-b border-line py-2.5 pr-2.5 pl-4">
-            <Heading className="type-heading-lg text-text-strong">{label}</Heading>
+            {/* The bell that opened the panel can sit straight above this heading, which the design detector
+                reads as a decorative icon tile stacked over a heading. It is a button and its panel. */}
+            <Heading data-impeccable-ignore="icon-tile-stack" className="type-heading-lg text-text-strong">{label}</Heading>
             {unread > 0 ? (
               <Button size="sm" variant="ghost" icon="CheckCheck" onClick={markAll}>
                 Mark all as read

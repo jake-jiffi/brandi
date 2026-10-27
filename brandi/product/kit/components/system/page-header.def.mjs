@@ -1,6 +1,7 @@
 // PageHeader's one definition: its README, its preview board and its scripted checks all come from here.
 
-const LONG = "[Invoice 1042 for the March grooming package, the late fee and the travel surcharge]"
+// Long enough to need cutting at two lines in a condensed face too.
+const LONG = "[Invoice 1042 for the March grooming package, the late fee, the travel surcharge, the second dog's nail trim and the flea treatment we added on the day]"
 
 export default {
   name: "PageHeader",

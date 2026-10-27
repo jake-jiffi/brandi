@@ -1,5 +1,10 @@
 // Schedule's one definition: its README, its preview board and its scripted checks all come from here.
 
+// Times and spans as this product writes them (TIME in lib/format-locale.js), the way Schedule does.
+const on = (h, m = 0) => new Date(2026, 10, 5, h, m)
+const tm = (format, h, m = 0) => format.formatTime(on(h, m), { onTheHour: "drop" })
+const span = (format, [h1, m1 = 0], [h2, m2 = 0]) => format.formatTimeRange(on(h1, m1), on(h2, m2), { onTheHour: format.TIME?.onTheHour === "drop" ? "drop" : "pair" })
+
 // A café's roster for the week of Monday 2 November 2026. Colours follow the role, as a Tag's would.
 const shift = (id, title, start, end, meta, color) => ({ id, title, start, end, meta, color, href: `#${id}` })
 const roster = [
@@ -137,7 +142,7 @@ export default {
     {
       name: "Monday comes first in en-AU, dates read in the locale, and today carries aria-current",
       example: "week",
-      async run({ scope, expect }) {
+      async run({ scope, expect, format }) {
         expect.equal(await words(scope.locator('[data-slot="schedule-period"]')), "2 to 8 November 2026", "the period, as a range joined with to")
         const days = await scope.locator('[data-slot="schedule-day"] .sr-only').allTextContents()
         expect.equal(days[0].trim(), "Monday 2 November", "the week starts on Monday")
@@ -145,30 +150,30 @@ export default {
         const today = scope.locator('[data-slot="schedule-day"][aria-current="date"]')
         expect.equal(await today.count(), 1, "one day is today")
         expect.equal(await words(today.locator(".sr-only")), "Wednesday 4 November, today", "today is Wednesday, said in words")
-        expect.equal(await words(scope.locator('[data-slot="schedule-hour"]').first()), "7 am", "hours read in the locale")
+        expect.equal(await words(scope.locator('[data-slot="schedule-hour"]').first()), tm(format, 7), "hours read in the locale")
       },
     },
     {
       name: "The grid is one tab stop, and the arrows move from slot to slot, through events side by side, stopping at the edges",
       example: "week",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         const grid = scope.getByRole("grid", { name: "Roster, 2 to 8 November 2026" })
         expect.equal(await grid.locator('[tabindex="0"]').count(), 1, "one tab stop in the grid")
         expect(await tabTo(page, grid), "Tab reaches the grid")
-        expect.equal(await inHand(page), "[Priya Nair], 8 am to 12 pm, Kitchen", "focus lands on today's first event")
+        expect.equal(await inHand(page), `[Priya Nair], ${span(format, [8], [12])}, Kitchen`, "focus lands on today's first event")
         await page.keyboard.press("ArrowRight")
-        expect.equal(await inHand(page), "[Jordan Kaur], 8 to 10 am, Training", "Right goes to the event beside it, in the same slot")
+        expect.equal(await inHand(page), `[Jordan Kaur], ${span(format, [8], [10])}, Training`, "Right goes to the event beside it, in the same slot")
         await page.keyboard.press("ArrowRight")
         expect.equal(await inHand(page), "slot 3-1-0", "then on to Thursday's free 8 am slot")
         await page.keyboard.press("ArrowDown")
         await page.keyboard.press("ArrowDown")
-        expect.equal(await inHand(page), "[Alex Chen], 10 am to 2 pm, Deliveries", "Down twice lands on Thursday's 10 am shift")
+        expect.equal(await inHand(page), `[Alex Chen], ${span(format, [10], [14])}, Deliveries`, "Down twice lands on Thursday's 10 am shift")
         for (let i = 0; i < 6; i++) await page.keyboard.press("ArrowUp")
         expect.equal(await inHand(page), "slot 3-0-0", "Up stops at the first hour")
         await page.keyboard.press("Home")
-        expect.equal(await inHand(page), "[Sam Lee], 7 am to 3 pm, Front of house", "Home goes to Monday's slot in the same row")
+        expect.equal(await inHand(page), `[Sam Lee], ${span(format, [7], [15])}, Front of house`, "Home goes to Monday's slot in the same row")
         await page.keyboard.press("ArrowLeft")
-        expect.equal(await inHand(page), "[Sam Lee], 7 am to 3 pm, Front of house", "Left stops at the first day")
+        expect.equal(await inHand(page), `[Sam Lee], ${span(format, [7], [15])}, Front of house`, "Left stops at the first day")
         await page.keyboard.press("Control+End")
         expect.equal(await inHand(page), "slot 6-11-0", "Ctrl End goes to the last slot")
         expect.equal(await grid.locator('[tabindex="0"]').count(), 1, "still one tab stop, where focus is")
@@ -179,27 +184,28 @@ export default {
     {
       name: "Every event reads its title and time, and a slot inside a longer event says what continues",
       example: "week",
-      async run({ scope, expect }) {
+      async run({ scope, expect, format }) {
         const names = await scope.locator('[data-slot="schedule-event"]').evaluateAll((els) => els.map((el) => el.getAttribute("aria-label").replace(/\s+/g, " ")))
         expect.equal(names.length, 11, "every shift in the week is on the grid")
-        // On the hour the minutes go, and the locale writes a shared half once: 8 to 10 am, 7:00 am to 12:30 pm.
-        const said = /^\[[^\]]+\], \d{1,2}(:\d{2})?( [ap]m)? to \d{1,2}(:\d{2})? [ap]m, [A-Z]/
+        // On the hour the minutes go, and the locale writes a shared half once: 8 to 10 am, 7:00 am to 12:30 pm,
+        // or the brand's own way: 11am to 10.30pm.
+        const said = /^\[[^\]]+\], \d{1,2}([:.]\d{2})? ?([ap]m)? to \d{1,2}([:.]\d{2})? ?[ap]m, [A-Z]/
         expect(names.every((n) => said.test(n)), `each names its person, its time and its role (${names.find((n) => !said.test(n))})`)
-        expect.equal(await scope.getByRole("link", { name: "[Alex Chen], 7:00 am to 12:30 pm, Deliveries" }).count(), 1, "an event with an href is a link, with minutes when they are not on the hour")
+        expect.equal(await scope.getByRole("link", { name: `[Alex Chen], ${span(format, [7], [12, 30])}, Deliveries` }).count(), 1, "an event with an href is a link, with minutes when they are not on the hour")
         const continues = await words(scope.locator('[data-slot="schedule-slot"][data-target="2-3-0"]'))
-        expect.equal(continues, "[Priya Nair], until 12 pm", "Wednesday's 10 am slot says Priya's shift continues")
+        expect.equal(continues, `[Priya Nair], until ${tm(format, 12)}`, "Wednesday's 10 am slot says Priya's shift continues")
       },
     },
     {
       name: "An event cut short in a narrow lane shows in full on keyboard focus",
       example: "week",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         expect(await tabTo(page, scope.getByRole("grid")), "Tab reaches the grid")
         await page.keyboard.press("ArrowRight")
-        expect.equal(await inHand(page), "[Jordan Kaur], 8 to 10 am, Training", "focus is on the narrow event beside Priya's")
+        expect.equal(await inHand(page), `[Jordan Kaur], ${span(format, [8], [10])}, Training`, "focus is on the narrow event beside Priya's")
         const tip = page.locator('[data-slot="tooltip-content"]')
         await tip.waitFor({ state: "visible", timeout: 3000 })
-        expect.equal((await tip.innerText()).replace(/\s+/g, " ").trim(), "[Jordan Kaur], 8 to 10 am, Training", "the tooltip holds the whole event")
+        expect.equal((await tip.innerText()).replace(/\s+/g, " ").trim(), `[Jordan Kaur], ${span(format, [8], [10])}, Training`, "the tooltip holds the whole event")
         const wide = await scope.locator('[data-slot="schedule-event"]', { hasText: "[Alex Chen]" }).last().evaluate((el) => el.closest('[data-slot="tooltip-trigger"]')?.dataset.state ?? "none")
         expect(wide !== "open", "an event shown in full opens no tooltip")
       },
@@ -227,7 +233,7 @@ export default {
     {
       name: "Under 640px of its own width it becomes a list by day, and Tab moves through the events",
       example: "phone",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         expect.equal(await scope.locator('[data-slot="schedule-grid"]').evaluate((el) => getComputedStyle(el).display), "none", "the grid is gone")
         const list = scope.locator('[data-slot="schedule-list"]')
         expect(await list.isVisible(), "the list shows")
@@ -239,7 +245,7 @@ export default {
         const first = list.getByRole("link").first()
         expect(await tabTo(page, first), "Tab reaches the first event")
         await page.keyboard.press("Tab")
-        expect.equal(await inHand(page), "[Priya Nair], 9 am to 5 pm, Kitchen", "Tab moves to the next event")
+        expect.equal(await inHand(page), `[Priya Nair], ${span(format, [9], [17])}, Kitchen`, "Tab moves to the next event")
       },
     },
     {
@@ -286,7 +292,7 @@ export default {
     {
       name: "A shift past midnight shows on both days, and the grid reaches back to hold it",
       example: "week",
-      async run({ page, expect }) {
+      async run({ page, expect, format }) {
         const out = await page.evaluate(() => {
           const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
           const host = document.createElement("div")
@@ -302,7 +308,7 @@ export default {
           host.remove()
           return { firstHour, parts, listed }
         })
-        expect.equal(out.firstHour, "12 am", "the grid starts at midnight, to hold the shift's second half")
+        expect.equal(out.firstHour, tm(format, 0), "the grid starts at midnight, to hold the shift's second half")
         expect.equal(out.parts.join(","), "4,5", "the shift shows on Friday and on Saturday")
         expect.equal(out.listed, 2, "and under both days in the phone list")
       },

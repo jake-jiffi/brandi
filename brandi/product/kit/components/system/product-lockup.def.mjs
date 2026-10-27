@@ -47,7 +47,7 @@ export default {
     {
       id: "rail",
       title: "A long name in the rail",
-      markup: `<div class="w-60 rounded-lg border border-line bg-rail px-4 py-5"><x-import component-from-global-scope="NS.ProductLockup" product="[Workforce planning and rostering]" href="#"></x-import></div>`,
+      markup: `<div class="w-60 rounded-lg border border-line bg-rail px-4 py-5"><x-import component-from-global-scope="NS.ProductLockup" tone="rail" product="[Workforce planning and rostering]" href="#"></x-import></div>`,
     },
     {
       id: "ink",

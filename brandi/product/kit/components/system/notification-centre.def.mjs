@@ -88,6 +88,7 @@ export default {
       "Each line names who did what, in the past tense or as a request: [Sam Lee] asked you to approve [14] timesheets. The assistant's lines name the assistant, so the ai tone is never the only clue.",
       "Times as people read them: Today, 9:41 am.",
     ],
+    Detector: ["The bell can sit straight above the open panel's heading, which the design detector reads as a decorative icon tile over a heading. The heading carries data-impeccable-ignore=\"icon-tile-stack\": it is a button and the panel it opened."],
     Rules: [
       "For events that concern the person signed in. Something that went wrong while they were there is an Alert or a Toast, not a notification.",
       "A highlight count is waiting on the reader: unread notifications are. Zero shows nothing.",

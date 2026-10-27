@@ -86,7 +86,9 @@ const Header = React.forwardRef<HTMLElement, PageHeaderProps>(function PageHeade
         <div className="flex min-w-0 flex-1 flex-col gap-1 @max-[640px]/page-header:w-full">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
             {/* Focusable from script only, so focus can land here after an action removes what had it. */}
-            <Heading tabIndex={-1} data-slot="page-title" className="min-w-0 max-w-full rounded-xs type-title text-balance text-text-strong">
+            {/* A display face set in capitals keeps them for short titles; a long one reads in its own case, since
+                a line of capitals is hard going past a few words. */}
+            <Heading tabIndex={-1} data-slot="page-title" className={cn("min-w-0 max-w-full rounded-xs type-title text-balance text-text-strong", typeof title === "string" && title.length > 40 && "normal-case")}>
               {toggles ? (
                 <button
                   type="button"

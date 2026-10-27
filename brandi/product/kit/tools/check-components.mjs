@@ -7,8 +7,9 @@
  *   node tools/check-components.mjs [--previews <dir>] [--only Button,Dialog] [--json results.json]
  *
  * <dir> holds each component's rendered preview (<Name>Preview.preview.html, written by Brandi's
- * preview.mjs). A check receives { page, scope, expect, theme, brand }: scope is the example's section,
- * and brand is { name, product }, the names the bundle was built with.
+ * preview.mjs). A check receives { page, scope, expect, theme, brand, format }: scope is the example's
+ * section, brand is { name, product }, the names the bundle was built with, and format is lib/format.js
+ * with the product's TIME style, so an expected time reads the way the product writes times.
  * Prints {"passed": n, "failed": [...]} and exits 1 when anything failed.
  *
  * Without --previews it reads canvas/previews, which `brandi product bundle` renders along with
@@ -38,6 +39,9 @@ function makeExpect() {
   expect.atLeast = (a, b, message) => { if (!(a >= b)) throw new Error(`${message ?? "too small"}: got ${a}, wanted at least ${b}`) }
   return expect
 }
+
+// The starter's own formatter and time style, so a check expects a time the way this product writes it.
+const format = { ...(await import(pathToFileURL(path.join(root, "lib", "format.js")).href)), TIME: (await import(pathToFileURL(path.join(root, "lib", "format-locale.js")).href)).TIME }
 
 const dir = path.join(root, "components", "system")
 const files = readdirSync(dir).filter((x) => x.endsWith(".def.mjs")).sort()
@@ -112,7 +116,7 @@ for (const def of defs) {
           const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
           return { name: kit?.BRAND?.name ?? "Product", product: kit?.PRODUCT?.name ?? "Product" }
         })
-        await check.run({ page, scope, expect: makeExpect(), theme, brand })
+        await check.run({ page, scope, expect: makeExpect(), theme, brand, format })
         if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`)
         passed.push(label)
       } catch (e) {

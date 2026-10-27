@@ -1,5 +1,8 @@
 // TimePicker's one definition: its README, its preview board and its scripted checks all come from here.
 
+// A time as this product writes it (TIME in lib/format-locale.js), from the starter's own formatter.
+const T = (format, h, m = 0) => format.formatTime(h * 60 + m)
+
 const row = (inner) => `<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; width: 100%;">\n${inner}\n</div>`
 const field = (label, props, extra = "") => `<x-import component-from-global-scope="NS.Field" label="${label}"${extra}>\n<x-import component-from-global-scope="NS.TimePicker" ${props}></x-import>\n</x-import>`
 
@@ -96,67 +99,67 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
     {
       name: "Typing moves the list to the time it reads as, and Enter takes what was typed, written in the locale's way",
       example: "basics",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         const input = scope.getByRole("combobox", { name: "Reminder" })
         await input.focus()
         await page.keyboard.type("930")
         await page.getByRole("listbox", { name: "Reminder" }).waitFor()
-        expect.equal(await inHand(page), "9:30 am", "930 puts 9:30 am in hand")
+        expect.equal(await inHand(page), T(format, 9, 30), "930 puts 9:30 am in hand")
         await page.keyboard.press("Enter")
-        expect.equal(await input.inputValue(), "9:30 am", "the field reads 9:30 am")
+        expect.equal(await input.inputValue(), T(format, 9, 30), "the field reads 9:30 am")
         expect.equal(await scope.locator('input[type="hidden"][name="reminder"]').inputValue(), "09:30", "the value is HH:mm")
         expect.equal(await page.evaluate(() => document.querySelectorAll("[data-radix-popper-content-wrapper]").length), 0, "the list closed")
         await input.fill("")
         await page.keyboard.type("12")
-        expect.equal(await inHand(page), "12:00 pm", "12 is noon, not midnight")
+        expect.equal(await inHand(page), T(format, 12, 0), "12 is noon, not midnight")
         await input.fill("")
         await page.keyboard.type("9:50 pm")
         await page.keyboard.press("Enter")
-        expect.equal(await input.inputValue(), "9:50 pm", "a time between the list's steps is taken as typed")
+        expect.equal(await input.inputValue(), T(format, 21, 50), "a time between the list's steps is taken as typed")
         expect(await input.evaluate((el) => document.activeElement === el), "focus stayed on the input")
       },
     },
     {
       name: "Down opens the list at the chosen time, Down moves, and Enter takes the time in hand",
       example: "basics",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         const input = scope.getByRole("combobox", { name: "Start" })
         await input.focus()
         await page.keyboard.press("ArrowDown")
         await page.getByRole("listbox", { name: "Start" }).waitFor()
-        expect.equal(await inHand(page), "9:00 am", "the chosen time is in hand")
-        expect.equal(await page.getByRole("listbox", { name: "Start" }).getByRole("option", { selected: true }).textContent(), "9:00 am", "and marked as chosen")
+        expect.equal(await inHand(page), T(format, 9, 0), "the chosen time is in hand")
+        expect.equal(await page.getByRole("listbox", { name: "Start" }).getByRole("option", { selected: true }).textContent(), T(format, 9, 0), "and marked as chosen")
         await page.keyboard.press("ArrowDown")
         await page.keyboard.press("ArrowDown")
-        expect.equal(await inHand(page), "9:30 am", "Down moved a step at a time")
+        expect.equal(await inHand(page), T(format, 9, 30), "Down moved a step at a time")
         await page.keyboard.press("Enter")
-        expect.equal(await input.inputValue(), "9:30 am", "Enter took the time in hand")
+        expect.equal(await input.inputValue(), T(format, 9, 30), "Enter took the time in hand")
         expect.equal(await scope.locator('input[type="hidden"][name="start"]').inputValue(), "09:30", "as HH:mm")
       },
     },
     {
       name: "A finish counts the hours from the start, in the hours style, and reads 5 as 5 pm",
       example: "basics",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         const input = scope.getByRole("combobox", { name: "Finish" })
         await input.focus()
         await page.keyboard.press("ArrowDown")
         const list = page.getByRole("listbox", { name: "Finish" })
         await list.waitFor()
         const first = (await list.getByRole("option").first().textContent()).trim()
-        expect.equal(first, "9:15 am0.25 h", "the list begins a step after the start, with how long that is")
-        expect.equal((await list.getByRole("option", { selected: true }).textContent()).trim(), "5:00 pm8 h", "the chosen finish is 8 h after the start")
+        expect.equal(first, `${T(format, 9, 15)}0.25 h`, "the list begins a step after the start, with how long that is")
+        expect.equal((await list.getByRole("option", { selected: true }).textContent()).trim(), `${T(format, 17, 0)}8 h`, "the chosen finish is 8 h after the start")
         await input.fill("")
         await page.keyboard.type("5")
         await page.keyboard.press("Tab")
-        expect.equal(await input.inputValue(), "5:00 pm", "5 after a start of 9 is 5 pm")
+        expect.equal(await input.inputValue(), T(format, 17, 0), "5 after a start of 9 is 5 pm")
         expect.equal(await scope.locator('input[type="hidden"][name="finish"]').inputValue(), "17:00", "17:00")
       },
     },
     {
       name: "A time that does not read, or is before the start, is caught when the person leaves the field",
       example: "basics",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         const reminder = scope.getByRole("combobox", { name: "Reminder" })
         await reminder.focus()
         await page.keyboard.type("25:00")
@@ -164,16 +167,16 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
         await page.keyboard.press("Escape")
         await page.keyboard.press("Tab")
         expect.equal(await reminder.getAttribute("aria-invalid"), "true", "caught on leaving")
-        expect.equal(await message(reminder), "Enter a time like 9:30 am", "the Field says what to enter")
+        expect.equal(await message(reminder), `Enter a time like ${T(format, 9, 30)}`, "the Field says what to enter")
         expect.equal(await reminder.inputValue(), "25:00", "what was typed stays")
         const finish = scope.getByRole("combobox", { name: "Finish" })
         await finish.fill("8:00 am")
         await page.keyboard.press("Tab")
-        expect.equal(await message(finish), "Choose a time after 9:00 am", "a finish before the start says so")
+        expect.equal(await message(finish), `Choose a time after ${T(format, 9, 0)}`, "a finish before the start says so")
         await finish.fill("6pm")
         await page.keyboard.press("Tab")
         expect.equal(await finish.getAttribute("aria-invalid"), null, "a good time clears it")
-        expect.equal(await finish.inputValue(), "6:00 pm", "and is written out")
+        expect.equal(await finish.inputValue(), T(format, 18, 0), "and is written out")
       },
     },
     {
@@ -199,7 +202,7 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
     {
       name: "The chosen time scrolls into view when the list opens",
       example: "states",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         await scope.getByRole("combobox", { name: "Booking" }).focus()
         await page.keyboard.press("ArrowDown")
         await page.getByRole("listbox", { name: "Booking" }).waitFor()
@@ -212,7 +215,7 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
         })
         expect(shown.scrolls, "the list is long enough to scroll")
         expect(shown.inView, "6:30 pm is in view")
-        expect.equal(`${shown.first}|${shown.last}`, "10:00 am|9:00 pm", "the list keeps to min and max, every 30 minutes")
+        expect.equal(`${shown.first}|${shown.last}`, `${T(format, 10, 0)}|${T(format, 21, 0)}`, "the list keeps to min and max, every 30 minutes")
       },
     },
     {
@@ -249,11 +252,11 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
       name: "Drawn open for a design, it is a still picture with the chosen time in view and its hours shown",
       example: "open",
       themes: ["light", "dark"],
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, format }) {
         expect.equal(await page.locator("[data-radix-focus-guard]").count(), 0, "no focus guards")
         const list = scope.getByRole("listbox", { name: "End of shift" })
         const chosen = list.getByRole("option", { selected: true })
-        expect.equal((await chosen.textContent()).trim(), "5:30 pm8.5 h", "5:30 pm is chosen, 8.5 h after the start")
+        expect.equal((await chosen.textContent()).trim(), `${T(format, 17, 30)}8.5 h`, "5:30 pm is chosen, 8.5 h after the start")
         const inView = await chosen.evaluate((el) => {
           const o = el.getBoundingClientRect()
           const p = el.closest('[data-slot="combobox-panel"]').getBoundingClientRect()

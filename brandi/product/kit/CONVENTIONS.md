@@ -93,8 +93,9 @@ frame?, state?, logic? }`.
   Non-string props go through `{{holes}}` with values in `vals`. Show every variant and every state
   the reference names, including empty, loading and error where the component has them.
 - `checks` run in Chrome through Playwright: `run({ page, scope, expect, theme, brand })`, where
-  `scope` is the example's section and `brand` is `{ name, product }`. Expect the brand's names from
-  `brand`, never as literals: a starter carries the brand's own. Options: `themes: ["light", "dark"]`, `touch`, `reducedMotion`,
+  `scope` is the example's section, `brand` is `{ name, product }` and `format` is lib/format.js with
+  the product's `TIME`. Expect the brand's names from `brand` and every time through `format`, never as
+  literals: a starter carries the brand's own names and its own way of writing a time. Options: `themes: ["light", "dark"]`, `touch`, `reducedMotion`,
   `forcedColors`, `viewport`. Every rule marked Review gets a check. Prove keyboard paths, focus
   return, Escape order and focus after an action with real key presses.
 

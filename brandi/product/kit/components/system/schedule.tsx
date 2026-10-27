@@ -514,7 +514,8 @@ export const Schedule = React.forwardRef<HTMLDivElement, ScheduleProps>(function
   const weekdayShort = fmt({ weekday: "short" })
   const dayNumber = fmt({ day: "numeric" })
   const dayLong = fmt({ weekday: "long", day: "numeric", month: "long" })
-  const hourLabel = fmt({ hour: "numeric" })
+  // In English the brand's own way, 7am or 7 am; another language keeps its locale's.
+  const hourLabel = ENGLISH ? { format: (d: Date) => formatTime(d, { onTheHour: "drop" }) } : fmt({ hour: "numeric" })
 
   return (
     <div ref={ref} data-slot="schedule" data-view={shown} aria-busy={loading || undefined} className={cn("@container flex min-w-0 flex-col gap-4", className)}>
