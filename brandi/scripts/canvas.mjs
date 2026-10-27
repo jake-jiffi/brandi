@@ -222,13 +222,20 @@ function indent(text, n) {
  * The floor every artboard sits on. Deliberately tiny: it resets the things
  * that bite (default margin, browser-blue links, images overflowing their
  * frame) and decides nothing else.
+ *
+ * It sits in the base layer. Unlayered CSS beats every layer whatever its
+ * specificity, so an unlayered `a { color: inherit }` beat a mounted
+ * component's Tailwind utilities: a primary Button given an href drew dark
+ * text on its fill. Layered, a board's own CSS still wins and so do utilities.
  */
 function baseCss() {
-  return `* { box-sizing: border-box; }
-body { margin: 0; }
-img, svg { max-width: 100%; }
-a { color: inherit; text-decoration-thickness: 0.06em; text-underline-offset: 0.18em; }
-a:hover { text-decoration-thickness: 0.12em; }`;
+  return `@layer base {
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  img, svg { max-width: 100%; }
+  a { color: inherit; text-decoration-thickness: 0.06em; text-underline-offset: 0.18em; }
+  a:hover { text-decoration-thickness: 0.12em; }
+}`;
 }
 
 // ---------------------------------------------------------------------------

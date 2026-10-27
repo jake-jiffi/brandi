@@ -16,6 +16,16 @@ describe('artboard()', () => {
     assert.match(a, /<helmet>[\s\S]*<\/helmet>/);
   });
 
+  test('the floor sits in the base layer, so a mounted component\'s utilities beat it', () => {
+    // Unlayered CSS beats every layer whatever its specificity. An unlayered link reset drew a
+    // primary Button's href in the body colour, on the Button's own fill.
+    const style = /<style>\n([\s\S]*?)<\/style>/.exec(minimal())[1];
+    const layer = /@layer base \{\n([\s\S]*?)\n *\} *\n/.exec(style);
+    assert.ok(layer, 'a base layer');
+    assert.match(layer[1], /a \{ color: inherit;/);
+    assert.equal(/(^|\n) *a \{/.test(style.replace(layer[0], '')), false, 'no link reset outside the layer');
+  });
+
   test('a static artboard still carries a typed logic block, with an empty class', () => {
     // The Design canvas expects the block on every artboard and says nothing
     // when it is missing.
