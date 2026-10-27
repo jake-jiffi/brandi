@@ -38,10 +38,12 @@ export const Character = React.forwardRef<HTMLSpanElement, CharacterProps>(funct
       loop?.cancel()
       loop = reduce.matches
         ? undefined
-        : el.animate([{ transform: "translateY(0)" }, { transform: "translateY(-4%)" }], {
+        : // Three swings, 4.8 seconds, then still: motion that starts on its own and runs past five
+          // seconds beside other content needs a way to stop it (WCAG 2.2.2).
+          el.animate([{ transform: "translateY(0)" }, { transform: "translateY(-4%)" }], {
             duration: 1600,
             direction: "alternate",
-            iterations: Infinity,
+            iterations: 3,
             easing: "ease-in-out",
           })
     }

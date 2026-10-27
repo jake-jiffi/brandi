@@ -11,7 +11,7 @@ export default {
     { name: "pose", type: '"welcome" | "working" | "done" | "caught-up" | "needs-person" | "nothing-found" | "could-not-load" | "help"', doc: "The moment it marks. A moment the brand's pack has no pose for renders nothing, and the words carry it." },
     { name: "size", type: "number", default: "96", doc: "Height in px. The width follows the drawing, so it is never squashed." },
     { name: "flat", type: "boolean", default: "false", doc: "The 2D rendition, when the pack also has 3D stills." },
-    { name: "motion", type: "boolean", default: "false", doc: "A gentle loop, for working and calm moments only. It never runs under reduced motion." },
+    { name: "motion", type: "boolean", default: "false", doc: "A gentle bob, for working and calm moments only: three swings, under five seconds, then still. It never runs under reduced motion." },
   ],
   notes: {
     Behaviour: [
@@ -88,6 +88,14 @@ ${pose("nothing-found", "nothing-found")}
       async run({ scope, expect }) {
         const running = await scope.locator('[data-slot="character"]').evaluate((el) => el.getAnimations().filter((a) => a.playState === "running").length)
         expect.equal(running, 1, "running animations")
+      },
+    },
+    {
+      name: "Its loop stops by itself inside five seconds",
+      example: "working",
+      async run({ scope, expect }) {
+        const timing = await scope.locator('[data-slot="character"]').evaluate((el) => el.getAnimations()[0]?.effect.getComputedTiming())
+        expect(timing && Number.isFinite(timing.endTime) && timing.endTime <= 5000, `it ends by 5 s (ends at ${timing?.endTime})`)
       },
     },
     {
