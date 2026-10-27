@@ -14,7 +14,7 @@
  *   brandi system                     resolve and audit the design system
  *   brandi tokens [--out brand/tokens] [--prefix acme] [--strict-dimensions]
  *   brandi sheets [--out <dir>]       write the specification artboards
- *   brandi canvas --dir <dir> --title "Acme brand" [--json]   the files and calls for a Design canvas
+ *   brandi canvas --dir <dir> --title "Acme brand" [--live <canvas.json>] [--json]   the files and calls for a Design canvas
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf] [--print]     the brand book: a 16:9 deck, or the A4 print book with --print
  *   brandi logo <plan|refine|trace|wordmark|lockup|import|audit|board|pick|master|colour|status>
@@ -1024,8 +1024,22 @@ async function cmdCanvas(flags) {
   if (existsSync(path.join(dir, 'canvas.json'))) {
     manifest = JSON.parse(await readFile(path.join(dir, 'canvas.json'), 'utf8'));
   }
+  // The live index, read from the canvas right before this run. Everything in
+  // it that this folder does not write (boards a person added, their notes,
+  // keys the editor set, installed systems) has to survive the publish.
+  let live = null;
+  if (flags.live !== undefined) {
+    if (typeof flags.live !== 'string') return fail('--live needs the path of the canvas.json read from the canvas.');
+    try { live = JSON.parse(await readFile(path.resolve(flags.live), 'utf8')); } catch (e) {
+      return fail(`--live ${flags.live} is not a readable canvas.json: ${e.message}`);
+    }
+    if (!live || typeof live !== 'object' || Array.isArray(live) || (live.boards !== undefined && typeof live.boards !== 'object')) {
+      return fail(`--live ${flags.live} is not a canvas index: expected an object with boards keyed by file.`);
+    }
+  }
   const near = await brandBesideCanvas(dir, flags);
-  const check = validateCanvas({ artboards, manifest, brandFonts: recordedFonts(near?.brand) });
+  const liveSystems = (live?.designSystems ?? []).map((d) => d.namespace).filter(Boolean);
+  const check = validateCanvas({ artboards, manifest, brandFonts: recordedFonts(near?.brand), systems: liveSystems });
   if (!check.ok && !flags.force) {
     return fail(
       `Refusing to seed a canvas with ${plural(check.errors.length, 'error')}:\n` +
@@ -1057,9 +1071,13 @@ async function cmdCanvas(flags) {
   }
   // An image an artboard names that is not in the folder renders as a broken
   // image, and the canvas says nothing about it.
+  // A file of an installed system's copy is not an image beside the boards:
+  // the install copies it under ds/<namespace>/ on the canvas.
+  const systems = new Set([...(manifest.designSystems ?? []).map((d) => d.namespace), ...liveSystems]);
+  const installedFile = (r) => { const m = /^(?:\.\.\/)*ds\/([^/]+)\//.exec(r); return Boolean(m && systems.has(m[1])); };
   const localRefs = (source) => [...source.matchAll(/(?:src\s*=\s*"|url\(\s*['"]?)([^"')\s]+)/g)]
     .map((m) => m[1].replace(/^\.\//, ''))
-    .filter((r) => !/^(https?:|data:|\/_blob\/|#|support\.js$)/.test(r) && !r.includes('{{'));
+    .filter((r) => !/^(https?:|data:|\/_blob\/|#|support\.js$)/.test(r) && !r.includes('{{') && !installedFile(r));
   const missing = [...new Set(artboards.flatMap((a) => localRefs(a.source).filter((r) => !images.includes(r)).map((r) => `${a.file} names ${r}`)))];
   if (missing.length && !flags.force) {
     return fail(`Images the artboards name that are not in ${path.relative(process.cwd(), dir) || '.'}:\n  ${missing.join('\n  ')}\nPut each file beside the artboards, or fix the name.`);
@@ -1084,16 +1102,22 @@ async function cmdCanvas(flags) {
   // What the last run from this folder published: its index keeps the canvas's
   // creation record, and an artboard that has since gone must be removed from
   // the canvas explicitly, because a publish keeps every file it is not sent.
-  let createdOnFiles = null;
+  let lastIndex = null;
   let previous = [];
   try {
-    createdOnFiles = JSON.parse(await readFile(indexPath, 'utf8')).createdOnFiles ?? null;
+    lastIndex = JSON.parse(await readFile(indexPath, 'utf8'));
     previous = (await readdir(project)).filter((f) => f !== 'canvas.json');
   } catch { /* a first publish from this folder */ }
   await rm(project, { recursive: true, force: true });
   await mkdir(project, { recursive: true });
 
-  const index = designIndex({ manifest, title, createdOnFiles });
+  const removed = previous.filter((f) => !files.includes(f) && !images.includes(f));
+  let index;
+  try {
+    index = designIndex({ manifest, title, base: live ?? lastIndex, removed: removed.filter((f) => f.endsWith('.dc.html')) });
+  } catch (e) {
+    return fail(e.message);
+  }
   await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
   for (const a of artboards) {
     const source = forDesignCanvas(a.source);
@@ -1101,7 +1125,10 @@ async function cmdCanvas(flags) {
     bytes.set(a.file, Buffer.byteLength(source));
   }
   for (const f of images) await copyFile(path.join(dir, f), path.join(project, f));
-  const removed = previous.filter((f) => !files.includes(f) && !images.includes(f));
+  // Boards on the canvas that this folder never wrote: a person's work, kept.
+  const theirs = Object.keys(index.boards).filter((f) => !files.includes(f));
+  const clashes = findOverlaps({ artboards: Object.entries(index.boards).map(([file, b]) => ({ file, ...b })) })
+    .filter((c) => theirs.includes(c.a) !== theirs.includes(c.b));
 
   // The calls, in the order the canvas asks for: the index and the entry
   // artboard with its images first, so the canvas opens on something, then
@@ -1129,10 +1156,16 @@ async function cmdCanvas(flags) {
   add(images.filter((f) => !sent.has(f)));
   const abs = (f) => path.join(project, f);
   const rel = (p) => path.relative(process.cwd(), p) || '.';
+  // The install rides in the first call, with the index that records it: the
+  // server copies each file from the published system, so nothing is uploaded.
+  const install = {};
+  for (const rec of manifest.designSystems ?? []) {
+    for (const f of rec.files ?? []) install[`project/ds/${rec.namespace}/${f}`] = { artifact: rec.artifact, path: `project/${f}` };
+  }
   const publishCalls = calls.map((c, i) => {
     const map = Object.fromEntries(c.files.map((f) => [`project/${f}`, `project/${f}`]));
     if (i === calls.length - 1) for (const f of removed) map[`project/${f}`] = null;
-    if (i === 0) return { root, file_path: indexPath, files: map };
+    if (i === 0) return { root, file_path: indexPath, files: { ...map, ...install } };
     delete map[`project/${c.files[0]}`];
     return { root, file_path: abs(c.files[0]), files: map };
   });
@@ -1143,6 +1176,10 @@ async function cmdCanvas(flags) {
       `  ${plural(files.length, 'artboard')}, ${plural(images.length, 'image')}, ${plural(publishCalls.length, 'publish call')}`,
       removed.length ? `  ${plural(removed.length, 'file')} gone since the last run, sent as null so the canvas drops them: ${removed.join(', ')}` : '',
       check.warnings.length ? `  ${check.warnings.length} craft warnings, see: brandi validate --dir ${rel(dir)}` : '',
+      Object.keys(install).length ? `  installs ${plural(Object.keys(install).length, 'file')} of ${(manifest.designSystems ?? []).filter((d) => d.files?.length).map((d) => d.namespace).join(', ')} in the first call, copied server side` : '',
+      live ? `  merged into the live index: ${plural(theirs.length, 'board')} and ${plural(Object.keys(live.notes ?? {}).length, 'note')} already on the canvas kept` : '',
+      !live && lastIndex ? '  merged into the last local publish, not the live index: a change made on the canvas since then is overwritten. Read project/canvas.json from the canvas first and pass it as --live <file>.' : '',
+      ...clashes.map((c) => `  warning: ${c.a} overlaps ${c.b}, which is already on the canvas. Move one in canvas.json.`),
       '',
       'Publish it with the Artifact tool, from the Design type:',
       `  0. A new canvas: publish with the Design type's type_url, title "${title}",`,
@@ -1152,8 +1189,9 @@ async function cmdCanvas(flags) {
       'and the index only when artboards were added, removed or moved.',
     ].filter(Boolean).join('\n'),
     {
-      ok: true, title, root, calls: publishCalls,
+      ok: true, title: index.title, root, calls: publishCalls,
       artboards: files, images, removed, warnings: check.warnings,
+      kept: theirs, overlaps: clashes, merged: live ? 'live' : lastIndex ? 'last-publish' : null,
     },
   );
 }

@@ -87,6 +87,29 @@ describe('artboard()', () => {
     assert.equal(decoded.accent.default, '#1F6F4A');
     assert.equal(decoded.$preview.width, 900);
   });
+
+  test('a product board names its screen and language, and loads the installed system after the support line', () => {
+    const src = minimal({ title: 'Rosters & leave', lang: 'en-AU', system: 'acme' });
+    assert.match(src, /<html lang="en-AU">/);
+    assert.match(src, /<title>Rosters &amp; leave<\/title>/);
+    const head = src.slice(src.indexOf('<head>'), src.indexOf('</head>')).split('\n').map((l) => l.trim()).filter(Boolean);
+    assert.deepEqual(head.slice(-4), [
+      '<script src="./support.js"></script>',
+      '<link rel="stylesheet" href="ds/acme/tokens.css">',
+      '<link rel="stylesheet" href="ds/acme/components/bundle.css">',
+      '<script src="ds/acme/components/bundle.js"></script>',
+    ]);
+    assert.ok(head.indexOf('<title>Rosters &amp; leave</title>') < head.indexOf('<script src="./support.js"></script>'));
+    assert.equal(K.validateArtboard(src, { systems: ['acme'] }).ok, true);
+  });
+
+  test('refuses a namespace the Design type would skip, and a language that is not a tag', () => {
+    for (const bad of ['Acme', '-acme', 'acme corp', 'a/b', '', 'x'.repeat(65)]) {
+      assert.throws(() => minimal({ system: bad }), RangeError, JSON.stringify(bad));
+    }
+    assert.throws(() => minimal({ lang: 'English' }), RangeError);
+    assert.doesNotThrow(() => minimal({ system: 'acme_2-x' }));
+  });
 });
 
 describe('validateArtboard: the silent failures', () => {
@@ -180,6 +203,34 @@ describe('validateArtboard: the silent failures', () => {
     const src = K.artboard({ name: 'X', body: '<p>x</p>' })
       .replace('<helmet>', '<helmet>\n  <link rel="stylesheet" href="https://cdn.example.com/a.css">');
     assert.ok(K.validateArtboard(src).errors.some((e) => /blocks/.test(e.message)));
+  });
+
+  test('takes an installed system\'s files only when the index records that namespace', () => {
+    const src = minimal({ system: 'acme' });
+    assert.equal(K.validateArtboard(src, { systems: ['acme'] }).ok, true);
+    const unrecorded = K.validateArtboard(src, { systems: ['other'] });
+    assert.equal(unrecorded.ok, false);
+    assert.equal(unrecorded.errors.filter((e) => /records no design system with the namespace acme/.test(e.message)).length, 3);
+    // The same path one folder down is the same file, reached from a subfolder.
+    const nested = src.replaceAll('"ds/acme/', '"../ds/acme/');
+    assert.equal(K.validateArtboard(nested, { systems: ['acme'] }).ok, true);
+  });
+
+  test('a system path that climbs out of its folder is refused, recorded or not', () => {
+    const src = minimal({ system: 'acme' }).replace('ds/acme/components/bundle.js', 'ds/acme/../../evil.js');
+    const r = K.validateArtboard(src, { systems: ['acme'] });
+    assert.equal(r.ok, false);
+    assert.ok(r.errors.some((e) => /will not serve/.test(e.message)));
+    // An outside script is still an outside script.
+    const ext = minimal({ system: 'acme' }).replace('ds/acme/components/bundle.js', 'https://cdn.example.com/x.js');
+    assert.ok(K.validateArtboard(ext, { systems: ['acme'] }).errors.some((e) => /external script/.test(e.message)));
+  });
+
+  test('validateCanvas reads the namespaces from the manifest it is given', () => {
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }], { designSystems: [{ namespace: 'acme', title: 'Acme' }] });
+    const artboards = [{ file: 'Main.dc.html', source: minimal({ system: 'acme' }) }];
+    assert.equal(K.validateCanvas({ artboards, manifest }).ok, true);
+    assert.equal(K.validateCanvas({ artboards, manifest: K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }]) }).ok, false);
   });
 
   test('catches lorem ipsum', () => {
@@ -350,6 +401,41 @@ describe('canvasManifest', () => {
     assert.throws(() => K.canvasManifest([{ file: 'M.dc.html', w: 10, h: 10 }], {
       annotations: [{ id: 'a', x: 0, y: 0, w: 40, text: 'too narrow' }],
     }), RangeError);
+  });
+
+  test('a title note carries its kind and row width; a sticky still needs its own width', () => {
+    const m = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }], {
+      annotations: [{ id: 'console', x: 0, y: -300, text: 'Ops console', kind: 'title1', maxW: 9040 }],
+    });
+    assert.deepEqual(m.annotations[0], { id: 'console', x: 0, y: -300, text: 'Ops console', kind: 'title1', maxW: 9040 });
+    assert.equal('w' in m.annotations[0], false, 'no width is invented for a title');
+    assert.throws(() => K.canvasManifest([{ file: 'M.dc.html', w: 10, h: 10 }], {
+      annotations: [{ id: 'sticky', x: 0, y: 0, text: 'no width' }],
+    }), RangeError);
+    assert.throws(() => K.canvasManifest([{ file: 'M.dc.html', w: 10, h: 10 }], {
+      annotations: [{ id: 't', x: 0, y: 0, text: 'x', kind: 'title1', maxW: 0 }],
+    }), RangeError);
+    assert.throws(() => K.canvasManifest([{ file: 'M.dc.html', w: 10, h: 10 }], {
+      annotations: [{ id: 't', x: 0, y: 0, text: 'x', kind: 'Title One' }],
+    }), RangeError);
+  });
+
+  test('design system records keep to the hosts and paths the Design type accepts', () => {
+    const ok = { namespace: 'acme', title: 'Acme', artifact: 'https://claude.ai/artifact/AbC123', files: ['tokens.json', 'components/bundle.js'] };
+    assert.equal(K.canvasManifest([{ file: 'M.dc.html', w: 10, h: 10 }], { designSystems: [ok] }).designSystems[0].namespace, 'acme');
+    for (const artifact of ['https://evil.example/artifact/AbC', 'https://claude.ai/artifact/AbC/edit', 'AbC123', 'https://claude.ai/artifact/AbC?x=1']) {
+      assert.throws(() => K.checkSystemRecord({ ...ok, artifact }), RangeError, artifact);
+    }
+    assert.doesNotThrow(() => K.checkSystemRecord({ ...ok, artifact: 'https://preview.claude.com/code/artifact/0b1c-2d' }));
+    for (const files of [['../x'], ['/abs'], ['a/../b'], ['ok', 3]]) {
+      assert.throws(() => K.checkSystemRecord({ ...ok, files }), RangeError, JSON.stringify(files));
+    }
+    assert.throws(() => K.checkSystemRecord({ namespace: 'acme', files: ['tokens.json'] }), RangeError, 'files without an address');
+  });
+
+  test('FRAMES carries the 820 width a product canvas checks, beside the tablet device', () => {
+    assert.deepEqual([K.FRAMES.tablet820.w, K.FRAMES.tablet820.h], [820, 1180]);
+    assert.deepEqual([K.FRAMES.tablet.w, K.FRAMES.tablet.h], [834, 1112]);
   });
 
   test('validates launch', () => {
@@ -576,6 +662,79 @@ describe('the Design canvas', () => {
     assert.throws(() => K.designIndex({ manifest, title: '' }), TypeError);
     assert.throws(() => K.designIndex({ manifest: { artboards: [] }, title: 'T' }), TypeError);
   });
+
+  const live = () => ({
+    v: 3,
+    createdOnFiles: { v: 1, at: '2026-10-01T00:00:00.000Z' },
+    title: 'Acme product canvas',
+    launch: { view: 'canvas' },
+    pages: [{ id: 'mine', name: 'Their page' }],
+    boards: {
+      'Main.dc.html': { x: 0, y: 0, w: 1440, h: 900, frameless: true, guides: [{ kind: 'grid', size: 8 }] },
+      'TheirSketch.dc.html': { x: 4000, y: 0, w: 600, h: 400 },
+      'Old.dc.html': { x: 2000, y: 0, w: 600, h: 400 },
+    },
+    order: ['TheirSketch.dc.html', 'Main.dc.html', 'Old.dc.html'],
+    notes: { sticky1: { x: 10, y: -200, text: 'Ask about rosters', w: 240, fill: 'yellow' } },
+    designSystems: [{ title: 'Acme', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v7', copiedAt: '2026-10-01T00:00:00.000Z' }],
+    editorOnly: { keep: true },
+  });
+
+  test('merging into the live index keeps the person\'s boards, notes, editor keys and installed systems', () => {
+    const manifest = K.canvasManifest([
+      { file: 'Main.dc.html', w: 1440, h: 1200, title: 'Contents' },
+      { file: 'ConsoleRosters1440.dc.html', w: 1440, h: 900 },
+    ], { annotations: [{ id: 'console', x: 0, y: -300, text: 'Ops console', kind: 'title1', maxW: 3000 }] });
+    const index = K.designIndex({ manifest, title: 'A new name', base: live(), removed: ['Old.dc.html'] });
+    assert.equal(index.title, 'Acme product canvas', 'the canvas keeps its own title');
+    assert.deepEqual(index.createdOnFiles, live().createdOnFiles);
+    assert.deepEqual(index.editorOnly, { keep: true }, 'a key Brandi never heard of survives');
+    assert.deepEqual(index.boards['TheirSketch.dc.html'], { x: 4000, y: 0, w: 600, h: 400 });
+    assert.equal(index.boards['Old.dc.html'], undefined, 'a board this folder stopped sending is dropped');
+    assert.equal(index.boards['Main.dc.html'].frameless, true);
+    assert.deepEqual(index.boards['Main.dc.html'].guides, [{ kind: 'grid', size: 8 }]);
+    assert.equal(index.boards['Main.dc.html'].h, 1200, 'its own keys come from the manifest');
+    assert.equal(index.boards['Main.dc.html'].title, 'Contents');
+    assert.deepEqual(index.order, ['Main.dc.html', 'TheirSketch.dc.html', 'ConsoleRosters1440.dc.html']);
+    assert.deepEqual(index.notes.sticky1, live().notes.sticky1);
+    assert.deepEqual(index.notes.console, { x: 0, y: -300, text: 'Ops console', kind: 'title1', maxW: 3000 });
+    assert.deepEqual(index.designSystems, live().designSystems);
+    assert.deepEqual(index.pages, [{ id: 'mine', name: 'Their page' }]);
+  });
+
+  test('a key Brandi used to write and no longer does is cleared from its own board', () => {
+    const base = live();
+    base.boards['Main.dc.html'].page = 'mine';
+    base.boards['Main.dc.html'].is_interactive = true;
+    const index = K.designIndex({ manifest: K.canvasManifest([{ file: 'Main.dc.html', w: 1440, h: 900 }]), title: 'T', base });
+    assert.equal('page' in index.boards['Main.dc.html'], false);
+    assert.equal('is_interactive' in index.boards['Main.dc.html'], false);
+  });
+
+  test('an install replaces its own record, keeps the rest, and never writes the files list', () => {
+    const now = new Date('2026-10-27T09:00:00Z');
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }], {
+      designSystems: [
+        { title: 'Acme', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v8', files: ['tokens.json'] },
+        { title: 'Declared only', namespace: 'draft' },
+      ],
+    });
+    const base = live();
+    base.designSystems.push({ title: 'Other', namespace: 'other', artifact: 'https://claude.ai/artifact/Sys2', version: null, copiedAt: 'x' });
+    base.designSystems.push({ title: 'Acme again', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v1', copiedAt: 'y' });
+    const index = K.designIndex({ manifest, title: 'T', base, now });
+    assert.deepEqual(index.designSystems, [
+      { title: 'Acme', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v8', copiedAt: '2026-10-27T09:00:00.000Z' },
+      { title: 'Other', namespace: 'other', artifact: 'https://claude.ai/artifact/Sys2', version: null, copiedAt: 'x' },
+    ]);
+  });
+
+  test('a namespace another system already holds is refused, not overwritten', () => {
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }], {
+      designSystems: [{ title: 'Impostor', namespace: 'acme', artifact: 'https://claude.ai/artifact/SomethingElse' }],
+    });
+    assert.throws(() => K.designIndex({ manifest, title: 'T', base: live() }), /already held by another design system/);
+  });
 });
 
 describe('brandi canvas: the folder a Design canvas is published from', async () => {
@@ -689,6 +848,59 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
     assert.notEqual(code, 0);
     assert.match(out, /my photo\.png/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const product = (name) => K.artboard({
+    name, system: 'acme', title: name, lang: 'en',
+    body: '<x-import component-from-global-scope="Acme.Root"><div style="width:600px;height:400px;display:flex;flex-direction:column;gap:12px"><p style="margin:0">Hi</p></div></x-import>',
+    preview: { width: 600, height: 400 },
+  });
+
+  test('a product board publishes: its system files are not missing images, and the install rides with the index', async () => {
+    const dir = await fresh({ 'Main.dc.html': product('Main') });
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 600, h: 400 }], {
+      launch: { view: 'canvas' },
+      designSystems: [{ title: 'Acme', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v9', files: ['tokens.json', 'tokens.css', 'components/bundle.css', 'components/bundle.js'] }],
+    });
+    await writeFile(path.join(dir, 'brand', 'canvas', 'canvas.json'), JSON.stringify(manifest));
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme product']);
+    assert.equal(code, 0, String(out));
+    assert.deepEqual(out.calls[0].files['project/ds/acme/components/bundle.js'], { artifact: 'https://claude.ai/artifact/Sys1', path: 'project/components/bundle.js' });
+    assert.equal(Object.keys(out.calls[0].files).filter((k) => k.startsWith('project/ds/acme/')).length, 4);
+    const index = JSON.parse(await readFile(path.join(dir, 'brand', '.publish', 'acme-product', 'project', 'canvas.json'), 'utf8'));
+    assert.equal(index.designSystems.length, 1);
+    assert.equal('files' in index.designSystems[0], false);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('with --live, a republish keeps what a person did on the canvas; without it, it says what it overwrote', async () => {
+    const dir = await fresh({ 'Main.dc.html': product('Main') });
+    const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 600, h: 400 }], { launch: { view: 'canvas' }, designSystems: [{ title: 'Acme', namespace: 'acme' }] });
+    await writeFile(path.join(dir, 'brand', 'canvas', 'canvas.json'), JSON.stringify(manifest));
+    const first = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.equal(first.code, 0, String(first.out));
+    const liveIndex = {
+      v: 3, createdOnFiles: { v: 1, at: '2026-10-01T00:00:00.000Z' }, title: 'Acme', launch: { view: 'canvas' }, pages: [],
+      boards: { 'Main.dc.html': { x: 0, y: 0, w: 600, h: 400 }, 'Theirs.dc.html': { x: 300, y: 100, w: 600, h: 400 } },
+      order: ['Main.dc.html', 'Theirs.dc.html'], notes: { n1: { x: 0, y: -200, text: 'keep me', w: 200 } },
+      designSystems: [{ title: 'Acme', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v9', copiedAt: 'z' }],
+    };
+    const livePath = path.join(dir, 'live.json');
+    await writeFile(livePath, JSON.stringify(liveIndex));
+    const merged = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', '--live', livePath]);
+    assert.equal(merged.code, 0, String(merged.out));
+    assert.equal(merged.out.merged, 'live');
+    assert.deepEqual(merged.out.kept, ['Theirs.dc.html']);
+    assert.equal(merged.out.overlaps.length, 1, 'a kept board sitting on one of ours is reported');
+    const index = JSON.parse(await readFile(path.join(dir, 'brand', '.publish', 'acme', 'project', 'canvas.json'), 'utf8'));
+    assert.deepEqual(index.notes.n1, liveIndex.notes.n1);
+    assert.deepEqual(index.designSystems, liveIndex.designSystems);
+    assert.equal(Object.keys(merged.out.calls[0].files).includes('project/Theirs.dc.html'), false, 'their board is never sent');
+    const again = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.equal(again.out.merged, 'last-publish');
+    const bad = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', '--live', path.join(dir, 'missing.json')]);
+    assert.notEqual(bad.code, 0);
     await rm(dir, { recursive: true, force: true });
   });
 });

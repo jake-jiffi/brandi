@@ -131,8 +131,10 @@ not `<helmet>`:
 ```
 
 These are the canvas's own files, so the recipe's rule against outside scripts and stylesheets does
-not touch them. Brandi's validator does not know that yet (last section). No Google Fonts link
-either: the fonts ship as files with the system (`02-brand-to-product.md`).
+not touch them. `$A validate` takes them once the folder's `canvas.json` records the namespace under
+`designSystems` (section 8), and refuses a namespace it does not record. `artboard()` writes the
+three lines when given `system`. No Google Fonts link either: the fonts ship as files with the
+system (`02-brand-to-product.md`).
 
 ### The mount
 
@@ -372,13 +374,11 @@ number on both.
 | Width | Frame | In Brandi's `FRAMES` | Root | For |
 | --- | --- | --- | --- | --- |
 | 1440 | 1440 wide, as tall as the content, from 900 up | `desktop` (1440 x 900), `desktopTall` (1440 x 1600) | Fluid for a page. Fixed for foundations, components and states boards | Console and portal pages, options, specimen boards |
-| 820 | 820 x 1180 | None. `tablet` is 834 x 1112, another device | Fixed | Tablet tools, and the 820 version of a page |
+| 820 | 820 x 1180 | `tablet820`. `tablet` (834 x 1112) is a device frame | Fixed | Tablet tools, and the 820 version of a page |
 | 390 | 390 x 844 | `phone` | Fixed | Phone apps, and the phone version of a page |
 | Strip | Its frames side by side, the gaps between them, and a caption row | None | Fixed | States on a phone or tablet surface |
 
 The family canvas left 40px between phone frames in a strip and 80px between tablet frames.
-*(proposal)* Add `tablet820: { w: 820, h: 1180 }` to `FRAMES`, so the checked width has its own
-frame instead of borrowing `tablet`.
 
 - `w` and `h` in `canvas.json` equal the board's own `$preview`. Measure the rendered board at its
   width and write the same numbers in both places. A frame smaller than its content clips, and only
@@ -448,9 +448,9 @@ Through the Design type, in this order.
    note spacing, call size, file count, how many systems a canvas holds). Where they differ from
    this file, they win.
 3. **Check the local copy.** Run `$A validate --dir <canvas folder>`, render every board through a
-   local runtime shim, and run the round's gates. Brandi has no such shim yet, and its validator
-   fails on the head lines (last section). All checking happens here, before the publish. The type's
-   instructions say not to read back or render the published canvas unless the person asks.
+   local runtime shim, and run the round's gates. All checking happens here, before the publish.
+   The type's instructions say not to read back or render the published canvas unless the person
+   asks.
 4. **Create the canvas once.** Follow "Publishing a canvas" in the brand-system skill. Run the
    quickstart with intent `design`, then one create call with the type's `type_url`, the title as
    the client would say it, and `auto_open: "after_first_write"`. Send nothing else, and keep the
@@ -480,9 +480,15 @@ Through the Design type, in this order.
    README or from a record already on the canvas. Copy the fonts once, and the rest whenever the
    system changes. Map a file an earlier copy had, and this one does not, to `null`. Compare
    checksums afterwards. If another system's record already holds the namespace, stop and ask.
+
+   `$A canvas` writes both halves. Put the record in the canvas folder's `canvas.json` under
+   `designSystems`, with `files` listing the paths to copy, and the first call it prints carries the
+   copies and the index with the record. It refuses a namespace another system holds, and never
+   writes `files` into the canvas's index.
 6. **Read the index before you write it.** Re-read the live `project/canvas.json` right before
-   writing it. Change only your own keys and keep every other key and entry: the person's notes,
-   keys the editor set, the creation record. The last system's index changed outside the session
+   writing it, and pass the saved file to `$A canvas` as `--live <file>`. It changes only its own
+   keys and keeps every other key and entry: the person's notes and boards, keys the editor set, the
+   creation record, the installed systems. The last system's index changed outside the session
    mid-way. Send the index only when boards were added, removed or moved, a note changed (a module
    heading, a recorded pick), or the install changed.
 7. **Read a hand-edited board before you replace it.** If a person edited a board on the canvas,
@@ -507,20 +513,22 @@ rendered: say so rather than handing over blank previews.
 
 ---
 
-## Where Brandi's canvas code stops
+## What Brandi's canvas code does for a product canvas
 
-Brandi's canvas layer was built for brand rounds. Each row below was checked against the code, and
-each fix is a proposal.
+Brandi's canvas layer was built for brand rounds. These changes let it carry a product canvas:
 
-| Today | On a product canvas | Fix *(proposal)* |
-| --- | --- | --- |
-| `validateArtboard` errors on any script loaded from anywhere but `./support.js`, and on any stylesheet not from Google Fonts | Every board with the head lines fails `$A validate` | Accept relative paths under `ds/<namespace>/` when the index holds a record for that namespace |
-| `brandi canvas` treats any `src` it cannot find beside the boards as a missing image | It refuses `ds/<namespace>/components/bundle.js` | The same exemption |
-| `brandi canvas` rebuilds the index through `designIndex` on every run: `designSystems: []`, and only `createdOnFiles` kept from the last local publish | A republish drops the install record, the title notes, and every change a person made on the canvas | Merge into the live index, read right before the write |
-| `canvasManifest` and `designIndex` keep only `x`, `y`, `w`, `text` and `page` on a note | A `title1` note cannot be written | Pass `kind`, `maxW` and `maxH` through |
-| `artboard()` writes only the `support.js` line in `<head>`, with no `<title>` or `lang` | It cannot write a product board | Options for the install lines, the title and the language |
-| `FRAMES` has no 820 frame | The checked width borrows `tablet` | `tablet820`, 820 x 1180 |
-| `preview.mjs` strips the logic block and has no runtime | Mounted components do not render, so boards cannot be previewed or checked | A product preview that serves the local folder through a runtime shim, as the last system did |
+| Brandi | For a product canvas |
+| --- | --- |
+| `validateArtboard` and `$A validate` | Accept `ds/<namespace>/` stylesheets and scripts when `canvas.json` records the namespace, at any folder depth. Refuse an unrecorded namespace and a path with a `..` folder |
+| `$A canvas` | Skips the installed files in its missing-image check. Puts each record's `files` in the first call as server-side copies, beside the index that records them |
+| `designIndex` and `$A canvas --live <file>` | Merge into the live index: Brandi's own boards, notes, pages and records change, and everything else stays. Without `--live` it merges into the last local publish and says what that overwrites |
+| `canvasManifest` | Carries `kind`, `maxW` and `maxH` on a note, so a `title1` heading is one call, and design system records |
+| `artboard()` | Writes `<title>`, `lang` and the install lines (`title`, `lang`, `system`) |
+| `FRAMES` | `tablet820`, 820 x 1180 |
+
+One gap is left. `preview.mjs` strips the logic block and has no runtime, so a board that mounts
+components renders empty. Until a product preview with a runtime shim exists, say so rather than
+handing over blank previews.
 
 `brandi canvas` reads only the top level of the canvas folder, so it never sends the `ds/` files.
 Leave that as it is: the install copies them server side.

@@ -456,6 +456,10 @@ Always in this order. The validator exists because the format fails silently.
 4. Make each call the command printed, in order, to that url: `root`, `file_path` and `files`
    exactly as printed.
 
+Republishing to a canvas that exists: `read` its `project/canvas.json` first and pass the saved file
+to step 2 as `--live <file>`. The index then keeps the boards, notes and settings people added on the
+canvas, and changes only what this folder writes.
+
 Show the link and a sentence or two on what you drafted and assumed. Do not explain the editor.
 
 To change a canvas already published, edit the working files in `brand/canvas/`, run step 2 again,

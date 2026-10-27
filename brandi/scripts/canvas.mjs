@@ -29,6 +29,9 @@ export const FRAMES = Object.freeze({
   phone: { w: 390, h: 844, note: 'iPhone logical resolution' },
   phoneLarge: { w: 430, h: 932 },
   tablet: { w: 834, h: 1112 },
+  // A product canvas checks 820, which is no device: the width where a tablet
+  // layout and a desktop one meet. `tablet` is a device frame and stays one.
+  tablet820: { w: 820, h: 1180, note: 'The checked tablet width on a product canvas' },
   desktop: { w: 1440, h: 900 },
   desktopTall: { w: 1440, h: 1600 },
   slide: { w: 1920, h: 1080, note: '16:9. Body type never below 24px at this size' },
@@ -84,6 +87,31 @@ const EMOJI_RE = /\p{Extended_Pictographic}/u;
 
 const escapeAttr = (s) =>
   String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+const escapeText = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * A design system's folder on a canvas. The Design type skips a folder that
+ * does not fit this, so a typo here is an install that silently never happens.
+ */
+export const NAMESPACE_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/**
+ * The lines that load an installed design system's copy, straight after the
+ * support line: its variables, then its components' styles, then the
+ * components. The canvas supplies React, so the bundle never brings its own.
+ */
+export function systemHeadLines(namespace) {
+  if (!NAMESPACE_RE.test(String(namespace))) {
+    throw new RangeError(
+      `A design system namespace is lower case letters, digits, _ and -, starting with a letter or digit, 64 at most. Got ${JSON.stringify(namespace)}.`,
+    );
+  }
+  return [
+    `<link rel="stylesheet" href="ds/${namespace}/tokens.css">`,
+    `<link rel="stylesheet" href="ds/${namespace}/components/bundle.css">`,
+    `<script src="ds/${namespace}/components/bundle.js"></script>`,
+  ];
+}
 
 /** Escape a JSON object for a single-quoted `data-props` attribute. */
 export function encodeProps(obj) {
@@ -110,13 +138,20 @@ export function decodeProps(attr) {
  * @param {string} [spec.logic]   the body of the Component class. Omit for static.
  * @param {{width:number,height:number}} [spec.preview]
  * @param {string} [spec.systemNote]  the mini-system comment. Strongly encouraged.
+ * @param {string} [spec.title]   the screen's name in a few words, for <title>.
+ * @param {string} [spec.lang]    the copy's language, for <html lang>.
+ * @param {string} [spec.system]  an installed design system's namespace: its head lines follow support.js.
  */
 export function artboard(spec) {
-  const { name, body, css = '', fonts, props, logic, preview, systemNote } = spec;
+  const { name, body, css = '', fonts, props, logic, preview, systemNote, title, lang, system } = spec;
   if (!name || !/^[A-Z][A-Za-z0-9]*$/.test(name)) {
     throw new TypeError(`artboard name must be PascalCase with no extension, got ${JSON.stringify(name)}`);
   }
   if (!body || !body.trim()) throw new TypeError(`artboard ${name} has no body`);
+  if (lang !== undefined && !/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(lang)) {
+    throw new RangeError(`artboard ${name}: lang must be a language tag such as en or en-AU, got ${JSON.stringify(lang)}`);
+  }
+  const headLines = system !== undefined ? systemHeadLines(system) : [];
 
   const fontLinks = (Array.isArray(fonts) ? fonts : fonts ? [fonts] : [])
     .map((href) => {
@@ -138,10 +173,12 @@ export function artboard(spec) {
 
   const parts = [];
   parts.push('<!doctype html>');
-  parts.push('<html>');
+  parts.push(lang ? `<html lang="${lang}">` : '<html>');
   parts.push('<head>');
   parts.push('  <meta charset="utf-8">');
+  if (title) parts.push(`  <title>${escapeText(title)}</title>`);
   parts.push(`  ${SUPPORT_LINE}`);
+  for (const line of headLines) parts.push(`  ${line}`);
   parts.push('</head>');
   parts.push('<body>');
   if (systemNote) {
@@ -214,6 +251,7 @@ export function canvasManifest(entries, {
   pages,
   annotations,
   launch,
+  designSystems,
 } = {}) {
   if (!entries.length) throw new TypeError('a canvas needs at least one artboard');
 
@@ -300,13 +338,32 @@ export function canvasManifest(entries, {
       if (ids.has(a.id)) throw new RangeError(`duplicate annotation id: ${a.id}`);
       ids.add(a.id);
       if (typeof a.text !== 'string') throw new TypeError(`annotation ${a.id} text must be one plain string`);
-      if (a.w < 120 || a.w > 2000) throw new RangeError(`annotation ${a.id} width must be 120-2000`);
+      if (a.kind !== undefined && !/^[a-z][a-z0-9]{0,23}$/.test(a.kind)) {
+        throw new RangeError(`annotation ${a.id} kind must be a plain word such as title1, got ${JSON.stringify(a.kind)}`);
+      }
+      // A sticky is drawn at its width, so it needs one. A title is one line,
+      // sized by maxW, and a width is optional. An undefined width used to pass
+      // here and reach the index as null.
+      if (a.kind === undefined || a.w !== undefined) {
+        if (!(a.w >= 120 && a.w <= 2000)) throw new RangeError(`annotation ${a.id} width must be 120-2000`);
+      }
+      for (const k of ['maxW', 'maxH']) {
+        if (a[k] !== undefined && !(Number.isFinite(a[k]) && a[k] > 0)) {
+          throw new RangeError(`annotation ${a.id} ${k} must be a positive number, got ${JSON.stringify(a[k])}`);
+        }
+      }
     }
     manifest.annotations = annotations.map((a) => ({
-      id: a.id, x: Math.round(a.x), y: Math.round(a.y), w: Math.round(a.w), text: a.text,
+      id: a.id, x: Math.round(a.x), y: Math.round(a.y),
+      ...(a.w !== undefined ? { w: Math.round(a.w) } : {}),
+      text: a.text,
+      ...(a.kind ? { kind: a.kind } : {}),
+      ...(a.maxW !== undefined ? { maxW: Math.round(a.maxW) } : {}),
+      ...(a.maxH !== undefined ? { maxH: Math.round(a.maxH) } : {}),
       ...(a.page ? { page: a.page } : {}),
     }));
   }
+  if (designSystems?.length) manifest.designSystems = designSystems.map(checkSystemRecord);
   if (pages?.length) {
     if (pages.length > 40) throw new RangeError('a canvas may have at most 40 pages');
     const pageIds = new Set(pages.map((p) => p.id));
@@ -360,20 +417,67 @@ export function forDesignCanvas(source) {
 }
 
 /**
+ * A design system record as Brandi's canvas.json carries it. `artifact` is the
+ * system's address cut after its id, on the hosts the Design type accepts;
+ * `files` is Brandi's own extension, the files to copy on this publish, and
+ * never reaches the canvas's index. A record without `artifact` only declares
+ * a namespace, so a board's head lines validate before the system is installed.
+ */
+const ARTIFACT_RE = /^https:\/\/(preview\.)?claude\.(ai|com)\/(code\/)?artifact\/[A-Za-z0-9_-]+$/;
+const SAFE_PATH_RE = /^(?!\/)(?!.*(^|\/)\.\.?(\/|$))[A-Za-z0-9_.\/-]+$/;
+
+export function checkSystemRecord(rec) {
+  if (!rec || typeof rec !== 'object') throw new TypeError('a design system record must be an object');
+  if (!NAMESPACE_RE.test(String(rec.namespace))) {
+    throw new RangeError(`design system namespace ${JSON.stringify(rec.namespace)} must be lower case letters, digits, _ and -, 64 at most`);
+  }
+  if (rec.artifact !== undefined && !ARTIFACT_RE.test(String(rec.artifact))) {
+    throw new RangeError(
+      `design system ${rec.namespace}: artifact must be the system's address cut after its id, on claude.ai or claude.com, got ${JSON.stringify(rec.artifact)}`,
+    );
+  }
+  if (rec.files !== undefined) {
+    if (!rec.artifact) throw new RangeError(`design system ${rec.namespace}: files to copy need the system's artifact address`);
+    if (!Array.isArray(rec.files) || !rec.files.every((f) => typeof f === 'string' && SAFE_PATH_RE.test(f))) {
+      throw new RangeError(`design system ${rec.namespace}: files must be relative paths inside the system, with no .. and no leading /`);
+    }
+  }
+  return { ...rec };
+}
+
+const artifactId = (url) => String(url).split('/').pop();
+
+// The keys Brandi writes on its own boards. Anything else on an entry (the
+// editor's `frameless`, `guides`, `radius`, `paper`) belongs to the canvas.
+const BOARD_KEYS = ['x', 'y', 'w', 'h', 'title', 'page', 'expand', 'print', 'is_interactive'];
+
+/**
  * Brandi's canvas.json, written as the Design canvas's own index (version 3).
  *
  * Brandi keeps its own manifest shape because the validator, the preview and
  * the logo boards all read it. This is the translation at the edge: `boards`
  * keyed by file, `order` back to front with Main first, annotations as notes.
- * `createdOnFiles` is carried over from an earlier index when there is one,
- * because the canvas treats it as the record of when the canvas was made.
+ *
+ * With `base`, the index merges into an index that exists: the live one read
+ * from the canvas right before the write, or the last local publish. Only
+ * Brandi's own keys change. Boards a person added on the canvas, their notes,
+ * keys the editor set and the installed systems all survive, because a publish
+ * that rebuilt the index from scratch dropped every one of them. `removed`
+ * names boards an earlier publish from this folder sent and this one does not.
  */
-export function designIndex({ manifest, title, createdOnFiles = null, now = new Date() }) {
+export function designIndex({ manifest, title, createdOnFiles = null, now = new Date(), base = null, removed = [] }) {
   if (!title) throw new TypeError('a canvas needs a title');
   if (!manifest?.artboards?.length) throw new TypeError('a canvas needs at least one artboard');
+  const prev = base && typeof base === 'object' && !Array.isArray(base) ? structuredClone(base) : {};
+  const gone = new Set(removed);
+
   const boards = {};
+  for (const [file, entry] of Object.entries(prev.boards ?? {})) if (!gone.has(file)) boards[file] = entry;
   for (const a of manifest.artboards) {
+    const kept = { ...(boards[a.file] ?? {}) };
+    for (const k of BOARD_KEYS) delete kept[k];
     boards[a.file] = {
+      ...kept,
       x: a.x, y: a.y, w: a.w, h: a.h,
       ...(a.title ? { title: a.title } : {}),
       ...(a.page ? { page: a.page } : {}),
@@ -382,22 +486,68 @@ export function designIndex({ manifest, title, createdOnFiles = null, now = new 
       ...(a.is_interactive ? { is_interactive: true } : {}),
     };
   }
+
   const files = manifest.artboards.map((a) => a.file);
-  const order = files.includes('Main.dc.html') ? ['Main.dc.html', ...files.filter((f) => f !== 'Main.dc.html')] : files;
-  const notes = {};
+  const order = (Array.isArray(prev.order) ? prev.order : []).filter((f) => boards[f]);
+  for (const f of [...files, ...Object.keys(boards)]) if (!order.includes(f)) order.push(f);
+  // The entry artboard leads, wherever an earlier order put it.
+  if (order.includes('Main.dc.html')) order.unshift(...order.splice(order.indexOf('Main.dc.html'), 1));
+
+  const notes = { ...(prev.notes ?? {}) };
   for (const n of manifest.annotations ?? []) {
-    notes[n.id] = { x: n.x, y: n.y, text: n.text, w: n.w, ...(n.page ? { page: n.page } : {}) };
+    notes[n.id] = {
+      ...(notes[n.id] ?? {}),
+      x: n.x, y: n.y, text: n.text,
+      ...(n.w !== undefined ? { w: n.w } : {}),
+      ...(n.kind ? { kind: n.kind } : {}),
+      ...(n.maxW !== undefined ? { maxW: n.maxW } : {}),
+      ...(n.maxH !== undefined ? { maxH: n.maxH } : {}),
+      ...(n.page ? { page: n.page } : {}),
+    };
   }
+
+  const pages = [...(prev.pages ?? [])];
+  for (const p of manifest.pages ?? []) {
+    const i = pages.findIndex((q) => q.id === p.id);
+    if (i >= 0) pages[i] = { ...pages[i], ...p };
+    else pages.push(p);
+  }
+
+  // A record goes in place of the first one holding its namespace, a later
+  // duplicate is taken out, and every other record stays exactly as it is.
+  const systems = [...(prev.designSystems ?? [])];
+  for (const rec of manifest.designSystems ?? []) {
+    if (!rec.artifact) continue;
+    const { files: copying, ...record } = rec;
+    if (copying?.length || !record.copiedAt) record.copiedAt = now.toISOString();
+    if (record.version === undefined) record.version = null;
+    const i = systems.findIndex((s) => s.namespace === record.namespace);
+    if (i >= 0) {
+      if (systems[i].artifact && artifactId(systems[i].artifact) !== artifactId(record.artifact)) {
+        throw new RangeError(
+          `The namespace ${record.namespace} is already held by another design system (${systems[i].artifact}). Another namespace, or which system stays, is the person's call.`,
+        );
+      }
+      systems[i] = record;
+      for (let j = systems.length - 1; j > i; j--) if (systems[j].namespace === record.namespace) systems.splice(j, 1);
+    } else {
+      systems.push(record);
+    }
+  }
+  if (systems.length > 4) throw new RangeError(`A canvas holds four design systems at most; this index would hold ${systems.length}.`);
+
   return {
+    ...prev,
     v: 3,
-    createdOnFiles: createdOnFiles ?? { v: 1, at: now.toISOString() },
-    title,
-    launch: manifest.launch ?? { view: 'canvas' },
-    pages: manifest.pages ?? [],
+    createdOnFiles: prev.createdOnFiles ?? createdOnFiles ?? { v: 1, at: now.toISOString() },
+    // A canvas keeps the title it has: the person may have renamed it.
+    title: prev.title ?? title,
+    launch: manifest.launch ?? prev.launch ?? { view: 'canvas' },
+    pages,
     boards,
     order,
     notes,
-    designSystems: [],
+    designSystems: systems,
   };
 }
 
@@ -464,11 +614,30 @@ export function findOverlaps(manifest, { chromeTop = 56 } = {}) {
  * Returns `{ok, errors, warnings}`. Errors mean the artboard will not render
  * correctly. Warnings mean it will render, and look generic.
  */
-export function validateArtboard(source, { name = 'artboard', allowFonts = true, brandFonts = [] } = {}) {
+export function validateArtboard(source, { name = 'artboard', allowFonts = true, brandFonts = [], systems = [] } = {}) {
   const errors = [];
   const warnings = [];
   const err = (m, fix) => errors.push({ message: m, fix });
   const warn = (m, fix) => warnings.push({ message: m, fix });
+
+  // A file of an installed design system's copy is the canvas's own file, so
+  // the rule against outside scripts and stylesheets does not touch it. The
+  // namespace has to be one the index records, or the file is not there.
+  const installed = new Set(systems);
+  const systemFile = (ref) => {
+    const m = /^(?:\.\/|(?:\.\.\/)+)?ds\/([^/]+)\/(.+)$/.exec(ref ?? '');
+    if (!m) return null;
+    const safe = SAFE_PATH_RE.test(m[2]) && !/[\\%:;]/.test(ref);
+    return { ns: m[1], ok: safe && installed.has(m[1]), safe };
+  };
+  const systemError = (kind, ref, sys) => err(
+    sys.safe
+      ? `${kind} ${ref}, but canvas.json records no design system with the namespace ${sys.ns}.`
+      : `${kind} ${ref}, a path the canvas will not serve.`,
+    sys.safe
+      ? 'Record the system in designSystems in canvas.json and install its files under ds/<namespace>/, or fix the namespace.'
+      : 'Name a file inside the system with letters, digits, _ . - and /, and no .. folder.',
+  );
 
   // --- Structure ---------------------------------------------------------
   if (!source.includes(SUPPORT_LINE)) {
@@ -483,6 +652,10 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
   const scriptTags = [...source.matchAll(/<script\b([^>]*)>/g)];
   for (const [, attrs] of scriptTags) {
     if (/src\s*=/.test(attrs) && !/src\s*=\s*"\.\/support\.js"/.test(attrs)) {
+      const src = /src\s*=\s*"([^"]*)"/.exec(attrs)?.[1];
+      const sys = systemFile(src);
+      if (sys?.ok) continue;
+      if (sys) { systemError('A script loads', src, sys); continue; }
       err(
         `An external script is loaded: ${attrs.trim()}`,
         'The canvas has no network egress. Inline the code instead.',
@@ -611,7 +784,9 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
   for (const m of source.matchAll(/<link\b[^>]*>/g)) {
     const tag = m[0];
     const href = /href\s*=\s*"([^"]*)"/.exec(tag)?.[1] ?? '';
-    if (/stylesheet/.test(tag) && !/^https:\/\/fonts\.googleapis\.com\//.test(href)) {
+    const sys = /stylesheet/.test(tag) ? systemFile(href) : null;
+    if (sys && !sys.ok) systemError('A stylesheet loads', href, sys);
+    if (/stylesheet/.test(tag) && !sys && !/^https:\/\/fonts\.googleapis\.com\//.test(href)) {
       err(
         `A stylesheet is loaded from ${href || 'an unquoted href'}, which the canvas blocks.`,
         'Google Fonts is the only permitted host. Inline everything else.',
@@ -680,9 +855,10 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
 }
 
 /** Validate a whole set at once, plus the manifest that lays them out. */
-export function validateCanvas({ artboards, manifest, brandFonts = [] }) {
+export function validateCanvas({ artboards, manifest, brandFonts = [], systems = [] }) {
+  const recorded = [...new Set([...systems, ...(manifest?.designSystems ?? []).map((d) => d.namespace)])];
   const results = artboards.map(({ file, source }) =>
-    validateArtboard(source, { name: file, brandFonts }),
+    validateArtboard(source, { name: file, brandFonts, systems: recorded }),
   );
   const errors = results.flatMap((r) => r.errors.map((e) => ({ file: r.name, ...e })));
   const warnings = results.flatMap((r) => r.warnings.map((w) => ({ file: r.name, ...w })));
@@ -734,4 +910,5 @@ export function validateCanvas({ artboards, manifest, brandFonts = [] }) {
 export default {
   artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding,
   forDesignCanvas, designIndex, encodeProps, decodeProps, FRAMES, BANNED_FONTS, DEFAULT_FONTS,
+  systemHeadLines, checkSystemRecord, NAMESPACE_RE,
 };

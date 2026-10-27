@@ -80,10 +80,12 @@ by rendering a preview instead.
 Where a step below has no command, it is work you do against the reference named. Say so in the
 round record rather than implying a script ran.
 
-Brandi's canvas commands (`$A validate`, `$A canvas`) were built for brand rounds. They reject the
-lines that install a system on a board and rebuild the canvas index without its install record, so
-they cannot publish a product canvas yet. Publish it through the Design type by hand, following
-`references/06-canvas.md`, whose last section lists what the code still lacks.
+`$A validate` and `$A canvas` take product boards. A board's install lines validate when the
+canvas folder's `canvas.json` records the system's namespace under `designSystems`, and a record
+carrying the system's `artifact` and the `files` to copy puts the install in the first publish call.
+Before a republish, read the live `project/canvas.json` with the `Artifact` tool and pass it as
+`--live <file>`, so the boards and notes people added on the canvas survive
+(`references/06-canvas.md`, section 8).
 
 ## Fundamentals first
 
