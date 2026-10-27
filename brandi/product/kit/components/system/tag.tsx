@@ -23,6 +23,8 @@ const DOT: Record<string, string> = {
 export interface TagProps extends Omit<React.ComponentPropsWithoutRef<"span">, "children" | "color"> {
   /** The category's chart series slot, 1 to 6. Grey for unknown or unset. */
   color?: TagColor | `${1 | 2 | 3 | 4 | 5 | 6}`
+  /** False for a token with no category colour, such as a person or a team. */
+  dot?: boolean
   /** Adds a remove button with a 24px hit area, 40px on a touch screen. */
   onRemove?: () => void
   /** The remove button's name. "Remove [tag]" by default. */
@@ -33,7 +35,7 @@ export interface TagProps extends Omit<React.ComponentPropsWithoutRef<"span">, "
 
 /** A category someone assigned: an outlined label with the category's colour dot, so it never reads as a status. */
 export const Tag = React.forwardRef<HTMLSpanElement, TagProps>(function Tag(
-  { color = "grey", onRemove, removeLabel, className, children, ...rest },
+  { color = "grey", dot = true, onRemove, removeLabel, className, children, ...rest },
   ref
 ) {
   const [label, setLabel] = React.useState<HTMLSpanElement | null>(null)
@@ -54,7 +56,7 @@ export const Tag = React.forwardRef<HTMLSpanElement, TagProps>(function Tag(
       {...rest}
     >
       {/* Forced colours keep the series colour, as a chart's marks do. */}
-      <span aria-hidden="true" data-slot="tag-dot" className={cn("size-2 shrink-0 rounded-full forced-color-adjust-none", DOT[slot])} />
+      {dot ? <span aria-hidden="true" data-slot="tag-dot" className={cn("size-2 shrink-0 rounded-full forced-color-adjust-none", DOT[slot])} /> : null}
       <span ref={setLabel} data-slot="tag-label" className="max-w-48 min-w-0 truncate">
         {children}
       </span>

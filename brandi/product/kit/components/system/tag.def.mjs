@@ -20,6 +20,7 @@ export default {
   status: "proven",
   props: [
     { name: "color", type: '1 | 2 | 3 | 4 | 5 | 6 | "grey"', default: '"grey"', doc: "The category's chart series slot, so it looks the same in a table and in a chart. Grey for unknown or unset." },
+    { name: "dot", type: "boolean", default: "true", doc: "False for a token with no category colour, such as a person or a team." },
     { name: "onRemove", type: "() => void", doc: 'Adds a remove button named "Remove [tag]", with a 24px hit area, 40px on a touch screen.' },
     { name: "removeLabel", type: "string", doc: 'The remove button\'s name, when the tag\'s words are not plain text. "Remove [tag]" by default.' },
     { name: "children", type: "ReactNode", doc: "The category's name." },

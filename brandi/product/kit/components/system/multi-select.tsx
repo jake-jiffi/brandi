@@ -218,7 +218,8 @@ export const MultiSelect = React.forwardRef<HTMLInputElement, MultiSelectProps>(
               // Drawn for a design, a token keeps its remove button, as it would look, and a press does nothing.
               onRemove={disabled ? undefined : design ? () => undefined : () => remove(v, "button")}
               // The dot is a category's colour. A token with none (a person, a team) draws no grey dot.
-              className={cn("max-w-full pointer-coarse:h-10 pointer-coarse:pr-2.5", option?.color === undefined && "[&_[data-slot=tag-dot]]:hidden")}
+              dot={option?.color !== undefined}
+              className="max-w-full pointer-coarse:h-10 pointer-coarse:pr-2.5"
             >
               {labelOf(v)}
             </Tag>
