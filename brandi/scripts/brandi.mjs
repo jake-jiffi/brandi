@@ -32,6 +32,13 @@
  *   brandi fonts                      check the typefaces actually load from Google Fonts
  *   brandi check <paths...> [--limit N]  hold work against the brand
  *   brandi complete <phase>           mark a phase done and advance
+ *   brandi product tokens [--input <file>] [--out product]
+ *                                     the product layer: every role a working screen needs,
+ *                                     in both themes, solved for contrast and audited
+ *   brandi product audit [--tokens product/tokens.json]
+ *                                     measure every declared pair in both themes
+ *   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
+ *                                     the starter's globals.css for Next.js, Tailwind 4 and shadcn
  *
  * Every command prints a short human summary, and `--json` prints the machine
  * form instead, so the skill can read a result without parsing prose.
@@ -48,6 +55,8 @@ import {
   systemInputFromBrand, addDecision, addEvidence, addOpenQuestion, slugify, PHASES, PROVENANCE,
 } from './brandfile.mjs';
 import { buildSystem, assertPublishable } from './system.mjs';
+import { buildProductTokens, auditProductTokens, auditSummary, toProductCss } from './producttokens.mjs';
+import { toStarterGlobals } from './productglobals.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2681,6 +2690,98 @@ async function cmdComplete(flags, positional) {
 
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// product
+// ---------------------------------------------------------------------------
+
+const PRODUCT_USAGE = `brandi product: the product layer, for the product-system skill.
+
+  brandi product tokens [--input <file>] [--out product]
+      Every role a working screen needs, in both themes, solved for contrast,
+      then audited. Reads brand/brand.json, or --input: a brand file, or a
+      plain system input ({ "primary": "#...", "accents": [...], "type": {...} })
+      for a brand Brandi has never built. Decided roles come from
+      product/product.json ("roles": { "primary": { "light", "dark" }, ... }).
+      Writes tokens.json, tokens.css and contrast-audit.json.
+
+  brandi product audit [--tokens product/tokens.json]
+      Measure every pair a tokens file declares, in both themes.
+
+  brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
+      The starter's globals.css for Next.js, Tailwind CSS 4 and shadcn/ui, from
+      the tokens. The starter ships the same generator, so the two never drift.`;
+
+async function productSource(flags) {
+  if (typeof flags.input === 'string') {
+    const parsed = JSON.parse(await readFile(path.resolve(flags.input), 'utf8'));
+    const input = parsed.brandi ? systemInputFromBrand(migrateBrand(parsed)) : parsed;
+    return { system: buildSystem(input), name: parsed.meta?.name ?? parsed.name ?? null, source: path.relative(process.cwd(), path.resolve(flags.input)) };
+  }
+  const { file, brand, system } = await resolveSystem(flags, { gate: false });
+  return { system, name: brand.meta?.name ?? null, source: path.relative(process.cwd(), file) };
+}
+
+function productAuditLines(audit) {
+  const lines = [auditSummary(audit)];
+  for (const f of audit.fails) lines.push(`  fail  ${f.theme.padEnd(5)} ${f.fg} on ${f.bg}: ${f.ratio}:1, below ${f.min}:1`);
+  for (const n of audit.notes) lines.push(`  note  ${n}`);
+  if (audit.warnings.length) lines.push('', `${plural(audit.warnings.length, 'warning')}:`);
+  for (const w of audit.warnings) lines.push(`  ${w.theme.padEnd(5)} ${w.area.padEnd(13)} ${w.message}`);
+  return lines;
+}
+
+async function cmdProduct(flags, positional) {
+  const [sub] = positional;
+  if (!sub || flags.help) return emit(PRODUCT_USAGE, { usage: PRODUCT_USAGE });
+  if (sub === 'tokens') {
+    const dir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const configFile = path.join(dir, 'product.json');
+    const config = existsSync(configFile) ? JSON.parse(await readFile(configFile, 'utf8')) : {};
+    const { system, name, source } = await productSource(flags);
+    const tokens = buildProductTokens(system, {
+      name: config.name ?? (name ? `${name} product system` : 'Product system'),
+      roles: config.roles ?? {},
+      displayForTitles: config.displayForTitles ?? true,
+      brandColours: config.brandColours ?? null,
+      source,
+    });
+    const audit = auditProductTokens(tokens);
+    await mkdir(dir, { recursive: true });
+    const written = [];
+    const write = async (file, content) => {
+      await writeFile(path.join(dir, file), content);
+      written.push(path.relative(process.cwd(), path.join(dir, file)));
+    };
+    await write('tokens.json', JSON.stringify(tokens, null, 2) + '\n');
+    await write('tokens.css', toProductCss(tokens));
+    await write('contrast-audit.json', JSON.stringify({ summary: auditSummary(audit), ...audit }, null, 2) + '\n');
+    const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), '', ...written.map((w) => `  ${w}`)];
+    emit(lines.join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, files: written });
+    if (!audit.ok) process.exitCode = 1;
+    return;
+  }
+  if (sub === 'audit') {
+    const file = path.resolve(typeof flags.tokens === 'string' ? flags.tokens : path.join('product', 'tokens.json'));
+    if (!existsSync(file)) return fail(`No tokens file at ${path.relative(process.cwd(), file)}. Run \`brandi product tokens\` first.`);
+    const audit = auditProductTokens(JSON.parse(await readFile(file, 'utf8')));
+    emit(productAuditLines(audit).join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes });
+    if (!audit.ok) process.exitCode = 1;
+    return;
+  }
+  if (sub === 'globals') {
+    const file = path.resolve(typeof flags.tokens === 'string' ? flags.tokens : path.join('product', 'tokens.json'));
+    if (!existsSync(file)) return fail(`No tokens file at ${path.relative(process.cwd(), file)}. Run \`brandi product tokens\` first.`);
+    const target = path.resolve(typeof flags.out === 'string' ? flags.out : path.join('product', 'globals.css'));
+    const css = toStarterGlobals(JSON.parse(await readFile(file, 'utf8')));
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, css);
+    const rel = path.relative(process.cwd(), target);
+    emit(`Wrote ${rel} (${css.split('\n').length} lines) from ${path.relative(process.cwd(), file)}.`, { ok: true, file: rel });
+    return;
+  }
+  return fail(`Unknown product subcommand "${sub}".\n\n${PRODUCT_USAGE}`);
+}
+
 const COMMANDS = {
   init: cmdInit,
   status: cmdStatus,
@@ -2706,6 +2807,7 @@ const COMMANDS = {
   guardian: cmdGuardian,
   check: cmdCheck,
   complete: cmdComplete,
+  product: cmdProduct,
 };
 
 async function main() {
@@ -2723,6 +2825,7 @@ async function main() {
     if (command === 'logo') return cmdLogo(flags, rest, ['--help']);
     if (command === 'mockup') return cmdMockup({ ...flags, help: true }, rest);
     if (command === 'media') return cmdMedia({ ...flags, help: true }, rest);
+    if (command === 'product') return cmdProduct({ ...flags, help: true }, rest);
     const source = String(await readFile(fileURLToPath(import.meta.url)));
     // Drop the shebang and the comment opener by what they are, not by line
     // count: slicing a fixed number of lines printed `/**` as the first line.

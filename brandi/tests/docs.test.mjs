@@ -28,6 +28,7 @@ let commands;
 let skillFiles = {};
 let commandFiles = {};
 let references = {};
+let productReferences = {};
 let contract;
 let companion;
 let scratch;
@@ -38,7 +39,7 @@ before(async () => {
   const block = /const COMMANDS = \{([\s\S]*?)\};/.exec(cliSource)[1];
   commands = [...block.matchAll(/^\s*([a-z]+):/gm)].map((m) => m[1]);
 
-  for (const name of ['brand-system', 'brand-guardian', 'logo-forge']) {
+  for (const name of ['brand-system', 'brand-guardian', 'logo-forge', 'product-system']) {
     skillFiles[name] = await readFile(path.join(ROOT, 'skills', name, 'SKILL.md'), 'utf8');
   }
   for (const f of await readdir(path.join(ROOT, 'commands'))) {
@@ -49,6 +50,12 @@ before(async () => {
   const refDir = path.join(ROOT, 'skills', 'brand-system', 'references');
   for (const f of (await readdir(refDir)).filter((f) => /^\d\d-.*\.md$/.test(f))) {
     references[f] = await readFile(path.join(refDir, f), 'utf8');
+  }
+  // The product-system skill's references, kept apart because several tests
+  // above hold the brand-system references to the brand file's schema.
+  const productDir = path.join(ROOT, 'skills', 'product-system', 'references');
+  for (const f of await readdir(productDir)) {
+    productReferences[f] = await readFile(path.join(productDir, f), 'utf8');
   }
   contract = await loadContract();
 
@@ -82,7 +89,8 @@ describe('the commands the docs name all exist', () => {
 
   test('every `brandi <word>` in the docs is a real command', () => {
     const known = new Set([...commands, 'help']);
-    for (const [where, text] of Object.entries({ ...skillFiles, ...commandFiles, ...references, companion })) {
+    const product = Object.fromEntries(Object.entries(productReferences).map(([f, t]) => [`product-system/${f}`, t]));
+    for (const [where, text] of Object.entries({ ...skillFiles, ...commandFiles, ...references, ...product, companion })) {
       // Same line only: a line break means the next word is prose or shell,
       // not an argument. And skip the shell that resolves the binary itself.
       // `"$A" check` is how the commands and the companion skill write it.
@@ -289,6 +297,7 @@ describe('the Codex path', () => {
     'brand-system': skillFiles['brand-system'],
     'brand-guardian': skillFiles['brand-guardian'],
     'logo-forge': skillFiles['logo-forge'],
+    'product-system': skillFiles['product-system'],
     'brand-status.md': commandFiles['brand-status.md'],
     'brand-canvas.md': commandFiles['brand-canvas.md'],
     'brand-check.md': commandFiles['brand-check.md'],
@@ -354,6 +363,42 @@ describe('the Codex path', () => {
     assert.match(skillFiles['brand-guardian'], /\$brand-system/);
     assert.equal(/\$LOGO|logo\.mjs/.test(lf), false, 'the forge goes through `"$A" logo`, not a derived script path');
     assert.match(lf, /`<brandi>`, it means the plugin root/);
+    const ps = skillFiles['product-system'];
+    assert.match(ps, /If there is no `AskUserQuestion` tool,\s+ask\s+the questions in one plain message/);
+    assert.match(ps, /Without a subagent tool, run each review yourself/);
+    assert.match(ps, /preview\.mjs --dir product\/canvas --out <dir>/);
+    assert.match(ps, /`<brandi>`, it means the plugin root/);
+  });
+});
+
+describe('the product-system skill', () => {
+  test('every reference on disk is pointed at by the skill, and every one it points at exists', () => {
+    // A path under brand-system/ is a deliberate pointer at the brand journey's references.
+    const listed = new Set([...skillFiles['product-system'].matchAll(/(?<!brand-system\/)references\/([\w-]+\.md)/g)].map((m) => m[1]));
+    for (const f of Object.keys(productReferences)) {
+      assert.ok(listed.has(f), `product-system/references/${f} exists but nothing points at it`);
+    }
+    for (const f of listed) {
+      assert.ok(productReferences[f], `the skill points at references/${f}, which does not exist`);
+    }
+  });
+
+  test('no reference is a stub', () => {
+    for (const [where, text] of Object.entries(productReferences)) {
+      assert.ok(text.split('\n').length > 80, `${where} is only ${text.split('\n').length} lines`);
+      const prose = text.replace(/`[^`]*`/g, '').replace(/```[\s\S]*?```/g, '');
+      assert.equal(/\bTODO\b|\bTBD\b|coming soon/i.test(prose), false, `${where} contains a placeholder`);
+    }
+  });
+
+  test('carries no links to particular artifacts: the skill is public and the systems it builds are not', () => {
+    for (const [where, text] of Object.entries({ 'SKILL.md': skillFiles['product-system'], ...productReferences, 'brand-product.md': commandFiles['brand-product.md'] })) {
+      assert.equal(/claude\.ai\/(?:code\/)?artifact\//.test(text), false, `${where} links a particular artifact`);
+    }
+  });
+
+  test('states the bar the product tokens command enforces', () => {
+    assert.match(skillFiles['product-system'], /colour tokens N \| pairs checked N \| fails N/);
   });
 });
 
@@ -481,7 +526,9 @@ describe('the references agree with the code they describe', () => {
     const roots = Object.keys(schema.properties);
     const unresolved = new Set();
     let checked = 0;
-    for (const [where, text] of Object.entries(references)) {
+    // The product-system skill reads the brand file too, so its paths are held to the same schema.
+    const product = Object.fromEntries(Object.entries(productReferences).map(([f, t]) => [`product-system/${f}`, t]));
+    for (const [where, text] of Object.entries({ ...references, ...product, 'product-system/SKILL.md': skillFiles['product-system'] })) {
       for (const m of text.matchAll(/`([a-z][A-Za-z0-9]*(?:\[\])?(?:\.[A-Za-z0-9]+(?:\[\])?)+)`/g)) {
         if (!roots.includes(m[1].split('.')[0].replace(/\[\]$/, ''))) continue;
         checked++;
@@ -632,8 +679,8 @@ describe('the README states numbers that are true', () => {
   // `test(` call site, so adding one trips this and forces whoever added it to
   // re-run the suite and refresh all three numbers. A test added inside an
   // existing loop is the one case that slips through.
-  const SUITE_TESTS = 1939;
-  const STATIC_TEST_CALLS = 1645;
+  const SUITE_TESTS = 1994;
+  const STATIC_TEST_CALLS = 1688;
   let readme;
   // The worked example the README counts pages for: the deck `brandi book`
   // builds from tests/fixtures/muddy-paws.json. It is built here rather than

@@ -120,6 +120,7 @@ Eight phases. Three of them stop for you. Everything else runs on its own.
 | `/brandi:brand-canvas` | Rebuild and republish the canvas |
 | `/brandi:brand-logo` | Generate a range of marks and take one to a master |
 | `/brandi:brand-media` | Photography, scenes, motion, sound and logo sparks, with Higgsfield |
+| `/brandi:brand-product` | Build or continue the SaaS product system built on the brand |
 
 ## The logo forge
 
@@ -237,6 +238,35 @@ uploaded.
 sound get their own pages, each labelled as generated, with the model and the person who approved
 it. No generated person is ever presented as a customer or a member of staff.
 
+## Product systems
+
+A fourth skill, `product-system`, takes the brand into the products built on it: the layer below the
+brand book that most systems skip. It works from a Brandi brand, from an existing brand and its
+website, or from a product that has already shipped, and it produces the system those products are
+built from. That means product tokens in both themes, a component library with previews and
+behaviour rules, the written system, a Design canvas carrying the whole product family with options
+and states on record, a Next.js, Tailwind 4 and shadcn starter, platform specs, an AI pattern
+catalogue, and quality gates run in rounds.
+
+The arithmetic is in the command line:
+
+```bash
+brandi product tokens     # every role a working screen needs, in both themes, solved for contrast
+brandi product audit      # measure every pair the tokens declare, in both themes
+brandi product globals    # the starter's globals.css, from the same tokens
+```
+
+`product tokens` keeps a brand colour that passes and moves one that fails only as far as it must,
+holding its hue and chroma. Hierarchy roles (muted and subtle text, control edges) are solved to the
+quietest value that still passes, so the hierarchy never collapses into one grey. A role a person
+decided is never moved: if it fails, the audit says so. Washes are composited over the surface they
+sit on before they are measured, because a contrast ratio ignores alpha. The test suite runs it
+across 40 brand colours, from near-black to pale and muted to loud, and every derived role passes on
+every one.
+
+The rest of the journey (directions, the canvas, the gates) is method the skill carries in its
+references. The commands are the parts that can be deterministic.
+
 ## What makes it different
 
 **Nothing is invented.** Every statement carries its provenance: supplied, extracted, published,
@@ -290,7 +320,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-1939 tests. They include property tests over the colour and type engines against hundreds of random
+1994 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

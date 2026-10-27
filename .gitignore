@@ -19,3 +19,11 @@ node_modules/
 
 # Scaffolding written by other tooling that runs in this directory.
 build-manifest.json
+
+# Local-only material: client references, read-back artifact files, pilot work,
+# the saved Cowork build and the running build notes. Never pushed: this repo is
+# public and some of it is licensed or belongs to clients.
+private/
+
+# Session logs a browser-automation tool writes into the working directory.
+.playwright-mcp/

@@ -1,0 +1,105 @@
+# The Design System artifact
+
+The system is published as a Design System artifact: a page that shows the README, the written
+sections, the tokens and every component with a live preview in both themes, and from which a Design
+canvas installs the system. The type's own instructions change between releases, so read them at
+publish time. This file is what holds across releases, and what the last system learned.
+
+## Creating it
+
+Run the `Artifact` quickstart (intent `other`) and start from the Design System type it names. Read
+the type's instructions and every reference it points at before writing a file: its format, craft,
+from-code and cover guides set the file layout and what the page expects. Keep the url the create
+call returns.
+
+## What goes in it
+
+| Path | What |
+| --- | --- |
+| `project/README.md` | Principles, content fundamentals, visual foundations, brand marks and imagery, iconography, components, using this system |
+| `project/1-writing.md` and on | The written sections, numbered in reading order (`04-written-system.md`) |
+| `project/tokens.json` | The product tokens, as `$A product tokens` writes them |
+| `project/tokens.css` | Your own, with "generated from tokens.json" on its first line, so previews and the canvas get exactly the variables the components use |
+| `project/components/<Name>/README.md` and `preview.html` | One card per component, both generated from the component's one definition |
+| `project/components/bundle.js`, `bundle.css`, `index.d.ts` | The component bundle the previews and the canvas mount, and the types for every prop |
+| `project/fonts/` | The faces, as files |
+| `project/starter/` | The production starter, with the example product under `examples/` |
+| Asset groups | Logos, app icons, characters or illustrations when the brand has them, and Licences, each with a README |
+| `project/design-system.json` | The index the page reads |
+
+A component's `preview.html` renders inside the page's card viewer and looks blank opened on its
+own. That is expected, not a broken preview.
+
+## The README
+
+The README is the page people land on, so it carries the whole system in one read and points at the
+sections for depth. In order:
+
+1. **What the system is for**, in two sentences: which products it is the starting point for, and
+   where the brand shows up in them (the few deliberate places, not everywhere).
+2. **Principles**, five or six, each a rule with its reason ("One primary action per view").
+3. **Content fundamentals**: the voice at work, and the rules people need daily (sentence case,
+   button labels, status copy, numbers), with a pointer to the writing section.
+4. **Visual foundations**: the material hierarchy (canvas, then rail and panes, then cards, then
+   controls), colour roles, status, type, spacing and layout, corners, shadows and borders, states,
+   motion, and the contrast record with its pair count.
+5. **Brand marks and imagery**: the logo in product, the product lockup, characters or illustration
+   if the brand has them, the app icon.
+6. **Iconography**: the set, the stroke and the sizes.
+7. **Components**: the namespace, the count by group, and the behaviour every component shares.
+8. **Using this system**: what to load and in what order, the provider and theme switch, installing
+   on a canvas, sample data, types, and where production code comes from (the starter).
+
+## The index
+
+`project/design-system.json` is the type's index. Know what you own in it:
+
+| Field | What it is | Who edits it |
+| --- | --- | --- |
+| `v`, `layout` | The index format | The type. Never change |
+| `createdOnFiles` | When the system was first published from files | Never change: it is the creation marker |
+| `title`, `namespace` | The system's name and the global its components hang off | Set once |
+| `libraries` | The runtime the previews load (React, at a major version) | When the bundle's runtime changes |
+| `groups`, `assetGroups`, `blobs` | Asset groups, their order and their files in the asset store | When assets change |
+| `sections`, `docs` | The written sections | When a section is added or renamed |
+| `lastChange` | Who changed it, via what, when, and a one-line note | Every publish |
+
+## Before publishing
+
+- `$A product audit` reports no fails, and the round record says the bar was met (or says plainly
+  that this is a draft).
+- Every component has a README and a preview, both generated from its definition, and every preview
+  renders in both themes.
+- The em-dash check and the banned-words check pass on every generated file.
+- The starter's fresh install builds, lints and type-checks clean.
+- The Licences group lists every face and icon set with its licence.
+- The person has said yes.
+
+The publish result reports a version id. Write it into the round record: a canvas that installs the
+system records the same id, and that is how the drift check knows which version a canvas carries.
+
+## Updating it
+
+- **Read before you write.** Re-read the live index (`project/design-system.json`) right before
+  writing it. Keep its creation marker; change only the last-change record (who, via what, when, and
+  a note). Send it last, after every other file.
+- **Send only what changed.** By the end of a round that is one call.
+- **Content types.** Send TypeScript and Python files with an explicit `text/plain` type.
+- **Images go to the asset store** and are named in the index; each group's README is a file.
+- **Ask first.** Publishing or changing a live artifact waits for the person's yes, every time.
+
+## Installing it on a canvas
+
+The canvas installs the system by copying its files server side from the published Design System,
+not by uploading them again: `tokens.json`, `tokens.css`, the font files, `components/bundle.css` and
+`components/bundle.js` into the canvas's `ds/<namespace>/` folder. The canvas's index records which
+version of the system it came from and when it was copied. Copy the fonts once; copy the rest
+whenever the system changes, and check the copies' checksums against the source (`09-operate.md`).
+
+Because the canvas installs from the published system, the system is published before the canvas is
+built, and every change to the system is published before the canvas picks it up.
+
+## Who can see it
+
+A new artifact is private. Sharing it, and making it the default system for new designs, are the
+person's decisions. Systems stay active in the Claude account they were built in.
