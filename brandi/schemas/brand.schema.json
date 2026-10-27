@@ -852,6 +852,13 @@
                 }
               }
             },
+            "cover": {
+              "type": "object",
+              "description": "The variant the brand's own cover puts straight on its colour. The book's cover draws it there, with no paper card under it.",
+              "properties": {
+                "variant": { "type": "string", "description": "A variant's name, as identity.logo.variants records it." }
+              }
+            },
             "monochrome": {
               "type": "object",
               "description": "One-colour behaviour, which is what embroidery, foil, etching and a fax get.",

@@ -195,9 +195,9 @@ a:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
   font-family: var(--mono); font-size: 13px; letter-spacing: 0.04em; color: var(--muted);
 }
 .folio { font-family: var(--mono); font-size: 14px; }
-.corner-mark { position: absolute; top: 48px; right: 96px; height: 32px; display: flex; align-items: center; }
-.corner-mark svg { height: 32px; width: auto; display: block; }
-.corner-mark img { height: 32px; width: auto; display: block; }
+.corner-mark { position: absolute; top: 48px; right: 96px; height: var(--corner-h, 32px); display: flex; align-items: center; }
+.corner-mark svg { height: var(--corner-h, 32px); width: auto; display: block; }
+.corner-mark img { height: var(--corner-h, 32px); width: auto; display: block; }
 .two { display: grid; grid-template-columns: 560px minmax(0, 1fr); width: 100%; height: 100%; }
 .rail { background: var(--tint); padding: 88px 64px 120px 96px; display: flex; flex-direction: column; gap: 28px; }
 .rail p { font-size: 19px; line-height: 1.5; max-width: 34ch; }
@@ -334,9 +334,68 @@ function footer(ctx, chapter, n, { left, centre, right } = {}) {
   </div>`;
 }
 
+/**
+ * The cover's mark. A supplied file sits on a paper card, since a mark in several inks may not read on
+ * the brand colour. A brand whose own cover puts a variant straight on its colour names it in
+ * identity.logo.cover ({ "variant": "<a variant's name>" }), and the cover does the same.
+ */
+function coverMark(ctx) {
+  const pick = ctx.brand?.identity?.logo?.cover?.variant;
+  const v = pick ? (ctx.brand.identity.logo.variants ?? []).find((x) => x?.name === pick) : null;
+  const file = v?.file && (ctx.assets[v.file] ? v.file : Object.keys(ctx.assets).find((k) => k.endsWith(`/${v.file}`)));
+  const asset = file ? ctx.assets[file] : null;
+  if (asset) {
+    const aspect = asset.kind === 'svg' ? svgAspect(asset.markup) : 3;
+    const h = Math.min(260, 1300 / aspect);
+    return `<span class="mark" role="img" aria-label="${esc(v.name)}" style="height:${Math.round(h)}px;width:${Math.round(h * aspect)}px">${asset.markup}</span>`;
+  }
+  return ctx.logo.file
+    ? `<span style="display:inline-flex;background:var(--paper);padding:40px 56px;border-radius:var(--radius)">${ctx.logo.at(180, { maxW: 1300 })}</span>`
+    : ctx.logo.at(220, { colour: 'var(--on-primary)', maxW: 1400 });
+}
+
 function cornerMark(ctx) {
   if (!ctx.logo.file) return '';
-  return `<div class="corner-mark" aria-hidden="true">${ctx.logo.markup}</div>`;
+  // It lives in the 80px above the content. A larger mark rises to stay there; one whose minimum will not
+  // fit is left off, since the logo pages carry it, rather than drawn under its own minimum.
+  const h = cornerHeight(ctx);
+  if (h > 64) return '';
+  return `<div class="corner-mark" aria-hidden="true" style="--corner-h:${h}px;top:${Math.min(48, 80 - h)}px">${ctx.logo.markup}</div>`;
+}
+
+/**
+ * The corner mark's height: 32px, or the brand's own minimum when that is larger. A minimum is recorded
+ * along the long side, so a wide mark's height is that over its width-to-height ratio. At 32px a wide
+ * shield came out 15mm across on every page, under its 20mm minimum.
+ */
+export function cornerHeight(ctx) {
+  const L = ctx.brand?.identity?.logo ?? {};
+  const minLong = (L.minSizes ?? []).find((m) => typeof m?.screenPx === 'number')?.screenPx ?? L.minSize?.screenPx ?? null;
+  return minLong ? Math.max(32, Math.ceil(minLong / Math.max(ctx.logo.aspect ?? 1, 1))) : 32;
+}
+
+/** How many inks a drawn mark uses. A raster mark counts as many: nothing can tell. */
+export function inkCount(asset) {
+  if (!asset || asset.kind !== 'svg') return Infinity;
+  const inks = new Set();
+  for (const [, c] of String(asset.markup).matchAll(/(?:fill|stroke)\s*[:=]\s*"?\s*(#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|[a-z]+)/gi)) {
+    const v = c.toLowerCase();
+    if (!['none', 'currentcolor', 'transparent', 'inherit', 'url'].includes(v)) inks.add(v);
+  }
+  return Math.max(1, inks.size);
+}
+
+/**
+ * The ground a variant is made for, read from its name and use: "dark" for one made for black, "reversed"
+ * for one reversed out of any strong colour (the brand's or dark), "light", "mono", or null for any.
+ */
+export function groundOf(v) {
+  const said = `${v?.name ?? ''} ${v?.use ?? ''}`.toLowerCase();
+  if (/one[- ]colou?r|monochrome|single[- ]colou?r/.test(said) && !/revers/.test(said)) return 'mono';
+  if (/on (black|dark|wood|charcoal)/.test(said)) return 'dark';
+  if (/revers|knock[- ]?out|white on/.test(said)) return 'reversed';
+  if (/on (paper|light|white)\b/.test(said)) return 'light';
+  return null;
 }
 
 /**
@@ -1157,37 +1216,56 @@ function planPages(ctx) {
     chapter: 'logo', id: 'variants', title: 'Variants on backgrounds',
     render: (n) => {
       const variants = has(logo.variants) ? logo.variants : [{ name: L.file ? 'Primary' : 'Wordmark', use: null }];
-      // A supplied file is shown in its own colours only on the light ground.
-      // On the brand colour and on dark it is reversed by filter, unless the
-      // variant is itself the reversed artwork, which is drawn as supplied.
-      const reverse = L.file ? 'brightness(0) invert(1)' : '';
+      const assetOf = (v) => {
+        const file = v?.file && (ctx.assets[v.file] ? v.file : Object.keys(ctx.assets).find((k) => k.endsWith(`/${v.file}`)));
+        return file ? ctx.assets[file] : null;
+      };
+      // A variant's ground, from its name, its use and the role its file is recorded with.
+      const roleOf = (v) => (logo.files ?? []).find((f) => f && typeof f === 'object' && f.path && v?.file && f.path.endsWith(v.file))?.role ?? '';
+      const groundFor = (v) => groundOf({ name: v?.name, use: `${v?.use ?? ''} ${roleOf(v)}` });
+      // The brand's own one-colour artwork, if it supplies one, named where another mark cannot be flattened.
+      const oneColour = variants.find((v) => groundFor(v) === 'mono' && assetOf(v));
       const grounds = [
-        ['Light', 'var(--paper)', () => ({})],
-        ['Primary', 'var(--primary)', (reversed) => ({ colour: 'var(--on-primary)', filter: reversed ? '' : reverse })],
-        ['Dark', 'var(--inverted)', (reversed) => ({ colour: 'var(--on-inverted)', filter: reversed ? '' : reverse })],
-        ['One colour', 'var(--paper)', () => ({ colour: 'var(--ink)', filter: L.file ? 'brightness(0)' : '' })],
+        ['Light', 'light', 'var(--paper)', 'var(--ink)'],
+        ['Primary', 'primary', 'var(--primary)', 'var(--on-primary)'],
+        ['Dark', 'dark', 'var(--inverted)', 'var(--on-inverted)'],
+        ['One colour', 'mono', 'var(--paper)', 'var(--ink)'],
       ];
       const rowH = variants.length > 3 ? 170 : 210;
+      const markFor = (shown, v, opts, groundName) => (shown
+        ? `<span class="mark" role="img" aria-label="${esc(`${v.name ?? name}, on ${groundName}`)}" style="height:${Math.round(Math.min(72, 240 / (shown.kind === 'svg' ? svgAspect(shown.markup) : 3)))}px;width:${Math.round(Math.min(72 * (shown.kind === 'svg' ? svgAspect(shown.markup) : 3), 240))}px;${opts.filter ? `filter:${opts.filter};` : ''}${opts.colour ? `color:${opts.colour};` : ''}">${shown.markup}</span>`
+        : L.at(64, { ...opts, maxW: 180, alt: `${v.name ?? name}, on ${groundName}` }));
+      const note = (text) => `<span style="font-size:13px;line-height:1.35;color:inherit;opacity:.7;text-align:center;max-width:22ch">${text}</span>`;
       return contentPage(ctx, {
         id: 'variants', chapter: 'Logo', title: 'Variants on backgrounds', n, fill: true,
         rail: railText(
-          `Each recorded variant on the four grounds it will meet: the page, the brand colour, a dark surface and one colour.`,
-          L.file ? 'On the brand colour, on dark and in one colour the artwork is shown as a silhouette made by filter, for reference only. Use the supplied reversed and one-colour artwork in production, never a filter.' : esc(L.typesetNote),
+          'Each recorded variant on the grounds it is made for: the page, the brand colour, a dark surface and one colour.',
+          L.file ? 'A variant made for one ground is drawn only there. A logo in one ink is recoloured for the other grounds, which is the same artwork. A logo in several inks is never reversed or flattened by filter: it is drawn as supplied, and the one-colour cell names the artwork to use.' : esc(L.typesetNote),
           has(logo.monochrome?.rule) ? `<strong>One colour.</strong> ${esc(logo.monochrome.rule)}` : null,
         ),
         canvas: `<div style="display:flex;flex-direction:column;gap:14px">
           <div style="display:grid;grid-template-columns:200px repeat(4,minmax(0,1fr));gap:0 4px"><span></span>${grounds.map(([g]) => `<span class="label">${g}</span>`).join('')}</div>
           ${variants.slice(0, 4).map((v) => {
-            const file = v.file && (ctx.assets[v.file] || Object.keys(ctx.assets).find((k) => k.endsWith(`/${v.file}`)));
-            const shown = file ? ctx.assets[file === true ? v.file : file] ?? ctx.assets[v.file] : null;
-            const reversed = Boolean(shown) && /revers|knock|white|inverse/i.test(String(v.name ?? ''));
-            const draw = (opts, groundName) => (shown
-              ? `<span class="mark" role="img" aria-label="${esc(`${v.name ?? name}, on ${groundName}`)}" style="height:${Math.round(Math.min(72, 240 / (shown.kind === 'svg' ? svgAspect(shown.markup) : 3)))}px;width:${Math.round(Math.min(72 * (shown.kind === 'svg' ? svgAspect(shown.markup) : 3), 240))}px;${opts.filter ? `filter:${opts.filter};` : ''}${opts.colour ? `color:${opts.colour};` : ''}">${shown.markup}</span>`
-              : L.at(64, { ...opts, maxW: 180, alt: `${v.name ?? name}, on ${groundName}` }));
+            const shown = assetOf(v);
+            const art = shown ?? (L.file ? { kind: L.kind, markup: L.markup } : null);
+            const single = inkCount(art) === 1;
+            const made = groundFor(v);
             const fallback = !shown && v.file && L.file;
+            const cell = (key, groundName, colour) => {
+              const here = made === null || (made === 'reversed' ? ['primary', 'dark'] : made === 'mono' ? ['mono', 'light'] : [made]).includes(key);
+              if (!here) return note(`Not used on ${groundName}`);
+              // Supplied for its ground, it is drawn as it is.
+              if ((shown && made) || key === 'light') return markFor(shown, v, {}, groundName);
+              if (key === 'mono') {
+                if (!L.file || single) return markFor(shown, v, { colour, filter: L.file ? 'brightness(0)' : '' }, groundName);
+                return note(oneColour ? `Use ${esc(oneColour.name)}` : `[${PLACEHOLDER}: the one-colour logo]`);
+              }
+              // The brand colour or dark: one ink takes the ground's own colour; several inks stay as supplied.
+              return markFor(shown, v, single || !L.file ? { colour, filter: L.file ? 'brightness(0) invert(1)' : '' } : {}, groundName);
+            };
             return `<div style="display:grid;grid-template-columns:200px repeat(4,minmax(0,1fr));gap:0 4px;align-items:stretch">
               <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding-right:16px"><strong style="font-size:16px">${esc(v.name ?? v)}</strong>${v.use ? `<span style="font-size:13px;color:var(--muted);line-height:1.3">${esc(v.use)}</span>` : ''}${fallback ? `<span class="todo" style="font-size:12px">[${PLACEHOLDER}: ${esc(v.file)} not on disk; primary shown]</span>` : ''}</div>
-              ${grounds.map(([groundName, g, optsFor], gi) => `<div data-ground="${['light', 'primary', 'dark', 'mono'][gi]}" style="background:${g};min-height:${rowH}px;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;border:1px solid var(--rule)">${draw(optsFor(reversed), String(groundName).toLowerCase())}</div>`).join('')}
+              ${grounds.map(([groundName, key, g, colour]) => `<div data-ground="${key}" style="background:${g};color:${colour};min-height:${rowH}px;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;border:1px solid var(--rule)">${cell(key, String(groundName).toLowerCase(), colour)}</div>`).join('')}
             </div>`;
           }).join('')}
         </div>`,
@@ -2331,9 +2409,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [], me
     ?? (stamped && !Number.isNaN(stamped.getTime()) ? localDate(stamped) : null);
   const cover = `<section class="page" id="cover" style="background:var(--primary);color:var(--on-primary)">
   <div class="full" style="justify-content:space-between">
-    <div style="display:flex;align-items:flex-start">${ctx.logo.file
-      ? `<span style="display:inline-flex;background:var(--paper);padding:40px 56px;border-radius:var(--radius)">${ctx.logo.at(180, { maxW: 1300 })}</span>`
-      : ctx.logo.at(220, { colour: 'var(--on-primary)', maxW: 1400 })}</div>
+    <div style="display:flex;align-items:flex-start">${coverMark(ctx)}</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end">
       <h1 class="big" style="font-size:112px;font-weight:400">Brand guidelines</h1>
       <div class="mono" style="text-align:right;line-height:1.7;opacity:.9">Version ${esc(ctx.version)}<br>${date ? esc(date) : todo('an effective date')}</div>

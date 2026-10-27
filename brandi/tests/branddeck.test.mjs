@@ -238,7 +238,7 @@ describe('the logo', () => {
     for (const c of cells('primary')) assert.match(c, /filter:brightness\(0\) invert\(1\)/, 'reverse filter on the brand ground');
     for (const c of cells('dark')) assert.match(c, /filter:brightness\(0\) invert\(1\)/);
     for (const c of cells('light')) assert.equal(/filter:/.test(c), false, 'the light ground shows the artwork in its own colours');
-    assert.match(page, /shown as a silhouette made by filter/);
+    assert.match(page, /never reversed or flattened by filter/);
     // A reversed file on disk is drawn unfiltered on the brand ground.
     const withReversed = renderBrandDeck({ brand, system, assets: { ...SCRATCH_ASSETS, 'assets/logos/muddy-paws-reversed.svg': { kind: 'svg', markup: '<svg id="reversed-mark" viewBox="0 0 300 100"><rect width="300" height="100" fill="#fff"/></svg>' } } }).html;
     const rev = [...pageOf(withReversed, 'variants').matchAll(/<div data-ground="primary"[^>]*>([\s\S]*?)<\/div>/g)].map((m) => m[1]).find((c) => c.includes('reversed-mark'));
@@ -246,6 +246,49 @@ describe('the logo', () => {
     assert.equal(/filter:/.test(rev), false);
     // The typeset fallback never has a filter to apply.
     for (const c of [...pageOf(deck.html, 'variants').matchAll(/<div data-ground="primary"[^>]*>([\s\S]*?)<\/div>/g)]) assert.equal(/filter:/.test(c[1]), false);
+  });
+
+  test('a logo in several inks is never reversed or flattened by filter: it is drawn as supplied, and one colour names the artwork', () => {
+    const two = '<svg xmlns="http://www.w3.org/2000/svg" id="two-ink" viewBox="0 0 300 100"><rect width="200" height="100" fill="#1F6F4A"/><circle cx="250" cy="50" r="40" fill="#C9A227"/></svg>';
+    const b = clone(brand);
+    b.identity.logo.variants = [
+      { name: 'Primary horizontal', file: 'muddy-paws-primary.svg' },
+      { name: 'Outline, on black', file: 'muddy-paws-outline-dark.svg' },
+      { name: 'One-colour outline', file: 'muddy-paws-one.svg' },
+    ];
+    const assets = {
+      'assets/logos/muddy-paws-primary.svg': { kind: 'svg', markup: two },
+      'assets/logos/muddy-paws-outline-dark.svg': { kind: 'svg', markup: '<svg id="on-black" viewBox="0 0 300 100"><rect width="300" height="100" fill="none" stroke="#6BBF3A"/></svg>' },
+      'assets/logos/muddy-paws-one.svg': { kind: 'svg', markup: '<svg id="one-ink" viewBox="0 0 300 100"><rect width="300" height="100" fill="#000"/></svg>' },
+    };
+    const page = pageOf(renderBrandDeck({ brand: b, system, assets }).html, 'variants');
+    const row = (marker) => page.split('<div style="display:grid;grid-template-columns:200px').find((r) => r.includes(marker)) ?? '';
+    const primary = row('Primary horizontal');
+    // A silhouette of a two-ink mark drew a blank shield on the brand colour.
+    assert.equal(/filter:/.test(primary), false, 'no filter on a mark in several inks');
+    assert.match(primary, /data-ground="mono"[^>]*>[\s\S]*?Use One-colour outline/, 'one colour names the artwork the brand supplies');
+    const onBlack = row('Outline, on black');
+    assert.match(onBlack, /data-ground="dark"[^>]*>[\s\S]*?id="on-black"/, 'a variant made for black is drawn on dark');
+    for (const g of ['light', 'primary', 'mono']) assert.match(onBlack, new RegExp(`data-ground="${g}"[^>]*>[\\s\\S]*?Not used on`), `and nowhere else (${g})`);
+  });
+
+  test("the corner mark is never drawn under the logo's own minimum, and a brand's cover variant goes straight on its colour", () => {
+    const b = clone(brand);
+    b.identity.logo.minSizes = [{ variant: 'Primary horizontal', screenPx: 150 }];
+    const html = renderBrandDeck({ brand: b, system, assets: SCRATCH_ASSETS }).html;
+    // The fixture mark is three times as wide as it is tall: 150px across is 50px tall, raised to stay above the content.
+    assert.match(html, /class="corner-mark" aria-hidden="true" style="--corner-h:50px;top:30px"/);
+    const bare = clone(brand);
+    delete bare.identity.logo.minSizes;
+    delete bare.identity.logo.minSize;
+    assert.match(renderBrandDeck({ brand: bare, system, assets: SCRATCH_ASSETS }).html, /--corner-h:32px;top:48px/, '32px when nothing larger is on record');
+    b.identity.logo.minSizes = [{ screenPx: 600 }];
+    assert.equal(/class="corner-mark"/.test(renderBrandDeck({ brand: b, system, assets: SCRATCH_ASSETS }).html), false, 'left off when its minimum will not fit above the content');
+    b.identity.logo.minSizes = [{ variant: 'Primary horizontal', screenPx: 150 }];
+    b.identity.logo.cover = { variant: 'Mark only' };
+    const cover = /<section class="page" id="cover"[\s\S]*?<\/section>/.exec(renderBrandDeck({ brand: b, system, assets: SCRATCH_ASSETS }).html)[0];
+    assert.match(cover, /id="the-favicon"/, 'the named variant');
+    assert.equal(/background:var\(--paper\);padding:40px 56px/.test(cover), false, 'with no paper card under it');
   });
 
   test('R2-N-07: a rule that forbids the lockup shows the tagline alone, and a boolean decides either way', () => {
