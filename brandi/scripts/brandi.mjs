@@ -46,6 +46,8 @@
  *                                     every component's card and preview from its definition
  *   brandi product gates [--round N]  the machine gates for a round, every tool version recorded
  *   brandi product round --round N    the round held against the bar, with the judged gates
+ *   brandi product specs              check platform specs and report their coverage
+ *   brandi product standards          the monthly standards check, and its report
  *
  * Every command prints a short human summary, and `--json` prints the machine
  * form instead, so the skill can read a result without parsing prose.
@@ -66,6 +68,8 @@ import { buildProductTokens, auditProductTokens, auditSummary, toProductCss } fr
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
 import { runGates, judgeRound, roundMarkdown, WIDTHS } from './productgates.mjs';
+import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
+import { loadDefinitions } from './productdocs.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2780,7 +2784,19 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
   brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
       Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
       review (ui-ux-pro-max) into the round, hold every gate against the bar,
-      and write record.md and record.json. Exits 1 until the bar is met.`;
+      and write record.md and record.json. Exits 1 until the bar is met.
+
+  brandi product specs [--dir product/platform]
+      Check every platform spec (the stamp, all thirteen fields, every value
+      citing a key the stamp lists and the reference's registry holds), and
+      report which component and platform pairs have no spec. The platforms
+      come from product.json ("platforms": ["web", "ios-ipados", ...]).
+
+  brandi product standards [--dir product/platform] [--markers <file>] [--fetch] [--mark-stale]
+      The monthly standards check: compare every stamped marker with a fresh
+      one (fetched where the plain web serves it, else from --markers), list
+      the specs each moved marker touches, mark them stale with --mark-stale,
+      and write the report. A source nobody fetched is "not fetched".`;
 
 async function productSource(flags) {
   if (typeof flags.input === 'string') {
@@ -2924,6 +2940,51 @@ async function cmdProduct(flags, positional) {
     await writeFile(path.join(dir, 'record.json'), `${JSON.stringify({ round, system, met: judged.met, verdicts: judged.verdicts, critique, rules, signOff, versions: gates.versions }, null, 2)}\n`);
     emit([`Round ${round}: ${judged.met ? 'the bar is met' : 'the bar is not met yet'}.`, ...judged.verdicts.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Record: ${path.relative(process.cwd(), path.join(dir, 'record.md'))}`].join('\n'), { ok: judged.met, round, verdicts: judged.verdicts });
     if (!judged.met) process.exitCode = 1;
+    return;
+  }
+  if (sub === 'specs' || sub === 'standards') {
+    const productDir = path.resolve('product');
+    const dir = path.resolve(typeof flags.dir === 'string' ? flags.dir : path.join(productDir, 'platform'));
+    const specs = loadSpecs(dir);
+    const sources = loadSources();
+    let config = {};
+    try { config = JSON.parse(await readFile(path.join(productDir, 'product.json'), 'utf8')); } catch { /* defaults */ }
+    if (sub === 'specs') {
+      const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
+      const components = existsSync(path.join(starter, 'components', 'system')) ? (await loadDefinitions(path.join(starter, 'components', 'system'))).map((d) => d.name) : [];
+      const platforms = (config.platforms ?? ['web']).filter((p) => PLATFORMS.includes(p));
+      const problems = specs.flatMap((sp) => checkSpec(sp, { sources, components: components.length ? components : null }));
+      const cov = coverage(specs, { components, platforms });
+      const stale = specs.filter((sp) => /^stale/.test(sp.stamp?.status ?? ''));
+      emit([
+        `${plural(specs.length, 'spec')} checked against ${sources.size} registry keys: ${problems.length ? `${plural(problems.length, 'problem')}` : 'all complete'}.`,
+        ...problems.map((p) => `  ${p}`),
+        `Coverage: ${cov.present} of ${cov.total} component and platform pairs (${platforms.join(', ')}).`,
+        ...cov.missing.slice(0, 40).map((m) => `  missing  ${m.component} on ${m.platform}`),
+        cov.missing.length > 40 ? `  and ${cov.missing.length - 40} more` : '',
+        stale.length ? `Stale, so no native code from these until reviewed: ${stale.map((sp) => sp.file).join(', ')}` : '',
+      ].filter(Boolean).join('\n'), { ok: !problems.length && !cov.missing.length, problems, coverage: cov, stale: stale.map((sp) => sp.file) });
+      if (problems.length || cov.missing.length) process.exitCode = 1;
+      return;
+    }
+    const date = typeof flags.date === 'string' ? flags.date : new Date().toISOString().slice(0, 10);
+    const fresh = typeof flags.markers === 'string' ? JSON.parse(await readFile(path.resolve(flags.markers), 'utf8')) : {};
+    if (flags.fetch) {
+      const keys = [...new Set(specs.flatMap((sp) => (sp.stamp?.sources ?? []).map((x) => x.key)))];
+      for (const key of keys) {
+        if (fresh[key]?.marker) continue;
+        const url = specs.flatMap((sp) => sp.stamp?.sources ?? []).find((x) => x.key === key)?.url ?? sources.get(key)?.url;
+        fresh[key] = url ? await fetchMarker(key, url) : { error: 'no URL' };
+      }
+    }
+    const result = compareMarkers(specs, fresh);
+    const report = standardsReport(result, { date, sources });
+    const file = path.join(dir, `standards-${date}.md`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(file, report);
+    const staled = flags['mark-stale'] ? writeStale(specs, result.changes, date) : [];
+    emit([report.split('\n')[2], `Report: ${path.relative(process.cwd(), file)}`, staled.length ? `Marked stale: ${staled.join(', ')}` : ''].filter(Boolean).join('\n'),
+      { ok: !result.changes.length && !result.notFetched.length, changes: result.changes, notFetched: result.notFetched, report: path.relative(process.cwd(), file), staled });
     return;
   }
   return fail(`Unknown product subcommand "${sub}".\n\n${PRODUCT_USAGE}`);
