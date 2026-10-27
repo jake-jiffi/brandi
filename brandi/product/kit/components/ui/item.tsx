@@ -39,8 +39,10 @@ const ItemSeparator = React.forwardRef(function ItemSeparator({
   )
 })
 
+// Patched (07-starter.md, item): the system's body type and text role, and the hover wash on a linked item, in
+// place of shadcn's text-sm and muted fill.
 const itemVariants = cva(
-  "group/item flex w-full flex-wrap items-center rounded-md border text-sm transition-colors duration-100 [a]:transition-colors [a]:hover:bg-muted",
+  "group/item flex w-full flex-wrap items-center rounded-md border type-body text-text transition-colors duration-100 [a]:transition-colors [a]:hover:bg-hover",
   {
     variants: {
       variant: {
