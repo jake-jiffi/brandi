@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 
 import { useOverlayOpener } from "./dialog"
 import { Icon } from "./icon"
-import { keyClass } from "./menu"
+import { Kbd } from "./kbd"
 
 /** One result: a record to jump to or an action to run. */
 export interface CommandAction {
@@ -226,7 +226,7 @@ function Palette({
                       {item.description ? <span data-slot="command-item-description" className="ml-2 type-meta text-text-muted">{item.description}</span> : null}
                     </span>
                     {item.meta ? <span data-slot="command-item-meta" className="shrink-0 type-meta text-text-muted">{item.meta}</span> : null}
-                    {item.shortcut ? <kbd className={keyClass}>{item.shortcut}</kbd> : null}
+                    {item.shortcut ? <Kbd>{item.shortcut}</Kbd> : null}
                   </div>
                 )
               })}
@@ -241,21 +241,21 @@ function Palette({
       ) : null}
       <div aria-hidden="true" data-slot="command-hints" className="flex items-center gap-4 border-t border-line px-4 py-2.5 type-caption text-text-muted pointer-coarse:hidden">
         <span className="flex items-center gap-1.5">
-          <kbd className={keyClass}>
+          <Kbd>
             <Icon name="ArrowUp" size={12} />
-          </kbd>
-          <kbd className={keyClass}>
+          </Kbd>
+          <Kbd>
             <Icon name="ArrowDown" size={12} />
-          </kbd>
+          </Kbd>
           to move
         </span>
         <span className="flex items-center gap-1.5">
-          <kbd className={keyClass}>Enter</kbd>
+          <Kbd>Enter</Kbd>
           to run
         </span>
         {modal || onClose ? (
           <span className="flex items-center gap-1.5">
-            <kbd className={keyClass}>Esc</kbd>
+            <Kbd>Esc</Kbd>
             to close
           </span>
         ) : null}

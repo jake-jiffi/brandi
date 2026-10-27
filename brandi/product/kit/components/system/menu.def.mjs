@@ -46,7 +46,7 @@ const pictureItems = [
   { label: "Download PDF", icon: "Download", description: "With the payment link on it" },
   { label: "Mark as sent", icon: "Send", disabled: true },
   "separator",
-  { label: "Delete invoice", icon: "X", danger: true },
+  { label: "Delete invoice", icon: "Trash2", danger: true },
 ]
 
 export default {
@@ -140,7 +140,7 @@ export default {
     { label: "Move to folder", icon: "Folder", onSelect: () => self.setState({ chose: "Move to folder" }) },
     { label: "Mark as sent", icon: "Send", disabled: true, onSelect: () => self.setState({ chose: "Mark as sent" }) },
     "separator",
-    { label: "Delete invoice", icon: "X", danger: true, onSelect: () => self.setState({ chose: "Delete invoice", confirm: true }) },
+    { label: "Delete invoice", icon: "Trash2", danger: true, onSelect: () => self.setState({ chose: "Delete invoice", confirm: true }) },
   ],
   exportItems: [
     { group: "Format" },

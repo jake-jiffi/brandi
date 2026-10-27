@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils"
 
 import { portalTheme } from "./dialog"
 import { Icon } from "./icon"
+import { Kbd } from "./kbd"
 
 /** One action in a menu. */
 export interface MenuAction {
@@ -58,10 +59,6 @@ export interface MenuProps {
   className?: string
 }
 
-/** The key style the system's menus share. Hidden on touch screens, which have no keyboard to press it on. */
-export const keyClass =
-  "inline-flex h-5 min-w-5 shrink-0 items-center justify-center gap-0.5 rounded-xs border border-line bg-surface-subtle px-1 type-caption text-text-muted pointer-coarse:hidden"
-
 const isAction = (entry: MenuEntry): entry is MenuAction => typeof entry === "object" && "label" in entry
 
 function ActionContent({ action, icon }: { action: MenuAction; icon: boolean }) {
@@ -72,7 +69,7 @@ function ActionContent({ action, icon }: { action: MenuAction; icon: boolean }) 
         <span data-slot="menu-action-label">{action.label}</span>
         {action.description ? <span data-slot="menu-action-description" className="type-meta text-text-muted">{action.description}</span> : null}
       </span>
-      {action.shortcut ? <kbd className={cn(keyClass, "ml-3")}>{action.shortcut}</kbd> : null}
+      {action.shortcut ? <Kbd className="ml-3">{action.shortcut}</Kbd> : null}
     </>
   )
 }
