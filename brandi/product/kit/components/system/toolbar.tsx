@@ -1,0 +1,107 @@
+"use client"
+
+import * as React from "react"
+
+import { formatNumber } from "@/lib/format"
+import type { IconName } from "@/lib/icons"
+import { useMergedRef } from "@/lib/refs"
+import { cn } from "@/lib/utils"
+
+import { Button, type ButtonVariant } from "./button"
+import { Spacer } from "./spacer"
+
+export interface ToolbarBulkAction {
+  /** One to three words, verb first: "Send reminders". */
+  label: string
+  icon?: IconName
+  variant?: Extract<ButtonVariant, "secondary" | "primary" | "danger">
+  disabled?: boolean
+  onSelect?: () => void
+}
+
+export interface ToolbarProps extends Omit<React.ComponentPropsWithoutRef<"div">, "role"> {
+  /** Names the group for screen readers ("[Record] filters"). */
+  label: string
+  /** How many rows are selected. Above zero, the filters give way to the bulk actions. */
+  selectedCount?: number
+  /** The actions for the selected rows, as data, so a board can pass them. They act only on rows on screen. */
+  bulkActions?: ToolbarBulkAction[]
+  /** Clears the selection. Focus then goes back to the filters, never to the page body. */
+  onClearSelection?: () => void
+  /** Sticks to the top of the scrolling area while the table scrolls. On by default. */
+  sticky?: boolean
+  /** Search first, then filter chips, a Spacer, then the view switcher and secondary actions. */
+  children?: React.ReactNode
+}
+
+const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+/** One row of search, filters and view controls above a table or list, wrapping when the space runs out. */
+export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
+  { label, selectedCount = 0, bulkActions = [], onClearSelection, sticky = true, className, children, ...rest },
+  ref
+) {
+  const own = React.useRef<HTMLDivElement | null>(null)
+  const merged = useMergedRef(ref, own)
+  const filters = React.useRef<HTMLDivElement | null>(null)
+  const selecting = selectedCount > 0
+  // Set when a button in the selection row is pressed: if that press ends the selection, the button goes
+  // with it, and focus has to land somewhere useful.
+  const pressedInSelection = React.useRef(false)
+
+  React.useEffect(() => {
+    if (selecting) return
+    const lost = !document.activeElement || document.activeElement === document.body
+    if (pressedInSelection.current && lost) {
+      const first = filters.current?.querySelector<HTMLElement>(FOCUSABLE)
+      if (first) first.focus()
+      else if (own.current) {
+        own.current.tabIndex = -1
+        own.current.focus()
+      }
+    }
+    pressedInSelection.current = false
+  }, [selecting])
+
+  const press = (fn?: () => void) => () => {
+    pressedInSelection.current = true
+    fn?.()
+  }
+
+  return (
+    <div
+      ref={merged}
+      role="group"
+      aria-label={label}
+      data-slot="toolbar"
+      data-selecting={selecting ? "" : undefined}
+      className={cn("py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas", className)}
+      {...rest}
+    >
+      {/* The filters stay mounted while rows are selected, so nothing typed into them is lost. */}
+      <div ref={filters} data-slot="toolbar-row" hidden={selecting} className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">
+        {children}
+      </div>
+      {selecting ? (
+        <div data-slot="toolbar-selection" className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">
+          <span data-slot="toolbar-count" className="px-1 type-label text-text-strong tabular-nums">
+            {formatNumber(selectedCount)} selected
+          </span>
+          {bulkActions.map((action) => (
+            <Button key={action.label} variant={action.variant ?? "secondary"} size="sm" icon={action.icon} disabled={action.disabled} onClick={press(action.onSelect)}>
+              {action.label}
+            </Button>
+          ))}
+          <Spacer />
+          <Button variant="ghost" size="sm" icon="X" onClick={press(onClearSelection)}>
+            Clear selection
+          </Button>
+        </div>
+      ) : null}
+      {/* Polite, and only on change: it says how many are selected as the count moves. */}
+      <p data-slot="toolbar-status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {selecting ? `${formatNumber(selectedCount)} selected` : ""}
+      </p>
+    </div>
+  )
+})

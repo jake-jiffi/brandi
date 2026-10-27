@@ -9,19 +9,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Toggle as TogglePrimitive } from "radix-ui"
 
+// Patched (07-starter.md, toggle): the system's type, pressable shape and washes, pressed in
+// selected-strong with a selected-line edge, the control heights with touch sizes, and a disabled state
+// that keeps pointer events, so a tooltip can still say why. Focus is the base styles' outline.
 const toggleVariants = cva(
-  "group/toggle inline-flex items-center justify-center gap-1 rounded-md text-sm font-medium whitespace-nowrap transition-[color,box-shadow] hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-pressed:bg-muted [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/toggle inline-flex items-center justify-center gap-1.5 rounded-control type-label whitespace-nowrap text-text-strong transition-colors select-none hover:bg-hover active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-danger-line aria-pressed:bg-selected-strong [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default: "bg-transparent",
-        outline: "border border-input bg-transparent shadow-xs hover:bg-muted",
+        outline: "border border-line-control bg-surface aria-pressed:border-selected-line",
       },
       size: {
         default:
-          "h-9 min-w-9 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
-        sm: "h-8 min-w-8 px-2.5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
-        lg: "h-10 min-w-10 px-2.5 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+          "h-9 min-w-9 px-3 pointer-coarse:h-11 pointer-coarse:min-w-11 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        sm: "h-8 min-w-8 px-2.5 pointer-coarse:h-10 pointer-coarse:min-w-10 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5",
+        lg: "h-11 min-w-11 px-3.5 pointer-coarse:h-12 pointer-coarse:min-w-12 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
       },
     },
     defaultVariants: {
