@@ -59,6 +59,7 @@
 
 import { readFile, writeFile, mkdir, mkdtemp, readdir, rm, stat, copyFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -320,7 +321,7 @@ async function cmdScan(flags) {
   // was being told nothing was found, when the thing they handed over contains
   // the palette. Logo colours are weighted far above incidental ones so the
   // ranking reflects what a colour actually means, not how often it was typed.
-  const SOURCE_WEIGHT = { logo: 1000, token: 20, style: 1 };
+  const SOURCE_WEIGHT = { logo: 1000, guidelines: 500, token: 20, style: 1 };
   const hexScore = new Map();
   const hexWhere = new Map();
   const note = (hex, kind, file) => {
@@ -354,6 +355,37 @@ async function cmdScan(flags) {
     } catch { /* unreadable file, skip */ }
   };
 
+  // A brand that arrives as guidelines arrives as a PDF. Its text names the colours (HEX with or
+  // without the hash, sometimes only as "HEX E31837") and its embedded fonts name the typefaces, so
+  // both are read when Poppler is installed, and the summary says what is missing when it is not.
+  const guidelinePdfs = files.filter((f) => /\.pdf$/i.test(f) && !logos.includes(f)).slice(0, 4);
+  const pantone = new Set();
+  let pdfReader = null;
+  if (guidelinePdfs.length) {
+    const probe = spawnSync('pdftotext', ['-v'], { encoding: 'utf8' });
+    pdfReader = probe.error ? null : 'pdftotext';
+  }
+  for (const f of pdfReader ? guidelinePdfs : []) {
+    const text = spawnSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout ?? '';
+    for (const c of extractColors(text)) note(c.hex.toUpperCase(), 'guidelines', f);
+    for (const m of text.matchAll(/\bHEX\s*[:#]?\s*#?([0-9A-Fa-f]{6})\b/g)) note(`#${m[1].toUpperCase()}`, 'guidelines', f);
+    // A code, not the word after it: "an exact PMS match" names no ink.
+    for (const m of text.matchAll(/\b(?:PANTONE|PMS)\s+(\d{2,4}(?:\s?[CUM])?|(?:Black|Warm Red|Reflex Blue|Process (?:Blue|Black|Cyan|Magenta|Yellow)|(?:Cool|Warm) Gray \d{1,2})(?:\s?[CUM])?)\b/gi)) {
+      pantone.add(m[1].replace(/\s+/g, ' ').trim());
+    }
+    const embedded = spawnSync('pdffonts', [f], { encoding: 'utf8' }).stdout ?? '';
+    for (const line of embedded.split('\n').slice(2)) {
+      const name = line.trim().split(/\s+/)[0];
+      if (!name) continue;
+      // Embedded subsets carry a six-letter prefix; the family is what precedes the style.
+      const family = name.replace(/^[A-Z]{6}\+/, '').split(/[-,]/)[0].replace(/(MT|PS|Std|Pro)$/, '')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+      // A layout tool embeds whatever the designer's machine drew a glyph with; an emoji face is not a brand face.
+      if (/emoji|symbol|dingbat|wingding|zapf/i.test(family)) continue;
+      noteFont(family, 'guidelines');
+    }
+  }
+
   for (const f of vectors.slice(0, 20)) await readColours(f, 'logo');
   for (const f of tokenFiles.slice(0, 40)) await readColours(f, 'token');
   for (const f of styles) await readColours(f, 'style');
@@ -372,7 +404,7 @@ async function cmdScan(flags) {
         // matters: a colour in the logo is a decision, one in a stylesheet may
         // be an accident.
         count: score,
-        from: kinds.includes('logo') ? 'logo' : kinds.includes('token') ? 'tokens' : 'stylesheets',
+        from: kinds.includes('logo') ? 'logo' : kinds.includes('guidelines') ? 'guidelines' : kinds.includes('token') ? 'tokens' : 'stylesheets',
         files: [...where.files],
       };
     });
@@ -389,6 +421,9 @@ async function cmdScan(flags) {
     screenshots: screenshots.map(rel),
     documents: copy.map(rel),
     coloursInUse: colours,
+    guidelines: guidelinePdfs.map(rel),
+    guidelinesRead: Boolean(pdfReader),
+    pantone: [...pantone],
     fontFamiliesInUse: [...fontFamilies.keys()],
     typefacesFromLogo: [...fontFamilies.entries()].filter(([, k]) => k === 'logo').map(([n]) => n),
   };
@@ -401,9 +436,15 @@ async function cmdScan(flags) {
     `web fonts        ${fonts.length}`,
     `screenshots      ${screenshots.length}`,
     `documents        ${copy.length}`,
+    guidelinePdfs.length ? `guidelines PDFs  ${guidelinePdfs.length}${pdfReader ? ' (read)' : ' (not read: install Poppler for pdftotext and pdffonts, then run this again)'}` : '',
     `colours in use   ${colours.length ? colours.slice(0, 6).map((c) => `${c.hex} (${c.from})`).join('  ') : 'none found'}`,
     `typefaces in use ${[...fontFamilies.keys()].slice(0, 6).join(', ') || 'none found'}`,
-  ];
+    pantone.size ? `Pantone          ${[...pantone].slice(0, 8).join(', ')}` : '',
+  ].filter((l) => l !== '');
+  const fromGuidelines = colours.filter((c) => c.from === 'guidelines');
+  if (fromGuidelines.length) {
+    summary.push('', `${fromGuidelines.length} colour${fromGuidelines.length === 1 ? '' : 's'} came out of the brand's own guidelines. They are supplied, not candidates: record each with its page before proposing anything.`);
+  }
   const fromLogo = colours.filter((c) => c.from === 'logo');
   if (fromLogo.length) {
     summary.push('');
@@ -413,7 +454,7 @@ async function cmdScan(flags) {
         `these as supplied rather than as candidates, and say so before proposing anything else.`,
     );
   }
-  if (!logos.length && !tokenFiles.length && !colours.length) {
+  if (!logos.length && !tokenFiles.length && !colours.length && !guidelinePdfs.length) {
     summary.push('', 'Nothing to build on here. This is a from-nothing brand, which is fine: it just means every decision is a decision rather than an inheritance.');
   }
   emit(summary.join('\n'), { ok: true, ...found });

@@ -7,7 +7,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, writeFile, readFile, rm, symlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { execFile } from 'node:child_process';
+import { execFile, spawnSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -821,6 +821,67 @@ describe('scanning a real codebase, not a synthetic one', () => {
     const r = await cli(['scan'], p);
     assert.deepEqual(r.coloursInUse.map((c) => c.hex), [],
       'a hex in a .ts constant is not evidence of a brand colour');
+  });
+});
+
+/** A one-page PDF in Helvetica, built by hand so the test needs no PDF library. */
+function tinyPdf(lines) {
+  const content = `BT /F1 12 Tf 72 720 Td 14 TL ${lines.map((l) => `(${l.replace(/[()\\]/g, '\\$&')}) '`).join(' ')} ET`;
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${Buffer.byteLength(content)} >>\nstream\n${content}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let pdf = '%PDF-1.4\n';
+  const offsets = [];
+  objects.forEach((o, i) => { offsets.push(Buffer.byteLength(pdf)); pdf += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const xref = Buffer.byteLength(pdf);
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+  return `${pdf}trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+}
+
+/**
+ * Found on a brand that arrived as a guidelines PDF. Scan read none of it and called the brand
+ * from-nothing, when the PDF named every colour by PMS, CMYK, RGB and HEX.
+ */
+describe('a brand that arrives as a guidelines PDF', () => {
+  const hasPoppler = !spawnSync('pdftotext', ['-v']).error;
+  let project;
+  before(async () => {
+    project = path.join(dir, 'guidelines-pdf');
+    await mkdir(path.join(project, 'source'), { recursive: true });
+    await writeFile(path.join(project, 'source', 'Brand-Guidelines.pdf'), tinyPdf([
+      'Primary teal  PMS 3278 C  HEX: #1a9e7c',
+      'Night blue  PMS 2767 C  HEX 1b2a4a',
+      'Print on coated stock with a PMS match.',
+    ]));
+    await cli(['init', '--name', 'Guidelined'], project);
+  });
+
+  test('its colours and Pantone codes are read and marked as the guidelines own', { skip: !hasPoppler && 'Poppler is not installed' }, async () => {
+    const r = await cli(['scan'], project);
+    const byHex = new Map(r.coloursInUse.map((c) => [c.hex, c]));
+    for (const hex of ['#1A9E7C', '#1B2A4A']) {
+      assert.ok(byHex.has(hex), `${hex} is printed in the guidelines and must be found`);
+      assert.equal(byHex.get(hex).from, 'guidelines');
+    }
+    assert.deepEqual(r.pantone, ['3278 C', '2767 C'], 'a code, never the word after PMS');
+    assert.ok(r.fontFamiliesInUse.includes('Helvetica'), 'the faces the PDF uses are read too');
+    assert.equal(r.guidelinesRead, true);
+  });
+
+  test('it is not called a from-nothing brand, and the summary says the colours are supplied', { skip: !hasPoppler && 'Poppler is not installed' }, async () => {
+    const { stdout } = await run(process.execPath, [CLI, 'scan'], { cwd: project, timeout: 60000 });
+    assert.match(stdout, /came out of the brand's own guidelines/);
+    assert.equal(/from-nothing/.test(stdout), false);
+  });
+
+  test('without Poppler it says what to install rather than reporting nothing', async () => {
+    const { stdout } = await run(process.execPath, [CLI, 'scan'], { cwd: project, timeout: 60000, env: { ...process.env, PATH: path.dirname(process.execPath) } });
+    assert.match(stdout, /not read: install Poppler/);
+    assert.equal(/from-nothing/.test(stdout), false, 'an unread PDF is still something to build on');
   });
 });
 

@@ -82,6 +82,13 @@ Existing usage beats fresh invention. A colour a business has been using for six
 that has been accumulating recognition; replacing it to get a marginally better hue is a bad trade,
 and you should say so.
 
+**If the brand arrives as guidelines, the job is conversion, not invention.** Scan reads a guidelines
+PDF when Poppler is installed: the colours it prints, its PMS codes and the faces it embeds. That is
+the index, not the record. Read the document page by page and log every value it states with
+`$A evidence --provenance supplied --source "Brand guidelines p.N"`, then `$A set` it. Fill only
+what the document leaves out, and file each fill as an assumption with `$A question`. A guidelines
+document is the client's decision already made; a better hue of their green is not yours to propose.
+
 **If they supplied photographs, measure them before you plan anything.** Run
 `$A images <their folder>`. This is not optional and it is not a formality: every decision about how
 photography gets used is a decision about the SHAPE of a photograph, and none of them can be made
