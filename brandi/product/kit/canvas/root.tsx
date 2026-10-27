@@ -10,11 +10,12 @@ import { TooltipProvider } from "@/components/ui/tooltip"
  * the board it opened from. Adds no padding and no box of its own.
  */
 export function Root({
-  theme = "light",
+  theme,
   background = "canvas",
   shortcuts = true,
   children,
 }: {
+  /** Light or dark for the whole board. Leave it out where the host page sets the theme (a Design System preview). */
   theme?: "light" | "dark"
   background?: "canvas" | "surface" | "none"
   shortcuts?: boolean
@@ -22,11 +23,13 @@ export function Root({
 }) {
   React.useLayoutEffect(() => {
     const el = document.documentElement
-    el.dataset.theme = theme
-    el.classList.toggle("dark", theme === "dark")
-    el.style.colorScheme = theme
     el.dataset.shortcuts = shortcuts ? "on" : "off"
-    document.body.style.background = background === "none" ? "transparent" : `var(--${background})`
+    if (theme) {
+      el.dataset.theme = theme
+      el.classList.toggle("dark", theme === "dark")
+      el.style.colorScheme = theme
+      document.body.style.background = background === "none" ? "transparent" : `var(--${background})`
+    }
   }, [theme, background, shortcuts])
   return (
     <TooltipProvider delayDuration={300}>

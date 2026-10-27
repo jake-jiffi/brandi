@@ -1,0 +1,111 @@
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
+import { existsSync, readdirSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, GENERATED, KIT } from '../scripts/productstarter.mjs';
+import { toStarterGlobals } from '../scripts/productglobals.mjs';
+import { buildProductTokens } from '../scripts/producttokens.mjs';
+import { buildSystem } from '../scripts/system.mjs';
+
+const tokens = buildProductTokens(buildSystem({ primary: '#1F6F4A', accents: ['#D9822B'], type: { display: 'Bitter', body: 'Karla', mono: 'JetBrains Mono' } }), { name: 'Acme product system' });
+const identity = systemIdentity({}, { brandName: 'Muddy Paws & Co' });
+
+describe('who the system is', () => {
+  test('the canvas folder and the bundle global come from the brand name', () => {
+    assert.equal(identity.namespace, 'muddy-paws-co');
+    assert.equal(identity.global, 'MuddyPawsCo');
+    assert.equal(identity.locale, 'en-AU');
+    assert.equal(identity.currency, 'AUD');
+    assert.equal(identity.lang, 'en-AU');
+  });
+
+  test('product.json can set any of it, and a name the canvas would skip is refused', () => {
+    const set = systemIdentity({ productName: 'Rosters', namespace: 'acme', global: 'Acme', locale: 'en-NZ', currency: 'NZD' }, { brandName: 'X' });
+    assert.deepEqual([set.name, set.namespace, set.global, set.locale, set.currency, set.lang], ['Rosters', 'acme', 'Acme', 'en-NZ', 'NZD', 'en-NZ']);
+    assert.throws(() => systemIdentity({ namespace: 'Acme Corp' }), RangeError);
+    assert.throws(() => systemIdentity({ global: 'acme' }), RangeError);
+  });
+
+  test('a brand name that starts with a digit still gives a valid global', () => {
+    assert.match(systemIdentity({}, { brandName: '7 Eleven' }).global, /^[A-Z][A-Za-z0-9]*$/);
+  });
+});
+
+describe('the brand faces through next/font', () => {
+  test('hosted faces load from next/font/google with the weights the type styles use', () => {
+    const src = fontsModule(tokens);
+    assert.match(src, /import \{ Karla \} from "next\/font\/google"/);
+    assert.match(src, /import \{ JetBrains_Mono \} from "next\/font\/google"/);
+    assert.match(src, /variable: "--font-brand-sans"/);
+    assert.match(src, /export const fontVariables = \[sansFace\.variable, displayFace\.variable, monoFace\.variable\]/);
+    const used = new Set(tokens.type.groups.flatMap((g) => g.styles.filter((s) => (s.family ?? g.family) === 'sans').map((s) => String(s.fontWeight ?? 400))));
+    const loaded = JSON.parse(/sansFace = Karla\(\{ subsets: \["latin"\], weight: (\[[^\]]*\])/.exec(src)[1]);
+    assert.deepEqual(new Set(loaded), used, 'exactly the weights the styles ask for');
+  });
+
+  test('a face the system ships as a file loads through next/font/local', () => {
+    const local = structuredClone(tokens);
+    local.type.fonts = [{ family: 'Karla', file: 'fonts/Karla-Regular.woff2', weight: '400', style: 'normal' }];
+    const src = fontsModule(local);
+    assert.match(src, /import localFont from "next\/font\/local"/);
+    assert.match(src, /path: "\.\/fonts\/Karla-Regular\.woff2"/);
+    assert.equal(/import \{ Karla \}/.test(src), false);
+  });
+
+  test('a role whose stack starts with a system face sets nothing', () => {
+    const sys = structuredClone(tokens);
+    sys.type.families.mono = 'ui-monospace, Menlo, monospace';
+    assert.equal(/monoFace/.test(fontsModule(sys)), false);
+  });
+});
+
+describe('the files the system owns in a starter', () => {
+  test('every generated file is written, and globals.css is the one generator\'s output', () => {
+    const files = generatedFiles(tokens, identity);
+    assert.deepEqual([...files.keys()].sort(), [...GENERATED].sort());
+    assert.equal(files.get('app/globals.css'), toStarterGlobals(tokens));
+    assert.match(files.get('lib/format-locale.js'), /export const LOCALE = "en-AU"\nexport const CURRENCY = "AUD"/);
+    assert.match(files.get('lib/product.ts'), /name: "Muddy Paws & Co"/);
+    assert.equal(JSON.parse(files.get('system/system.json')).global, 'MuddyPawsCo');
+    assert.match(files.get('tools/build-globals.mjs'), /export function toStarterGlobals/);
+  });
+
+  test('a fresh starter gets the whole kit; a second run rewrites only the generated files', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-'));
+    const out = path.join(dir, 'starter');
+    const first = await writeStarter({ out, tokens, identity });
+    assert.equal(first.fresh, true);
+    for (const f of ['package.json', 'tools/build-canvas.mjs', 'components/system/button.tsx', 'components/ui/dialog.tsx', 'components/system/index.ts', 'app/globals.css']) {
+      assert.ok(existsSync(path.join(out, f)), f);
+    }
+    assert.equal(existsSync(path.join(out, 'node_modules')), false);
+    assert.match(await readFile(path.join(out, 'components/system/index.ts'), 'utf8'), /export \{ Button \} from "\.\/button"/);
+    // A product's own component, and an edit to a kit file, survive a refresh.
+    await writeFile(path.join(out, 'components/system/custom-panel.tsx'), 'export function CustomPanel() { return null }\n');
+    await writeFile(path.join(out, 'components/system/button.tsx'), '// edited by the product\nexport const Button = () => null\n');
+    const second = await writeStarter({ out, tokens: { ...tokens, name: 'Renamed' }, identity });
+    assert.equal(second.fresh, false);
+    assert.match(await readFile(path.join(out, 'components/system/button.tsx'), 'utf8'), /edited by the product/);
+    assert.match(await readFile(path.join(out, 'components/system/index.ts'), 'utf8'), /CustomPanel/);
+    assert.equal(JSON.parse(await readFile(path.join(out, 'system/tokens.json'), 'utf8')).name, 'Renamed');
+    // --kit copies the kit's own files again.
+    await writeStarter({ out, tokens, identity, refreshKit: true });
+    assert.equal(/edited by the product/.test(await readFile(path.join(out, 'components/system/button.tsx'), 'utf8')), false);
+    assert.ok(existsSync(path.join(out, 'components/system/custom-panel.tsx')), 'a product file is never deleted');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('the bundle step says what to do when the starter is not installed', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-bundle-'));
+    await mkdir(path.join(dir, 'system'), { recursive: true });
+    await assert.rejects(buildBundle({ starter: dir, productDir: dir }), /Run npm install there first/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('the kit never carries a generated index or an installed node_modules', () => {
+    assert.equal(readdirSync(KIT).includes('node_modules'), false);
+  });
+});

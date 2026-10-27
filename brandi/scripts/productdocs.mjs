@@ -9,8 +9,9 @@
  */
 
 import { readdir, readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { artboard } from './canvas.mjs';
 import { googleFontsUrl } from './artboards.mjs';
@@ -175,4 +176,90 @@ export function previewBoard(def, system) {
   });
 }
 
-export default { loadDefinitions, checkDefinition, componentReadme, previewBoard, resolveNs, hostedFontsUrl, NOTE_ORDER, GROUPS };
+const SHIM_SOURCE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'runtime', 'dc-shim.js');
+
+/** The card height the Design System gives a preview: its examples stacked, with their titles. */
+export function cardHeight(def) {
+  if (def.card?.height) return def.card.height;
+  return Math.min(1200, 48 + def.examples.reduce((h, ex, i) => h + (i ? 28 : 0) + 30 + (ex.height ?? 56), 0));
+}
+
+/**
+ * A component's preview.html for the Design System's card viewer. The page preloads tokens.css,
+ * the fonts, bundle.css, React 18 and the bundle; this adds the examples as board markup and the
+ * runtime shim inline, so nothing else has to be found by path. Root gets no theme here: the
+ * viewer's own theme switch decides light or dark.
+ */
+export function previewPage(def, system) {
+  const ns = system.global;
+  const sections = def.examples.map((ex) => [
+    `<section data-example="${ex.id}" style="display: flex; flex-direction: column; gap: 12px;">`,
+    `<h2 style="margin: 0; font-family: var(--font-sans); font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${ex.title}</h2>`,
+    `<div style="${LAYOUTS[ex.layout ?? 'row'] ?? LAYOUTS.row}">`,
+    resolveNs(ex.markup, ns).trim(),
+    '</div>',
+    '</section>',
+  ].join('\n')).join('\n');
+  const vals = Object.assign({}, ...def.examples.map((ex) => ex.vals ?? {}));
+  const shim = readFileSync(SHIM_SOURCE, 'utf8').replace(/<\/script/gi, '<\\/script');
+  return [
+    `<!-- @dsCard group="${def.group}" height=${cardHeight(def)} -->`,
+    '<!doctype html>',
+    `<html lang="${system.lang ?? 'en'}">`,
+    '<head>',
+    '<meta charset="utf-8">',
+    `<title>${def.name}</title>`,
+    '</head>',
+    '<body style="margin: 0;">',
+    '<x-dc>',
+    `<x-import component-from-global-scope="${ns}.Root" background="none">`,
+    '<div style="box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 28px; color: var(--text); font-family: var(--font-sans);">',
+    sections,
+    '</div>',
+    '</x-import>',
+    '</x-dc>',
+    `<script type="text/x-dc" data-dc-script>\nclass Component extends DCLogic {\n  state = ${JSON.stringify(def.state ?? {})};\n  renderVals() {\n    return Object.assign(${JSON.stringify(vals)}${def.logic ? `, (() => { const self = this; return { ${def.logic} }; })()` : ''});\n  }\n}\n</script>`,
+    `<script>\n${shim}\n</script>`,
+    '</body>',
+    '</html>',
+    '',
+  ].join('\n');
+}
+
+const tsDoc = (text, indent) => (text ? `${indent}/** ${String(text).replace(/\*\//g, '* /')} */\n` : '');
+
+/**
+ * components/index.d.ts for the Design System: the namespace's every export with its props, as
+ * types that document. Written from the definitions (the same source as the cards), and compiled
+ * under strict TypeScript at bundle time. `icons` is the vocabulary's names; a definition's own
+ * shared types go in its `types` list.
+ */
+export function typesFile(defs, system, { icons = [], numberStyles = [] } = {}) {
+  const ns = system.global;
+  const lines = [
+    `// ${system.name} components ${system.version}: types as docs, generated from each component's definition by brandi product bundle.`,
+    `// Mount on a canvas with component-from-global-scope="${ns}.<Export>", inside ${ns}.Root. React 18 comes from the page.`,
+    'import type { ComponentType, ReactNode } from "react"',
+    '',
+    `declare namespace ${ns} {`,
+    `  type IconName = ${icons.length ? icons.map((n) => JSON.stringify(n)).join(' | ') : 'string'}`,
+    `  type NumberStyle = ${numberStyles.length ? numberStyles.map((n) => JSON.stringify(n)).join(' | ') : 'string'}`,
+    '  const ICON_NAMES: readonly IconName[]',
+    '  const NUMBER_STYLES: readonly NumberStyle[]',
+    '  function formatNumber(value: number | string | null | undefined, style?: NumberStyle, options?: { locale?: string; currency?: string; digits?: number }): string',
+    '  /** Wraps every board: the theme, the providers, and the theme copied to the page for portals. */',
+    '  const Root: ComponentType<{ theme?: "light" | "dark"; background?: "canvas" | "surface" | "none"; shortcuts?: boolean; children?: ReactNode }>',
+  ];
+  for (const def of defs) {
+    for (const t of def.types ?? []) lines.push(`  ${t}`);
+    lines.push('', tsDoc(def.job, '  ').trimEnd(), `  interface ${def.name}Props {`);
+    for (const p of def.props) lines.push(`${tsDoc(`${p.doc}${p.default ? ` Default ${p.default}.` : ''}`, '    ')}    ${p.name}${p.required ? '' : '?'}: ${p.type}`);
+    if (!def.props.some((p) => p.name === 'children')) lines.push('    children?: ReactNode');
+    if (!def.props.some((p) => p.name === 'className')) lines.push('    className?: string');
+    lines.push('  }', `  const ${def.name}: ComponentType<${def.name}Props>`);
+  }
+  lines.push('}', '', 'declare global {', `  interface Window { ${ns}: typeof ${ns} }`, '}', '', 'export {}', '');
+  return lines.filter((l, i, all) => !(l === '' && all[i - 1] === '')).join('\n');
+}
+
+export default { loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile, cardHeight, resolveNs, hostedFontsUrl, NOTE_ORDER, GROUPS };

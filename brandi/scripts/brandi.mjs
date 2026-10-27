@@ -39,6 +39,11 @@
  *                                     measure every declared pair in both themes
  *   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
  *                                     the starter's globals.css for Next.js, Tailwind 4 and shadcn
+ *   brandi product starter [--out product/starter] [--kit]
+ *                                     the product kit as a Next.js starter, dressed in the tokens
+ *   brandi product bundle [--starter product/starter]
+ *                                     the canvas bundle from the starter's own components, and
+ *                                     every component's card and preview from its definition
  *
  * Every command prints a short human summary, and `--json` prints the machine
  * form instead, so the skill can read a result without parsing prose.
@@ -57,6 +62,7 @@ import {
 import { buildSystem, assertPublishable } from './system.mjs';
 import { buildProductTokens, auditProductTokens, auditSummary, toProductCss } from './producttokens.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
+import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2747,7 +2753,20 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
 
   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
       The starter's globals.css for Next.js, Tailwind CSS 4 and shadcn/ui, from
-      the tokens. The starter ships the same generator, so the two never drift.`;
+      the tokens. The starter ships the same generator, so the two never drift.
+
+  brandi product starter [--tokens product/tokens.json] [--out product/starter] [--kit]
+      Copy the product kit into a Next.js starter and write what the system owns:
+      tokens, identity, globals.css, the market's locale, the product's name and
+      the brand's faces. A second run rewrites only those files; --kit copies the
+      kit's components and tools again too. Identity comes from product.json
+      (productName, namespace, global, locale, currency, lang, version).
+
+  brandi product bundle [--starter product/starter] [--out product]
+      Build the canvas bundle from the starter's own components, then write each
+      component's card (README.md, preview.html) and preview board from its one
+      definition, and install the system beside the canvas boards. Needs npm
+      install in the starter first.`;
 
 async function productSource(flags) {
   if (typeof flags.input === 'string') {
@@ -2815,6 +2834,47 @@ async function cmdProduct(flags, positional) {
     await writeFile(target, css);
     const rel = path.relative(process.cwd(), target);
     emit(`Wrote ${rel} (${css.split('\n').length} lines) from ${path.relative(process.cwd(), file)}.`, { ok: true, file: rel });
+    return;
+  }
+  if (sub === 'starter') {
+    const productDir = path.resolve('product');
+    const file = path.resolve(typeof flags.tokens === 'string' ? flags.tokens : path.join('product', 'tokens.json'));
+    if (!existsSync(file)) return fail(`No tokens file at ${path.relative(process.cwd(), file)}. Run \`brandi product tokens\` first.`);
+    const tokens = JSON.parse(await readFile(file, 'utf8'));
+    const configFile = path.join(path.dirname(file), 'product.json');
+    const config = existsSync(configFile) ? JSON.parse(await readFile(configFile, 'utf8')) : {};
+    let brandName = config.brandName ?? null;
+    if (!brandName) {
+      try { brandName = (await resolveSystem(flags, { gate: false })).brand.meta?.name ?? null; } catch { brandName = null; }
+    }
+    let identity;
+    try { identity = systemIdentity(config, { brandName: brandName ?? tokens.name?.replace(/ product system$/, '') }); } catch (e) { return fail(e.message); }
+    const out = path.resolve(typeof flags.out === 'string' ? flags.out : path.join('product', 'starter'));
+    const res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts') });
+    const rel = path.relative(process.cwd(), out);
+    emit([
+      `${res.fresh ? 'Wrote' : 'Refreshed'} the ${identity.name} starter in ${rel}: namespace ${identity.namespace}, global ${identity.global}, ${identity.locale} ${identity.currency}.`,
+      ...res.written.map((w) => `  ${w}`),
+      '',
+      res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
+    ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, starter: rel });
+    return;
+  }
+  if (sub === 'bundle') {
+    const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join('product', 'starter'));
+    const productDir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    if (!existsSync(path.join(starter, 'system', 'system.json'))) return fail(`No starter at ${path.relative(process.cwd(), starter)}. Run \`brandi product starter\` first.`);
+    let res;
+    try { res = await buildBundle({ starter, productDir }); } catch (e) { return fail(e.message); }
+    const byGroup = {};
+    for (const c of res.components) byGroup[c.group] = (byGroup[c.group] ?? 0) + 1;
+    const files = res.manifest.files;
+    emit([
+      `${res.system.name}: ${res.manifest.exports.length} exports under ${res.system.global}, bundle.js ${(files['bundle.js'].bytes / 1024).toFixed(0)} KB, bundle.css ${(files['bundle.css'].bytes / 1024).toFixed(0)} KB.`,
+      `${plural(res.components.length, 'component card')}: ${Object.entries(byGroup).map(([g, n]) => `${g} ${n}`).join(', ')}.`,
+      `${res.components.reduce((n, c) => n + c.checks, 0)} scripted checks in the definitions.`,
+      `Cards in ${path.relative(process.cwd(), path.join(productDir, 'components'))}, preview boards in ${path.relative(process.cwd(), res.previews)}, the system installed under canvas/ds/${res.system.namespace}/.`,
+    ].join('\n'), { ok: true, system: res.system, exports: res.manifest.exports, components: res.components, files });
     return;
   }
   return fail(`Unknown product subcommand "${sub}".\n\n${PRODUCT_USAGE}`);
