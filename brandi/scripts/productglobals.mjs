@@ -249,6 +249,14 @@ ${styles.map(([s, f]) => styleUtility(s, f)).join('\n')}
   body {
     @apply bg-background text-foreground type-body;
   }
+  /* No word left alone on the last line of a paragraph, and no heading broken into one long line and one
+     short one. A component that sets its own wrap keeps it. */
+  p, li, dd, dt, figcaption, blockquote, label {
+    text-wrap: pretty;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    text-wrap: balance;
+  }
   /* The focus ring is an outline with an offset: it follows the radius and survives forced colours,
      where a box-shadow ring disappears. An ancestor that clips its overflow clips it like any ring,
      so inside a scroll container inset it with a negative offset. */

@@ -100,7 +100,23 @@ export function runtimeTags({ react, reactDom, shim }) {
 
 export const SHIM = path.join(path.dirname(fileURLToPath(import.meta.url)), 'runtime', 'dc-shim.js');
 
-export function toPreviewHtml(source, { width, height, label, base, runtime } = {}) {
+/**
+ * The boards a board places with dc-import, read from beside it, its own placements included. A
+ * rendered preview carries them, because a browser may refuse to read sibling files from disk: the
+ * detector's does, and every placed board drew as "No board".
+ */
+export async function placedBoards(dir, source, found = new Map()) {
+  for (const [, name] of String(source).matchAll(/<dc-import\b[^>]*\bname="([^"]+)"/gi)) {
+    const file = path.join(dir, `${name}.dc.html`);
+    if (found.has(name) || !existsSync(file)) continue;
+    const src = await readFile(file, 'utf8');
+    found.set(name, src);
+    await placedBoards(dir, src, found);
+  }
+  return found;
+}
+
+export function toPreviewHtml(source, { width, height, label, base, runtime, boards = null } = {}) {
   const frame = width ? `width: ${width}px; ${height ? `min-height: ${height}px;` : ''} overflow: hidden;` : '';
   const shim = `
 <style>
@@ -109,7 +125,10 @@ export function toPreviewHtml(source, { width, height, label, base, runtime } = 
   html, body { margin: 0; }
   ${frame ? `body > x-dc { ${frame} }\n  body > [data-dc-root] { ${frame} }` : ''}
 </style>`;
-  let out = source.replace('<script src="./support.js"></script>', runtime ? `${shim.trim()}\n${runtimeTags(runtime)}` : shim.trim());
+  // Before the shim, which reads them in place of the files beside the board. Every "<" is escaped, so a
+  // board's own closing script tag cannot end this one.
+  const embedded = boards?.size ? `<script>window.__dcBoards = Object.assign(window.__dcBoards || {}, ${JSON.stringify(Object.fromEntries(boards)).replace(/</g, '\\u003c')});</script>` : '';
+  let out = source.replace('<script src="./support.js"></script>', runtime ? `${shim.trim()}\n${embedded}${runtimeTags(runtime)}` : shim.trim());
   // Without a runtime, the logic block is classic script referencing a class nothing defines.
   if (!runtime) out = out.replace(/<script\b[^>]*\bdata-dc-script\b[\s\S]*?<\/script>/g, '');
   if (label) {
@@ -233,7 +252,8 @@ export async function previewArtboard(file, { outDir, width, height, png = true,
       console.error(`note: ${note}`);
     }
   }
-  await writeFile(htmlPath, toPreviewHtml(source, { width, height, label: path.basename(file), base, runtime }));
+  const boards = runtime ? await placedBoards(path.dirname(file), source) : null;
+  await writeFile(htmlPath, toPreviewHtml(source, { width, height, label: path.basename(file), base, runtime, boards }));
 
   let pngPath = null;
   const chrome = findChrome();
@@ -438,5 +458,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 
 export default {
   toPreviewHtml, previewArtboard, screenshot, findChrome, runChrome,
-  declaredFrame, manifestFrames, contactSheet, clampFrame, MAX_FRAME, needsRuntime, runtimeTags, SHIM,
+  declaredFrame, manifestFrames, contactSheet, clampFrame, MAX_FRAME, needsRuntime, runtimeTags, placedBoards, SHIM,
 };

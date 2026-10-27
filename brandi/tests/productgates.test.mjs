@@ -1,10 +1,10 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { judgeRound, roundMarkdown, findDetector, BAR, WIDTHS } from '../scripts/productgates.mjs';
+import { judgeRound, roundMarkdown, findDetector, collectPages, BAR, WIDTHS } from '../scripts/productgates.mjs';
 
 const clean = () => ({
   round: 3,
@@ -109,6 +109,32 @@ describe('the pinned detector', () => {
     assert.equal(findDetector({ IMPECCABLE_BIN: path.join(dir, 'nope') }), null);
     await writeFile(path.join(dir, 'pinned'), '');
     assert.equal(findDetector({ IMPECCABLE_BIN: path.join(dir, 'pinned') }), path.join(dir, 'pinned'));
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('the pages a round scans', () => {
+  test('a fluid board is drawn at each width it is scanned at, and a fixed one only at its own', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-pages-'));
+    await mkdir(path.join(dir, 'canvas'), { recursive: true });
+    const board = (name) => `<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc><p>${name}</p></x-dc></body></html>`;
+    await writeFile(path.join(dir, 'canvas', 'Home1440.dc.html'), board('Home'));
+    await writeFile(path.join(dir, 'canvas', 'Poster1440.dc.html'), board('Poster'));
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify({ artboards: [
+      { file: 'Home1440.dc.html', frame: [1440, 900], expand: 'fill' },
+      { file: 'Poster1440.dc.html', frame: [1440, 900] },
+    ] }));
+    const pages = await collectPages({ productDir: dir, outDir: path.join(dir, 'out') });
+    const home = pages.filter((p) => p.label === 'Home1440');
+    assert.deepEqual(home.map((p) => p.width), [...WIDTHS], 'the fluid board at every width');
+    for (const p of home) {
+      const html = await readFile(new URL(p.url), 'utf8');
+      // Drawn at 1440 and scanned at 390, a fluid board scrolled sideways by 1050px on every page.
+      assert.equal(/body > x-dc \{ width: 1440px/.test(html), false, `no 1440px frame on the page scanned at ${p.width}`);
+    }
+    const poster = pages.filter((p) => p.label === 'Poster1440');
+    assert.deepEqual(poster.map((p) => p.width), [1440], 'the fixed board at its own width only');
+    assert.match(await readFile(new URL(poster[0].url), 'utf8'), /body > x-dc \{ width: 1440px/);
     await rm(dir, { recursive: true, force: true });
   });
 });

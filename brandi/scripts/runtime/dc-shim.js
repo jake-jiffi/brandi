@@ -260,7 +260,9 @@
   }
   function load(name, ctx) {
     if (ctx.boards[name] || ctx.loading[name]) return ctx.loading[name] || Promise.resolve();
-    ctx.loading[name] = read(name + '.dc.html')
+    // A rendered preview carries the boards it places, because a browser may refuse to read sibling files.
+    var embedded = window.__dcBoards && window.__dcBoards[name];
+    ctx.loading[name] = (typeof embedded === 'string' ? Promise.resolve(embedded) : read(name + '.dc.html'))
       .then(function (src) {
         var doc = new DOMParser().parseFromString(src, 'text/html');
         return Promise.all(importsIn(doc).map(function (n) { return load(n, ctx); })).then(function () {

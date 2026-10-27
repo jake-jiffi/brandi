@@ -122,7 +122,8 @@ export default {
     {
       id: "open",
       title: "Shown open at its trigger, for a design",
-      markup: `<x-import component-from-global-scope="NS.Menu" open="{{yes}}" align="start" label="More actions for [Invoice 1043]" items="{{pictureItems}}"></x-import>`,
+      // Room under the trigger for the picture, so on a board it never lies over what comes next.
+      markup: `<div style="padding-bottom: 280px;"><x-import component-from-global-scope="NS.Menu" open="{{yes}}" align="start" label="More actions for [Invoice 1043]" items="{{pictureItems}}"></x-import></div>`,
     },
   ],
   state: { chose: "nothing yet", format: "csv", confirm: false },

@@ -392,8 +392,10 @@ export const Board = React.forwardRef<HTMLDivElement, BoardProps>(function Board
         aria-label={label}
         data-slot="board-columns"
         className={cn(
-          // Room for a lifted card's shadow and a focus outline, inside the scroll.
-          "-m-1 flex gap-4 overflow-x-auto p-1 pb-2",
+          // Room for a lifted card's shadow and a focus outline, inside the scroll. The margin takes back the
+          // padding and each column's own 6px, so a card's edge lines up with the page and every column sits
+          // 4px inside the scroller, never cut at its edge.
+          "-mx-2.5 -mt-2.5 -mb-1 flex gap-1 overflow-x-auto px-1 pt-1 pb-2",
           "@max-[639px]:scroll-px-1 @max-[639px]:snap-x @max-[639px]:snap-mandatory",
           drag && "@max-[639px]:snap-none"
         )}
@@ -414,7 +416,7 @@ export const Board = React.forwardRef<HTMLDivElement, BoardProps>(function Board
               data-column={col.id}
               data-drop-target={target ? "" : undefined}
               className={cn(
-                "-m-1.5 flex min-w-60 flex-1 basis-0 flex-col gap-2.5 rounded-lg p-1.5 transition-colors duration-(--duration-fast)",
+                "flex min-w-60 flex-1 basis-0 flex-col gap-2.5 rounded-lg p-1.5 transition-colors duration-(--duration-fast)",
                 "@max-[639px]:min-w-[85cqw] @max-[639px]:snap-start",
                 // The column a dragged card is over takes the hover wash, which reads on the canvas in both themes.
                 "data-[drop-target]:bg-hover forced-colors:data-[drop-target]:outline-2 forced-colors:data-[drop-target]:outline-dashed forced-colors:data-[drop-target]:outline-[color:Highlight]"

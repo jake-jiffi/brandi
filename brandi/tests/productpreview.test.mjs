@@ -86,7 +86,9 @@ describe('the shim renders a mounted board in a real browser', async () => {
     const dump = async (file) => {
       const res = await P.previewArtboard(path.join(dir, file), { outDir: path.join(dir, 'out'), png: false });
       assert.equal(res.runtime, true);
-      const { stdout } = await run(chrome, ['--headless=new', '--disable-gpu', '--allow-file-access-from-files', '--virtual-time-budget=4000', '--dump-dom', pathToFileURL(res.html).href], { timeout: 60000 });
+      // No --allow-file-access-from-files: the detector's browser runs without it, so a placed board has
+      // to arrive inside the preview rather than be read from beside it.
+      const { stdout } = await run(chrome, ['--headless=new', '--disable-gpu', '--virtual-time-budget=4000', '--dump-dom', pathToFileURL(res.html).href], { timeout: 60000 });
       return stdout;
     };
     const light = await dump('Board.dc.html');

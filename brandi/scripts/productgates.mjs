@@ -128,7 +128,9 @@ export async function collectPages({ productDir, outDir, widths = WIDTHS, only =
       const frame = frames.get(f) ?? declaredFrame(src) ?? { w: 1440, h: 900 };
       const entry = manifest?.artboards?.find((a) => a.file === f);
       const fluid = entry?.expand === 'fill';
-      const url = await render(canvas, f, frame, 'board');
+      // A fluid board fills whatever window it is in, so it is drawn without its frame's width: drawn at
+      // 1440 and scanned at 390, it scrolled sideways on every page.
+      const url = await render(canvas, f, fluid ? { w: undefined, h: frame.h } : frame, 'board');
       // A twin that is already dark is scanned as it is; a board with a dark tweak, both ways.
       const themes = /Dark\.dc\.html$/.test(f) ? ['dark'] : /"dark":\{"editor":"boolean"/.test(src) ? ['light', 'dark'] : ['light'];
       for (const width of fluid ? widths : [frame.w]) {

@@ -41,11 +41,13 @@ export default {
     {
       id: "page",
       title: "On a page",
-      markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" title="[Muddy Paws Grooming]" description="A client since [March 2023], with three pets and a booking every fortnight." breadcrumbs="{{trail}}" meta="{{ui.meta}}" actions="{{ui.actions}}" primary="{{ui.primary}}">
+      // An h2 here: on a board the example sits under the board's own h1, and a second h1 breaks its outline.
+      markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h2}}" title="[Muddy Paws Grooming]" description="A client since [March 2023], with three pets and a booking every fortnight." breadcrumbs="{{trail}}" meta="{{ui.meta}}" actions="{{ui.actions}}" primary="{{ui.primary}}">
 <x-import component-from-global-scope="NS.Tabs" label="Client sections" tabs="{{sections}}"></x-import>
 </x-import>`,
       layout: "block",
       vals: {
+        h2: 2,
         trail: [{ label: "Clients", href: "#clients" }, { label: "[Muddy Paws Grooming]" }],
         sections: ["Overview", { label: "Invoices", count: 8 }, { label: "Bookings", count: 2, attention: true }, "Notes"],
       },
@@ -80,9 +82,16 @@ export default {
   checks: [
     {
       name: "The title is the page's only h1 by default, focusable from script only",
-      example: "page",
-      async run({ scope, expect }) {
-        const title = scope.getByRole("heading", { level: 1, name: "[Muddy Paws Grooming]" })
+      async run({ page, expect }) {
+        // Mounted here, with no level given: the board's own examples sit under its h1, so they take h2 and h3.
+        await page.evaluate(() => {
+          const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+          const host = document.createElement("div")
+          host.id = "check-mount"
+          document.body.append(host)
+          window.ReactDOM.flushSync(() => window.ReactDOM.createRoot(host).render(window.React.createElement(kit.PageHeader, { title: "[Muddy Paws Grooming]" })))
+        })
+        const title = page.locator("#check-mount").getByRole("heading", { level: 1, name: "[Muddy Paws Grooming]" })
         expect.equal(await title.count(), 1, "the title is an h1")
         expect.equal(await title.getAttribute("tabindex"), "-1", "focusable from script only")
         expect.equal(await title.getAttribute("data-slot"), "page-title", "found by its slot")
