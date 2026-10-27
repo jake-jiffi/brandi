@@ -15,6 +15,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import net from 'node:net';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -169,6 +170,45 @@ const nodeScript = (starter, script, args, timeout = 1800000) => {
   const r = spawnSync(process.execPath, [path.join('tools', script), ...args], { cwd: starter, encoding: 'utf8', timeout });
   return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 };
+
+const freePort = () => new Promise((resolve, reject) => {
+  const srv = net.createServer();
+  srv.unref();
+  srv.on('error', reject);
+  srv.listen(0, () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
+});
+
+/**
+ * Build the starter and start it on a free port, for the gates to scan its routes. Returns the base
+ * URL and a stop function. Throws with the build's own words when it does not build.
+ */
+export async function serveStarter(starter, { log = () => {} } = {}) {
+  const next = path.join(starter, 'node_modules', 'next', 'dist', 'bin', 'next');
+  if (!existsSync(next)) throw new Error(`${starter} has no Next.js installed. Run npm install there first.`);
+  const env = { ...process.env, NEXT_TELEMETRY_DISABLED: '1' };
+  log('starter: building');
+  const built = spawnSync(process.execPath, [next, 'build'], { cwd: starter, env, encoding: 'utf8', timeout: 900000 });
+  if (built.status !== 0) throw new Error(`The starter did not build:\n${`${built.stdout}${built.stderr}`.trim().split('\n').slice(-15).join('\n')}`);
+  const port = await freePort();
+  const child = spawn(process.execPath, [next, 'start', '-p', String(port)], { cwd: starter, env, stdio: 'ignore' });
+  const base = `http://localhost:${port}`;
+  for (let i = 0; i < 120; i++) {
+    try {
+      const res = await fetch(base, { redirect: 'manual' });
+      if (res.status < 500) break;
+    } catch { /* not up yet */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  log(`starter: serving on ${base}`);
+  return { base, stop: () => child.kill() };
+}
+
+/** The routes a starter declares for the gates, in tools/routes.json. */
+export function starterRoutes(starter, base) {
+  const file = path.join(starter, 'tools', 'routes.json');
+  const list = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [{ path: '/', label: 'Home' }];
+  return list.map((r) => ({ url: `${base}${r.path}`, label: r.label ?? r.path }));
+}
 
 /**
  * Run the machine gates for one round. Writes rounds/round-<n>/gates.json and returns it.

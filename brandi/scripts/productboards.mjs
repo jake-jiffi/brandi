@@ -45,10 +45,9 @@ function shell(system, title, body, { props = true } = {}) {
   return [
     `<x-import component-from-global-scope="${system.global}.Root" theme="{{theme}}">`,
     `<main style="box-sizing: border-box; width: ${W}px; padding: 56px; display: flex; flex-direction: column; gap: 40px; background: var(--canvas); color: var(--text); font-family: var(--font-sans);">`,
-    `<header style="display: flex; flex-direction: column; gap: 8px;">`,
-    `<p style="margin: 0; font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);">${esc(system.name)}</p>`,
+    // No eyebrow over the heading: a label stacked above a title is a template tell. The board's name
+    // strip on the canvas already says which system it belongs to.
     `<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 42px; font-weight: 400; color: var(--text-strong);">${esc(title)}</h1>`,
-    '</header>',
     body,
     '</main>',
     '</x-import>',
@@ -100,8 +99,8 @@ export function colourBoard(tokens, system) {
   const rest = roles.filter((t) => !used.has(t.name));
   if (rest.length) sections.push(section('Other roles', `<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">\n${rest.map((t) => tile(t.name, value(t), t.usage, ratios(t.name))).join('\n')}\n</div>`));
   const brand = tokens.color.tokens.filter((t) => t.brand === true || (t.brand === undefined && t.name.startsWith('brand-') && t.name !== 'brand-hover'));
-  if (brand.length) sections.push(section('Brand values', `<p style="margin: 0; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">The brand's own colours. Screens never use them directly: every surface, text and action takes a role above, which is solved for contrast in both themes.</p>\n<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">\n${brand.map((t) => tile(t.name, value(t), t.usage, '')).join('\n')}\n</div>`));
-  return board(system, 'FoundationsColour1440', 'Colour', `<p style="margin: 0; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">Every role a screen uses, in its group, with its value in both themes and the lowest contrast the audit measured for it. ${audit.pairs} pairs checked, ${audit.fails.length} below their floor.</p>\n${sections.filter(Boolean).join('\n')}`);
+  if (brand.length) sections.push(section('Brand values', `<p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">The brand's own colours. Screens never use them directly: every surface, text and action takes a role above, which is solved for contrast in both themes.</p>\n<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">\n${brand.map((t) => tile(t.name, value(t), t.usage, '')).join('\n')}\n</div>`));
+  return board(system, 'FoundationsColour1440', 'Colour', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">Every role a screen uses, in its group, with its value in both themes and the lowest contrast the audit measured for it. ${audit.pairs} pairs checked, ${audit.fails.length} below their floor.</p>\n${sections.filter(Boolean).join('\n')}`);
 }
 
 function section(label, inner) {
@@ -112,10 +111,10 @@ function tile(name, value, usage, ratio) {
   return [
     '<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">',
     `<div style="height: 72px; border-radius: var(--radius-md); background: var(--${name}); border: 1px solid var(--line);"></div>`,
-    `<p style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere;">${esc(name)}</p>`,
-    `<p style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted); overflow-wrap: anywhere;">${esc(value)}</p>`,
-    ratio ? `<p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(ratio)}</p>` : '',
-    usage ? `<p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--text-subtle);">${esc(usage)}</p>` : '',
+    `<p style="margin: 0; text-wrap: pretty; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-strong); overflow-wrap: anywhere;">${esc(name)}</p>`,
+    `<p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted); overflow-wrap: anywhere;">${esc(value)}</p>`,
+    ratio ? `<p style="margin: 0; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(ratio)}</p>` : '',
+    usage ? `<p style="margin: 0; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-subtle);">${esc(usage)}</p>` : '',
     '</div>',
   ].filter(Boolean).join('\n');
 }
@@ -127,8 +126,8 @@ export function typeBoard(tokens, system) {
     const sample = /kpi/.test(s.name) ? '$36,120' : s.name === 'eyebrow' ? 'Needs you' : s.name === 'code' ? 'formatNumber(2490.5, "currency")' : 'Bookings that need you today';
     return [
       '<div style="display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; align-items: baseline; padding-block: 12px; border-top: 1px solid var(--line);">',
-      `<p style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">type-${esc(s.name)}<br>${esc(s.fontSize)} / ${esc(s.lineHeight)} · ${esc(s.fontWeight ?? 400)}</p>`,
-      `<p style="margin: 0; font-family: var(--font-${fam}); font-size: ${s.fontSize}; line-height: ${s.lineHeight}; font-weight: ${s.fontWeight ?? 400};${s.letterSpacing ? ` letter-spacing: ${s.letterSpacing};` : ''}${s.name === 'eyebrow' ? ' text-transform: uppercase;' : ''} color: var(--text-strong);">${esc(sample)}</p>`,
+      `<p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">type-${esc(s.name)}<br>${esc(s.fontSize)} / ${esc(s.lineHeight)} · ${esc(s.fontWeight ?? 400)}</p>`,
+      `<p style="margin: 0; text-wrap: pretty; font-family: var(--font-${fam}); font-size: ${s.fontSize}; line-height: ${s.lineHeight}; font-weight: ${s.fontWeight ?? 400};${s.letterSpacing ? ` letter-spacing: ${s.letterSpacing};` : ''}${s.name === 'eyebrow' ? ' text-transform: uppercase;' : ''} color: var(--text-strong);">${esc(sample)}</p>`,
       '</div>',
     ].join('\n');
   }).join('\n')));
@@ -139,9 +138,9 @@ export function typeBoard(tokens, system) {
 
 /** The shape board: spacing, corners, shadows and sizes, drawn at their values. */
 export function shapeBoard(tokens, system) {
-  const spacing = (tokens.spacing?.tokens ?? []).map((t) => `<div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; align-items: center;"><p style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p><div style="height: 12px; width: ${esc(t.value)}; background: var(--primary); border-radius: var(--radius-xs);"></div></div>`).join('\n');
-  const radii = (tokens.radius?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;"><div style="width: 120px; height: 72px; background: var(--surface); border: 1px solid var(--line-control); border-radius: ${esc(t.value)};"></div><p style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p></div>`).join('\n');
-  const shadows = (tokens.shadow?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;"><div style="width: 160px; height: 96px; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--${t.name});"></div><p style="margin: 0; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)}</p></div>`).join('\n');
+  const spacing = (tokens.spacing?.tokens ?? []).map((t) => `<div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; align-items: center;"><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p><div style="height: 12px; width: ${esc(t.value)}; background: var(--primary); border-radius: var(--radius-xs);"></div></div>`).join('\n');
+  const radii = (tokens.radius?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;"><div style="width: 120px; height: 72px; background: var(--surface); border: 1px solid var(--line-control); border-radius: ${esc(t.value)};"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p></div>`).join('\n');
+  const shadows = (tokens.shadow?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;"><div style="width: 160px; height: 96px; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--${t.name});"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)}</p></div>`).join('\n');
   const sizes = (tokens.size?.tokens ?? []).map((t) => `<li style="font-size: 13px; line-height: 20px;"><span style="font-family: var(--font-mono);">${esc(t.name)}</span> · ${esc(t.value)}${t.usage ? `: ${esc(t.usage)}` : ''}</li>`).join('\n');
   return board(system, 'FoundationsShape1440', 'Space, corners and depth', [
     section('Spacing', `<div style="display: flex; flex-direction: column; gap: 10px;">\n${spacing}\n</div>`),
@@ -153,9 +152,9 @@ export function shapeBoard(tokens, system) {
 
 /** The icon board: the whole vocabulary, mounted from the bundle by name. */
 export function iconBoard(system) {
-  const body = `<p style="margin: 0; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">One set, by name, in the colour of the text beside it. A board or a product names an icon from this list and nothing else.</p>
+  const body = `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">One set, by name, in the colour of the text beside it. A board or a product names an icon from this list and nothing else.</p>
 <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 16px;">
-<sc-for list="{{icons}}" as="icon" hint-placeholder-count="24"><div style="display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 16px 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface);"><x-import component-from-global-scope="${system.global}.Icon" name="{{icon.name}}" size="{{icon.size}}"></x-import><p style="margin: 0; font-size: 12px; line-height: 16px; color: var(--text-muted); text-align: center; overflow-wrap: anywhere;">{{icon.name}}</p></div></sc-for>
+<sc-for list="{{icons}}" as="icon" hint-placeholder-count="24"><div style="display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 16px 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface);"><x-import component-from-global-scope="${system.global}.Icon" name="{{icon.name}}" size="{{icon.size}}"></x-import><p style="margin: 0; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted); text-align: center; overflow-wrap: anywhere;">{{icon.name}}</p></div></sc-for>
 </div>`;
   return board(system, 'FoundationsIcons1440', 'Icons', body, { logic: boardLogic(`{ icons: (window.${system.global}.ICON_NAMES || []).map((name) => ({ name, size: 24 })) }`) });
 }
@@ -171,7 +170,7 @@ export function componentBoards(defs, system) {
     const state = Object.assign({}, ...members.map((d) => d.state ?? {}));
     const body = members.map((d) => [
       `<section style="display: flex; flex-direction: column; gap: 20px; padding-top: 32px; border-top: 1px solid var(--line);">`,
-      `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
+      `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
       ...d.examples.map((ex) => `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}">${resolveNs(ex.markup, system.global).trim()}</div></div>`),
       '</section>',
     ].join('\n')).join('\n');
@@ -206,7 +205,7 @@ export function twin(light, system, height) {
 /** The contents board: the system's sections, each linking to its first board. */
 export function contentsBoard(system, sections) {
   const body = sections.map((s) => `<li style="display: flex; flex-direction: column; gap: 4px; padding-block: 16px; border-top: 1px solid var(--line);"><a href="${esc(s.first)}" style="font-size: 20px; line-height: 28px; font-weight: 600; color: var(--link);">${esc(s.label)}</a><span style="font-size: 14px; line-height: 20px; color: var(--text-muted);">${esc(s.note)}</span></li>`).join('\n');
-  return board(system, 'Main', 'Contents', `<p style="margin: 0; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">The ${esc(system.name)} product system on one canvas: the foundations, every component mounted live, then each product's screens, states and options. Light boards with their dark twins beside them.</p>\n<ol style="margin: 0; padding: 0; list-style: none;">\n${body}\n</ol>`);
+  return board(system, 'Main', 'Contents', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">The ${esc(system.name)} product system on one canvas: the foundations, every component mounted live, then each product's screens, states and options. Light boards with their dark twins beside them.</p>\n<ol style="margin: 0; padding: 0; list-style: none;">\n${body}\n</ol>`);
 }
 
 function isGenerated(file) {

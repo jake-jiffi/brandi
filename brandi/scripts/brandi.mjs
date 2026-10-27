@@ -71,7 +71,7 @@ import { buildSystem, assertPublishable } from './system.mjs';
 import { buildProductTokens, auditProductTokens, auditSummary, toProductCss } from './producttokens.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
-import { runGates, judgeRound, roundMarkdown, WIDTHS } from './productgates.mjs';
+import { runGates, judgeRound, roundMarkdown, serveStarter, starterRoutes, WIDTHS } from './productgates.mjs';
 import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
@@ -2801,11 +2801,13 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       design-system.json last. Prints the calls, and the pictures to upload
       as assets; run it again with --blobs to record them.
 
-  brandi product gates [--round N] [--only Button,Dialog] [--route <url> ...]
+  brandi product gates [--round N] [--only Button,Dialog] [--serve] [--route <url> ...]
       The machine gates for a round: the token audit, the pinned detector at
       1440, 820 and 390 in light and dark, axe, and every scripted check, on
-      every component preview and canvas board (and a running starter's
-      routes). Writes product/rounds/round-N/gates.json with every tool version.
+      every component preview and canvas board, and the starter's routes:
+      --serve builds and starts the starter and scans tools/routes.json, or
+      --route names a running page. Writes product/rounds/round-N/gates.json
+      with every tool version.
 
   brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
       Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
@@ -2989,7 +2991,18 @@ async function cmdProduct(flags, positional) {
       if (!existsSync(path.join(starter, 'node_modules', 'playwright'))) return fail(`${path.relative(process.cwd(), starter)} has no node_modules with Playwright. Run npm install there first.`);
       const routes = (Array.isArray(flags.route) ? flags.route : flags.route ? [flags.route] : []).filter((r) => typeof r === 'string').map((url) => ({ url, label: new URL(url).pathname }));
       const lines = [];
-      const gates = await runGates({ productDir, starter, round, routes, only: typeof flags.only === 'string' ? flags.only.split(',') : null, log: (l) => { lines.push(l); if (!flags.json) process.stderr.write(`${l}\n`); } });
+      const log = (l) => { lines.push(l); if (!flags.json) process.stderr.write(`${l}\n`); };
+      let server = null;
+      if (flags.serve) {
+        try { server = await serveStarter(starter, { log }); } catch (e) { return fail(e.message); }
+        routes.push(...starterRoutes(starter, server.base));
+      }
+      let gates;
+      try {
+        gates = await runGates({ productDir, starter, round, routes, only: typeof flags.only === 'string' ? flags.only.split(',') : null, log });
+      } finally {
+        server?.stop();
+      }
       const judged = judgeRound(gates);
       const machine = judged.verdicts.filter((v) => ['Tokens', 'Drift', 'Detector', 'Accessibility', 'Record'].includes(v.gate));
       emit([`Round ${round} machine gates:`, ...machine.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
