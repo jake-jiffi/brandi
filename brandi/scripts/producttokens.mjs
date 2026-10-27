@@ -396,9 +396,12 @@ function themeValues(system, mode, roles, ai, brandInk) {
   // a usable series), and neighbours that collapse under a colour-vision
   // deficiency are reported by the audit.
   const seed = hexOf(system.palettes.brand.light.steps[8]);
-  const generated = (light && system.dataViz?.categorical?.length
-    ? system.dataViz.categorical
-    : dataVizPalette(seed, { count: SERIES_COUNT, mode })).map(hexOf);
+  // More candidates than slots, so a palette short of distinct hues never wraps around. In dark,
+  // the colour-vision-safe generator finds as few as four, and series-6 came out in series-1's
+  // colour; the brand's categorical palette, solved for the dark card, fills the rest.
+  const categorical = (system.dataViz?.categorical ?? []).map(hexOf);
+  const extra = dataVizPalette(seed, { count: SERIES_COUNT * 2, mode }).map(hexOf);
+  const generated = [...new Set([...(light ? categorical : []), ...extra, ...categorical])];
   const accentSeeds = Object.keys(system.palettes).filter((k) => /^accent\d+$/.test(k))
     .map((k) => hexOf(system.palettes[k].light.steps[8]));
   const palette = [];
@@ -407,8 +410,23 @@ function themeValues(system, mode, roles, ai, brandInk) {
     if (palette.length < SERIES_COUNT && palette.every((p) => hueGap(safeHue(toOklch(p).h), h) >= 25)) palette.push(c);
   }
   for (const c of generated) if (palette.length < SERIES_COUNT && !palette.includes(c)) palette.push(c);
+  // Two candidates can solve to one colour; the next candidate takes the slot instead. Last come
+  // spares a twelfth of the circle apart, past the colour-vision-safe set: the audit reports any
+  // neighbours they leave hard to tell apart, which beats a chart with two series in one colour.
+  const baseHue = safeHue(toOklch(seed).h);
+  const spares = Array.from({ length: 12 }, (_, k) => oklchToHex(gamutMapOklch({ L: light ? 0.56 : 0.74, C: 0.13, h: (baseHue + 15 + k * 30) % 360 })));
+  const candidates = [...new Set([...palette, ...generated, ...spares])];
+  const taken = new Set();
+  let next = 0;
   for (let i = 0; i < SERIES_COUNT; i += 1) {
-    v[`series-${i + 1}`] = solve(`series-${i + 1}`, palette[i % palette.length], [v.surface, v['surface-subtle']], FLOORS['non-text']);
+    let value = null;
+    while (next < candidates.length) {
+      value = solve(`series-${i + 1}`, candidates[next++], [v.surface, v['surface-subtle']], FLOORS['non-text']);
+      if (!taken.has(value.toUpperCase())) break;
+    }
+    value ??= solve(`series-${i + 1}`, candidates[i % candidates.length], [v.surface, v['surface-subtle']], FLOORS['non-text']);
+    taken.add(value.toUpperCase());
+    v[`series-${i + 1}`] = value;
   }
   v['chart-grid'] = ink ? toward(0.07) : (light ? N[3] : N[2]);
   v['chart-compare'] = solve('chart-compare', ink ? toward(0.45) : N[8], [v.surface], FLOORS['non-text'], 'floor');

@@ -185,6 +185,23 @@ describe('brand fidelity: a decided canvas, ink and labels carry the brand', () 
   });
 });
 
+describe('chart series', () => {
+  test('six series are six colours in both themes, whatever the brand hue', () => {
+    // Dark once drew series-6 in series-1's colour: its colour-vision-safe palette ran out of hues and wrapped.
+    for (const h of [0, 27, 55, 78, 110, 148, 190, 245, 280, 320]) {
+      for (const L of [0.3, 0.8]) {
+        const primary = oklchToHex(gamutMapOklch({ L, C: 0.15, h }));
+        const tokens = P.buildProductTokens(buildSystem({ primary, accentCount: 1 }));
+        for (const theme of ['light', 'dark']) {
+          const series = tokens.color.tokens.filter((t) => /^series-/.test(t.name)).map((t) => t.value[theme].toUpperCase());
+          assert.equal(series.length, 6);
+          assert.equal(new Set(series).size, 6, `${primary} ${theme}: ${series.join(' ')}`);
+        }
+      }
+    }
+  });
+});
+
 describe('the audit holds across the colour space', () => {
   // Ten hues, two lightnesses, two chromas: brand colours from near-black to
   // pale, muted to loud. Every derived role has to pass on every one of them.
