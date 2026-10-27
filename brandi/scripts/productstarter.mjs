@@ -45,6 +45,64 @@ export const PLATFORM_SPECS = path.resolve(here, '..', 'product', 'platform');
 
 // Files and folders a product makes for itself, never copied from the kit.
 const NOT_FROM_KIT = new Set(['node_modules', '.next', 'system', 'next-env.d.ts', 'tsconfig.tsbuildinfo']);
+
+// What the kit wrote into a starter last time, path -> sha256, so a refresh can take back a file the kit has
+// since dropped, and only while nobody has changed it.
+export const KIT_MANIFEST = '.brandi/kit-files.json';
+// Files the kit dropped before it kept a manifest, with every version it ever shipped. The placeholder home
+// page went when the worked example arrived, and left behind it shadowed the example's own "/".
+const RETIRED = {
+  'app/page.tsx': ['0dd47f4f00bde01e528ad93b27cfe55cfef70d611d933d3b5c61104e2aaf65fb'],
+};
+
+const sha = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+
+/** Every file the kit carries into a starter, relative, with its hash. */
+function kitFiles(kit) {
+  const out = {};
+  const walk = (dir, rel = '') => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const r = rel ? `${rel}/${entry.name}` : entry.name;
+      if (!rel && NOT_FROM_KIT.has(entry.name)) continue;
+      if (entry.name === 'node_modules' || r === 'canvas/dist') continue;
+      if (entry.isDirectory()) walk(path.join(dir, entry.name), r);
+      else out[r] = sha(path.join(dir, entry.name));
+    }
+  };
+  walk(kit);
+  return out;
+}
+
+/**
+ * Copy the kit into a starter and take back what the kit has dropped since it last wrote there: a file the
+ * last manifest (or the retired list) names, the kit no longer has, and nobody has changed since. A changed
+ * one stays, and is reported. Returns { removed, kept }.
+ */
+export function refreshKitFiles(out, kit = KIT) {
+  const manifestFile = path.join(out, KIT_MANIFEST);
+  let before = {};
+  try { before = JSON.parse(readFileSync(manifestFile, 'utf8')); } catch { /* none yet: a starter older than the manifest */ }
+  mkdirSync(out, { recursive: true });
+  for (const entry of readdirSync(kit)) {
+    if (NOT_FROM_KIT.has(entry)) continue;
+    cpSync(path.join(kit, entry), path.join(out, entry), { recursive: true, force: true, filter: (src) => !src.includes(`${path.sep}node_modules`) && !src.includes(`${path.sep}canvas${path.sep}dist`) });
+  }
+  const now = kitFiles(kit);
+  const removed = [];
+  const kept = [];
+  for (const rel of new Set([...Object.keys(before), ...Object.keys(RETIRED)])) {
+    if (now[rel]) continue;
+    const file = path.join(out, rel);
+    if (!existsSync(file)) continue;
+    const known = [before[rel], ...(RETIRED[rel] ?? [])].filter(Boolean);
+    if (known.includes(sha(file))) { rmSync(file); removed.push(rel); } else kept.push(rel);
+  }
+  // A route gone leaves Next.js's generated route types pointing at it, and the type check fails until a build.
+  if (removed.some((r) => r.startsWith('app/'))) rmSync(path.join(out, '.next', 'types'), { recursive: true, force: true });
+  mkdirSync(path.dirname(manifestFile), { recursive: true });
+  writeFileSync(manifestFile, `${JSON.stringify(now, null, 2)}\n`);
+  return { removed, kept };
+}
 const GENERATED = ['system/tokens.json', 'system/system.json', 'app/globals.css', 'lib/format-locale.js', 'lib/product.ts', 'app/fonts.ts', 'tools/build-globals.mjs'];
 
 const slug = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64);
@@ -182,13 +240,10 @@ export function generatedFiles(tokens, identity) {
 export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null, brand = null, brandRoot = null, productDir = null }) {
   const fresh = !existsSync(path.join(out, 'package.json'));
   const written = [];
+  let retired = { removed: [], kept: [] };
   if (fresh || refreshKit) {
-    mkdirSync(out, { recursive: true });
-    for (const entry of readdirSync(kit)) {
-      if (NOT_FROM_KIT.has(entry)) continue;
-      cpSync(path.join(kit, entry), path.join(out, entry), { recursive: true, force: true, filter: (src) => !src.includes(`${path.sep}node_modules`) && !src.includes(`${path.sep}canvas${path.sep}dist`) });
-      written.push(entry);
-    }
+    retired = refreshKitFiles(out, kit);
+    for (const entry of readdirSync(kit)) if (!NOT_FROM_KIT.has(entry)) written.push(entry);
   }
   for (const [rel, content] of generatedFiles(tokens, identity)) {
     const file = path.join(out, rel);
@@ -243,7 +298,7 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
     writeFileSync(file, content);
     written.push(rel);
   }
-  return { fresh, written, kept, brand: brandMarks, placeholder: !src };
+  return { fresh, written, kept, retired, brand: brandMarks, placeholder: !src };
 }
 
 /**

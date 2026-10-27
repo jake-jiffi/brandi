@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, definitionsHash, railTone, GENERATED, KIT } from '../scripts/productstarter.mjs';
+import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, definitionsHash, railTone, refreshKitFiles, KIT_MANIFEST, GENERATED, KIT } from '../scripts/productstarter.mjs';
 import { toStarterGlobals } from '../scripts/productglobals.mjs';
 import { buildProductTokens } from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -168,3 +168,40 @@ describe('what lib/product.ts reads off the system', () => {
     assert.doesNotMatch(generated, /as const/);
   });
 });
+
+describe('a kit refresh takes back what the kit dropped', () => {
+  const kitOf = async (dir, files) => {
+    for (const [rel, text] of Object.entries(files)) { await mkdir(path.dirname(path.join(dir, rel)), { recursive: true }); await writeFile(path.join(dir, rel), text); }
+    return dir;
+  };
+  test('a file the last kit wrote and the new kit lacks goes, unless someone changed it', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'brandi-kitfiles-'));
+    const out = path.join(root, 'starter');
+    const v1 = await kitOf(path.join(root, 'v1'), { 'app/page.tsx': 'old home', 'app/help/page.tsx': 'help', 'lib/x.ts': 'x' });
+    assert.deepEqual(refreshKitFiles(out, v1), { removed: [], kept: [] });
+    assert.ok(existsSync(path.join(out, KIT_MANIFEST)), 'the manifest is written');
+    const v2 = await kitOf(path.join(root, 'v2'), { 'lib/x.ts': 'x2' });
+    await writeFile(path.join(out, 'app', 'help', 'page.tsx'), 'help, changed by the product');
+    await mkdir(path.join(out, '.next', 'types'), { recursive: true });
+    const result = refreshKitFiles(out, v2);
+    assert.deepEqual(result, { removed: ['app/page.tsx'], kept: ['app/help/page.tsx'] });
+    assert.equal(existsSync(path.join(out, 'app', 'page.tsx')), false);
+    assert.equal(existsSync(path.join(out, '.next', 'types')), false, "a route gone clears Next.js's route types");
+    assert.equal(await readFile(path.join(out, 'lib', 'x.ts'), 'utf8'), 'x2');
+    await rm(root, { recursive: true, force: true });
+  });
+
+  test("a starter older than the manifest loses the kit's old placeholder home page, and only that exact file", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'brandi-kitfiles-'));
+    const out = path.join(root, 'starter');
+    const kit = await kitOf(path.join(root, 'kit'), { 'app/(app)/page.tsx': 'the worked example' });
+    const placeholder = 'import { Button } from "@/components/system"\n\nexport default function Page() {\n  return (\n    <main id="main" tabIndex={-1} className="p-8">\n      <h1 className="type-title">Starter</h1>\n      <Button variant="primary" icon="Check">Approve</Button>\n    </main>\n  )\n}\n';
+    await kitOf(out, { 'app/page.tsx': placeholder });
+    assert.deepEqual(refreshKitFiles(out, kit).removed, ['app/page.tsx']);
+    await kitOf(out, { 'app/page.tsx': 'a home page the product wrote' });
+    await rm(path.join(out, KIT_MANIFEST));
+    assert.deepEqual(refreshKitFiles(out, kit), { removed: [], kept: ['app/page.tsx'] });
+    await rm(root, { recursive: true, force: true });
+  });
+});
+

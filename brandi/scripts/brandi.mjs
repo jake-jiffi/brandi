@@ -2980,11 +2980,13 @@ async function cmdProduct(flags, positional) {
       `${res.fresh ? 'Wrote' : 'Refreshed'} the ${identity.name} starter in ${rel}: namespace ${identity.namespace}, global ${identity.global}, ${identity.locale} ${identity.currency}.`,
       ...res.written.map((w) => `  ${w}`),
       ...res.kept.map((k) => `  kept ${k}: it no longer carries the generated marker, so it is the product's own`),
+      ...(res.retired?.removed ?? []).map((r) => `  removed ${r}: the kit no longer has it, and nobody had changed it`),
+      ...(res.retired?.kept ?? []).map((r) => `  kept ${r}: the kit dropped it, but it has changed since the kit wrote it. Remove it if it is only the kit's old copy`),
       res.brand ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
       res.placeholder ? "lib/brand.ts still holds the kit's placeholder mark. Name the brand's marks in product.json (brand.marks) or record a logo master." : '',
       '',
       res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : flags.kit ? 'Copied the kit\'s components and tools again, and rewrote the generated files. Next: `brandi product bundle`.' : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
-    ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, kept: res.kept, starter: rel });
+    ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, kept: res.kept, retired: res.retired, starter: rel });
     return;
   }
   if (sub === 'bundle') {
