@@ -175,7 +175,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
           "@container/rail flex min-h-0 min-w-0 flex-col text-rail-text",
           drawer
             ? "size-full"
-            : cn("rounded-lg border border-rail-line bg-rail shadow-xs", collapsed ? "w-(--rail-collapsed)" : "w-full", autoHeight ? "h-auto" : "h-full"),
+            : cn("rounded-lg border border-rail-line bg-rail shadow-xs [--focus:var(--rail-focus)]", collapsed ? "w-(--rail-collapsed)" : "w-full", autoHeight ? "h-auto" : "h-full"),
           className
         )}
       >
@@ -193,7 +193,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
               <Icon name="X" size={20} />
             </ButtonBase>
           ) : null}
-          <ProductLockup product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
+          <ProductLockup tone="rail" color={PRODUCT.railTone === "dark" ? "on-dark" : "auto"} product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
           {home ? (
             <Link
               href={home}

@@ -12,10 +12,6 @@ const inView = async (page, locator) => {
   await locator.scrollIntoViewIfNeeded()
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
-const luminance = (rgb) => {
-  const [r, g, b] = (rgb.match(/[\d.]+/g) ?? []).map(Number)
-  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-}
 // The live drawer, in its portal: never the picture a design shows in place.
 const liveDrawer = (page) => page.locator('[role="dialog"][data-slot="sheet-content"]:not([data-inline])')
 // A preview carries a <base> pointing at its source folder, so an in-page link would load that folder
@@ -460,9 +456,17 @@ export default {
       example: "phone",
       themes: ["light", "dark"],
       async run({ page, scope, expect, theme }) {
+        // The rail's colour in this theme, read inside the shell: a brand's rail can be navy in light.
+        const rail = await scope.evaluate((el) => {
+          const probe = document.createElement("div")
+          probe.style.background = "var(--rail)"
+          el.appendChild(probe)
+          const colour = getComputedStyle(probe).backgroundColor
+          probe.remove()
+          return colour
+        })
         const { drawer } = await openDrawer(page, scope)
-        const l = luminance(await drawer.evaluate((el) => getComputedStyle(el).backgroundColor))
-        expect(theme === "dark" ? l < 0.25 : l > 0.85, `the drawer is ${theme} (luminance ${l.toFixed(2)})`)
+        expect.equal(await drawer.evaluate((el) => getComputedStyle(el).backgroundColor), rail, `the drawer takes the ${theme} rail`)
       },
     },
     {

@@ -234,7 +234,11 @@ ${styles.map(([s, f]) => styleUtility(s, f)).join('\n')}
 /* 6. Base ----------------------------------------------------------------- */
 @layer base {
   * {
-    @apply border-border outline-ring;
+    @apply border-border;
+    /* The resting outline colour is the focus colour where the element sits, so a ring that fades in
+       with transition-colors starts in its own colour: --ring is computed at the root, and on a rail
+       with its own focus colour the ring flashed the page's colour first. */
+    outline-color: var(--focus);
   }
   html {
     @apply font-sans;

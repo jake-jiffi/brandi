@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
 import { useLink } from "@/lib/link"
+import { PRODUCT } from "@/lib/product"
 import { cn } from "@/lib/utils"
 
 import { Icon } from "./icon"
@@ -41,7 +42,7 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
     <header
       ref={ref}
       data-slot="phone-top-bar"
-      className={cn("flex h-14 min-w-0 shrink-0 items-center gap-1 border-b border-rail-line bg-rail px-2 text-rail-text-strong", className)}
+      className={cn("flex h-14 min-w-0 shrink-0 items-center gap-1 border-b border-rail-line bg-rail px-2 text-rail-text-strong [--focus:var(--rail-focus)]", className)}
     >
       {back ? (
         <ButtonBase asChild variant="ghost" size="icon" className={control}>
@@ -71,7 +72,7 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
             {title}
           </p>
         ) : (
-          <ProductLockup product={product} href={home} height={20} />
+          <ProductLockup tone="rail" color={PRODUCT.railTone === "dark" ? "on-dark" : "auto"} product={product} href={home} height={20} />
         )}
       </div>
       {actions ? (

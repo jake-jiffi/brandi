@@ -20,11 +20,13 @@ export interface ProductLockupProps extends Omit<React.HTMLAttributes<HTMLElemen
   height?: number
   /** Makes the whole lockup one link, named "[Brand] [product]". */
   href?: string
+  /** `rail` for the rail and the top bar: the name takes the rail's strong text colour, so it never sinks into a dark rail. */
+  tone?: "default" | "rail"
 }
 
 /** The mark with the product's name, for the top of the rail, sign-in and product emails. */
 export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(function ProductLockup(
-  { product = PRODUCT.name, color = "auto", layout = "inline", height, href, className, ...rest },
+  { product = PRODUCT.name, color = "auto", layout = "inline", height, href, tone = "default", className, ...rest },
   ref
 ) {
   const Link = useLink()
@@ -32,7 +34,7 @@ export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(f
   const ink = color === "ink"
   const content = (
     <>
-      <Logo color={color} height={h} title={href ? "" : undefined} />
+      <Logo color={color} height={h} title={href ? "" : undefined} className={tone === "rail" && !ink ? "text-rail-text-strong" : undefined} />
       {layout === "inline" ? (
         // A border, not a fill, so the hairline survives forced colours.
         <span aria-hidden data-slot="product-lockup-rule" className={cn("my-0.5 w-0 self-stretch border-l", ink ? "border-current/40" : "border-line")} />
@@ -42,8 +44,8 @@ export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(f
         // Never larger than the mark: the name steps down with a small one.
         className={cn(
           "min-w-0 truncate",
-          h >= 24 ? "type-heading" : h >= 20 ? "type-label" : "type-caption",
-          ink ? "text-current" : "text-text-strong"
+          PRODUCT.lockupName === "eyebrow" ? "type-eyebrow" : h >= 24 ? "type-heading" : h >= 20 ? "type-label" : "type-caption",
+          ink ? "text-current" : tone === "rail" ? "text-rail-text-strong" : "text-text-strong"
         )}
       >
         {product}

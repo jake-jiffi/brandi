@@ -31,7 +31,7 @@ export function useShell() {
 export const drawerContext = React.createContext<{ onClose: () => void } | null>(null)
 
 // The drawer is the Sheet from the left, on the rail's own colours, never wider than a thumb's reach.
-const drawerClass = "max-w-80 overflow-hidden bg-rail text-rail-text"
+const drawerClass = "max-w-80 overflow-hidden bg-rail text-rail-text [--focus:var(--rail-focus)]"
 
 export interface AppShellProps {
   /** A Sidebar. It is the rail from 1024px, and the drawer's contents under that. Built in the board's script on a canvas. */

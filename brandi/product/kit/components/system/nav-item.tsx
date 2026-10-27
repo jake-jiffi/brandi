@@ -79,7 +79,7 @@ export const NavItem = React.forwardRef<HTMLAnchorElement, NavItemProps>(functio
       data-sub={sub ? "" : undefined}
       className={cn(
         "group/nav-item relative flex min-h-9 w-full min-w-0 items-center gap-2.5 rounded-control px-3 py-1.5 type-label text-rail-text transition-colors duration-(--duration-fast)",
-        "hover:bg-rail-hover hover:text-rail-text-strong focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px] pointer-coarse:min-h-11",
+        "hover:bg-rail-hover hover:text-rail-text-strong [--focus:var(--rail-focus)] focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px] pointer-coarse:min-h-11",
         current && "bg-rail-selected text-rail-text-strong shadow-[inset_0_0_0_1px_var(--rail-line)] hover:bg-rail-selected",
         // Lined up under the label of the item above: 12px in, the 18px icon and its 10px gap.
         sub && "pl-10 @max-[160px]/rail:hidden",

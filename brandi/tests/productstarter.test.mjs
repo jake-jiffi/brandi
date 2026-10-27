@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, definitionsHash, GENERATED, KIT } from '../scripts/productstarter.mjs';
+import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, definitionsHash, railTone, GENERATED, KIT } from '../scripts/productstarter.mjs';
 import { toStarterGlobals } from '../scripts/productglobals.mjs';
 import { buildProductTokens } from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -143,5 +143,19 @@ describe("a product repo's previews", () => {
     await writeFile(path.join(dir, 'b.def.mjs'), 'export default { name: "B", job: "Changed." }\n');
     assert.notEqual(definitionsHash(dir).sha256, expected);
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('what lib/product.ts reads off the system', () => {
+  test("the rail's tone comes from the tokens, aliases followed", () => {
+    const of = (rail, text) => ({ color: { tokens: [{ name: 'surface', value: { light: '#FCFDFC', dark: '#191919' } }, { name: 'rail', value: { light: rail, dark: '#111111' } }, { name: 'rail-text-strong', value: { light: text, dark: '#FFFFFF' } }] } });
+    assert.equal(railTone(of('#0F1B3C', '#FFFFFF')), 'dark', 'a navy rail');
+    assert.equal(railTone(of('{surface}', '#2F3130')), 'light', 'a rail that is the surface');
+    assert.equal(railTone({ color: { tokens: [] } }), 'light');
+  });
+
+  test('the lockup name style is the brand\'s choice, "label" unless product.json says "eyebrow"', () => {
+    assert.equal(systemIdentity({}, { brandName: 'Acme' }).lockupName, 'label');
+    assert.equal(systemIdentity({ lockup: { name: 'eyebrow' } }, { brandName: 'Acme' }).lockupName, 'eyebrow');
   });
 });

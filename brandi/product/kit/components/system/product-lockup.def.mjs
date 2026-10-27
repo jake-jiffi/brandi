@@ -10,6 +10,7 @@ export default {
     { name: "layout", type: '"inline" | "stacked"', default: '"inline"', doc: "Inline, with a hairline between mark and name, or stacked, the name under the mark." },
     { name: "height", type: "number", doc: "The mark's height in px, the logo system's preferred size by default." },
     { name: "href", type: "string", doc: 'Makes the whole lockup one link, named "[Brand] [product]".' },
+    { name: "tone", type: '"default" | "rail"', default: '"default"', doc: "`rail` on the rail and the top bar: the name takes the rail's strong text colour, and the rail asks for the mark drawn for its ground." },
   ],
   notes: {
     Behaviour: [
