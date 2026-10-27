@@ -111,6 +111,20 @@ export function shiftL(hex, dL) {
 }
 
 /**
+ * The least contrast a state keeps from the colour it changes: a hover, a press, a selected row, a rail's
+ * hairline. A fixed step of lightness moves almost no light near black, and a black rail's selected row
+ * came out #030303 on #000000.
+ */
+export const STEP = Object.freeze({ hover: 1.1, pressed: 1.19, selected: 1.25, line: 1.15 });
+
+/** A lightness step from `base` the eye can see: the given step, grown until it holds `min` against `base`. */
+export function visibleShift(base, dL, min) {
+  let hex = shiftL(base, dL);
+  for (let k = 1; contrastRatio(hex, base) < min && k <= 40; k += 1) hex = shiftL(base, dL * (1 + k * 0.5));
+  return hex;
+}
+
+/**
  * The colour nearest `seed` that clears `min` against every background.
  *
  * Hue and chroma stay; lightness moves towards whichever end can pass, and
@@ -181,12 +195,15 @@ export function solveForContrast(seed, against, min, { margin = MARGIN, mode = '
  * solved so the label still reads. A state that quietly drops its label below
  * 4.5:1 is the failure this exists to prevent.
  */
-export function stateOf(fill, label, amount) {
+export function stateOf(fill, label, amount, min = STEP.hover) {
   const L = toOklch(fill).L;
   const away = toOklch(label).L > L ? -1 : 1;
   const room = away < 0 ? L : 1 - L;
   const dir = room >= amount + 0.04 ? away : -away;
-  const hex = shiftL(fill, dir * amount);
+  // A dark navy cannot get far enough darker to be seen (1.16:1 against black at most), so a state that
+  // cannot reach its step one way takes it the other.
+  let hex = visibleShift(fill, dir * amount, min);
+  if (contrastRatio(hex, fill) < min) hex = visibleShift(fill, -dir * amount, min);
   return contrastRatio(hex, label) >= FLOORS.text + MARGIN ? hex : solveForContrast(hex, [label], FLOORS.text).hex;
 }
 
@@ -257,7 +274,7 @@ const hexOf = (c) => (typeof c === 'string' ? c : c?.hex);
  * for primary, brand, highlight, canvas, focus and rail. Anything not decided is
  * derived, and derived values are solved to pass.
  */
-function themeValues(system, mode, roles, ai, brandInk) {
+function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
   const light = mode === 'light';
   const N = steps(system.palettes.neutral[mode]);
   const B = steps(system.palettes.brand[mode]);
@@ -362,13 +379,13 @@ function themeValues(system, mode, roles, ai, brandInk) {
     v.primary = p;
   }
   v['on-primary'] = labelOn(v.primary).hex;
-  v['primary-hover'] = stateOf(v.primary, v['on-primary'], 0.05);
-  v['primary-pressed'] = stateOf(v.primary, v['on-primary'], 0.09);
+  v['primary-hover'] = stateOf(v.primary, v['on-primary'], 0.05, STEP.hover);
+  v['primary-pressed'] = stateOf(v.primary, v['on-primary'], 0.09, STEP.pressed);
 
   // The brand fill: the brand's own colour as a secondary emphasis.
   v.brand = decided('brand') ?? B[8];
   v['on-brand'] = labelOn(v.brand).hex;
-  v['brand-hover'] = stateOf(v.brand, v['on-brand'], 0.05);
+  v['brand-hover'] = stateOf(v.brand, v['on-brand'], 0.05, STEP.hover);
 
   // Focus clears 3:1 on every ground it can sit on, the selected tints included: a list row is often
   // selected and focused at once, and a dark focus colour once held 2.8:1 on the dark selected tint.
@@ -413,18 +430,20 @@ function themeValues(system, mode, roles, ai, brandInk) {
   const generated = [...new Set([...(light ? categorical : []), ...extra, ...categorical])];
   const accentSeeds = Object.keys(system.palettes).filter((k) => /^accent\d+$/.test(k))
     .map((k) => hexOf(system.palettes[k].light.steps[8]));
+  // A colour the brand bars from this theme's grounds never becomes a series here, nor does its hue.
+  const barred = (c) => avoid.some((a) => hueGap(safeHue(toOklch(a).h), safeHue(toOklch(c).h)) < 25);
   const palette = [];
   for (const c of [generated[0], ...accentSeeds, ...generated.slice(1)]) {
     const h = safeHue(toOklch(c).h);
-    if (palette.length < SERIES_COUNT && palette.every((p) => hueGap(safeHue(toOklch(p).h), h) >= 25)) palette.push(c);
+    if (!barred(c) && palette.length < SERIES_COUNT && palette.every((p) => hueGap(safeHue(toOklch(p).h), h) >= 25)) palette.push(c);
   }
-  for (const c of generated) if (palette.length < SERIES_COUNT && !palette.includes(c)) palette.push(c);
+  for (const c of generated) if (!barred(c) && palette.length < SERIES_COUNT && !palette.includes(c)) palette.push(c);
   // Two candidates can solve to one colour; the next candidate takes the slot instead. Last come
   // spares a twelfth of the circle apart, past the colour-vision-safe set: the audit reports any
   // neighbours they leave hard to tell apart, which beats a chart with two series in one colour.
   const baseHue = safeHue(toOklch(seed).h);
   const spares = Array.from({ length: 12 }, (_, k) => oklchToHex(gamutMapOklch({ L: light ? 0.56 : 0.74, C: 0.13, h: (baseHue + 15 + k * 30) % 360 })));
-  const candidates = [...new Set([...palette, ...generated, ...spares])];
+  const candidates = [...new Set([...palette, ...generated, ...spares])].filter((c) => !barred(c));
   const taken = new Set();
   let next = 0;
   for (let i = 0; i < SERIES_COUNT; i += 1) {
@@ -455,9 +474,9 @@ function themeValues(system, mode, roles, ai, brandInk) {
     v.rail = railDecided;
     const darkRail = toOklch(v.rail).L < 0.5;
     const step = darkRail ? 1 : -1;
-    v['rail-hover'] = shiftL(v.rail, 0.05 * step);
-    v['rail-selected'] = shiftL(v.rail, 0.1 * step);
-    v['rail-line'] = shiftL(v.rail, 0.07 * step);
+    v['rail-hover'] = visibleShift(v.rail, 0.05 * step, STEP.hover);
+    v['rail-selected'] = visibleShift(v.rail, 0.1 * step, STEP.selected);
+    v['rail-line'] = visibleShift(v.rail, 0.07 * step, STEP.line);
     const railGrounds = [v.rail, v['rail-hover'], v['rail-selected']];
     const tint = oklchToHex(gamutMapOklch({ L: darkRail ? 0.93 : 0.25, C: 0.04, h: safeHue(toOklch(B[8]).h) }));
     v['rail-text'] = solve('rail-text', tint, railGrounds, 7);
@@ -538,6 +557,8 @@ const statusUsage = (s) => ({
 function contrastFor(name, { railDecided }) {
   const textOn = (on, min = FLOORS.text) => [{ on, min, kind: 'text' }];
   const nonText = (on) => [{ on, min: FLOORS['non-text'], kind: 'non-text' }];
+  // A state against the colour it changes: not a contrast floor, the least step an eye can see.
+  const step = (on, min) => [{ on, min, kind: 'step' }];
   const tags = [...Array.from({ length: SERIES_COUNT }, (_, i) => `tag-${i + 1}`), 'tag-grey'];
   switch (name) {
     case 'text-strong': return textOn([...SURFACES, 'highlight-soft']);
@@ -554,6 +575,9 @@ function contrastFor(name, { railDecided }) {
     case 'on-highlight': return textOn(['highlight']);
     case 'on-danger': return textOn(['danger-solid']);
     case 'chart-compare': return nonText(['surface']);
+    case 'primary-hover': return step(['primary'], STEP.hover);
+    case 'primary-pressed': return step(['primary'], STEP.pressed);
+    case 'brand-hover': return step(['brand'], STEP.hover);
     default: break;
   }
   if (STATUS_FAMILIES.includes(name)) return textOn(['surface', 'surface-subtle', 'canvas', `${name}-surface`]);
@@ -562,15 +586,22 @@ function contrastFor(name, { railDecided }) {
     if (name === 'rail-text' || name === 'rail-text-strong') return textOn(['rail', 'rail-hover', 'rail-selected']);
     if (name === 'rail-muted') return textOn(['rail', 'rail-hover']);
     if (name === 'rail-focus') return nonText(['rail', 'rail-hover', 'rail-selected']);
+    if (name === 'rail-hover') return step(['rail'], STEP.hover);
+    if (name === 'rail-selected') return step(['rail'], STEP.selected);
+    if (name === 'rail-line') return step(['rail'], STEP.line);
   }
   return [];
 }
 
 /** The type styles a working screen needs, sized for density rather than reading. */
-function typeGroups({ displayForTitles }) {
+function typeGroups({ displayForTitles, displayCase = null }) {
   const display = displayForTitles
     ? { family: 'display', fontWeight: 400 }
     : { family: 'sans', fontWeight: 700 };
+  // A display face the brand only ever sets in capitals is set in capitals here too, opened up a little,
+  // because capitals set at a lower-case face's tight tracking crowd.
+  const caps = displayForTitles && displayCase === 'upper';
+  const set = (style) => (caps ? { ...style, letterSpacing: '0.01em', textTransform: 'uppercase' } : style);
   return [
     {
       name: 'Display',
@@ -579,9 +610,9 @@ function typeGroups({ displayForTitles }) {
         ? 'The display face in three places only: the page title, a greeting or full-page headline, and the sign-in hero. One display moment per screen.'
         : 'The display face is not used in product screens; titles are the body face, bold.',
       styles: [
-        { name: 'hero', fontSize: '48px', lineHeight: '52px', fontWeight: display.fontWeight, letterSpacing: '-0.02em', usage: 'Sign-in and onboarding heroes only.' },
-        { name: 'display', fontSize: '36px', lineHeight: '42px', fontWeight: display.fontWeight, letterSpacing: '-0.015em', usage: 'A greeting or a full-page headline.' },
-        { name: 'title', fontSize: '26px', lineHeight: '32px', fontWeight: display.fontWeight, letterSpacing: '-0.01em', usage: 'The page title.' },
+        set({ name: 'hero', fontSize: '48px', lineHeight: '52px', fontWeight: display.fontWeight, letterSpacing: '-0.02em', usage: 'Sign-in and onboarding heroes only.' }),
+        set({ name: 'display', fontSize: '36px', lineHeight: '42px', fontWeight: display.fontWeight, letterSpacing: '-0.015em', usage: 'A greeting or a full-page headline.' }),
+        set({ name: 'title', fontSize: '26px', lineHeight: '32px', fontWeight: display.fontWeight, letterSpacing: '-0.01em', usage: 'The page title.' }),
       ],
     },
     {
@@ -668,7 +699,7 @@ export function checkFonts(fonts) {
   });
 }
 
-export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, source = null, fonts: fontFiles = [], shape = {} } = {}) {
+export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, displayCase = null, charts = {}, source = null, fonts: fontFiles = [], shape = {} } = {}) {
   if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved Brandi system');
 
   // Decided values arrive as people write them: "#fff" as often as "#FFFFFF",
@@ -692,8 +723,10 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   // on a brand fill is the brand's navy rather than a neutral near-black.
   const darkCandidates = [roles.ink?.light, roles.primary?.light, roles.rail?.light, ...(brandColours ?? []).map((c) => c.hex)].filter(Boolean);
   const brandInk = darkCandidates.filter((h) => toOklch(h).L < 0.3).sort((a, b) => toOklch(a).L - toOklch(b).L)[0] ?? null;
-  const light = themeValues(system, 'light', roles, ai, brandInk);
-  const dark = themeValues(system, 'dark', roles, ai, brandInk);
+  // charts.avoid: colours the brand keeps off one theme's grounds (a pink barred from dark, say).
+  const avoid = (m) => (charts?.avoid?.[m] ?? []).map(expand).filter(Boolean);
+  const light = themeValues(system, 'light', roles, ai, brandInk, avoid('light'));
+  const dark = themeValues(system, 'dark', roles, ai, brandInk, avoid('dark'));
   const railDecided = Boolean(roles.rail?.light || roles.rail?.dark);
 
   const primitives = (brandColours ?? [
@@ -761,7 +794,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
     type: {
       fonts: checkFonts(fontFiles),
       families,
-      groups: typeGroups({ displayForTitles }),
+      groups: typeGroups({ displayForTitles, displayCase }),
     },
     spacing: {
       note: '4px base, aligned with Tailwind, so p-5 in code is space-5 in a design. Use the steps; never invent a gap.',

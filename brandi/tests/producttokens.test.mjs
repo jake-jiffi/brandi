@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import * as P from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
+import { toStarterGlobals } from '../scripts/productglobals.mjs';
 import { systemInputFromBrand } from '../scripts/brandfile.mjs';
 import { contrastRatio, toOklch, oklchToHex, gamutMapOklch } from '../scripts/color.mjs';
 
@@ -143,6 +144,50 @@ describe('decided roles', () => {
     for (const n of ['rail-text', 'rail-text-strong', 'rail-muted', 'rail-focus']) {
       assert.ok(audit.rows.some((r) => r.fg === n && r.bg === 'rail'), `${n} is not measured on the rail`);
     }
+  });
+});
+
+describe('states the eye can see, from any base', () => {
+  test('a pure black rail and primary still get a hover, a selected row, a hairline and a press', () => {
+    // Black is the primary in light only: on a dark page a black button would not stand off it.
+    const tokens = P.buildProductTokens(system, { roles: { rail: { light: '#000000', dark: '#000000' }, primary: { light: '#000000' } } });
+    const at = (n, m) => P.resolveColour(tokens, n, m);
+    for (const m of ['light', 'dark']) {
+      // A fixed step of lightness from black came out #000000 to #030303: no visible state at all.
+      assert.ok(contrastRatio(at('rail-hover', m), at('rail', m)) >= P.STEP.hover, `${m} rail hover`);
+      assert.ok(contrastRatio(at('rail-selected', m), at('rail', m)) >= P.STEP.selected, `${m} rail selected`);
+      assert.ok(contrastRatio(at('rail-line', m), at('rail', m)) >= P.STEP.line, `${m} rail line`);
+    }
+    assert.equal(at('primary', 'light').toLowerCase(), '#000000');
+    assert.ok(contrastRatio(at('primary-hover', 'light'), '#000000') >= P.STEP.hover, 'black primary hover');
+    assert.ok(contrastRatio(at('primary-pressed', 'light'), '#000000') >= P.STEP.pressed, 'black primary pressed');
+    const audit = P.auditProductTokens(tokens);
+    assert.ok(audit.rows.some((r) => r.fg === 'rail-selected' && r.bg === 'rail' && r.kind === 'step'), 'the audit measures the step');
+    assert.equal(audit.fails.length, 0, JSON.stringify(audit.fails));
+  });
+});
+
+describe('brand rules the tokens keep', () => {
+  test('a colour the brand bars from dark grounds takes no chart series there, nor does its hue', () => {
+    const accented = buildSystem({ primary: '#1F6F4A', accents: ['#D63384'], type: { display: 'Bitter', body: 'Karla', mono: 'JetBrains Mono' } });
+    const series = (t, m) => Array.from({ length: 6 }, (_, i) => P.resolveColour(t, `series-${i + 1}`, m));
+    const near = (hex) => Math.min(Math.abs(toOklch(hex).h - toOklch('#D63384').h), 360 - Math.abs(toOklch(hex).h - toOklch('#D63384').h)) < 25;
+    const free = P.buildProductTokens(accented, {});
+    assert.ok(series(free, 'dark').some(near), 'without the rule the accent is a dark series');
+    const kept = P.buildProductTokens(accented, { charts: { avoid: { dark: ['#D63384'] } } });
+    assert.equal(series(kept, 'dark').some(near), false, `no dark series in its hue: ${series(kept, 'dark').join(', ')}`);
+    assert.ok(series(kept, 'light').some(near), 'light keeps it');
+    assert.equal(new Set(series(kept, 'dark').map((h) => h.toUpperCase())).size, 6, 'six distinct series still');
+    assert.equal(P.auditProductTokens(kept).fails.length, 0);
+  });
+
+  test('a display face set only in capitals takes them in the title styles, and nowhere else', () => {
+    const caps = P.buildProductTokens(system, { displayCase: 'upper' });
+    const styles = caps.type.groups.flatMap((g) => g.styles);
+    for (const n of ['hero', 'display', 'title']) assert.equal(styles.find((s) => s.name === n).textTransform, 'uppercase', n);
+    assert.equal(styles.find((s) => s.name === 'heading').textTransform, undefined, 'headings keep the body face as it is');
+    assert.equal(P.buildProductTokens(system, {}).type.groups.flatMap((g) => g.styles).find((s) => s.name === 'title').textTransform, undefined);
+    assert.match(toStarterGlobals(caps), /@utility type-title \{[^}]*text-transform: uppercase;/, 'the starter sets it');
   });
 });
 

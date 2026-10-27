@@ -23,6 +23,8 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `roles.focus` | The focus ring colour | The brand colour, solved to 3:1 on every ground |
 | `roles.rail` | A signature navigation surface | None: the rail is a quiet surface |
 | `displayForTitles` | Whether the display face sets page titles | `true` |
+| `displayCase` | `"upper"` when the brand only ever sets its display face in capitals: the hero, display and title styles take capitals, tracked open a little | Unset: the face's own case |
+| `charts.avoid` | Colours the brand keeps off one theme's grounds, `{ "light": [...], "dark": [...] }`: no chart series takes them or their hue there | None |
 | `brandColours` | The brand book's named colours, emitted as `brand-*` | The primary and accents |
 
 A decided role is used exactly as given. If it fails the audit, resolve it with the person (a

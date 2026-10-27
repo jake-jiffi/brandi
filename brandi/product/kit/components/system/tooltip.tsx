@@ -179,15 +179,16 @@ export const Tooltip = React.forwardRef<HTMLSpanElement, TooltipProps>(function 
 export function useTruncated(el: HTMLElement | null) {
   const [cut, setCut] = React.useState(false)
   // New words at the same width resize nothing, so measure after every render as well. Only a label still
-  // on the page counts: wrapping a cut label in its Tooltip replaces it, and the old one measures zero.
+  // on the page counts: wrapping a cut label in its Tooltip replaces it, and the old one measures zero. Any
+  // overflow counts, a single pixel included: the browser draws the ellipsis for it, so the name is cut.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   React.useLayoutEffect(() => {
-    if (el?.isConnected) setCut(el.scrollWidth > el.clientWidth + 1)
+    if (el?.isConnected) setCut(el.scrollWidth > el.clientWidth)
   })
   React.useLayoutEffect(() => {
     if (!el) return
     const measure = () => {
-      if (el.isConnected) setCut(el.scrollWidth > el.clientWidth + 1)
+      if (el.isConnected) setCut(el.scrollWidth > el.clientWidth)
     }
     measure()
     const observer = new ResizeObserver(measure)

@@ -2911,6 +2911,8 @@ async function cmdProduct(flags, positional) {
       name: config.name ?? (name ? `${name} product system` : 'Product system'),
       roles: config.roles ?? {},
       displayForTitles: config.displayForTitles ?? true,
+      displayCase: config.displayCase ?? null,
+      charts: config.charts ?? {},
       brandColours: config.brandColours ?? null,
       fonts: config.fonts ?? [],
       shape: config.shape ?? {},

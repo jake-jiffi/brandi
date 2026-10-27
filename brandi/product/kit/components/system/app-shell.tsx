@@ -153,9 +153,10 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
           </div>
         ) : null}
 
-        {/* Drawn open for a design, the page behind the drawer is hidden, as it is from a screen reader when the
-            drawer is live: the picture is the drawer and its scrim, with no words left under a layer. */}
-        <div data-slot="app-shell-column" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", navInline && "@max-[1024px]/shell:invisible")}>
+        {/* Drawn open for a design, the page behind the drawer is not drawn at all, as it is gone from a screen
+            reader when the drawer is live: the picture is the drawer and its scrim, with no words left under a
+            layer. Hidden rather than invisible, because invisible text still sits on the page at rest. */}
+        <div data-slot="app-shell-column" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", navInline && "@max-[1024px]/shell:hidden")}>
           <div data-slot="app-shell-top" className="shrink-0 @min-[1024px]/shell:hidden">
             {topBar ?? (
               <PhoneTopBar

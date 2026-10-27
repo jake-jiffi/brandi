@@ -96,7 +96,7 @@ function styleUtility(s, fam) {
     `  font-weight: ${s.fontWeight ?? 400};`,
   ];
   if (s.letterSpacing != null) lines.push(`  letter-spacing: ${s.letterSpacing};`);
-  if (s.name === 'eyebrow') lines.push('  text-transform: uppercase;');
+  if (s.name === 'eyebrow' || s.textTransform === 'uppercase') lines.push('  text-transform: uppercase;');
   if (s.name.startsWith('kpi')) lines.push('  font-variant-numeric: tabular-nums;');
   if (fam === 'display') lines.push('  font-synthesis: none;');
   return `@utility type-${s.name} {\n${lines.join('\n')}\n}`;

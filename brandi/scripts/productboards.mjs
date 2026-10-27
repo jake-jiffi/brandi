@@ -80,7 +80,8 @@ function board(system, name, title, body, { height = 900, logic } = {}) {
 export function colourBoard(tokens, system) {
   const audit = auditProductTokens(tokens);
   const ratios = (name) => {
-    const rows = audit.rows.filter((r) => r.fg === name && r.ratio !== null);
+    // A state's step from its base is not a contrast to print beside it.
+    const rows = audit.rows.filter((r) => r.fg === name && r.ratio !== null && r.kind !== 'step');
     const pick = (theme) => rows.filter((r) => r.theme === theme).sort((a, b) => a.ratio - b.ratio)[0];
     const l = pick('light');
     const d = pick('dark');

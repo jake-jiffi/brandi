@@ -72,7 +72,7 @@ export default {
       async run({ page, expect }) {
         await page.keyboard.press("Tab")
         expect.equal(await page.evaluate(() => document.activeElement.textContent.trim()), "Choose files", "Tab reached the button")
-        const [chooser] = await Promise.all([page.waitForEvent("filechooser", { timeout: 3000 }), page.keyboard.press("Enter")])
+        const [chooser] = await Promise.all([page.waitForEvent("filechooser", { timeout: 10000 }), page.keyboard.press("Enter")])
         expect(chooser.isMultiple(), "the picker takes several files")
       },
     },

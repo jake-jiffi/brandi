@@ -116,6 +116,8 @@ export default {
       example: "long",
       async run({ page, scope, expect }) {
         expect(await scope.locator('[data-slot="tag-label"]').evaluate((el) => el.scrollWidth > el.clientWidth), "the long name is cut short")
+        // Said outright, rather than as a 30 s wait: a name cut by a single pixel once got no tooltip at all.
+        expect.equal(await scope.locator('[data-slot="tooltip-trigger"]').count(), 1, "the cut tag has its tooltip")
         expect(await tabTo(page, scope.locator('[data-slot="tooltip-trigger"]')), "Tab reaches the cut tag")
         const tip = page.locator('[data-slot="tooltip-content"]')
         await tip.waitFor({ state: "visible", timeout: 2000 })
