@@ -159,23 +159,56 @@ export function iconBoard(system) {
   return board(system, 'FoundationsIcons1440', 'Icons', body, { logic: boardLogic(`{ icons: (window.${system.global}.ICON_NAMES || []).map((name) => ({ name, size: 24 })) }`) });
 }
 
-/** One board per catalogue group, built from each component's own examples. */
+/**
+ * A component's holes, renamed into its own scope on a group board: `{{rows}}` becomes `{{c3_rows}}`.
+ * Loop variables (`as="a"`) and the board's `theme` stay as they are.
+ */
+export function scopeHoles(markup, prefix) {
+  const locals = new Set([...markup.matchAll(/\sas="([A-Za-z_]\w*)"/g)].map((m) => m[1]));
+  return markup.replace(/\{\{([A-Za-z_]\w*)/g, (hole, root) => (root === 'theme' || locals.has(root) ? hole : `{{${prefix}_${root}`));
+}
+
+/**
+ * One board per catalogue group, built from each component's own examples. Each component keeps its
+ * own scope: its values and logic outputs are prefixed, and its logic runs with its own slice of state.
+ * Merged into one object, two components' keys collided ("three", "groups", "retry") and boards
+ * showed another component's data or failed to render.
+ */
 export function componentBoards(defs, system) {
   const out = [];
   for (const group of GROUPS) {
     const members = defs.filter((d) => d.group === group);
     if (!members.length) continue;
-    const vals = Object.assign({}, ...members.flatMap((d) => d.examples.map((ex) => ex.vals ?? {})));
-    const logicParts = members.filter((d) => d.logic).map((d) => resolveLogicNs(d.logic, system.global));
-    const state = Object.assign({}, ...members.map((d) => d.state ?? {}));
-    const body = members.map((d) => [
-      `<section style="display: flex; flex-direction: column; gap: 20px; padding-top: 32px; border-top: 1px solid var(--line);">`,
-      `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
-      ...d.examples.map((ex) => `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}">${resolveNs(ex.markup, system.global).trim()}</div></div>`),
-      '</section>',
-    ].join('\n')).join('\n');
+    const vals = {};
+    const state = {};
+    const scopes = [];
+    const body = members.map((d, i) => {
+      const prefix = `c${i}`;
+      for (const ex of d.examples) for (const [k, v] of Object.entries(ex.vals ?? {})) vals[`${prefix}_${k}`] = v;
+      if (d.state) state[prefix] = d.state;
+      if (d.logic) scopes.push(`scoped(${JSON.stringify(prefix)}, (self) => ({ ${resolveLogicNs(d.logic, system.global)} }));`);
+      return [
+        `<section style="display: flex; flex-direction: column; gap: 20px; padding-top: 32px; border-top: 1px solid var(--line);">`,
+        `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
+        ...d.examples.map((ex) => `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}">${scopeHoles(resolveNs(ex.markup, system.global).trim(), prefix)}</div></div>`),
+        '</section>',
+      ].join('\n');
+    }).join('\n');
     const name = `Components${pascal(group === 'The assistant' ? 'Assistant' : group)}1440`;
-    const logic = `state = ${JSON.stringify(state)};\nrenderVals() {\n  return Object.assign(${JSON.stringify(vals)}, { theme: this.props.dark ? "dark" : "light" }${logicParts.length ? `, (() => { const self = this; return { ${logicParts.join(', ')} }; })()` : ''});\n}`;
+    const logic = [
+      `state = ${JSON.stringify(state)};`,
+      'renderVals() {',
+      `  const vals = Object.assign(${JSON.stringify(vals)}, { theme: this.props.dark ? "dark" : "light" });`,
+      '  const scoped = (prefix, build) => {',
+      '    const slice = this.state[prefix] || {};',
+      '    const self = { props: this.props, state: slice, setState: (patch) => this.setState({ [prefix]: Object.assign({}, this.state[prefix] || {}, typeof patch === "function" ? patch(this.state[prefix] || {}) : patch) }) };',
+      '    const made = build(self);',
+      '    for (const key in made) vals[prefix + "_" + key] = made[key];',
+      '  };',
+      ...scopes.map((line) => `  ${line}`),
+      '  return vals;',
+      '}',
+    ].join('\n');
     out.push(board(system, name, `Components: ${group === 'The assistant' ? 'the assistant' : group.toLowerCase()}`, body, { logic }));
   }
   return out;

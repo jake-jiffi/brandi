@@ -40,8 +40,21 @@ describe('the boards a system generates for itself', () => {
     assert.deepEqual(boards.map((b) => b.name), ['ComponentsActions1440', 'ComponentsStatus1440']);
     assert.match(boards[0].source, /component-from-global-scope="Acme\.Button"/);
     assert.match(boards[1].source, /To build, not yet proven\./);
-    assert.match(boards[0].source, /"yes":true/);
+    assert.match(boards[0].source, /"c0_yes":true/);
   });
+
+  test('each component keeps its own scope on a group board, so two keys of one name cannot collide', () => {
+    const a = { name: 'Alpha', group: 'Data', job: 'A.', status: 'proven', props: [], state: { open: false }, logic: 'flip: () => self.setState({ open: !self.state.open }), open: self.state.open',
+      examples: [{ id: 'a', title: 'A', markup: '<x-import component-from-global-scope="NS.Alpha" rows="{{rows}}" open="{{open}}"></x-import><sc-for list="{{rows}}" as="a">{{a.name}}</sc-for>', vals: { rows: [1, 2] } }] };
+    const b = { name: 'Beta', group: 'Data', job: 'B.', status: 'proven', props: [], state: { open: true }, logic: 'open: self.state.open',
+      examples: [{ id: 'b', title: 'B', markup: '<x-import component-from-global-scope="NS.Beta" rows="{{rows}}"></x-import>', vals: { rows: 'not an array' } }] };
+    const [data] = B.componentBoards([a, b], { global: 'Acme', namespace: 'acme', name: 'Acme' });
+    assert.match(data.source, /"c0_rows":\[1,2\]/);
+    assert.match(data.source, /"c1_rows":"not an array"/);
+    assert.match(data.source, /rows="\{\{c0_rows\}\}" open="\{\{c0_open\}\}"/);
+    assert.match(data.source, /\{\{a\.name\}\}/, 'a loop variable is left alone');
+    assert.match(data.source, /state = \{"c0":\{"open":false\},"c1":\{"open":true\}\}/, 'each slice of state is its own');
+    assert.equal(B.scopeHoles('{{theme}} {{x.y}}', 'c2'), '{{theme}} {{c2_x.y}}');  });
 
   test('a dark twin imports its light board with the theme flipped', () => {
     const light = B.colourBoard(tokens, system);
