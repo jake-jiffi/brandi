@@ -48,6 +48,7 @@
  *   brandi product round --round N    the round held against the bar, with the judged gates
  *   brandi product specs              check platform specs and report their coverage
  *   brandi product standards          the monthly standards check, and its report
+ *   brandi product drift              canvas against system against code
  *
  * Every command prints a short human summary, and `--json` prints the machine
  * form instead, so the skill can read a result without parsing prose.
@@ -70,6 +71,7 @@ import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs'
 import { runGates, judgeRound, roundMarkdown, WIDTHS } from './productgates.mjs';
 import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
+import { driftCheck, driftReport } from './productdrift.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2796,7 +2798,14 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       The monthly standards check: compare every stamped marker with a fresh
       one (fetched where the plain web serves it, else from --markers), list
       the specs each moved marker touches, mark them stale with --mark-stale,
-      and write the report. A source nobody fetched is "not fetched".`;
+      and write the report. A source nobody fetched is "not fetched".
+
+  brandi product drift [--starter product/starter]
+      Canvas against system against code: the tokens copied into the canvas and
+      the starter, globals.css, every copy of the bundle by checksum, the
+      components and props mounted on boards, the starter's components against
+      the catalogue, board sizes, raw colours typed into boards, and local-only
+      files in the canvas folder. Exits 1 on any difference.`;
 
 async function productSource(flags) {
   if (typeof flags.input === 'string') {
@@ -2985,6 +2994,15 @@ async function cmdProduct(flags, positional) {
     const staled = flags['mark-stale'] ? writeStale(specs, result.changes, date) : [];
     emit([report.split('\n')[2], `Report: ${path.relative(process.cwd(), file)}`, staled.length ? `Marked stale: ${staled.join(', ')}` : ''].filter(Boolean).join('\n'),
       { ok: !result.changes.length && !result.notFetched.length, changes: result.changes, notFetched: result.notFetched, report: path.relative(process.cwd(), file), staled });
+    return;
+  }
+  if (sub === 'drift') {
+    const productDir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
+    if (!existsSync(path.join(productDir, 'tokens.json'))) return fail('No product/tokens.json. Run `brandi product tokens` first.');
+    const result = await driftCheck({ productDir, starter });
+    emit(driftReport(result), { ok: !result.differences.length, differences: result.differences, unchecked: result.unchecked });
+    if (result.differences.length) process.exitCode = 1;
     return;
   }
   return fail(`Unknown product subcommand "${sub}".\n\n${PRODUCT_USAGE}`);

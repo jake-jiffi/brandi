@@ -126,6 +126,8 @@ export function componentReadme(def, system) {
 }
 
 export const resolveNs = (markup, ns) => String(markup).replace(/(["'])NS\./g, `$1${ns}.`);
+// In a definition's logic, NS.<Export> is the component itself, for props that take an element.
+export const resolveLogicNs = (logic, ns) => String(logic).replace(/(^|[^\w.$])NS\./g, `$1window.${ns}.`);
 
 // A preview is a document of its own: one main landmark and one h1, so a page-level accessibility scan
 // reads it as a page. The h1 is visually hidden: the board's frame and the card already name it.
@@ -165,7 +167,7 @@ export function previewBoard(def, system) {
   const logic = [
     `state = ${JSON.stringify(def.state ?? {})};`,
     'renderVals() {',
-    `  return Object.assign(${JSON.stringify(vals)}, { theme: this.props.dark ? "dark" : "light" }${def.logic ? `, (() => { const self = this; return { ${def.logic} }; })()` : ''});`,
+    `  return Object.assign(${JSON.stringify(vals)}, { theme: this.props.dark ? "dark" : "light" }${def.logic ? `, (() => { const self = this; return { ${resolveLogicNs(def.logic, ns)} }; })()` : ''});`,
     '}',
   ].join('\n');
   return artboard({
@@ -224,7 +226,7 @@ export function previewPage(def, system) {
     '</main>',
     '</x-import>',
     '</x-dc>',
-    `<script type="text/x-dc" data-dc-script>\nclass Component extends DCLogic {\n  state = ${JSON.stringify(def.state ?? {})};\n  renderVals() {\n    return Object.assign(${JSON.stringify(vals)}${def.logic ? `, (() => { const self = this; return { ${def.logic} }; })()` : ''});\n  }\n}\n</script>`,
+    `<script type="text/x-dc" data-dc-script>\nclass Component extends DCLogic {\n  state = ${JSON.stringify(def.state ?? {})};\n  renderVals() {\n    return Object.assign(${JSON.stringify(vals)}${def.logic ? `, (() => { const self = this; return { ${resolveLogicNs(def.logic, ns)} }; })()` : ''});\n  }\n}\n</script>`,
     `<script>\n${shim}\n</script>`,
     '</body>',
     '</html>',
