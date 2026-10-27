@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, shrinkStill, BRAND_MARKER } from '../scripts/productbrand.mjs';
+import { cleanSvg, tighten, toInk, scopeClasses, clearSpaceRatio, brandSources, brandConstant, brandModule, shrinkStill, BRAND_MARKER } from '../scripts/productbrand.mjs';
 import { encodePng } from '../scripts/png.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
@@ -37,6 +37,22 @@ describe('a mark, made safe to inline', () => {
     assert.equal(tighten(tight), tight, 'a tight file is left as it is');
     const moved = '<svg viewBox="0 0 100 100"><g transform="translate(10 20)"><rect width="30" height="40" fill="#000"/></g></svg>';
     assert.match(tighten(moved), /viewBox="10 20 30 40"/, 'transforms count');
+  });
+
+  test('a file keeps its class names to itself, so two renditions side by side keep their colours', () => {
+    const navy = '<svg viewBox="0 0 1 1"><style>.cls-1{fill:#1d2b4f}.cls-10{fill:#6b9ee0}</style><path class="cls-1"/><path class="cls-10"/></svg>';
+    const white = '<svg viewBox="0 0 1 1"><style>.cls-1{fill:#fff}</style><path class="cls-1"/></svg>';
+    const a = scopeClasses(navy, 'brand-full-');
+    const b = scopeClasses(white, 'brand-full-on-dark-');
+    assert.match(a, /\.brand-full-cls-1\{fill:#1d2b4f\}\.brand-full-cls-10\{fill:#6b9ee0\}/);
+    assert.match(a, /class="brand-full-cls-1"/);
+    assert.match(b, /\.brand-full-on-dark-cls-1\{fill:#fff\}/);
+    assert.equal(/\.cls-1\b/.test(a + b), false, 'no bare class rule is left to paint the page');
+  });
+
+  test('the one-ink rendition rewrites colours inside a style block without swallowing the next rule', () => {
+    assert.equal(toInk('<svg viewBox="0 0 1 1"><style>.a{fill:#000}.b{fill:#fff;stroke:#111}</style></svg>'),
+      '<svg fill="currentColor" viewBox="0 0 1 1"><style>.a{fill:currentColor}.b{fill:currentColor;stroke:currentColor}</style></svg>');
   });
 
   test("Brandi's clear-space sentence becomes the share of the logo's height", () => {

@@ -62,11 +62,31 @@ export function tighten(svg) {
   return svg.replace(/(<svg\b[^>]*\sviewBox=")[^"]*(")/i, `$1${r(ink.x)} ${r(ink.y)} ${r(ink.width)} ${r(ink.height)}$2`);
 }
 
+/**
+ * A file's class names, prefixed so they are its own. Brand exports style their paths through
+ * `<style>.cls-1 { fill: ... }</style>`, and a `<style>` inside an inlined SVG applies to the whole
+ * page: with the light and dark renditions side by side, the last `.cls-1` painted both, and a navy
+ * wordmark drew white on a light ground.
+ */
+export function scopeClasses(svg, prefix) {
+  const names = new Set();
+  for (const m of svg.matchAll(/\sclass\s*=\s*"([^"]*)"/gi)) for (const n of m[1].split(/\s+/).filter(Boolean)) names.add(n);
+  if (!names.size) return svg;
+  const escape = (n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = svg.replace(/(\sclass\s*=\s*")([^"]*)(")/gi, (_, a, list, b) => `${a}${list.split(/\s+/).filter(Boolean).map((n) => `${prefix}${n}`).join(' ')}${b}`);
+  out = out.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (_, open, css, close) => {
+    let scoped = css;
+    for (const n of names) scoped = scoped.replace(new RegExp(`\\.${escape(n)}(?![\\w-])`, 'g'), `.${prefix}${n}`);
+    return `${open}${scoped}${close}`;
+  });
+  return out;
+}
+
 /** The one-ink rendition from a single-colour master: every ink becomes currentColor, so the mark takes the text colour. */
 export function toInk(svg) {
   let s = svg
     .replace(/\b(fill|stroke)="(?!none|currentColor|url\()[^"]*"/gi, '$1="currentColor"')
-    .replace(/\b(fill|stroke)\s*:\s*(?!none|currentColor|url\()[^;"]+/gi, '$1:currentColor');
+    .replace(/\b(fill|stroke)\s*:\s*(?!none|currentColor|url\()[^;"}]+/gi, '$1:currentColor');
   // An element with no fill paints black, which is not the text colour.
   if (!/<svg\b[^>]*\sfill=/i.test(s)) s = s.replace(/<svg\b/i, '<svg fill="currentColor"');
   return s;
@@ -158,9 +178,9 @@ export function brandConstant(src, { publicDir = null, stills = new Map() } = {}
   for (const [rendition, rel] of Object.entries(src.files ?? {})) {
     if (!RENDITIONS.includes(rendition)) throw new Error(`${src.from} names a mark "${rendition}"; the renditions are ${RENDITIONS.join(', ')}.`);
     // An ink rendition is one colour by definition, so whatever its file's ink, it takes the text colour.
-    if (rel) marks[rendition] = tighten((rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel)));
+    if (rel) marks[rendition] = scopeClasses(tighten((rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel))), `brand-${rendition}-`);
   }
-  if (src.inkFrom && !marks['full-ink']) marks['full-ink'] = tighten(toInk(cleanSvg(read(src.inkFrom, 'the one-ink mark').text, src.inkFrom)));
+  if (src.inkFrom && !marks['full-ink']) marks['full-ink'] = scopeClasses(tighten(toInk(cleanSvg(read(src.inkFrom, 'the one-ink mark').text, src.inkFrom))), 'brand-full-ink-');
 
   const kept = [];
   const logo = {};
@@ -186,7 +206,7 @@ export function brandConstant(src, { publicDir = null, stills = new Map() } = {}
       const out = {};
       for (const [state, rel] of Object.entries(map ?? {})) {
         if (!CHARACTER_STATES.includes(state)) throw new Error(`${src.from} gives the character a "${state}" pose; the states are ${CHARACTER_STATES.join(', ')}.`);
-        if (/\.svg$/i.test(rel)) { out[state] = cleanSvg(read(rel, `the ${state} pose`).text, rel); continue; }
+        if (/\.svg$/i.test(rel)) { out[state] = scopeClasses(cleanSvg(read(rel, `the ${state} pose`).text, rel), `brand-${state}-`); continue; }
         const { file } = read(rel, `the ${state} pose`);
         if (stills.has(file)) { out[state] = stills.get(file); continue; }
         copied.push(file);
@@ -234,4 +254,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { shrinkStill, cleanSvg, tighten, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
+export default { shrinkStill, cleanSvg, tighten, scopeClasses, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
