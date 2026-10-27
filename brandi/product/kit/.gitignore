@@ -1,0 +1,5 @@
+node_modules
+.next
+canvas/dist
+next-env.d.ts
+*.tsbuildinfo

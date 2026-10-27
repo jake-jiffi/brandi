@@ -205,8 +205,10 @@ instructions at publish time: they change between releases.
 
 If there is no `Artifact` tool (Codex, or any session without it), stop before publishing and hand
 over the board files with the system beside them. `node <brandi>/scripts/preview.mjs --dir product/canvas --out <dir>`
-renders boards that use only the tokens. It cannot run the component bundle yet, so a board that
-mounts components comes out empty: say so rather than handing over blank previews.
+renders every board, mounted components included: a board that mounts the system runs on React
+18.3.1 (fetched once into a cache and checked against a pinned hash) and Brandi's runtime shim, with
+the system's built files installed beside the boards under `product/canvas/ds/<namespace>/`. Offline
+with nothing cached, such a board renders without its components and the command says so.
 
 ## Operate (ongoing)
 

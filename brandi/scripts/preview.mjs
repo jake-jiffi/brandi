@@ -36,6 +36,8 @@ import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { ensurePageReact } from './pagereact.mjs';
+
 const run = promisify(execFile);
 
 /**
@@ -81,17 +83,34 @@ export function findChrome() {
  * directory, where the photograph is not, so the page renders a broken-image
  * icon and says nothing about it. A <base> points those back at the source.
  */
-export function toPreviewHtml(source, { width, height, label, base } = {}) {
+/**
+ * Does this artboard need a runtime to look like itself? A board that mounts a design system's
+ * components, imports another board, loops, branches or fills a hole renders empty or shows its
+ * {{holes}} as text when its logic is simply dropped.
+ */
+export function needsRuntime(source) {
+  return /\{\{|<(x-import|dc-import|sc-for|sc-if)\b|(?:href|src)="(?:\.\.\/)*ds\//.test(source);
+}
+
+/** The runtime's script tags, for a board that needs one: the page's React, then the shim. */
+export function runtimeTags({ react, reactDom, shim }) {
+  return [react, reactDom, shim].map((f) => `<script src="${pathToFileURL(f).href}"></script>`).join('');
+}
+
+export const SHIM = path.join(path.dirname(fileURLToPath(import.meta.url)), 'runtime', 'dc-shim.js');
+
+export function toPreviewHtml(source, { width, height, label, base, runtime } = {}) {
+  const frame = width ? `width: ${width}px; ${height ? `min-height: ${height}px;` : ''} overflow: hidden;` : '';
   const shim = `
 <style>
   x-dc { display: block; }
   helmet { display: none; }
   html, body { margin: 0; }
-  ${width ? `body > x-dc { width: ${width}px; ${height ? `min-height: ${height}px;` : ''} overflow: hidden; }` : ''}
+  ${frame ? `body > x-dc { ${frame} }\n  body > [data-dc-root] { ${frame} }` : ''}
 </style>`;
-  let out = source.replace('<script src="./support.js"></script>', shim.trim());
-  // The logic block is classic script referencing a class the runtime defines.
-  out = out.replace(/<script\b[^>]*\bdata-dc-script\b[\s\S]*?<\/script>/g, '');
+  let out = source.replace('<script src="./support.js"></script>', runtime ? `${shim.trim()}\n${runtimeTags(runtime)}` : shim.trim());
+  // Without a runtime, the logic block is classic script referencing a class nothing defines.
+  if (!runtime) out = out.replace(/<script\b[^>]*\bdata-dc-script\b[\s\S]*?<\/script>/g, '');
   if (label) {
     out = out.replace('<body>', `<body>\n<!-- preview of ${label} -->`);
   }
@@ -165,7 +184,7 @@ export async function runChrome(chrome, args, { timeout = 90000, retries = 1 } =
 }
 
 /** Screenshot a standalone HTML file at a fixed window size. */
-export async function screenshot(chrome, htmlPath, pngPath, { width = 1200, height = 2400 } = {}) {
+export async function screenshot(chrome, htmlPath, pngPath, { width = 1200, height = 2400, query = '' } = {}) {
   // No `--user-data-dir`. On a machine where the user already has Chrome open,
   // a second instance asking for a profile contends for it whether that profile
   // is fresh or shared: measured at 2.2 seconds without one against 120 seconds
@@ -178,9 +197,11 @@ export async function screenshot(chrome, htmlPath, pngPath, { width = 1200, heig
     '--no-default-browser-check',
     '--force-device-scale-factor=1',
     '--virtual-time-budget=4000',
+    // A board that imports another reads the sibling file, which a file:// page may not do by default.
+    '--allow-file-access-from-files',
     `--window-size=${width},${height}`,
     `--screenshot=${pngPath}`,
-    pathToFileURL(htmlPath).href,
+    pathToFileURL(htmlPath).href + query,
   ]);
 }
 
@@ -190,23 +211,37 @@ async function mkdtempSafe() {
   return dir;
 }
 
-/** Render one artboard to HTML, and to PNG when a browser is available. */
-export async function previewArtboard(file, { outDir, width, height, png = true } = {}) {
+/**
+ * Render one artboard to HTML, and to PNG when a browser is available. A board that needs a runtime
+ * gets the page's React and the shim; `props` reaches it as ?props= (a dark twin, a state).
+ */
+export async function previewArtboard(file, { outDir, width, height, png = true, props, suffix = '' } = {}) {
   const source = await readFile(file, 'utf8');
-  const stem = path.basename(file).replace(/\.dc\.html$/, '');
+  const stem = path.basename(file).replace(/\.dc\.html$/, '') + suffix;
   const dir = outDir ?? path.dirname(file);
   await mkdir(dir, { recursive: true });
   const htmlPath = path.join(dir, `${stem}.preview.html`);
   const base = pathToFileURL(path.resolve(path.dirname(file)) + path.sep).href;
-  await writeFile(htmlPath, toPreviewHtml(source, { width, height, label: path.basename(file), base }));
+  let runtime = null;
+  let note = null;
+  if (needsRuntime(source)) {
+    try {
+      runtime = { ...(await ensurePageReact()), shim: SHIM };
+    } catch (e) {
+      note = `${path.basename(file)} renders without its runtime: ${e.message}`;
+      console.error(`note: ${note}`);
+    }
+  }
+  await writeFile(htmlPath, toPreviewHtml(source, { width, height, label: path.basename(file), base, runtime }));
 
   let pngPath = null;
   const chrome = findChrome();
+  const query = runtime && props ? `?props=${encodeURIComponent(JSON.stringify(props))}` : '';
   if (png && chrome) {
     pngPath = path.join(dir, `${stem}.png`);
-    await screenshot(chrome, htmlPath, pngPath, { width, height });
+    await screenshot(chrome, htmlPath, pngPath, { width, height, query });
   }
-  return { html: htmlPath, png: pngPath, chrome: Boolean(chrome) };
+  return { html: htmlPath, png: pngPath, chrome: Boolean(chrome), runtime: Boolean(runtime), note, query };
 }
 
 /**
@@ -402,5 +437,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
 
 export default {
   toPreviewHtml, previewArtboard, screenshot, findChrome, runChrome,
-  declaredFrame, manifestFrames, contactSheet, clampFrame, MAX_FRAME,
+  declaredFrame, manifestFrames, contactSheet, clampFrame, MAX_FRAME, needsRuntime, runtimeTags, SHIM,
 };

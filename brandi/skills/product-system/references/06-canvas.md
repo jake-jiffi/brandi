@@ -508,8 +508,7 @@ Through the Design type, in this order.
     the system version it carries, into the round record.
 
 No `Artifact` tool: stop after step 3, and hand over the board files with the system installed
-beside them instead of a link. Until a runtime shim exists, boards that mount components cannot be
-rendered: say so rather than handing over blank previews.
+beside them instead of a link, with the previews `preview.mjs` renders through the runtime shim.
 
 ---
 
@@ -525,10 +524,7 @@ Brandi's canvas layer was built for brand rounds. These changes let it carry a p
 | `canvasManifest` | Carries `kind`, `maxW` and `maxH` on a note, so a `title1` heading is one call, and design system records |
 | `artboard()` | Writes `<title>`, `lang` and the install lines (`title`, `lang`, `system`) |
 | `FRAMES` | `tablet820`, 820 x 1180 |
-
-One gap is left. `preview.mjs` strips the logic block and has no runtime, so a board that mounts
-components renders empty. Until a product preview with a runtime shim exists, say so rather than
-handing over blank previews.
+| `preview.mjs` | Renders a board that mounts components, imports a board, loops, branches or fills a hole through Brandi's runtime shim (`scripts/runtime/dc-shim.js`) on React 18.3.1, the version the canvas supplies. The shim implements the format the type documents; the canvas's own runtime is never copied |
 
 `brandi canvas` reads only the top level of the canvas folder, so it never sends the `ds/` files.
 Leave that as it is: the install copies them server side.

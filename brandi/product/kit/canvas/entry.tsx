@@ -1,0 +1,7 @@
+// The canvas bundle: the system's components under the system's namespace, for boards to mount with
+// <x-import component-from-global-scope="<Namespace>.<Export>">. Built by tools/build-canvas.mjs from
+// the same files the product ships, so a board shows exactly what production renders.
+export * from "@/components/system"
+export { formatNumber, NUMBER_STYLES } from "@/lib/format"
+export { ICON_NAMES } from "@/lib/icons"
+export { Root } from "./root"
