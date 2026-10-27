@@ -35,6 +35,7 @@ export default {
     { name: "invalid", type: "boolean", default: "false", doc: "A danger edge that stays danger when focused. Inside a Field, its error sets this." },
     { name: "disabled, readOnly", type: "boolean", default: "false", doc: "Disabled fades everything. Read-only is a dashed edge and a lock, with no step buttons." },
     { name: "inputMode", type: "string", doc: "numeric for whole numbers and decimal for amounts by default; text only when the range goes below zero, because phone keypads have no minus sign." },
+    { name: "name, readOnly, disabled and the rest", type: "native", doc: "Every native input prop it does not set itself passes through to the input." },
   ],
   notes: {
     Behaviour: [

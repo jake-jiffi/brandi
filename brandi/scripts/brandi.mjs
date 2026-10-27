@@ -2981,7 +2981,7 @@ async function cmdProduct(flags, positional) {
       res.brand ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
       res.placeholder ? "lib/brand.ts still holds the kit's placeholder mark. Name the brand's marks in product.json (brand.marks) or record a logo master." : '',
       '',
-      res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
+      res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : flags.kit ? 'Copied the kit\'s components and tools again, and rewrote the generated files. Next: `brandi product bundle`.' : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
     ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, kept: res.kept, starter: rel });
     return;
   }

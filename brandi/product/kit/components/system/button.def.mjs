@@ -13,6 +13,7 @@ export default {
     { name: "block", type: "boolean", default: "false", doc: "Fills its container's width." },
     { name: "href", type: "string", doc: "Renders a link that looks like a button. Links navigate; buttons act." },
     { name: "disabled", type: "boolean", default: "false", doc: "Faded and unpressable. Say why nearby or in a tooltip." },
+    { name: "onClick, form, name and the rest", type: "native", doc: "Every native button prop passes through to the button." },
   ],
   tables: [
     {

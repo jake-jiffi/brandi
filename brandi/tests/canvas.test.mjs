@@ -123,6 +123,15 @@ describe('artboard()', () => {
 });
 
 describe('validateArtboard: the silent failures', () => {
+  test('a word in example data is not a module statement; a real import or export is', () => {
+    const count = (logic) => (K.validateArtboard(K.artboard({ name: 'Probe', title: 'Probe', body: '<div>x</div>', logic })).errors ?? [])
+      .filter((e) => /classic script/.test(JSON.stringify(e))).length;
+    assert.equal(count('rows = [{ note: "The export to [the bank] failed" }];'), 0, 'example data');
+    assert.equal(count('// import nothing here\nconst a = 1;'), 0, 'a comment');
+    assert.equal(count('import x from "y";'), 1);
+    assert.equal(count('export default 1;'), 1);
+  });
+
   const bad = (body, extra = {}) => K.validateArtboard(K.artboard({ name: 'X', body, ...extra }));
 
   test('catches an expression inside a hole', () => {

@@ -72,6 +72,9 @@ export async function driftCheck({ productDir, starter }) {
   const manifest = existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, 'utf8')) : null;
   const defs = existsSync(path.join(starter, 'components', 'system')) ? await loadDefinitions(path.join(starter, 'components', 'system')) : [];
   const propsOf = new Map(defs.map((d) => [d.name, new Set(d.props.map((p) => p.name))]));
+  // A definition with a row typed "native" passes its element's own props through (placeholder,
+  // readonly, onClick), so a board may set any of them.
+  const native = new Set(defs.filter((d) => d.props.some((p) => p.type === 'native')).map((d) => d.name));
   propsOf.set('Root', new Set(['theme', 'background', 'shortcuts']));
   const boards = existsSync(canvas) ? readdirSync(canvas).filter((f) => f.endsWith('.dc.html')).sort() : [];
   let canvasManifest = null;
@@ -91,7 +94,7 @@ export async function driftCheck({ productDir, starter }) {
         const attr = a[1];
         if (attr === 'component-from-global-scope' || attr.startsWith('aria-') || attr.startsWith('data-')) continue;
         const prop = camel(attr);
-        if (!known.has(prop) && !ALWAYS.has(prop)) add('prop', f, `${target} ${attr}=`, `the definition has no ${prop}`);
+        if (!known.has(prop) && !ALWAYS.has(prop) && !native.has(name)) add('prop', f, `${target} ${attr}=`, `the definition has no ${prop}, and no native row to pass it through`);
       }
     }
     // Board sizes: canvas.json against the board's own $preview.

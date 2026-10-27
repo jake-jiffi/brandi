@@ -46,6 +46,7 @@ export default {
     { name: "size", type: '"sm" | "md" | "lg"', default: '"md"', doc: "32, 36 or 44px square; 40, 44 or 48px on a touch screen." },
     { name: "tooltipOpen", type: "boolean", doc: "Shows the tooltip in place, for a design. Leave it unset in product code." },
     { name: "disabled", type: "boolean", default: "false", doc: "Faded and unpressable. Say why nearby." },
+    { name: "onClick, form, name and the rest", type: "native", doc: "Every native button prop passes through to the button." },
   ],
   tables: [
     {

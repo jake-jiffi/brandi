@@ -43,7 +43,7 @@ export default {
     { name: "invalid", type: "boolean", default: "false", doc: "A danger edge that stays danger when focused. Inside a Field, its error sets this." },
     { name: "disabled", type: "boolean", default: "false", doc: "Faded and unchangeable. Say why in the Field's hint." },
     { name: "readOnly", type: "boolean", default: "false", doc: "A dashed edge and a lock. The hint says where the value comes from and where to change it." },
-    { name: "type, inputMode, autoComplete", type: "string", doc: "Set them, so phones show the right keyboard and browsers can fill the field. Every native input prop passes through." },
+    { name: "type, inputMode, autoComplete", type: "native", doc: "Set them, so phones show the right keyboard and browsers can fill the field. Every native input prop passes through." },
   ],
   notes: {
     Behaviour: [

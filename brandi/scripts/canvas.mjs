@@ -690,7 +690,11 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     } else if (!/class\s+Component\s+extends\s+DCLogic/.test(code)) {
       err('The logic block must declare `class Component extends DCLogic`.', null);
     }
-    if (/\bimport\b|\bexport\b/.test(code)) {
+    // Statements, not words: example data such as "The export to [the bank] failed" is not a module.
+    const statements = code
+      .replace(/"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'|`(?:[^`\\]|\\.)*`/g, (q) => q[0] + q[0])
+      .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, '');
+    if (/(^|[\n;])\s*import\s*[\w{*'"]|(^|[\n;{}])\s*export\s/.test(statements)) {
       err('The logic block is classic script, not a module. import and export will fail.', null);
     }
     if (/\brender\s*\(/.test(code) && !/renderVals/.test(code)) {

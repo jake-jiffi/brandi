@@ -52,6 +52,20 @@ async function product({ drift = false } = {}) {
 }
 
 describe('the drift check', () => {
+  test('a component that passes native props through may take them on a board; one that does not may not', async () => {
+    const { dir, starter } = await product();
+    await writeFile(path.join(starter, 'components', 'system', 'field-box.tsx'), 'export function FieldBox() { return null }\n');
+    await writeFile(path.join(starter, 'components', 'system', 'field-box.def.mjs'), `export default { name: "FieldBox", group: "Inputs", job: "A box.", status: "proven",
+  props: [{ name: "size", type: "string", doc: "Its size." }, { name: "placeholder, readOnly and the rest", type: "native", doc: "Every native input prop passes through." }],
+  examples: [{ id: "a", title: "A", markup: '<x-import component-from-global-scope="NS.FieldBox"></x-import>' }] }\n`);
+    await writeFile(path.join(dir, 'components', 'manifest.json'), JSON.stringify({ exports: ['Button', 'FieldBox', 'Root'] }));
+    await writeFile(path.join(dir, 'canvas', 'Main.dc.html'), artboard({ name: 'Main', system: 'acme', preview: { width: 600, height: 400 }, body: '<x-import component-from-global-scope="Acme.Root" theme="light"><x-import component-from-global-scope="Acme.FieldBox" placeholder="[Search]" readonly="true"></x-import><x-import component-from-global-scope="Acme.Button" on-click="{{go}}">Go</x-import></x-import>' }));
+    const { differences } = await driftCheck({ productDir: dir, starter });
+    const props = differences.filter((d) => d.area === 'prop').map((d) => d.found);
+    assert.deepEqual(props, ['Acme.Button on-click='], 'Button declares no native row; FieldBox does');
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('a product whose canvas, system and code agree has nothing to report', async () => {
     const { dir, starter } = await product();
     const result = await driftCheck({ productDir: dir, starter });
