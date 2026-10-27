@@ -1264,6 +1264,9 @@ function planPages(ctx) {
             const art = shown ?? (L.file ? { kind: L.kind, markup: L.markup } : null);
             const single = inkCount(art) === 1;
             const { list: allowed, made } = allowedFor(v);
+            // A logo made for black carries black in its art. On the merely dark grey its black fill shows
+            // as a shape the guidelines rule out; on black it disappears, as it is meant to.
+            const onBlack = /\bon (true )?black\b/i.test(`${v.name ?? ''} ${v.use ?? ''} ${roleOf(v)}`);
             const fallback = !shown && v.file && L.file;
             const cell = (key, groundName, colour) => {
               if (!allowed.includes(key)) {
@@ -1281,7 +1284,7 @@ function planPages(ctx) {
             };
             return `<div style="display:grid;grid-template-columns:200px repeat(4,minmax(0,1fr));gap:0 4px;align-items:stretch">
               <div style="display:flex;flex-direction:column;justify-content:center;gap:4px;padding-right:16px"><strong style="font-size:16px">${esc(v.name ?? v)}</strong>${v.use ? `<span style="font-size:13px;color:var(--muted);line-height:1.3">${esc(v.use)}</span>` : ''}${fallback ? `<span class="todo" style="font-size:12px">[${PLACEHOLDER}: ${esc(v.file)} not on disk; primary shown]</span>` : ''}</div>
-              ${grounds.map(([groundName, key, g, colour]) => `<div data-ground="${key}" style="background:${g};color:${colour};min-height:${rowH}px;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;border:1px solid var(--rule)">${cell(key, String(groundName).toLowerCase(), colour)}</div>`).join('')}
+              ${grounds.map(([groundName, key, g, colour]) => `<div data-ground="${key}" style="background:${key === 'dark' && onBlack ? '#000000' : g};color:${key === 'dark' && onBlack ? '#ffffff' : colour};min-height:${rowH}px;display:flex;align-items:center;justify-content:center;padding:20px;overflow:hidden;border:1px solid var(--rule)">${cell(key, String(groundName).toLowerCase(), colour)}</div>`).join('')}
             </div>`;
           }).join('')}
         </div>`,

@@ -284,11 +284,13 @@ const SANS_FACE = /\b(sans|grotesk|grotesque|gothic|geometric)\b/i;
 /**
  * The fallback stack behind a display face, read from its name: a condensed sans for a condensed face,
  * a sans for a sans, and a serif otherwise. A condensed display face once fell back to Georgia.
+ * Names are single-quoted: the book and the sheets put a stack inside a double-quoted style attribute,
+ * and a double quote ended the attribute there, taking the face, the size and the weight with it.
  */
 export function displayFallback(face) {
   const name = String(face ?? '');
-  if (CONDENSED_FACE.test(name)) return 'Impact, Haettenschweiler, "Arial Narrow Bold", "Arial Narrow", sans-serif';
-  if (SANS_FACE.test(name)) return 'ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif';
-  return 'Georgia, "Times New Roman", serif';
+  if (CONDENSED_FACE.test(name)) return "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif";
+  if (SANS_FACE.test(name)) return "ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif";
+  return "Georgia, 'Times New Roman', serif";
 }
 

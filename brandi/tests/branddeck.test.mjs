@@ -14,6 +14,7 @@ import { promisify } from 'node:util';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { typographyArtboard } from '../scripts/artboards.mjs';
 import { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PLACEHOLDER, PAGE_W, PAGE_H, registerRowHeight, packRegister, REGISTER_HEIGHT } from '../scripts/branddeck.mjs';
 import { renderBrandBook } from '../scripts/brandbook.mjs';
 import { findChrome, runChrome } from '../scripts/preview.mjs';
@@ -283,6 +284,29 @@ describe('the logo', () => {
     const shield = page.split('<div style="display:grid;grid-template-columns:200px').find((r) => r.includes('>Shield<')) ?? '';
     assert.match(shield, /data-ground="primary"[^>]*>[\s\S]*?id="the-mark"/, 'drawn on the brand colour, as it lists');
     assert.match(shield, /data-ground="dark"[^>]*>[\s\S]*?Not used on dark\. Use Outline, on black/, 'and on dark it names the variant made for black');
+  });
+
+  test('a condensed display face keeps every style attribute whole in the book, the A4 book and the sheets', () => {
+    // The fallback once carried double-quoted names into double-quoted style attributes, which ended each
+    // attribute at the first inner quote and dropped the face, the size and the weight after it.
+    const b = clone(brand);
+    b.identity.type = { ...b.identity.type, display: 'League Gothic' };
+    const sys = buildSystem(systemInputFromBrand(b));
+    const whole = (html, where) => {
+      for (const m of html.matchAll(/style="[^"]*"(.)/g)) assert.match(m[1], /[\s>/]/, `${where}: a style attribute cut short before "${m[0].slice(-60)}"`);
+    };
+    const deck = renderBrandDeck({ brand: b, system: sys, assets: SCRATCH_ASSETS }).html;
+    assert.match(deck, /League Gothic', Impact, Haettenschweiler, 'Arial Narrow Bold'/, 'the condensed fallback is there');
+    whole(deck, 'the book');
+    whole(renderBrandBook({ brand: b, system: sys, assets: SCRATCH_ASSETS }), 'the A4 book');
+    whole(typographyArtboard(sys, { brandName: 'Muddy Paws' }), 'the type sheet');
+  });
+
+  test('a logo made for black is drawn on black in the dark column', () => {
+    const b = clone(brand);
+    b.identity.logo.variants = [{ name: 'Outline, on black', file: 'muddy-paws-primary.svg' }];
+    const page = pageOf(renderBrandDeck({ brand: b, system, assets: SCRATCH_ASSETS }).html, 'variants');
+    assert.match(page, /data-ground="dark" style="background:#000000;color:#ffffff/);
   });
 
   test('the contents fills its columns one at a time to a fixed height, and takes a fourth column before it overflows', () => {
