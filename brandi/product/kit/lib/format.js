@@ -93,7 +93,9 @@ export function formatTime(value, { locale = LOCALE, time = TIME, onTheHour } = 
  * drops them at each end (11am to 10.30pm), "keep" keeps them.
  */
 export function formatTimeRange(a, b, { locale = LOCALE, time = TIME, onTheHour = time.onTheHour } = {}) {
-  const both = a instanceof Date && b instanceof Date ? a.getMinutes() === 0 && b.getMinutes() === 0 : false
+  // On the hour at both ends, given as Dates or as minutes after midnight.
+  const minuteOf = (v) => (v instanceof Date ? v.getMinutes() : typeof v === "number" ? v % 60 : NaN)
+  const both = minuteOf(a) === 0 && minuteOf(b) === 0
   const keepMinutes = onTheHour === "keep" ? true : onTheHour === "pair" ? !both : undefined
   const t = { ...time, onTheHour: onTheHour === "pair" ? "drop" : onTheHour }
   const pa = timeParts(a, { locale, time: t, keepMinutes })

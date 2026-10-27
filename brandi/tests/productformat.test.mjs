@@ -201,6 +201,9 @@ describe('the time formatter', () => {
     assert.equal(formatTimeRange(at(8, 0), at(10, 0), { onTheHour: 'pair' }), '8 to 10 am');
     assert.equal(formatTimeRange(at(8, 0), at(12, 0), { onTheHour: 'pair' }), '8 am to 12 pm');
     assert.equal(formatTimeRange(at(7, 0), at(12, 30), { onTheHour: 'pair' }), '7:00 am to 12:30 pm');
+    // Minutes after midnight read the same as Dates: "pair" once ignored them and kept the minutes.
+    assert.equal(formatTimeRange(480, 600, { onTheHour: 'pair' }), '8 to 10 am');
+    assert.equal(formatTimeRange(420, 750, { onTheHour: 'pair' }), '7:00 am to 12:30 pm');
   });
 
   test("a brand's own way reaches every time: 11am to 10.30pm", () => {

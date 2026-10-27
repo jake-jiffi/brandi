@@ -112,6 +112,26 @@ export default {
   noop: () => undefined`,
   checks: [
     {
+      name: "A control put on the rail draws in the rail's colours, so it reads on a dark rail, in both themes",
+      example: "rail",
+      themes: ["light", "dark"],
+      async run({ scope, expect }) {
+        // A ghost button in the page's ink sat close to invisible on a dark rail.
+        const [inked, rail] = await scope.locator('[data-slot="sidebar"]').first().evaluate((el) => {
+          const probe = document.createElement("span")
+          probe.className = "text-text-strong"
+          const ref = document.createElement("span")
+          ref.style.color = "var(--rail-text-strong)"
+          el.append(probe, ref)
+          const out = [getComputedStyle(probe).color, getComputedStyle(ref).color]
+          probe.remove()
+          ref.remove()
+          return out
+        })
+        expect.equal(inked, rail, "text-strong inside the rail is the rail's strong text")
+      },
+    },
+    {
       name: "One nav landmark named Main holds the lockup, search, the groups, the footer and the account button",
       example: "rail",
       async run({ scope, expect, brand }) {

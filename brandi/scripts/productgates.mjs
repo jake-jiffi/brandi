@@ -144,11 +144,21 @@ export async function collectPages({ productDir, outDir, widths = WIDTHS, only =
 const withTheme = (page) => (page.theme === 'dark' && page.kind !== 'route' ? `${page.url}${page.url.includes('?') ? '&' : '?'}props=${encodeURIComponent('{"dark":true}')}` : page.kind === 'route' && page.theme === 'dark' ? `${page.url}${page.url.includes('?') ? '&' : '?'}theme=dark` : page.url);
 
 /** Run the detector on every page, a few at a time. Returns every finding with where it was. */
-export async function runDetector(pages, detector, { concurrency = 4 } = {}) {
+export async function runDetector(pages, detector, { concurrency = 4, status = httpStatus } = {}) {
   const findings = [];
   const errors = [];
+  // A route that answers 404 is not scanned by the detector, which then reports nothing: that read as
+  // clean. It is listed instead, and axe still covers it.
+  const unscanned = [];
   let next = 0;
-  const one = (page) => new Promise((resolve) => {
+  const one = async (page) => {
+    if (page.kind === 'route') {
+      const code = await status(page.url);
+      if (code >= 400) { unscanned.push({ page: page.label, width: page.width, theme: page.theme, reason: `answers ${code}` }); return; }
+    }
+    await scan(page);
+  };
+  const scan = (page) => new Promise((resolve) => {
     const url = withTheme(page);
     const child = spawn(detector, ['detect', '--json', '--no-config', '--viewport', `${page.width}x${page.height ?? 900}`, url]);
     let out = '';
@@ -165,7 +175,12 @@ export async function runDetector(pages, detector, { concurrency = 4 } = {}) {
   await Promise.all(Array.from({ length: Math.min(concurrency, pages.length) }, async () => {
     while (next < pages.length) await one(pages[next++]);
   }));
-  return { findings, errors };
+  return { findings, errors, unscanned };
+}
+
+/** A page's HTTP status, or 0 when it does not answer. */
+async function httpStatus(url) {
+  try { return (await fetch(url, { redirect: 'manual' })).status; } catch { return 0; }
 }
 
 const nodeScript = (starter, script, args, timeout = 1800000) => {
@@ -258,7 +273,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     widths,
     tokens: { summary: auditSummary(audit), fails: audit.fails.length, pairs: audit.pairs },
     drift: { differences: drift.differences, unchecked: drift.unchecked },
-    detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null },
+    detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null, unscanned: detection.unscanned ?? [] },
     axe: { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, skipped: axe.skipped ?? null, results: (axe.results ?? []).filter((r) => r.violations.length || r.error) },
     checks: { passed: checks.passed, failed: checks.failed },
   };
@@ -310,6 +325,8 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   if (gates.axe.skipped?.rules?.length) lines.push('', `axe ran every rule on the routes. On ${gates.axe.skipped.kinds.map((k) => `${k} pages`).join(' and ')}, which show a page frame more than once, it skipped ${gates.axe.skipped.rules.join(', ')}.`);
   lines.push('', '## Tool versions', '');
   for (const [k, v] of Object.entries(gates.versions)) lines.push(`- ${k}: ${typeof v === 'object' && v ? `${v.version ?? ''} (${v.path ?? ''})` : v ?? 'not found'}`);
+  const unscanned = [...new Set((gates.detector.unscanned ?? []).map((u) => `${u.page} (${u.reason})`))];
+  if (unscanned.length) lines.push('', `The detector did not scan ${unscanned.join(', ')}, at any width; axe covered ${unscanned.length === 1 ? 'it' : 'them'}.`);
   if (gates.detector.findings.length) {
     lines.push('', '## Detector findings', '');
     for (const f of gates.detector.findings) lines.push(`- ${f.page} at ${f.width}, ${f.theme}: ${f.rule} on ${f.selector ?? '?'} (${f.snippet ?? ''})`);

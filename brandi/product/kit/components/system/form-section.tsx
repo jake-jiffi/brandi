@@ -32,7 +32,8 @@ export const FormSection = React.forwardRef<HTMLElement, FormSectionProps>(funct
   return (
     <section ref={ref} data-slot="form-section" data-layout={layout} className={cn("@container", className)} {...rest}>
       {/* Split by the section's own width, never the window's. */}
-      <div className={cn("grid gap-x-8 gap-y-4", layout === "split" && "@min-[640px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
+      {/* items-start: side by side, the fields card is as tall as its fields, not as tall as a long description. */}
+      <div className={cn("grid items-start gap-x-8 gap-y-4", layout === "split" && "@min-[640px]:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]")}>
         <div data-slot="form-section-header" className="flex flex-col gap-1">
           <Heading className={cn(TITLE[level], "text-text-strong")}>{title}</Heading>
           {description != null ? <p className="max-w-measure type-body text-text-muted">{description}</p> : null}

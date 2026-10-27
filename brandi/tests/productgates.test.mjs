@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { judgeRound, roundMarkdown, findDetector, collectPages, BAR, WIDTHS } from '../scripts/productgates.mjs';
+import { judgeRound, roundMarkdown, findDetector, collectPages, runDetector, BAR, WIDTHS } from '../scripts/productgates.mjs';
 
 const clean = () => ({
   round: 3,
@@ -138,3 +138,16 @@ describe('the pages a round scans', () => {
     await rm(dir, { recursive: true, force: true });
   });
 });
+
+describe('a route the detector cannot scan', () => {
+  test('a route that answers 404 is listed as not scanned rather than counted clean, and the record says so', async () => {
+    const pages = [{ kind: 'route', label: 'Page not found', url: 'http://localhost:9/nope', width: 1440, theme: 'light' }];
+    const result = await runDetector(pages, '/no/detector/needed', { status: async () => 404 });
+    assert.deepEqual(result.findings, []);
+    assert.deepEqual(result.unscanned, [{ page: 'Page not found', width: 1440, theme: 'light', reason: 'answers 404' }]);
+    const g = clean();
+    g.detector.unscanned = result.unscanned;
+    assert.match(roundMarkdown(g, judgeRound(g), {}), /The detector did not scan Page not found \(answers 404\), at any width; axe covered it\./);
+  });
+});
+

@@ -21,6 +21,14 @@ export interface SearchFieldProps extends Omit<React.ComponentPropsWithoutRef<"i
   ariaLabel?: string
 }
 
+/** Whether single keys are on, as html[data-shortcuts] says, kept current as Root or Settings changes it. */
+function watchShortcuts(onChange: () => void) {
+  const observer = new MutationObserver(onChange)
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-shortcuts"] })
+  return () => observer.disconnect()
+}
+const shortcutsOn = () => document.documentElement.dataset.shortcuts !== "off"
+
 // Typing in any of these is typing, not a shortcut.
 const EDITABLE = 'input, textarea, select, [contenteditable=""], [contenteditable="true"], [role="textbox"], [role="searchbox"], [role="combobox"], [role="spinbutton"]'
 
@@ -52,6 +60,9 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
     document.addEventListener("keydown", onKeyDown)
     return () => document.removeEventListener("keydown", onKeyDown)
   }, [shortcut])
+  // With single keys off, the key is neither shown nor announced: it would advertise a key that does nothing.
+  const on = React.useSyncExternalStore(watchShortcuts, shortcutsOn, () => true)
+  const key = shortcut && on ? shortcut : undefined
 
   return (
     <div
@@ -73,14 +84,14 @@ export const SearchField = React.forwardRef<HTMLInputElement, SearchFieldProps>(
         placeholder={placeholder}
         // Inside a Field, the Field's label names it instead.
         aria-label={ariaLabelProp ?? ariaLabel ?? (control.field ? undefined : placeholder)}
-        aria-keyshortcuts={shortcut}
+        aria-keyshortcuts={key}
         autoComplete="off"
         disabled={disabled}
         className={cn(inputBare, "peer [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none")}
         {...rest}
         {...control.props}
       />
-      {shortcut ? (
+      {key ? (
         // The advertised key, hidden once the field has focus or a value, and on touch screens.
         <Kbd aria-hidden="true" className="pointer-coarse:hidden peer-focus:hidden peer-[:not(:placeholder-shown)]:hidden">
           {shortcut}

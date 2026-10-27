@@ -172,10 +172,12 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
         data-slot="sidebar"
         data-collapsed={isCollapsed ? "true" : undefined}
         className={cn(
-          "@container/rail flex min-h-0 min-w-0 flex-col text-rail-text",
+          // on-rail: a control a product puts on the rail (a bell by the account, a button in the footer) is a
+          // ghost button in the page's roles, which on a dark rail was close to invisible. The drawer is rail too.
+          "on-rail @container/rail flex min-h-0 min-w-0 flex-col text-rail-text",
           drawer
             ? "size-full"
-            : cn("rounded-lg border border-rail-line bg-rail shadow-xs [--focus:var(--rail-focus)]", collapsed ? "w-(--rail-collapsed)" : "w-full", autoHeight ? "h-auto" : "h-full"),
+            : cn("rounded-lg border border-rail-line bg-rail shadow-xs", collapsed ? "w-(--rail-collapsed)" : "w-full", autoHeight ? "h-auto" : "h-full"),
           className
         )}
       >

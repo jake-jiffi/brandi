@@ -69,6 +69,20 @@ export default {
       },
     },
     {
+      name: "With single keys turned off, the key is neither shown nor announced",
+      example: "shortcut",
+      async run({ page, scope, expect }) {
+        await page.evaluate(() => { document.documentElement.dataset.shortcuts = "off" })
+        const search = scope.getByRole("searchbox", { name: "Search clients" })
+        await page.waitForFunction(() => !document.querySelector('[data-example="shortcut"] [data-slot="kbd"]'), null, { timeout: 2000 }).catch(() => {})
+        expect.equal(await search.getAttribute("aria-keyshortcuts"), null, "no shortcut announced")
+        expect.equal(await scope.locator('[data-slot="kbd"]').count(), 0, "no key shown")
+        await page.evaluate(() => { document.documentElement.dataset.shortcuts = "on" })
+        await scope.locator('[data-slot="kbd"]').waitFor({ timeout: 2000 })
+        expect.equal(await search.getAttribute("aria-keyshortcuts"), "/", "and back when they are on")
+      },
+    },
+    {
       name: "/ focuses it from the page, without typing a slash",
       example: "shortcut",
       async run({ page, scope, expect }) {
