@@ -143,9 +143,10 @@ export function compareMarkers(specs, fresh) {
   for (const [key, entry] of [...stampedBy].sort(([a], [b]) => a.localeCompare(b, 'en', { numeric: true }))) {
     const now = fresh[key];
     if (!now || now.error || !now.marker) { notFetched.push({ key, reason: now?.error ?? 'not fetched this run' }); continue; }
-    const moved = [...entry.was].filter((w) => w !== now.marker);
-    if (moved.length) changes.push({ key, was: [...entry.was].join(', '), now: now.marker, specs: [...new Set(entry.specs)].sort(), level: now.level ?? null, note: now.note ?? null });
-    else unchanged.push(key);
+    const verdicts = [...entry.was].map((w) => markerMoved(w, now.marker));
+    if (verdicts.some((v) => v.verdict === 'moved')) changes.push({ key, was: [...entry.was].join(', '), now: now.marker, specs: [...new Set(entry.specs)].sort(), level: now.level ?? null, note: now.note ?? null });
+    else if (verdicts.every((v) => v.verdict === 'same')) unchanged.push(key);
+    else notFetched.push({ key, reason: verdicts.find((v) => v.verdict === 'unchecked').reason });
   }
   return { changes, notFetched, unchanged };
 }
@@ -202,6 +203,49 @@ export function toDay(text) {
   return null;
 }
 const DATE = /(20\d{2}-\d{2}-\d{2})/;
+
+const MONTH = '(January|February|March|April|May|June|July|August|September|October|November|December)';
+const iso = (y, month, d) => `${y}-${String(MONTHS.indexOf(month.toLowerCase()) + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+/** Every date a marker names, as YYYY-MM-DD, oldest first: 2024-12-12, 12 December 2024 and December 12, 2024 alike. */
+export function datesIn(text) {
+  const s = String(text ?? '');
+  const out = [...s.matchAll(/\b(20\d{2})-(\d{2})-(\d{2})\b/g)].map((m) => `${m[1]}-${m[2]}-${m[3]}`);
+  for (const m of s.matchAll(new RegExp(`\\b(\\d{1,2}) ${MONTH} (20\\d{2})\\b`, 'g'))) out.push(iso(m[3], m[2], m[1]));
+  for (const m of s.matchAll(new RegExp(`\\b${MONTH} (\\d{1,2}), (20\\d{2})\\b`, 'g'))) out.push(iso(m[3], m[1], m[2]));
+  return [...new Set(out)].sort();
+}
+
+const availability = (s) => new Map([...String(s).matchAll(/\b(iOS|iPadOS|Mac Catalyst|macOS|tvOS|visionOS|watchOS) (\d+(?:\.\d+)*)\+/g)].map((m) => [m[1], m[2]]));
+
+/**
+ * Has a source moved since a spec recorded it? A marker is written for people ("Recommendation
+ * 2024-12-12, errata 2026-10-01", "iOS 13.0+, macOS 10.15+") and read by machine (a status line, every
+ * platform an API lists), so the two are compared by what they assert, never as strings. A string
+ * comparison marked every spec stale on the first run.
+ *
+ * Dates: moved when the page now names a date later than any on record. Availability: moved when a
+ * platform version on record is gone or different, or the API is now deprecated. Nothing comparable
+ * on record ("undated", "macOS"), or a page that no longer shows a date: unchecked, with the reason.
+ */
+export function markerMoved(recorded, fetched) {
+  const r = String(recorded ?? '').trim();
+  const f = String(fetched ?? '').trim();
+  if (r === f) return { verdict: 'same' };
+  const ra = availability(r);
+  if (ra.size) {
+    const fa = availability(f);
+    if (!fa.size) return { verdict: 'unchecked', reason: `the page lists no platform versions now (it read "${f}"): read it by hand` };
+    if (/deprecated/i.test(f) && !/deprecated/i.test(r)) return { verdict: 'moved' };
+    return [...ra].every(([platform, version]) => fa.get(platform) === version) ? { verdict: 'same' } : { verdict: 'moved' };
+  }
+  const rd = datesIn(r);
+  if (rd.length) {
+    const fd = datesIn(f);
+    if (!fd.length) return { verdict: 'unchecked', reason: `the page shows no date now (it read "${f}"): read it by hand` };
+    return fd.at(-1) > rd.at(-1) ? { verdict: 'moved' } : { verdict: 'same' };
+  }
+  return { verdict: 'unchecked', reason: `no date or version on record ("${r}"), so there is nothing to compare. This run read "${f}": put that in the registry to track the page` };
+}
 
 /**
  * Read one source's marker the way the reference says its owner publishes it. Returns { marker }

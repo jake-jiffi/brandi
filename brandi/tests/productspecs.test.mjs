@@ -75,6 +75,35 @@ describe('the monthly standards check', () => {
     assert.match(report, /- APL-4: answered 503\. Unchecked, not unchanged\./);
   });
 
+  test('markers are compared by what they assert, so a first run does not mark every spec stale', () => {
+    const same = [
+      ['Recommendation 2024-12-12, errata 2026-10-01', 'W3C Recommendation 12 December 2024; errata 2026-10-01'],
+      ['iOS 26.0+, macOS 26.0+', 'iOS 26.0+, iPadOS 26.0+, Mac Catalyst 26.0+, macOS 26.0+'],
+      ['updated 2026-10-23', '2026-10-23'],
+      ['2026-09-09, new page', '2026-09-09'],
+    ];
+    const moved = [
+      ['Recommendation 2024-12-12, errata 2026-10-01', 'W3C Recommendation 12 December 2024; errata 2027-02-01'],
+      ['iOS 26.0+, macOS 26.0+', 'iOS 26.0+, macOS 26.1+'],
+      ['iOS 13.0+, macOS 10.15+', 'iOS 13.0+, macOS 10.15+ deprecated 27.0'],
+      ['`ms.date` 2026-10-07', '2026-11-02'],
+    ];
+    for (const [was, now] of same) assert.equal(S.markerMoved(was, now).verdict, 'same', `${was} | ${now}`);
+    for (const [was, now] of moved) assert.equal(S.markerMoved(was, now).verdict, 'moved', `${was} | ${now}`);
+  });
+
+  test('a marker with nothing to compare is unchecked: never unchanged, never stale', () => {
+    const undated = S.markerMoved('undated', 'text 1a2b3c4d5e6f');
+    assert.equal(undated.verdict, 'unchecked');
+    assert.match(undated.reason, /put that in the registry/);
+    assert.equal(S.markerMoved('2025-06-09', 'text 1a2b3c4d5e6f').verdict, 'unchecked', 'a page that stopped showing a date');
+    const apg = { ...spec, stamp: { ...spec.stamp, sources: [{ key: 'WEB-3', url: 'https://www.w3.org/WAI/ARIA/apg/patterns/button/', marker: 'undated' }] } };
+    const result = S.compareMarkers([apg], { 'WEB-3': { marker: 'text 1a2b3c4d5e6f' } });
+    assert.deepEqual(result.changes, []);
+    assert.deepEqual(result.unchanged, []);
+    assert.deepEqual(result.notFetched.map((n) => n.key), ['WEB-3']);
+  });
+
   test('marking a spec stale changes its status and nothing else', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-specs-'));
     await cp(FIXTURE, dir, { recursive: true });

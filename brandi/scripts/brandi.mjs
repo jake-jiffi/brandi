@@ -3103,8 +3103,13 @@ async function cmdProduct(flags, positional) {
       const keys = [...new Set(specs.flatMap((sp) => (sp.stamp?.sources ?? []).map((x) => x.key)))];
       for (const key of keys) {
         if (fresh[key]?.marker) continue;
-        const url = specs.flatMap((sp) => sp.stamp?.sources ?? []).find((x) => x.key === key)?.url ?? sources.get(key)?.url;
-        fresh[key] = url ? await fetchMarker(key, url) : { error: 'no URL' };
+        // A row can name more than one page (a spec and its errata): read them all, so a move on any shows.
+        const stamped = specs.flatMap((sp) => sp.stamp?.sources ?? []).find((x) => x.key === key)?.url;
+        const urls = [...new Set([stamped, ...(sources.get(key)?.urls ?? [])].filter(Boolean))];
+        const read = [];
+        for (const url of urls) read.push(await fetchMarker(key, url));
+        const markers = read.filter((r) => r.marker).map((r) => r.marker);
+        fresh[key] = !urls.length ? { error: 'no URL' } : markers.length ? { marker: markers.join('; ') } : read[0];
       }
     }
     const result = compareMarkers(specs, fresh);

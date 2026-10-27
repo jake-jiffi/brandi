@@ -603,6 +603,13 @@ a markers file (`{ "MAT-5": { "marker": "...", "level": "Review", "note": "the o
 It writes the report below to `product/platform/standards-<date>.md`; `--mark-stale` sets
 `status: stale since <date>` on every spec a moved marker touches.
 
+Markers are compared by what they assert, not as text. A marker that names dates has moved when the
+page now names a later one. One that names platform versions ("iOS 26.0+, macOS 26.0+") has moved
+when a recorded version changes or the API turns deprecated; extra platforms on the page are not a
+move. A row with several pages (a spec and its errata) is read page by page. A marker with no date
+or version to compare ("undated", "macOS") is reported as unchecked with what the page showed,
+never as unchanged: put that reading in the registry and the next run can track it.
+
 ### 5.1 What to fetch
 
 | Owner | Fetch | Read this marker | Note |
