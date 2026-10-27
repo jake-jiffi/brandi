@@ -36,6 +36,13 @@ const DropdownMenuTrigger = React.forwardRef(function DropdownMenuTrigger({
   )
 })
 
+// Patched (07-starter.md, dropdown-menu): the system's material and a layer above dialogs and sheets,
+// so a menu opened inside one shows over it. As wide as its trigger at least, 192px at least, and
+// moving only under motion-safe. It closes at once, because Radix keeps a layer live while an exit
+// animation plays and an Escape pressed during it would be swallowed. Shared with a menu drawn in place.
+const dropdownMenuPanelClass =
+  "min-w-[max(12rem,var(--radix-dropdown-menu-trigger-width,0px))] max-w-80 overflow-x-hidden overflow-y-auto rounded-md border border-line bg-surface-raised p-1 text-text shadow-md"
+
 const DropdownMenuContent = React.forwardRef(function DropdownMenuContent({
   className,
   align = "start",
@@ -49,7 +56,8 @@ const DropdownMenuContent = React.forwardRef(function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "cn-menu-target cn-menu-translucent z-50 max-h-(--radix-dropdown-menu-content-available-height) w-(--radix-dropdown-menu-trigger-width) min-w-32 origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          dropdownMenuPanelClass,
+          "z-(--z-popover) max-h-(--radix-dropdown-menu-content-available-height) origin-(--radix-dropdown-menu-content-transform-origin) animation-duration-(--duration-base) ease-standard data-[state=closed]:overflow-hidden data-open:animate-in data-open:fade-in-0 motion-safe:data-open:zoom-in-95 data-[side=bottom]:motion-safe:slide-in-from-top-2 data-[side=left]:motion-safe:slide-in-from-right-2 data-[side=right]:motion-safe:slide-in-from-left-2 data-[side=top]:motion-safe:slide-in-from-bottom-2",
           className
         )}
         {...props}
@@ -58,6 +66,15 @@ const DropdownMenuContent = React.forwardRef(function DropdownMenuContent({
     </DropdownMenuPrimitive.Portal>
   )
 })
+
+// Patched (07-starter.md, dropdown-menu): the option in hand takes the hover tint and a 1px inset edge
+// in line-control, and from the keyboard a 2px ring drawn inside it, because the menu scrolls and would
+// clip one drawn outside. 36px tall, 44px on touch. Destructive options in danger text. Disabled
+// options stay visible and do nothing. Shared with a menu drawn in place on a canvas.
+const dropdownMenuItemClass =
+  "group/dropdown-menu-item relative flex min-h-9 items-center gap-2.5 rounded-control px-2.5 py-1.5 type-body text-text select-none focus-visible:outline-offset-[-2px] data-highlighted:bg-hover data-highlighted:shadow-[inset_0_0_0_1px_var(--line-control)] data-inset:pl-9 data-[variant=destructive]:text-danger data-disabled:pointer-events-none data-disabled:opacity-50 pointer-coarse:min-h-11 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+const dropdownMenuLabelClass = "px-2.5 pt-2.5 pb-1 type-eyebrow text-text-subtle data-inset:pl-9"
+const dropdownMenuSeparatorClass = "-mx-1 my-1 h-px bg-line"
 
 const DropdownMenuGroup = React.forwardRef(function DropdownMenuGroup({
   ...props
@@ -82,10 +99,7 @@ const DropdownMenuItem = React.forwardRef(function DropdownMenuItem({
       data-slot="dropdown-menu-item"
       data-inset={inset}
       data-variant={variant}
-      className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-8 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
-        className
-      )}
+      className={cn(dropdownMenuItemClass, className)}
       {...props}
       ref={ref}
     />
@@ -105,16 +119,14 @@ const DropdownMenuCheckboxItem = React.forwardRef(function DropdownMenuCheckboxI
     <DropdownMenuPrimitive.CheckboxItem
       data-slot="dropdown-menu-checkbox-item"
       data-inset={inset}
-      className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(dropdownMenuItemClass, className)}
       checked={checked}
       {...props}
       ref={ref}
     >
+      {/* Patched (07-starter.md, dropdown-menu): the check leads, in the icon's place, so labels line up. */}
       <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        className="pointer-events-none flex size-4 shrink-0 items-center justify-center"
         data-slot="dropdown-menu-checkbox-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
@@ -151,15 +163,13 @@ const DropdownMenuRadioItem = React.forwardRef(function DropdownMenuRadioItem({
     <DropdownMenuPrimitive.RadioItem
       data-slot="dropdown-menu-radio-item"
       data-inset={inset}
-      className={cn(
-        "relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-8 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      className={cn(dropdownMenuItemClass, className)}
       {...props}
       ref={ref}
     >
+      {/* Patched (07-starter.md, dropdown-menu): the check leads, in the icon's place, so labels line up. */}
       <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        className="pointer-events-none flex size-4 shrink-0 items-center justify-center"
         data-slot="dropdown-menu-radio-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
@@ -183,10 +193,8 @@ const DropdownMenuLabel = React.forwardRef(function DropdownMenuLabel({
     <DropdownMenuPrimitive.Label
       data-slot="dropdown-menu-label"
       data-inset={inset}
-      className={cn(
-        "px-2 py-1.5 text-xs font-medium text-muted-foreground data-inset:pl-8",
-        className
-      )}
+      // Patched (07-starter.md, dropdown-menu): group labels in the eyebrow style, lined up with the options' text.
+      className={cn(dropdownMenuLabelClass, className)}
       {...props}
       ref={ref}
     />
@@ -200,7 +208,8 @@ const DropdownMenuSeparator = React.forwardRef(function DropdownMenuSeparator({
   return (
     <DropdownMenuPrimitive.Separator
       data-slot="dropdown-menu-separator"
-      className={cn("-mx-1 my-1 h-px bg-border", className)}
+      // Patched (07-starter.md, dropdown-menu): the system's hairline.
+      className={cn(dropdownMenuSeparatorClass, className)}
       {...props}
       ref={ref}
     />
@@ -242,10 +251,8 @@ const DropdownMenuSubTrigger = React.forwardRef(function DropdownMenuSubTrigger(
     <DropdownMenuPrimitive.SubTrigger
       data-slot="dropdown-menu-sub-trigger"
       data-inset={inset}
-      className={cn(
-        "flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-8 data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        className
-      )}
+      // Patched (07-starter.md, dropdown-menu): an option like the others, in hand while its menu is open.
+      className={cn(dropdownMenuItemClass, "data-open:bg-hover", className)}
       {...props}
       ref={ref}
     >
@@ -264,8 +271,10 @@ const DropdownMenuSubContent = React.forwardRef(function DropdownMenuSubContent(
   return (
     <DropdownMenuPrimitive.SubContent
       data-slot="dropdown-menu-sub-content"
+      // Patched (07-starter.md, dropdown-menu): the same material and layer as the menu it opened from.
       className={cn(
-        "cn-menu-target cn-menu-translucent z-50 min-w-[96px] origin-(--radix-dropdown-menu-content-transform-origin) overflow-hidden rounded-md bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+        dropdownMenuPanelClass,
+        "z-(--z-popover) origin-(--radix-dropdown-menu-content-transform-origin) animation-duration-(--duration-base) ease-standard data-open:animate-in data-open:fade-in-0 motion-safe:data-open:zoom-in-95",
         className
       )}
       {...props}
@@ -290,4 +299,9 @@ export {
   DropdownMenuSub,
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
+  // Patched (07-starter.md, dropdown-menu): the classes a menu drawn in place on a canvas shares.
+  dropdownMenuItemClass,
+  dropdownMenuLabelClass,
+  dropdownMenuPanelClass,
+  dropdownMenuSeparatorClass,
 }

@@ -35,6 +35,9 @@ function SheetPortal({
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
 }
 
+// Patched (07-starter.md, sheet): the scrim token, without the stock blur that review took out. The
+// sheet and its scrim come in with motion and close at once: Radix keeps a layer live while an exit
+// animation plays, so an Escape pressed during it would be swallowed instead of reaching the layer beneath.
 const SheetOverlay = React.forwardRef(function SheetOverlay({
   className,
   ...props
@@ -43,7 +46,7 @@ const SheetOverlay = React.forwardRef(function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 z-(--z-sheet) bg-scrim animation-duration-(--duration-slow) data-open:animate-in data-open:fade-in-0",
         className
       )}
       {...props}
@@ -52,24 +55,36 @@ const SheetOverlay = React.forwardRef(function SheetOverlay({
   )
 })
 
+// Patched (07-starter.md, sheet): the system's material (raised surface, radius-lg, shadow-xl), shared
+// with a sheet drawn in place on a canvas.
+const sheetPanelClass = "flex w-full max-w-[440px] flex-col rounded-lg bg-surface-raised text-text shadow-xl"
+
+// Patched (07-starter.md, sheet): inset 8px from the screen's edges like the rail, never wider than the
+// screen less that inset, sliding in only under motion-safe. overlayProps lets the scrim carry the
+// theme of the place the sheet opened from.
 const SheetContent = React.forwardRef(function SheetContent({
   className,
   children,
   side = "right",
   showCloseButton = true,
+  closeLabel = "Close",
+  overlayProps,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  closeLabel?: string
+  overlayProps?: React.ComponentProps<typeof SheetPrimitive.Overlay> & Record<`data-${string}`, string | undefined>
 }, ref: React.ForwardedRef<any>) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay {...overlayProps} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-          "fixed z-50 flex flex-col gap-4 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-lg transition duration-200 ease-in-out data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-r data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-l data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-[side=bottom]:data-open:slide-in-from-bottom-10 data-[side=left]:data-open:slide-in-from-left-10 data-[side=right]:data-open:slide-in-from-right-10 data-[side=top]:data-open:slide-in-from-top-10 data-closed:animate-out data-closed:fade-out-0 data-[side=bottom]:data-closed:slide-out-to-bottom-10 data-[side=left]:data-closed:slide-out-to-left-10 data-[side=right]:data-closed:slide-out-to-right-10 data-[side=top]:data-closed:slide-out-to-top-10",
+          sheetPanelClass,
+          "fixed z-(--z-sheet) animation-duration-(--duration-slow) ease-standard data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:max-w-none data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:w-[calc(100%-1rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:w-[calc(100%-1rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:max-w-none data-open:animate-in data-open:fade-in-0 data-[side=bottom]:motion-safe:data-open:slide-in-from-bottom-10 data-[side=left]:motion-safe:data-open:slide-in-from-left-10 data-[side=right]:motion-safe:data-open:slide-in-from-right-10 data-[side=top]:motion-safe:data-open:slide-in-from-top-10",
           className
         )}
         {...props}
@@ -78,14 +93,8 @@ const SheetContent = React.forwardRef(function SheetContent({
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-4 right-4"
-              size="icon-sm"
-            >
-              <XIcon
-              />
-              <span className="sr-only">Close</span>
+            <Button variant="ghost" size="icon-sm" aria-label={closeLabel} className={sheetCloseClass}>
+              <XIcon />
             </Button>
           </SheetPrimitive.Close>
         )}
@@ -94,11 +103,16 @@ const SheetContent = React.forwardRef(function SheetContent({
   )
 })
 
+// Patched (07-starter.md, sheet): centred on the title's first line (28px) inside 24px of padding, with
+// the X lined up on the content's right edge. 32px, 40px on touch.
+const sheetCloseClass = "absolute top-6 right-4 -mt-0.5 text-text-muted hover:text-text-strong pointer-coarse:top-5 pointer-coarse:right-3"
+
 const SheetHeader = React.forwardRef(function SheetHeader({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn("flex flex-col gap-1.5 p-4", className)}
+      // Patched (07-starter.md, sheet): the system's padding, with room for the close button.
+      className={cn("flex flex-col gap-1.5 px-6 pt-6 pb-4", className)}
       {...props}
       ref={ref}
     />
@@ -109,12 +123,17 @@ const SheetFooter = React.forwardRef(function SheetFooter({ className, ...props 
   return (
     <div
       data-slot="sheet-footer"
-      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      // Patched (07-starter.md, sheet): secondary then primary on the right, above a hairline.
+      className={cn("mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-line px-6 py-4", className)}
       {...props}
       ref={ref}
     />
   )
 })
+
+// Patched (07-starter.md, sheet): the system's type, balanced and without stragglers, shared with a sheet drawn in place on a canvas.
+const sheetTitleClass = "type-heading-lg text-balance text-text-strong"
+const sheetDescriptionClass = "type-body text-pretty text-text-muted"
 
 const SheetTitle = React.forwardRef(function SheetTitle({
   className,
@@ -123,7 +142,7 @@ const SheetTitle = React.forwardRef(function SheetTitle({
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn("cn-font-heading font-medium text-foreground", className)}
+      className={cn(sheetTitleClass, className)}
       {...props}
       ref={ref}
     />
@@ -137,7 +156,7 @@ const SheetDescription = React.forwardRef(function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-sm text-muted-foreground", className)}
+      className={cn(sheetDescriptionClass, className)}
       {...props}
       ref={ref}
     />
@@ -153,4 +172,9 @@ export {
   SheetFooter,
   SheetTitle,
   SheetDescription,
+  // Patched (07-starter.md, sheet): the classes a sheet drawn in place on a canvas shares.
+  sheetCloseClass,
+  sheetDescriptionClass,
+  sheetPanelClass,
+  sheetTitleClass,
 }

@@ -57,9 +57,11 @@ function CommandDialog({
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
+      {/* Patched (07-starter.md, command): near the top on every screen, through the dialog's own placement. */}
       <DialogContent
+        placement="top"
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
+          "overflow-hidden p-0",
           className
         )}
         showCloseButton={showCloseButton}

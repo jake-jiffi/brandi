@@ -11,7 +11,8 @@ import { ChevronRightIcon, MoreHorizontalIcon } from "lucide-react"
 const Breadcrumb = React.forwardRef(function Breadcrumb({ className, ...props }: React.ComponentProps<"nav">, ref: React.ForwardedRef<any>) {
   return (
     <nav
-      aria-label="breadcrumb"
+      // Patched (07-starter.md, breadcrumb): a nav named Breadcrumb, in sentence case.
+      aria-label="Breadcrumb"
       data-slot="breadcrumb"
       className={cn(className)}
       {...props}
@@ -25,7 +26,8 @@ const BreadcrumbList = React.forwardRef(function BreadcrumbList({ className, ...
     <ol
       data-slot="breadcrumb-list"
       className={cn(
-        "flex flex-wrap items-center gap-1.5 text-sm wrap-break-word text-muted-foreground sm:gap-2.5",
+        // Patched (07-starter.md, breadcrumb): the system's type, and one gap at every width (no viewport query).
+        "flex flex-wrap items-center gap-x-1.5 gap-y-1 type-body wrap-break-word text-text-muted",
         className
       )}
       {...props}
@@ -57,7 +59,8 @@ const BreadcrumbLink = React.forwardRef(function BreadcrumbLink({
   return (
     <Comp
       data-slot="breadcrumb-link"
-      className={cn("transition-colors hover:text-foreground", className)}
+      // Patched (07-starter.md, breadcrumb): a 24px target on every pointer, the WCAG minimum for a link in a trail.
+      className={cn("inline-flex min-h-6 items-center rounded-xs underline-offset-4 transition-colors duration-(--duration-fast) hover:text-text-strong hover:underline", className)}
       {...props}
       ref={ref}
     />
@@ -68,10 +71,9 @@ const BreadcrumbPage = React.forwardRef(function BreadcrumbPage({ className, ...
   return (
     <span
       data-slot="breadcrumb-page"
-      role="link"
-      aria-disabled="true"
+      // Patched (07-starter.md, breadcrumb): the current page is plain text with aria-current, not a disabled link.
       aria-current="page"
-      className={cn("font-normal text-foreground", className)}
+      className={cn("inline-flex min-h-6 items-center text-text", className)}
       {...props}
       ref={ref}
     />
@@ -88,7 +90,8 @@ const BreadcrumbSeparator = React.forwardRef(function BreadcrumbSeparator({
       data-slot="breadcrumb-separator"
       role="presentation"
       aria-hidden="true"
-      className={cn("[&>svg]:size-3.5", className)}
+      // Patched (07-starter.md, breadcrumb): the separator in the subtle text colour.
+      className={cn("flex text-text-subtle [&>svg]:size-3.5", className)}
       {...props}
       ref={ref}
     >

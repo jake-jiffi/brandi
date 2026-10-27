@@ -37,6 +37,9 @@ const DialogClose = React.forwardRef(function DialogClose({
       ref={ref} />
 })
 
+// Patched (07-starter.md, dialog): the scrim token, without the stock blur that review took out. The
+// dialog and its scrim fade in and close at once: Radix keeps a layer live while an exit animation
+// plays, so an Escape pressed during the fade would be swallowed instead of reaching the layer beneath.
 const DialogOverlay = React.forwardRef(function DialogOverlay({
   className,
   ...props
@@ -45,7 +48,7 @@ const DialogOverlay = React.forwardRef(function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-(--z-dialog) bg-scrim animation-duration-(--duration-slow) data-open:animate-in data-open:fade-in-0",
         className
       )}
       {...props}
@@ -54,50 +57,75 @@ const DialogOverlay = React.forwardRef(function DialogOverlay({
   )
 })
 
+// Patched (07-starter.md, dialog): the system's material (raised surface, radius-lg, shadow-xl), shared
+// with a dialog drawn in place on a canvas.
+const dialogPanelClass =
+  "relative flex w-full max-w-[520px] flex-col rounded-lg bg-surface-raised p-6 text-text shadow-xl @max-[639px]:data-[placement=center]:max-w-none @max-[639px]:data-[placement=center]:rounded-b-none @max-[639px]:data-[placement=center]:pb-[calc(var(--space-6)+env(safe-area-inset-bottom))]"
+
+// Patched (07-starter.md, dialog): the content sits inside the scrim, and the scrim is a container the
+// size of the screen, so the dialog measures the screen without a viewport query. Centred on a wide
+// screen; under 640px it rises from the bottom, full width, clear of the safe area. placement="top"
+// keeps it near the top on every screen, for the command menu, because a phone keyboard takes the
+// bottom half. overlayProps lets the scrim, and the dialog inside it, carry the theme of the place it
+// opened from.
 const DialogContent = React.forwardRef(function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeLabel = "Close",
+  placement = "center",
+  overlayProps,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  closeLabel?: string
+  placement?: "center" | "top"
+  overlayProps?: React.ComponentProps<typeof DialogPrimitive.Overlay> & Record<`data-${string}`, string | undefined>
 }, ref: React.ForwardedRef<any>) {
   return (
     <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-popover p-6 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
-          className
-        )}
-        {...props}
-      ref={ref}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-4 right-4"
-              size="icon-sm"
-            >
-              <XIcon
-              />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
+      <DialogOverlay {...overlayProps} className={cn("overflow-y-auto @container", overlayProps?.className)}>
+        <div
+          data-slot="dialog-frame"
+          data-placement={placement}
+          className="grid min-h-full justify-items-center p-6 data-[placement=center]:items-center data-[placement=top]:items-start data-[placement=top]:pt-[12vh] @max-[639px]:data-[placement=center]:items-end @max-[639px]:data-[placement=center]:p-0 @max-[639px]:data-[placement=top]:p-2"
+        >
+          <DialogPrimitive.Content
+            data-slot="dialog-content"
+            data-placement={placement}
+            className={cn(
+              dialogPanelClass,
+              "animation-duration-(--duration-slow) ease-standard data-open:animate-in data-open:fade-in-0 motion-safe:data-open:zoom-in-95 @max-[639px]:data-[placement=center]:motion-safe:data-open:zoom-in-100 @max-[639px]:data-[placement=center]:motion-safe:data-open:slide-in-from-bottom-10",
+              className
+            )}
+            {...props}
+            ref={ref}
+          >
+            {children}
+            {showCloseButton && (
+              <DialogPrimitive.Close data-slot="dialog-close" asChild>
+                <Button variant="ghost" size="icon-sm" aria-label={closeLabel} className={dialogCloseClass}>
+                  <XIcon />
+                </Button>
+              </DialogPrimitive.Close>
+            )}
+          </DialogPrimitive.Content>
+        </div>
+      </DialogOverlay>
     </DialogPortal>
   )
 })
+
+// Patched (07-starter.md, dialog): centred on the title's first line (28px) inside 24px of padding, with
+// the X lined up on the content's right edge. 32px, 40px on touch.
+const dialogCloseClass = "absolute top-6 right-4 -mt-0.5 text-text-muted hover:text-text-strong pointer-coarse:top-5 pointer-coarse:right-3"
 
 const DialogHeader = React.forwardRef(function DialogHeader({ className, ...props }: React.ComponentProps<"div">, ref: React.ForwardedRef<any>) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2", className)}
+      // Patched (07-starter.md, dialog): 6px between the title and its description, as in the sheet.
+      className={cn("flex flex-col gap-1.5", className)}
       {...props}
       ref={ref}
     />
@@ -116,7 +144,9 @@ const DialogFooter = React.forwardRef(function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+        // Patched (07-starter.md, dialog): secondary then primary on the right; under 640px the buttons
+        // stack full width in reading order, never reversed.
+        "flex flex-wrap items-center justify-end gap-2 @max-[639px]:flex-col @max-[639px]:items-stretch",
         className
       )}
       {...props}
@@ -132,6 +162,10 @@ const DialogFooter = React.forwardRef(function DialogFooter({
   )
 })
 
+// Patched (07-starter.md, dialog): the system's type, balanced and without stragglers, shared with a dialog drawn in place on a canvas.
+const dialogTitleClass = "type-heading-lg text-balance text-text-strong"
+const dialogDescriptionClass = "type-body text-pretty text-text-muted"
+
 const DialogTitle = React.forwardRef(function DialogTitle({
   className,
   ...props
@@ -139,7 +173,7 @@ const DialogTitle = React.forwardRef(function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("cn-font-heading leading-none font-medium", className)}
+      className={cn(dialogTitleClass, className)}
       {...props}
       ref={ref}
     />
@@ -153,10 +187,7 @@ const DialogDescription = React.forwardRef(function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn(
-        "text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground",
-        className
-      )}
+      className={cn(dialogDescriptionClass, className)}
       {...props}
       ref={ref}
     />
@@ -174,4 +205,9 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  // Patched (07-starter.md, dialog): the classes a dialog drawn in place on a canvas shares.
+  dialogCloseClass,
+  dialogDescriptionClass,
+  dialogPanelClass,
+  dialogTitleClass,
 }
