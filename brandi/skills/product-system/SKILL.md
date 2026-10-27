@@ -169,8 +169,10 @@ different things from it, and every difference is a decision on record.
    accept and why.
 3. Write the brand-to-product section: every departure from the brand book, with its reason, so
    nobody fixes the product back to the brand.
-4. Write PRODUCT.md (users, purpose, accessibility) and DESIGN.md (the visual system) for
-   Impeccable, from the system, not from intentions.
+4. PRODUCT.md and DESIGN.md, Impeccable's context files, come from the system: `$A product starter`
+   writes them from `product/product.json` and the tokens. Put purpose, positioning and evidence in
+   product.json (`purpose`, `positioning`, `evidence`) rather than in the file, so the next run keeps
+   them. A file whose generated marker is gone is the product's own, and the starter leaves it alone.
 
 `references/02-brand-to-product.md` covers each decision and the defaults.
 

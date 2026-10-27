@@ -2963,14 +2963,15 @@ async function cmdProduct(flags, positional) {
     let identity;
     try { identity = systemIdentity(config, { brandName: brandName ?? tokens.name?.replace(/ product system$/, '') }); } catch (e) { return fail(e.message); }
     const out = path.resolve(typeof flags.out === 'string' ? flags.out : path.join('product', 'starter'));
-    const res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform') });
+    const res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform'), product: config, brandName });
     const rel = path.relative(process.cwd(), out);
     emit([
       `${res.fresh ? 'Wrote' : 'Refreshed'} the ${identity.name} starter in ${rel}: namespace ${identity.namespace}, global ${identity.global}, ${identity.locale} ${identity.currency}.`,
       ...res.written.map((w) => `  ${w}`),
+      ...res.kept.map((k) => `  kept ${k}: it no longer carries the generated marker, so it is the product's own`),
       '',
       res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
-    ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, starter: rel });
+    ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, kept: res.kept, starter: rel });
     return;
   }
   if (sub === 'bundle') {

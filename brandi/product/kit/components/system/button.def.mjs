@@ -29,6 +29,17 @@ export default {
       ],
     },
   ],
+  // DESIGN.md's rows: the roles and the type style the base variants use (components/ui/button.tsx).
+  design: {
+    "button-primary": { backgroundColor: "primary", textColor: "on-primary", typography: "label", rounded: "radius-control", height: "36px", padding: "0 14px" },
+    "button-primary-hover": { backgroundColor: "primary-hover" },
+    "button-secondary": { backgroundColor: "surface", textColor: "text-strong", typography: "label", rounded: "radius-control", height: "36px", padding: "0 14px" },
+    "button-secondary-hover": { backgroundColor: "hover" },
+    "button-ghost": { textColor: "text-strong", typography: "label", rounded: "radius-control", height: "36px", padding: "0 14px" },
+    "button-brand": { backgroundColor: "brand", textColor: "on-brand", typography: "label", rounded: "radius-control", height: "36px", padding: "0 14px" },
+    "button-danger": { backgroundColor: "danger-surface", textColor: "danger", typography: "label", rounded: "radius-control", height: "36px", padding: "0 14px" },
+    "button-danger-solid": { backgroundColor: "danger-solid", textColor: "on-danger", typography: "label", rounded: "radius-control", height: "36px", padding: "0 14px" },
+  },
   notes: {
     States: [
       "Loading keeps the width, shows a spinner, sets aria-busy and aria-disabled, and ignores further presses. It stays focusable, so focus never drops.",

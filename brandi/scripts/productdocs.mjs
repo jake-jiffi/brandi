@@ -40,6 +40,8 @@ export const GROUPS = [
 ];
 
 const EM_DASH = /—/;
+/** The props a DESIGN.md component row may carry. A shadow, a focus ring or motion does not fit that format. */
+export const DESIGN_PROPS = ['backgroundColor', 'textColor', 'typography', 'rounded', 'padding', 'size', 'height', 'width'];
 
 /** Load every definition in a components folder, sorted by name. */
 export async function loadDefinitions(dir) {
@@ -79,6 +81,13 @@ export function checkDefinition(def) {
   for (const c of def.checks ?? []) {
     if (!c.name || typeof c.run !== 'function') problems.push(`${where}: check ${c.name ?? '?'} needs a name and a run function`);
     if (c.example && !ids.has(c.example)) problems.push(`${where}: check "${c.name}" names example ${c.example}, which does not exist`);
+  }
+  // Optional rows for DESIGN.md's frontmatter, naming roles: { "button-primary": { backgroundColor: "primary" } }.
+  for (const [row, props] of Object.entries(def.design ?? {})) {
+    if (!/^[a-z][a-z0-9-]*$/.test(row)) problems.push(`${where}: design row ${row} must be lower-case words with hyphens, such as button-primary`);
+    for (const prop of Object.keys(props ?? {})) {
+      if (!DESIGN_PROPS.includes(prop)) problems.push(`${where}: design row ${row}: ${prop} is not one of ${DESIGN_PROPS.join(', ')}`);
+    }
   }
   const text = JSON.stringify({ ...def, checks: (def.checks ?? []).map((c) => c.name) });
   if (EM_DASH.test(text)) problems.push(`${where}: an em dash; use a comma, a full stop or brackets`);

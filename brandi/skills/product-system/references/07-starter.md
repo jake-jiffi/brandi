@@ -33,6 +33,7 @@ Versions live in the kit's `package.json`, pinned exactly and tested together (s
 | Kind | What | How it changes |
 | --- | --- | --- |
 | Generated | `app/globals.css`, `app/fonts.ts`, `system/tokens.json`, `system/system.json`, `lib/format-locale.js`, `lib/product.ts`, `tools/build-globals.mjs` and `components/system/index.ts` | `$A product starter` rewrites them on every run. A hand edit is undone by the next run |
+| Generated until taken over | `PRODUCT.md` and `DESIGN.md` | Rewritten while they end on the generated marker, kept once it is deleted (section 7) |
 | Kit | `components/ui/` (shadcn, patched), `components/system/` (the system's components and their definitions), `lib/`, `hooks/`, `canvas/` and `tools/` | Copied on the first run, then the product's. `$A product starter --kit` copies them again |
 | Example | The example product's routes and sample data | A real product replaces it |
 
@@ -429,8 +430,12 @@ starter carries them, so the system's rounds and every product repo run the same
 
 A product repo starts from the starter and gets these with it.
 
-- **PRODUCT.md and DESIGN.md**, Impeccable's context files, generated from the system when brand
-  becomes product (`02-brand-to-product.md`). PRODUCT.md holds the users, the purpose and the
+- **PRODUCT.md and DESIGN.md**, Impeccable's context files, written by `$A product starter` from the
+  system when brand becomes product (`02-brand-to-product.md`). Each ends on a generated marker; while
+  it is there the next run rewrites the file, and once someone deletes it the file is theirs. A
+  definition can carry `design` rows (role names for `backgroundColor`, `textColor`, `typography` and
+  `rounded`, plus `padding`, `size`, `height` and `width`), which become DESIGN.md's component tokens.
+  The `.impeccable/design.json` sidecar is left to Impeccable's `document`. PRODUCT.md holds the users, the purpose and the
   accessibility target. The intake in `product/product.json` fills it: people and their jobs, the
   systems they touch, and what the assistant may do (`01-routes-and-intake.md`). DESIGN.md records
   the visual system the code ships: roles, type, shape, components and accepted deviations.

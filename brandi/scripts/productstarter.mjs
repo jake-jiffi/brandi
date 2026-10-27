@@ -3,8 +3,9 @@
  *
  * `brandi product starter` copies the kit (brandi/product/kit) into product/starter, then writes the
  * files the system owns: its tokens, its identity, globals.css, the market's locale, the product's
- * name and the brand's faces through next/font. A second run rewrites only those generated files, so
- * whatever a product has added survives; --kit copies the kit's own folders again as well.
+ * name and the brand's faces through next/font, and PRODUCT.md and DESIGN.md for Impeccable. A second
+ * run rewrites only those generated files, so whatever a product has added survives; --kit copies the
+ * kit's own folders again as well.
  *
  * `brandi product bundle` builds the canvas bundle from the starter's own components (one
  * implementation, built twice) and writes every component's Design System card and preview from its
@@ -19,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 
 import { toStarterGlobals } from './productglobals.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
+import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const KIT = path.resolve(here, '..', 'product', 'kit');
@@ -125,7 +127,7 @@ export function generatedFiles(tokens, identity) {
  * Write or refresh a starter. A fresh folder gets the whole kit; an existing one gets only the
  * generated files unless `refreshKit`. Font files the tokens ship are copied in from `fontsDir`.
  */
-export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null }) {
+export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null }) {
   const fresh = !existsSync(path.join(out, 'package.json'));
   const written = [];
   if (fresh || refreshKit) {
@@ -159,7 +161,17 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   const { writeIndex } = await import(pathToFileURL(path.join(out, 'tools', 'build-index.mjs')).href);
   writeIndex(out);
   written.push('components/system/index.ts');
-  return { fresh, written };
+  // Impeccable's context files. Rewritten while they carry the marker; once a person or Impeccable
+  // has taken one over (the marker gone), it is theirs and left alone.
+  const defs = await loadDefinitions(path.join(out, 'components', 'system'));
+  const kept = [];
+  for (const [rel, content] of [['PRODUCT.md', productMd({ product, identity, brandName })], ['DESIGN.md', designMd({ tokens, identity, defs, brandName })]]) {
+    const file = path.join(out, rel);
+    if (existsSync(file) && !readFileSync(file, 'utf8').includes(CONTEXT_MARKER)) { kept.push(rel); continue; }
+    writeFileSync(file, content);
+    written.push(rel);
+  }
+  return { fresh, written, kept };
 }
 
 /**
