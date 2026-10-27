@@ -56,7 +56,9 @@ this file wins.
   least; 24px hit areas for checkboxes, switches and inline links; 8px between targets; 16px input
   text on touch.
 - **Its own width.** Respond to the container, never the window: `@container` on the root and
-  `@max-[639px]:` style variants. Never `sm:` or `lg:` for a component's layout.
+  `@max-[640px]:` style variants (`@max-[N]` is narrower than N and `@min-[N]` is N or wider, so pair them on the
+  same number; `@max-[639px]` beside `@min-[640px]` leaves a container between them matching neither).
+  Never `sm:` or `lg:` for a component's layout.
 - **Screen readers.** Real elements (`button`, `a href`, `input` with `label`). Status never rides on
   colour alone: a word or an icon too. Live regions are polite and speak on change only.
   `role="alert"` only for something that went wrong while the person was there.

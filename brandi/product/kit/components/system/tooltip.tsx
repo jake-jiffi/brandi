@@ -43,7 +43,14 @@ function nameOf(el: HTMLElement, skip: Element | null) {
   if (label) return label
   const by = el.getAttribute("aria-labelledby")
   if (by) return by.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" ")
-  return Array.from(el.childNodes).filter((n) => n !== skip).map((n) => n.textContent ?? "").join("")
+  return Array.from(el.childNodes).filter((n) => n !== skip).map(heard).join("")
+}
+
+/** The text a screen reader hears: an aria-hidden part, such as a figure drawn beside its spoken words, is left out. */
+function heard(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? ""
+  if (node instanceof Element && node.getAttribute("aria-hidden") === "true") return ""
+  return Array.from(node.childNodes).map(heard).join("")
 }
 
 /**

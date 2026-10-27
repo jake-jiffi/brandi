@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
 import type { IconName } from "@/lib/icons"
+import { useLink } from "@/lib/link"
 import { useMergedRef } from "@/lib/refs"
 import { cn } from "@/lib/utils"
 
@@ -45,6 +46,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
 ) {
   const own = React.useRef<HTMLButtonElement | null>(null)
   const merged = useMergedRef(ref, own)
+  const Link = useLink()
   // Loading keeps the width the label had, so the row does not jump when the label changes.
   const [minWidth, setMinWidth] = React.useState<number | undefined>()
   React.useLayoutEffect(() => {
@@ -62,9 +64,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
   const classes = cn(block && "w-full", className)
 
   if (href && !disabled && !loading) {
+    // Through the product's link, so a link that looks like a button still navigates on the client.
     return (
       <ButtonBase asChild variant={VARIANT[variant]} size={SIZE[size]} className={classes} style={style}>
-        <a href={href} data-slot="button">{content}</a>
+        <Link href={href} data-slot="button">{content}</Link>
       </ButtonBase>
     )
   }
