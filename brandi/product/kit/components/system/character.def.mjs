@@ -1,4 +1,24 @@
 // Character's one definition. The kit carries a placeholder pack (lib/brand.ts) with four poses.
+const STATES = ["welcome", "working", "done", "caught-up", "needs-person", "nothing-found", "could-not-load", "help"]
+// A Character the check mounts itself, in a pose this brand's pack has ("missing": one it lacks), so the
+// checks run on any brand's pack, drawn or still. Resolves to the pose mounted, or null when there is none.
+const mount = (page, want, props = {}) =>
+  page.evaluate(
+    ([want, props, states]) => {
+      const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+      const have = states.filter((s) => kit.BRAND?.character?.poses?.[s])
+      const pose = want === "missing" ? states.find((s) => !have.includes(s)) : have.includes(want) ? want : have[0]
+      if (!pose) return null
+      const host = document.createElement("div")
+      host.id = "check-mount"
+      document.body.append(host)
+      const root = window.ReactDOM.createRoot(host)
+      window.ReactDOM.flushSync(() => root.render(window.React.createElement(kit.Character, { pose, ...props })))
+      return pose
+    },
+    [want, props, STATES]
+  )
+const mounted = (page) => page.locator('#check-mount [data-slot="character"]')
 const pose = (name, caption) =>
   `<div class="flex flex-col items-center gap-2"><x-import component-from-global-scope="NS.Character" pose="${name}"></x-import><span class="type-meta text-text-muted">${caption}</span></div>`
 
@@ -77,46 +97,53 @@ ${pose("nothing-found", "nothing-found")}
     },
     {
       name: "A moment the pack has no pose for renders nothing",
-      example: "no-pose",
-      async run({ scope, expect }) {
-        expect.equal(await scope.locator('[data-slot="character"]').count(), 0, "characters drawn")
+      async run({ page, expect }) {
+        // A pack with every moment drawn has no such moment to test.
+        if (!(await mount(page, "missing"))) return
+        expect.equal(await page.locator('#check-mount [data-slot="character"]').count(), 0, "characters drawn")
       },
     },
     {
       name: "Its loop runs when asked for",
-      example: "working",
-      async run({ scope, expect }) {
-        const running = await scope.locator('[data-slot="character"]').evaluate((el) => el.getAnimations().filter((a) => a.playState === "running").length)
+      async run({ page, expect }) {
+        if (!(await mount(page, "working", { motion: true, size: 64 }))) return
+        const running = await mounted(page).evaluate((el) => el.getAnimations().filter((a) => a.playState === "running").length)
         expect.equal(running, 1, "running animations")
       },
     },
     {
       name: "Its loop stops by itself inside five seconds",
-      example: "working",
-      async run({ scope, expect }) {
-        const timing = await scope.locator('[data-slot="character"]').evaluate((el) => el.getAnimations()[0]?.effect.getComputedTiming())
+      async run({ page, expect }) {
+        if (!(await mount(page, "working", { motion: true, size: 64 }))) return
+        const timing = await mounted(page).evaluate((el) => el.getAnimations()[0]?.effect.getComputedTiming())
         expect(timing && Number.isFinite(timing.endTime) && timing.endTime <= 5000, `it ends by 5 s (ends at ${timing?.endTime})`)
       },
     },
     {
       name: "Its loop never runs under reduced motion",
-      example: "working",
       reducedMotion: true,
-      async run({ scope, expect }) {
-        expect.equal(await scope.locator('[data-slot="character"]').evaluate((el) => el.getAnimations().length), 0, "animations under reduced motion")
+      async run({ page, expect }) {
+        if (!(await mount(page, "working", { motion: true, size: 64 }))) return
+        expect.equal(await mounted(page).evaluate((el) => el.getAnimations().length), 0, "animations under reduced motion")
       },
     },
     {
       name: "It keeps the drawing's proportions at every size",
       async run({ page, expect }) {
-        for (const c of await page.locator('[data-slot="character"]').all()) {
-          const ratio = await c.evaluate((el) => {
+        for (const size of [48, 96, 160]) {
+          if (!(await mount(page, "welcome", { size }))) return
+          const ratio = await mounted(page).last().evaluate(async (el) => {
             const svg = el.querySelector("svg")
-            const [, , w, h] = svg.getAttribute("viewBox").split(/\s+/).map(Number)
-            const box = svg.getBoundingClientRect()
+            const img = el.querySelector("img")
+            if (img && !img.complete) await new Promise((r) => img.addEventListener("load", r, { once: true }))
+            const art = svg ?? img
+            const box = art.getBoundingClientRect()
+            const [w, h] = svg
+              ? svg.getAttribute("viewBox")?.split(/[\s,]+/).slice(2).map(Number) ?? [Number(svg.getAttribute("width")), Number(svg.getAttribute("height"))]
+              : [img.naturalWidth, img.naturalHeight]
             return box.width / box.height / (w / h)
           })
-          expect(Math.abs(ratio - 1) < 0.02, `drawn at ${ratio.toFixed(3)} of its own aspect ratio`)
+          expect(Math.abs(ratio - 1) < 0.02, `drawn at ${ratio.toFixed(3)} of its own aspect ratio at ${size}px`)
         }
       },
     },

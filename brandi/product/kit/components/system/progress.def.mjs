@@ -21,7 +21,7 @@ export default {
     { name: "max", type: "number", default: "100", doc: "The end." },
     { name: "target", type: "number", doc: "A marker on the bar, in the same units as value." },
     { name: "targetLabel", type: "string", doc: 'What a screen reader hears for the target. "Target 90%" by default.' },
-    { name: "tone", type: '"success" | "warning" | "danger" | "info" | "brand"', default: '"brand"', doc: "The bar's colour. Each holds 3:1 against the track in both themes." },
+    { name: "tone", type: '"success" | "warning" | "danger" | "info" | "brand"', default: '"brand"', doc: "The bar's colour. Each holds 3:1 against the track in both themes. Brand draws in the primary colour, because a light brand fill cannot hold 3:1 on a light track." },
     { name: "indeterminate", type: "boolean", default: "false", doc: "An unknown length: a sweep, never a made-up percentage." },
     { name: "showValue", type: "boolean", default: "false", doc: "Shows valueLabel beside the label." },
     { name: "valueLabel", type: "string", doc: 'The value in words, shown and read: "34 of 40 h". The percentage by default.' },

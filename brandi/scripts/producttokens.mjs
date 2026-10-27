@@ -348,9 +348,17 @@ function themeValues(system, mode, roles, ai, brandInk) {
     v.primary = decided('primary');
   } else {
     const seed = light ? hexOf(system.palettes.brand.light.solidStrong) : B[8];
-    let p = solve('primary', seed, [v.surface, v.canvas], FLOORS['non-text']);
+    // Also the tracks a meter fills, because Progress draws its default tone in primary.
+    const standOff = [v.surface, v.canvas, v.line, v['surface-sunken']];
+    let p = solve('primary', seed, standOff, FLOORS['non-text']);
     const label = labelOn(p);
-    if (label.ratio < FLOORS.text + MARGIN) p = solve('primary', p, [label.hex], FLOORS.text);
+    if (label.ratio < FLOORS.text + MARGIN) {
+      // A label that pulls the fill towards the page (a dark label on a light page) can undo the 3:1
+      // just solved. Then the label is the one at the far end, which pushes the fill away from the page.
+      let q = solve('primary', p, [label.hex], FLOORS.text);
+      if (standOff.some((g) => contrastRatio(q, g) < FLOORS['non-text'])) q = solve('primary', p, [light ? '#ffffff' : steps(system.palettes.neutral.dark)[0]], FLOORS.text);
+      p = q;
+    }
     v.primary = p;
   }
   v['on-primary'] = labelOn(v.primary).hex;
@@ -539,7 +547,7 @@ function contrastFor(name, { railDecided }) {
     case 'text-inverse': return textOn(['surface-inverse']);
     case 'link': case 'link-hover': return textOn(['surface', 'surface-subtle', 'canvas']);
     case 'line-control': return nonText(['surface', 'surface-raised', 'surface-sunken', 'canvas', 'hover@surface']);
-    case 'primary': return nonText(['surface', 'canvas']);
+    case 'primary': return nonText(['surface', 'canvas', 'line', 'surface-sunken']);
     case 'on-primary': return textOn(['primary', 'primary-hover', 'primary-pressed']);
     case 'on-brand': return textOn(['brand', 'brand-hover']);
     case 'focus': return nonText([...SURFACES, 'selected', 'selected-strong']);

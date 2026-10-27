@@ -45,7 +45,55 @@ export function cleanSvg(svg, where = 'a mark') {
     tag = tag.replace(/^<svg/i, `<svg viewBox="0 0 ${w} ${h}"`);
   }
   tag = tag.replace(/\s(?:width|height)="[^"]*"/g, '');
-  return s.replace(open[0], tag).trim();
+  return inlineClassStyles(s.replace(open[0], tag).trim());
+}
+
+// The CSS properties SVG also takes as presentation attributes. A rule setting anything else stays a rule.
+const PRESENTATION = new Set(['fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset', 'stroke-opacity', 'opacity', 'clip-rule', 'display', 'visibility',
+  'color', 'font-family', 'font-size', 'font-weight', 'font-style', 'letter-spacing', 'text-anchor']);
+
+/**
+ * Class rules written onto the elements as attributes, and the stylesheet dropped. Brand exports style
+ * their paths through `<style>.cls-1{fill:...}</style>`: a stylesheet in a mark leaks into the page it
+ * is inlined in, and mail clients strip it, so an email's logo drew black. Only plain class selectors
+ * setting presentation properties are inlined, in the cascade's own order (a later rule wins, a rule
+ * beats a presentation attribute, an inline style beats both). Anything else leaves the file as it was,
+ * for scopeClasses to keep to itself.
+ */
+export function inlineClassStyles(svg) {
+  const blocks = [...svg.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)];
+  if (!blocks.length) return svg;
+  const rules = [];
+  for (const [, raw] of blocks) {
+    const css = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/<!\[CDATA\[|\]\]>/g, '');
+    if (css.replace(/[^{}]+\{[^{}]*\}/g, '').trim()) return svg;
+    for (const [, head, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const selectors = head.split(',').map((x) => x.trim()).filter(Boolean);
+      if (!selectors.every((x) => /^\.[A-Za-z_][\w-]*$/.test(x))) return svg;
+      const decls = body.split(';').map((d) => d.trim()).filter(Boolean).map((d) => [d.slice(0, d.indexOf(':')).trim().toLowerCase(), d.slice(d.indexOf(':') + 1).trim()]);
+      if (!decls.every(([prop, value]) => PRESENTATION.has(prop) && value && !/!important|var\(/i.test(value))) return svg;
+      for (const sel of selectors) rules.push({ cls: sel.slice(1), decls });
+    }
+  }
+  const out = svg.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '').replace(/<([A-Za-z][\w:-]*)(\s[^<>]*?)?(\/?)>/g, (tag, name, attrs = '', self) => {
+    const cls = /\sclass\s*=\s*"([^"]*)"/i.exec(attrs);
+    if (!cls) return tag;
+    const own = cls[1].split(/\s+/).filter(Boolean);
+    const props = new Map();
+    for (const r of rules) if (own.includes(r.cls)) for (const [prop, value] of r.decls) props.set(prop, value);
+    const inline = new Set((/\sstyle\s*=\s*"([^"]*)"/i.exec(attrs)?.[1] ?? '').split(';').map((d) => d.split(':')[0].trim().toLowerCase()).filter(Boolean));
+    let rest = attrs;
+    let added = '';
+    for (const [prop, value] of props) {
+      if (inline.has(prop)) continue;
+      const existing = new RegExp(`\\s${prop}\\s*=\\s*"[^"]*"`, 'i');
+      if (existing.test(rest)) rest = rest.replace(existing, ` ${prop}="${value}"`);
+      else added += ` ${prop}="${value}"`;
+    }
+    return `<${name}${rest.replace(cls[0], added)}${self}>`;
+  });
+  return out.replace(/<defs\b[^>]*>\s*<\/defs>/gi, '').replace(/<defs\s*\/>/gi, '');
 }
 
 /**
@@ -254,4 +302,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { shrinkStill, cleanSvg, tighten, scopeClasses, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
+export default { shrinkStill, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };

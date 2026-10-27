@@ -14,7 +14,8 @@ const Skeleton = React.forwardRef(function Skeleton({ className, ...props }: Rea
     <div
       data-slot="skeleton"
       aria-hidden="true"
-      className={cn("rounded-sm bg-line motion-safe:animate-pulse forced-colors:border forced-colors:border-dashed", className)}
+      // line-strong, a step past the hairline: a shape on the canvas has to stand off it (1.2:1 at least).
+      className={cn("rounded-sm bg-line-strong motion-safe:animate-pulse forced-colors:border forced-colors:border-dashed", className)}
       {...props}
       ref={ref}
     />

@@ -109,7 +109,9 @@ export default {
       example: "sizes",
       async run({ page, expect }) {
         const box = await page.locator("#logo-raised").boundingBox()
-        expect.equal(Math.round(box.height), 16, "drawn height for a 10px ask")
+        // The brand's own minimum, as the bundle carries it: 16px is only the kit's placeholder.
+        const min = await page.evaluate(() => Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.logo?.minHeight ?? 16)
+        expect.equal(Math.round(box.height), Math.round(min), "drawn height for a 10px ask")
       },
     },
     {

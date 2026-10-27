@@ -50,6 +50,19 @@ describe('a mark, made safe to inline', () => {
     assert.equal(/\.cls-1\b/.test(a + b), false, 'no bare class rule is left to paint the page');
   });
 
+  test('simple class styles become attributes, so a mark carries no stylesheet into an email or a page', () => {
+    const exported = '<svg viewBox="0 0 10 10"><defs><style>.cls-1{fill:#1d2b4f;}.cls-2,.cls-3{fill:#6b9ee0;stroke:#000;stroke-width:2px}.cls-3{fill:none}</style></defs><path class="cls-1" d="M0 0h1v1z"/><path class="cls-2" fill="#f00" d="M0 0h2v2z"/><path class="cls-3" style="stroke:#123" d="M0 0h3v3z"/></svg>';
+    const out = cleanSvg(exported, 'full.svg');
+    assert.equal(/<style|class=/.test(out), false, `no stylesheet and no class left: ${out}`);
+    assert.match(out, /<path fill="#1d2b4f" d="M0 0h1v1z"\/>/);
+    assert.match(out, /<path fill="#6b9ee0" d="M0 0h2v2z" stroke="#000" stroke-width="2px"\/>|<path [^>]*fill="#6b9ee0"[^>]*>/, 'the stylesheet beats a presentation attribute, as in the browser');
+    assert.match(out, /<path[^>]*fill="none"[^>]*style="stroke:#123"|<path[^>]*style="stroke:#123"[^>]*fill="none"/, 'a later rule wins, and an inline style keeps its own property');
+    assert.doesNotMatch(out, /<path[^>]*style="stroke:#123"[^>]*stroke="#000"/, 'the inline stroke is not overwritten');
+    assert.doesNotMatch(out, /<defs>\s*<\/defs>/, 'an emptied defs goes too');
+    const complex = '<svg viewBox="0 0 1 1"><style>svg .cls-1:hover{fill:red}</style><path class="cls-1"/></svg>';
+    assert.match(cleanSvg(complex, 'complex.svg'), /<style>/, 'a selector it cannot inline leaves the stylesheet for scopeClasses');
+  });
+
   test('the one-ink rendition rewrites colours inside a style block without swallowing the next rule', () => {
     assert.equal(toInk('<svg viewBox="0 0 1 1"><style>.a{fill:#000}.b{fill:#fff;stroke:#111}</style></svg>'),
       '<svg fill="currentColor" viewBox="0 0 1 1"><style>.a{fill:currentColor}.b{fill:currentColor;stroke:currentColor}</style></svg>');

@@ -15,7 +15,9 @@ const TONE: Record<ProgressTone, string> = {
   warning: "bg-warning",
   danger: "bg-danger",
   info: "bg-info",
-  brand: "bg-brand",
+  // The primary colour, which is solved against the track. The brand fill is not, and a light one cannot
+  // hold 3:1 on a light track.
+  brand: "bg-primary",
 }
 
 /** A number, from a prop or from a canvas attribute's text ("34"); anything else is missing. */

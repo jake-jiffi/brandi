@@ -9,6 +9,19 @@ const contrast = (a, b) => {
   const [hi, lo] = [luminance(rgb(a)), luminance(rgb(b))].sort((x, y) => y - x)
   return (hi + 0.05) / (lo + 0.05)
 }
+// How far apart two colours look: their distance in OKLab, where 0.1 is a plainly different colour.
+const oklab = ([r, g, b]) => {
+  const f = (c) => ((c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  const [R, G, B] = [f(r), f(g), f(b)]
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B)
+  const m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B)
+  const s = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B)
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s]
+}
+const apart = (a, b) => {
+  const [p, q] = [oklab(rgb(a)), oklab(rgb(b))]
+  return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2])
+}
 async function tabTo(page, locator, max = 40) {
   for (let i = 0; i < max; i++) {
     await page.keyboard.press("Tab")
@@ -135,13 +148,17 @@ export default {
       },
     },
     {
-      name: "Highlight is solid and warning is a tint, so needs you never blurs with heads up, in both themes",
+      name: "Highlight is solid and warning is a tint, so needs you never blurs with heads up, in both themes (2:1 apart or plainly different in colour)",
       example: "tones",
       themes: ["light", "dark"],
       async run({ scope, expect }) {
         const fill = (tone) => scope.locator(`[data-slot="badge"][data-tone="${tone}"]`).evaluate((el) => getComputedStyle(el).backgroundColor)
-        const ratio = contrast(await fill("highlight"), await fill("warning"))
-        expect.atLeast(Math.round(ratio * 100) / 100, 2, "contrast between the highlight and warning fills")
+        const [highlight, warning] = [await fill("highlight"), await fill("warning")]
+        // Apart in lightness (2:1) or plainly different in colour: a light, saturated highlight such as a
+        // highlighter yellow sits close in lightness to a pale warning tint and still never reads as one.
+        const ratio = Math.round(contrast(highlight, warning) * 100) / 100
+        const distance = Math.round(apart(highlight, warning) * 1000) / 1000
+        expect(ratio >= 2 || distance >= 0.1, `the highlight and warning fills: ${ratio}:1 apart and ${distance} in OKLab, wanted 2:1 or 0.1`)
       },
     },
     {
