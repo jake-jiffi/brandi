@@ -44,6 +44,8 @@
  *   brandi product bundle [--starter product/starter]
  *                                     the canvas bundle from the starter's own components, and
  *                                     every component's card and preview from its definition
+ *   brandi product gates [--round N]  the machine gates for a round, every tool version recorded
+ *   brandi product round --round N    the round held against the bar, with the judged gates
  *
  * Every command prints a short human summary, and `--json` prints the machine
  * form instead, so the skill can read a result without parsing prose.
@@ -63,6 +65,7 @@ import { buildSystem, assertPublishable } from './system.mjs';
 import { buildProductTokens, auditProductTokens, auditSummary, toProductCss } from './producttokens.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
+import { runGates, judgeRound, roundMarkdown, WIDTHS } from './productgates.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
@@ -2766,7 +2769,18 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       Build the canvas bundle from the starter's own components, then write each
       component's card (README.md, preview.html) and preview board from its one
       definition, and install the system beside the canvas boards. Needs npm
-      install in the starter first.`;
+      install in the starter first.
+
+  brandi product gates [--round N] [--only Button,Dialog] [--route <url> ...]
+      The machine gates for a round: the token audit, the pinned detector at
+      1440, 820 and 390 in light and dark, axe, and every scripted check, on
+      every component preview and canvas board (and a running starter's
+      routes). Writes product/rounds/round-N/gates.json with every tool version.
+
+  brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
+      Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
+      review (ui-ux-pro-max) into the round, hold every gate against the bar,
+      and write record.md and record.json. Exits 1 until the bar is met.`;
 
 async function productSource(flags) {
   if (typeof flags.input === 'string') {
@@ -2875,6 +2889,41 @@ async function cmdProduct(flags, positional) {
       `${res.components.reduce((n, c) => n + c.checks, 0)} scripted checks in the definitions.`,
       `Cards in ${path.relative(process.cwd(), path.join(productDir, 'components'))}, preview boards in ${path.relative(process.cwd(), res.previews)}, the system installed under canvas/ds/${res.system.namespace}/.`,
     ].join('\n'), { ok: true, system: res.system, exports: res.manifest.exports, components: res.components, files });
+    return;
+  }
+  if (sub === 'gates' || sub === 'round') {
+    const productDir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
+    const roundsDir = path.join(productDir, 'rounds');
+    const existing = existsSync(roundsDir) ? (await readdir(roundsDir)).map((d) => Number(/^round-(\d+)$/.exec(d)?.[1])).filter(Number.isFinite) : [];
+    const round = flags.round !== undefined ? Number(flags.round) : sub === 'gates' ? (existing.length ? Math.max(...existing) + 1 : 1) : Math.max(0, ...existing);
+    if (!Number.isInteger(round) || round < 1) return fail('--round must be a whole number from 1.');
+    if (sub === 'gates') {
+      if (!existsSync(path.join(productDir, 'tokens.json'))) return fail('No product/tokens.json. Run `brandi product tokens` first.');
+      if (!existsSync(path.join(starter, 'node_modules', 'playwright'))) return fail(`${path.relative(process.cwd(), starter)} has no node_modules with Playwright. Run npm install there first.`);
+      const routes = (Array.isArray(flags.route) ? flags.route : flags.route ? [flags.route] : []).filter((r) => typeof r === 'string').map((url) => ({ url, label: new URL(url).pathname }));
+      const lines = [];
+      const gates = await runGates({ productDir, starter, round, routes, only: typeof flags.only === 'string' ? flags.only.split(',') : null, log: (l) => { lines.push(l); if (!flags.json) process.stderr.write(`${l}\n`); } });
+      const judged = judgeRound(gates);
+      emit([`Round ${round} machine gates:`, ...judged.verdicts.filter((v) => ['Tokens', 'Detector', 'Accessibility', 'Record'].includes(v.gate)).map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
+        { ok: judged.verdicts.filter((v) => ['Tokens', 'Detector', 'Accessibility', 'Record'].includes(v.gate)).every((v) => v.pass), round, gates });
+      return;
+    }
+    const gatesFile = path.join(roundsDir, `round-${round}`, 'gates.json');
+    if (!existsSync(gatesFile)) return fail(`No gates for round ${round}. Run \`brandi product gates --round ${round}\` first.`);
+    const gates = JSON.parse(await readFile(gatesFile, 'utf8'));
+    const readJson = async (k) => (typeof flags[k] === 'string' ? JSON.parse(await readFile(path.resolve(flags[k]), 'utf8')) : null);
+    const critique = await readJson('critique');
+    const rules = await readJson('rules');
+    const signOff = typeof flags['sign-off'] === 'string' ? flags['sign-off'] : null;
+    const judged = judgeRound(gates, { critique, rules });
+    let system = {};
+    try { system = JSON.parse(await readFile(path.join(starter, 'system', 'system.json'), 'utf8')); } catch { /* no starter yet */ }
+    const dir = path.dirname(gatesFile);
+    await writeFile(path.join(dir, 'record.md'), roundMarkdown(gates, judged, { system, critique, rules, signOff }));
+    await writeFile(path.join(dir, 'record.json'), `${JSON.stringify({ round, system, met: judged.met, verdicts: judged.verdicts, critique, rules, signOff, versions: gates.versions }, null, 2)}\n`);
+    emit([`Round ${round}: ${judged.met ? 'the bar is met' : 'the bar is not met yet'}.`, ...judged.verdicts.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Record: ${path.relative(process.cwd(), path.join(dir, 'record.md'))}`].join('\n'), { ok: judged.met, round, verdicts: judged.verdicts });
+    if (!judged.met) process.exitCode = 1;
     return;
   }
   return fail(`Unknown product subcommand "${sub}".\n\n${PRODUCT_USAGE}`);

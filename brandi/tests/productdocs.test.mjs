@@ -52,6 +52,8 @@ describe('what one definition writes', () => {
     assert.match(board, /theme: this\.props\.dark \? "dark" : "light"/);
     assert.match(board, /fonts\.googleapis\.com\/css2\?family=Karla/);
     assert.match(board, /<link rel="stylesheet" href="ds\/acme\/components\/bundle\.css">/);
+    assert.equal((board.match(/<main /g) ?? []).length, 1, 'one main landmark, so a page-level scan reads it as a page');
+    assert.match(board, /<h1 style="position: absolute;[^"]*">Button<\/h1>/, 'one h1, visually hidden');
   });
 
   test('the Design System preview leaves the theme to the viewer and carries its runtime inline', () => {

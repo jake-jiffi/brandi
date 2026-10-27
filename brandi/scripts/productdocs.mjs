@@ -127,6 +127,10 @@ export function componentReadme(def, system) {
 
 export const resolveNs = (markup, ns) => String(markup).replace(/(["'])NS\./g, `$1${ns}.`);
 
+// A preview is a document of its own: one main landmark and one h1, so a page-level accessibility scan
+// reads it as a page. The h1 is visually hidden: the board's frame and the card already name it.
+const hiddenHeading = (name) => `<h1 style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;">${name}</h1>`;
+
 const LAYOUTS = {
   row: 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;',
   stack: 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;',
@@ -151,9 +155,10 @@ export function previewBoard(def, system) {
   ].join('\n'));
   const body = [
     `<x-import component-from-global-scope="${ns}.Root" theme="{{theme}}">`,
-    `<div style="box-sizing: border-box; width: ${width}px; padding: 24px; display: flex; flex-direction: column; gap: 28px; background: var(--canvas); color: var(--text); font-family: var(--font-sans);">`,
+    `<main style="box-sizing: border-box; width: ${width}px; padding: 24px; display: flex; flex-direction: column; gap: 28px; background: var(--canvas); color: var(--text); font-family: var(--font-sans);">`,
+    hiddenHeading(def.name),
     ...sections,
-    '</div>',
+    '</main>',
     '</x-import>',
   ].join('\n');
   const vals = Object.assign({}, ...def.examples.map((ex) => ex.vals ?? {}));
@@ -213,9 +218,10 @@ export function previewPage(def, system) {
     '<body style="margin: 0;">',
     '<x-dc>',
     `<x-import component-from-global-scope="${ns}.Root" background="none">`,
-    '<div style="box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 28px; color: var(--text); font-family: var(--font-sans);">',
+    '<main style="box-sizing: border-box; padding: 24px; display: flex; flex-direction: column; gap: 28px; color: var(--text); font-family: var(--font-sans);">',
+    hiddenHeading(def.name),
     sections,
-    '</div>',
+    '</main>',
     '</x-import>',
     '</x-dc>',
     `<script type="text/x-dc" data-dc-script>\nclass Component extends DCLogic {\n  state = ${JSON.stringify(def.state ?? {})};\n  renderVals() {\n    return Object.assign(${JSON.stringify(vals)}${def.logic ? `, (() => { const self = this; return { ${def.logic} }; })()` : ''});\n  }\n}\n</script>`,
