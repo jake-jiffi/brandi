@@ -23,6 +23,9 @@ export default {
   group: "Status",
   job: "A person, as a photo or initials on a tinted circle. The assistant has an avatar of its own.",
   status: "proven",
+  types: [
+    'type AvatarStatus = "online" | "away" | "offline"',
+  ],
   props: [
     { name: "name", type: "string", doc: "The person's name: their initials, and what a screen reader hears." },
     { name: "src", type: "string", doc: "A photo. Initials show until it loads, and instead of it when it fails." },

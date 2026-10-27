@@ -18,7 +18,7 @@ export default {
   job: "A ranked top N with direct labels and values: the clearest way to compare named things.",
   status: "proven",
   props: [
-    { name: "data", type: "Array<{ label, value }>", doc: "The named things and their values, in any order: the chart sorts them descending. null or missing is no data, said in words and drawn as no bar." },
+    { name: "data", type: "Array<{ label: string; value: number | null }>", doc: "The named things and their values, in any order: the chart sorts them descending. null or missing is no data, said in words and drawn as no bar." },
     { name: "format", type: "NumberStyle", default: '"number"', doc: "The style for the printed values. Exact: they are the numbers a screen reader hears." },
     { name: "max", type: "number", doc: "The value a full-length bar stands for, such as 100 for percentages. Defaults to the largest value." },
     { name: "color", type: "ChartSlot", default: "1", doc: "The series slot for the bars, 1 to 6. Other is always grey." },

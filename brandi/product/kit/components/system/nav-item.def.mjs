@@ -47,7 +47,7 @@ export default {
     { name: "count", type: "number", doc: "Work waiting there. Zero shows nothing." },
     { name: "attention", type: "boolean", default: "false", doc: "The count waits on the reader: it takes the highlight and reads 3 need you. Without it the count is grey and reads 3 waiting on others." },
     { name: "sub", type: "boolean", default: "false", doc: "A nested item under the one above: indented under its label, without an icon. The icons-only rail leaves it out." },
-    { name: "onClick", type: "(event) => void", doc: "Runs as the link is followed, before the navigation." },
+    { name: "onClick", type: "MouseEventHandler<HTMLAnchorElement>", doc: "Runs as the link is followed, before the navigation." },
   ],
   notes: {
     Behaviour: [

@@ -87,6 +87,12 @@ describe('what one definition writes', () => {
     assert.equal(dts.includes('value, defaultValue'), false);
   });
 
+  test('Root comes from its definition when the kit has one, never twice', () => {
+    const root = { ...button, name: 'Root', props: [{ name: 'theme', type: '"light" | "dark"', doc: 'The theme.' }] };
+    assert.equal((typesFile([button, root], system).match(/const Root:/g) ?? []).length, 1);
+    assert.equal((typesFile([button], system).match(/const Root:/g) ?? []).length, 1, 'a kit without the definition still gets the provider');
+  });
+
   test('functions a component carries on itself are declared on it', () => {
     const queue = { ...button, name: 'Queue', statics: [{ name: 'show', type: '(message: string) => string', doc: 'Adds one.' }] };
     const dts = typesFile([button, queue], system);

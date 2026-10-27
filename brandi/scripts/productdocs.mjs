@@ -255,7 +255,7 @@ export function typesFile(defs, system, { icons = [], numberStyles = [] } = {}) 
   const lines = [
     `// ${system.name} components ${system.version}: types as docs, generated from each component's definition by brandi product bundle.`,
     `// Mount on a canvas with component-from-global-scope="${ns}.<Export>", inside ${ns}.Root. React 18 comes from the page.`,
-    'import type { ComponentType, ReactNode } from "react"',
+    'import type { ComponentType, MouseEventHandler, ReactElement, ReactNode, Ref, RefObject } from "react"',
     '',
     `declare namespace ${ns} {`,
     `  type IconName = ${icons.length ? icons.map((n) => JSON.stringify(n)).join(' | ') : 'string'}`,
@@ -263,9 +263,12 @@ export function typesFile(defs, system, { icons = [], numberStyles = [] } = {}) 
     '  const ICON_NAMES: readonly IconName[]',
     '  const NUMBER_STYLES: readonly NumberStyle[]',
     '  function formatNumber(value: number | string | null | undefined, style?: NumberStyle, options?: { locale?: string; currency?: string; digits?: number }): string',
-    '  /** Wraps every board: the theme, the providers, and the theme copied to the page for portals. */',
-    '  const Root: ComponentType<{ theme?: "light" | "dark"; background?: "canvas" | "surface" | "none"; shortcuts?: boolean; children?: ReactNode }>',
   ];
+  // Root comes from its definition when the kit has one; a kit without it still gets the board provider.
+  if (!defs.some((d) => d.name === 'Root')) {
+    lines.push('  /** Wraps every board: the theme, the providers, and the theme copied to the page for portals. */',
+      '  const Root: ComponentType<{ theme?: "light" | "dark"; background?: "canvas" | "surface" | "none"; shortcuts?: boolean; children?: ReactNode }>');
+  }
   for (const def of defs) {
     for (const t of def.types ?? []) lines.push(`  ${t}`);
     lines.push('', tsDoc(def.job, '  ').trimEnd(), `  interface ${def.name}Props {`);

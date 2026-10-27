@@ -29,7 +29,7 @@ export default {
   props: [
     { name: "legend", type: "ReactNode", doc: "Names the choice, in sentence case. The group's accessible name." },
     { name: "name", type: "string", doc: "The form field's name, for a native form post." },
-    { name: "options", type: "Array<string | { value, label, description?, disabled? }>", doc: "Two to five. A description sits under its label and is read with it." },
+    { name: "options", type: "Array<string | { value: string; label: string; description?: string; disabled?: boolean }>", doc: "Two to five. A description sits under its label and is read with it." },
     { name: "value", type: "string", doc: "The chosen option, when the page holds it." },
     { name: "defaultValue", type: "string", doc: "The option chosen to start with. Preselect the safest or most common one." },
     { name: "onChange", type: "(value: string) => void", doc: "Called with the chosen option's value." },

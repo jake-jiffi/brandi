@@ -11,9 +11,12 @@ export default {
   group: "Charts",
   job: "Amounts across categories or days, grouped or stacked.",
   status: "proven",
+  types: [
+    "type ChartSlot = 1 | 2 | 3 | 4 | 5 | 6",
+  ],
   props: [
-    { name: "data", type: "Array<{ label, value } | { label, values: { [key]: number | null } }>", doc: "One item per category or day. null or a missing key is no data: the bar is skipped, never drawn as zero." },
-    { name: "series", type: "Array<{ key, label, color?, compare? }>", doc: "The series in `values`. Slots go series-1 to series-6 in this order, never by rank. `color` pins a slot so a thing keeps its colour. A seventh series folds into Other. `compare` draws a grey dashed marker." },
+    { name: "data", type: "Array<{ label: string; value: number | null } | { label: string; values: Record<string, number | null> }>", doc: "One item per category or day. null or a missing key is no data: the bar is skipped, never drawn as zero." },
+    { name: "series", type: "Array<{ key: string; label: string; color?: ChartSlot; compare?: boolean }>", doc: "The series in `values`. Slots go series-1 to series-6 in this order, never by rank. `color` pins a slot so a thing keeps its colour. A seventh series folds into Other. `compare` draws a grey dashed marker." },
     { name: "stacked", type: "boolean", default: "false", doc: "One bar per category, the series stacked in it. Only when the parts make a whole." },
     { name: "labels", type: '"auto" | "end" | "none"', default: '"auto"', doc: "For a stack: auto names two to four stacked series beside the last bar, end names every one, none leaves it to the legend." },
     { name: "title", type: "string", doc: "What the chart shows: its accessible name and the hidden table's caption. Inside a ChartFigure, the figure's heading does this." },

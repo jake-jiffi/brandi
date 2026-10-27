@@ -23,7 +23,7 @@ export default {
   job: "Shares of a whole as one segmented bar, with a legend that prints every share.",
   status: "proven",
   props: [
-    { name: "data", type: "Array<{ label, value, color? }>", doc: "The parts of one whole, in a fixed order, never by size. Zero and negative values are left out. null or missing is no data, and the legend says so. A seventh part and beyond fold into Other." },
+    { name: "data", type: "Array<{ label: string; value: number | null; color?: ChartSlot }>", doc: "The parts of one whole, in a fixed order, never by size. Zero and negative values are left out. null or missing is no data, and the legend says so. A seventh part and beyond fold into Other." },
     { name: "format", type: "NumberStyle", default: '"number"', doc: "The style for each part's value in the legend, printed exact beside its share." },
     { name: "title", type: "string", doc: "What the whole is: the legend's accessible name. Inside a ChartFigure, the figure's heading does this." },
     { name: "summary", type: "string", doc: "The takeaway in one sentence: the legend's accessible description. Inside a ChartFigure, the figure's takeaway." },

@@ -21,6 +21,9 @@ export default {
   group: "Navigation",
   job: "Sections of one page or record, with optional counts.",
   status: "proven",
+  types: [
+    "type TabOption = { value?: string; label: string; count?: number; countLabel?: string; attention?: boolean; icon?: IconName; id?: string }",
+  ],
   props: [
     { name: "tabs", type: "Array<string | TabOption>", doc: "Strings, or { value, label, count, countLabel, attention, icon, id, panelId }. Two to seven." },
     { name: "value", type: "string", doc: "The open tab, read from the URL." },

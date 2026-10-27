@@ -8,7 +8,7 @@ export default {
   job: "In-page navigation for settings and long documents.",
   status: "proven",
   props: [
-    { name: "items", type: "Array<string | { label, href, icon }>", doc: "A string links to #its-slug on the same page: Billing goes to #billing." },
+    { name: "items", type: "Array<string | { label: string; href: string; icon?: IconName }>", doc: "A string links to #its-slug on the same page: Billing goes to #billing." },
     { name: "value", type: "string", doc: "The current item: its href, or for a string item its slug. Nothing is current until it is set." },
     { name: "label", type: "string", default: "\"On this page\"", doc: "Names the navigation for a screen reader: Settings sections." },
   ],

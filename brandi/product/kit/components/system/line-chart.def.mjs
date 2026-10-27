@@ -15,8 +15,8 @@ export default {
   job: "A trend over time, with an optional comparison series.",
   status: "proven",
   props: [
-    { name: "data", type: "Array<{ label, value } | { label, values: { [key]: number | null } }>", doc: "One item per period, oldest first. null or a missing key is no data: the line breaks there, never dropping to zero." },
-    { name: "series", type: "Array<{ key, label, color?, compare? }>", doc: "The series in `values`. Slots go series-1 to series-6 in this order, never by rank. `color` pins a slot. `compare` draws the series grey and dashed in chart-compare." },
+    { name: "data", type: "Array<{ label: string; value: number | null } | { label: string; values: Record<string, number | null> }>", doc: "One item per period, oldest first. null or a missing key is no data: the line breaks there, never dropping to zero." },
+    { name: "series", type: "Array<{ key: string; label: string; color?: ChartSlot; compare?: boolean }>", doc: "The series in `values`. Slots go series-1 to series-6 in this order, never by rank. `color` pins a slot. `compare` draws the series grey and dashed in chart-compare." },
     { name: "area", type: "boolean", default: "false", doc: "A light fill under the first series. The scale then starts at zero, because the fill stands for an amount." },
     { name: "labels", type: '"auto" | "end" | "none"', default: '"auto"', doc: "auto names two to four lines at their ends, end names every line, none leaves it to the legend." },
     { name: "title", type: "string", doc: "What the chart shows: its accessible name and the hidden table's caption. Inside a ChartFigure, the figure's heading does this." },

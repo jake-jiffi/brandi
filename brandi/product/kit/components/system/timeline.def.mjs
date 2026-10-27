@@ -13,6 +13,9 @@ export default {
   group: "Data",
   job: "What happened to a record, newest first, with an icon by kind and a time.",
   status: "proven",
+  types: [
+    'type TimelineTone = "neutral" | "success" | "warning" | "danger" | "info" | "ai"',
+  ],
   props: [
     { name: "items", type: "{ text: ReactNode; time: string; icon?: IconName; tone?: TimelineTone }[]", doc: "Newest first. Each names who did what." },
     { name: "loading", type: "boolean", default: "false", doc: "Three skeleton rows, with Loading activity for screen readers." },

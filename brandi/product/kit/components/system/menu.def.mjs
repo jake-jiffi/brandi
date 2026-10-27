@@ -54,6 +54,10 @@ export default {
   group: "Overlays",
   job: "Actions on one thing, opened from an overflow button or any trigger.",
   status: "proven",
+  types: [
+    "type MenuAction = { label: string; icon?: IconName; description?: string; shortcut?: string; danger?: boolean; disabled?: boolean; checked?: boolean; onSelect?: () => void }",
+    'type MenuEntry = MenuAction | "separator" | { group: string }',
+  ],
   props: [
     { name: "items", type: "Array<MenuAction | \"separator\" | { group: string }>", doc: "Each action is { label, icon, description, shortcut, danger, disabled, checked, onSelect }. Six or fewer is best." },
     { name: "trigger", type: "ReactElement", doc: "What opens it, such as a Button. Without one, a ghost icon button with three dots. On a canvas, built in the board's script." },

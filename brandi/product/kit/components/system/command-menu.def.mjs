@@ -54,8 +54,11 @@ export default {
   group: "Overlays",
   job: "The palette: jump to any record, run an action or ask the assistant, from anywhere, on Cmd or Ctrl K.",
   status: "proven",
+  types: [
+    "type CommandAction = { label: string; icon?: IconName; description?: string; keywords?: string[]; shortcut?: string; meta?: string; onSelect?: () => void }",
+  ],
   props: [
-    { name: "groups", type: "Array<{ label, items: CommandAction[] }>", doc: "Each item is { label, icon, description, keywords, shortcut, meta, onSelect }. Groups in this order: Jump to, Actions." },
+    { name: "groups", type: "Array<{ label: string; items: CommandAction[] }>", doc: "Each item is { label, icon, description, keywords, shortcut, meta, onSelect }. Groups in this order: Jump to, Actions." },
     { name: "placeholder", type: "string", default: "\"Search or ask\"", doc: "\"Search\" when there is no onAsk, so the field promises nothing it cannot do." },
     { name: "query", type: "string", doc: "The words each opening starts with, for a design on a canvas. Without it, every opening starts empty." },
     { name: "onSelect", type: "(item: CommandAction) => void", doc: "Called with the result that ran, after its own onSelect. The shell navigates here and closes the phone drawer." },

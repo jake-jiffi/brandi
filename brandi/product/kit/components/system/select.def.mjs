@@ -56,7 +56,7 @@ export default {
   job: "One option from a short list, up to about 15.",
   status: "proven",
   props: [
-    { name: "options", type: "Array<string | { value, label, description?, icon?, disabled? }>", doc: "Up to about 15. A description sits under its label in the list only." },
+    { name: "options", type: "Array<string | { value: string; label: string; description?: string; icon?: IconName; disabled?: boolean }>", doc: "Up to about 15. A description sits under its label in the list only." },
     { name: "value", type: "string", doc: "The chosen option, when the page holds it." },
     { name: "defaultValue", type: "string", doc: "The option chosen to start with, when the Select holds it." },
     { name: "onChange", type: "(value: string) => void", doc: "Called with the chosen option's value." },
