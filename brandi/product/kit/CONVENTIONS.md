@@ -40,8 +40,11 @@ this file wins.
 - Type is the `type-*` utilities: `type-hero`, `type-display`, `type-title`, `type-heading-lg`,
   `type-heading`, `type-heading-sm`, `type-kpi`, `type-kpi-sm`, `type-body-lg`, `type-body`,
   `type-label`, `type-meta`, `type-caption`, `type-eyebrow`, `type-code`. Never `text-sm font-medium`.
-- Corners: `rounded-xs`, `rounded-sm`, `rounded-control` (whatever is pressable), `rounded-md`,
-  `rounded-lg`, `rounded-xl`, `rounded-full` (avatars). Shadows: `shadow-xs` to `shadow-xl`.
+- Corners follow the radius tokens' usages: `rounded-xs` (checkboxes, keys, tiny marks), `rounded-sm`
+  (badges, tags, tooltips), `rounded-control` (inputs, selects, menu items), `rounded-action`
+  (whatever a person can press: buttons, chips, segmented controls, the switch), `rounded-md` (cards,
+  menus, toasts), `rounded-lg` (panes, dialogs, sheets, the rail), `rounded-xl` (sign-in frames),
+  `rounded-full` (avatars, dots). Shadows: `shadow-xs` to `shadow-xl`.
 - Spacing is Tailwind's 4px scale. Control heights: 32, 36, 44px (`h-8`, `h-9`, `h-11`).
 
 ## Behaviour every component meets

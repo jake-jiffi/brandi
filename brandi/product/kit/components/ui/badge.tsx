@@ -11,7 +11,7 @@ import { Slot } from "radix-ui"
 // not pressed. The system's status tones, two sizes, the type style, and an optional dot (BadgeDot). The
 // stock variants stay so code written against shadcn still renders.
 const badgeVariants = cva(
-  "group/badge inline-flex w-fit max-w-full min-w-0 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-xs border border-transparent type-caption whitespace-nowrap transition-colors has-[>[data-slot=badge-dot]:first-child]:pl-1.5 has-[>[data-slot=icon]:first-child]:pl-1.5 aria-invalid:border-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex w-fit max-w-full min-w-0 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border border-transparent type-caption whitespace-nowrap transition-colors has-[>[data-slot=badge-dot]:first-child]:pl-1.5 has-[>[data-slot=icon]:first-child]:pl-1.5 aria-invalid:border-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {

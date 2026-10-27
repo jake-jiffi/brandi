@@ -47,7 +47,7 @@ export const Tag = React.forwardRef<HTMLSpanElement, TagProps>(function Tag(
       data-slot="tag"
       data-color={slot}
       className={cn(
-        "inline-flex h-6 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-xs border border-line-strong bg-surface pl-2 type-meta whitespace-nowrap text-text-strong",
+        "inline-flex h-6 max-w-full min-w-0 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong bg-surface pl-2 type-meta whitespace-nowrap text-text-strong",
         onRemove ? "pr-0.5" : "pr-2",
         className
       )}
@@ -64,7 +64,7 @@ export const Tag = React.forwardRef<HTMLSpanElement, TagProps>(function Tag(
           data-slot="tag-remove"
           aria-label={named}
           onClick={onRemove}
-          className="relative inline-flex size-6 shrink-0 items-center justify-center rounded-control text-text-muted transition-colors hover:bg-hover hover:text-text-strong active:bg-pressed pointer-coarse:-my-2 pointer-coarse:-mr-2 pointer-coarse:size-10"
+          className="relative inline-flex size-6 shrink-0 items-center justify-center rounded-action text-text-muted transition-colors hover:bg-hover hover:text-text-strong active:bg-pressed pointer-coarse:-my-2 pointer-coarse:-mr-2 pointer-coarse:size-10"
         >
           <Icon name="X" size={12} />
         </button>

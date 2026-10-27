@@ -627,7 +627,7 @@ function productRadii(system, { action = 'pill' } = {}) {
     { name: 'radius-lg', value: r('xl'), usage: 'Panes, dialogs, sheets and the rail.' },
     { name: 'radius-xl', value: r('2xl'), usage: 'Sign-in and onboarding frames.' },
     { name: 'radius-action', value: action === 'pill' ? '9999px' : action === 'control' ? r('md') : String(action), usage: action === 'pill' ? 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. If it is a pill, you can press it.' : 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. Record the rule in the brand-to-product section.' },
-    { name: 'radius-pill', value: '9999px', usage: 'Whatever the system decides is pressable and pill-shaped. Record the rule in the brand-to-product section.' },
+    { name: 'radius-pill', value: '9999px', usage: 'The full round, for avatars, dots and counts. Whatever a person can press takes radius-action.' },
   ];
 }
 
