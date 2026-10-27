@@ -1,4 +1,13 @@
 // PhoneTopBar's one definition: its README, its preview board and its scripted checks all come from here.
+const rgb = (s) => (String(s).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+const luminance = ([r, g, b]) => {
+  const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(rgb(a)), luminance(rgb(b))].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
 
 const probe = (el, prop, value) => {
   const p = document.createElement("span")
@@ -110,6 +119,18 @@ export default {
         const bar = await scope.locator('[data-slot="phone-top-bar"]').boundingBox()
         const box = await title.boundingBox()
         expect(box.x + box.width <= bar.x + bar.width, "nothing overflows the bar")
+      },
+    },
+    {
+      name: "An action passed in reads on the bar, on any rail, in both themes",
+      example: "detail",
+      themes: ["light", "dark"],
+      async run({ scope, expect, theme }) {
+        // Ghost icon buttons draw in the page's ink, which on a dark rail was 1.6:1.
+        const action = scope.getByRole("button", { name: "More actions for [Invoice 1042]" })
+        const ink = await action.evaluate((el) => getComputedStyle(el).color)
+        const bar = await scope.locator('[data-slot="phone-top-bar"]').evaluate((el) => getComputedStyle(el).backgroundColor)
+        expect.atLeast(Math.round(contrast(ink, bar) * 100) / 100, 3, `the action's icon on the bar in ${theme}`)
       },
     },
     {

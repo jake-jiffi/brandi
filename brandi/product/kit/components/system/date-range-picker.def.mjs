@@ -56,6 +56,7 @@ export default {
       "Named periods are what people call them: This month, Last 30 days, Last financial year.",
       "The words use \"to\" between the days, never a dash, and count the days: 1 day, 31 days.",
     ],
+    Detector: ["Inside a Card or a FormSection the design detector reads the field box as a nested card. The box carries data-impeccable-ignore=\"nested-cards\", because it is a field. axe and every scripted check still run on it."],
     Rules: [
       "One date: a DatePicker. A period of whole months only (a report by month): a Select of months.",
       "Give named periods for the periods the product's reports use. The value is always yyyy-mm-dd; only what people read and type follows the locale.",

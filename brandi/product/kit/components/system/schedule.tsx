@@ -3,7 +3,8 @@
 import * as React from "react"
 
 import { Skeleton } from "@/components/ui/skeleton"
-import { LOCALE } from "@/lib/format-locale"
+import { formatTime, formatTimeRange } from "@/lib/format"
+import { LOCALE, TIME as TIME_STYLE } from "@/lib/format-locale"
 import { useLink } from "@/lib/link"
 import { cn } from "@/lib/utils"
 
@@ -141,8 +142,11 @@ function range(options: Intl.DateTimeFormatOptions, a: Date, b: Date) {
 const TIME: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" }
 const HOUR: Intl.DateTimeFormatOptions = { hour: "numeric" }
 /** A time, or a span of time, without minutes when it falls on the hour: 7 am to 3 pm, 7:00 am to 12:30 pm. */
-const timeOf = (d: Date) => fmt(d.getMinutes() ? TIME : HOUR).format(d)
-const spanOf = (a: Date, b: Date) => range(a.getMinutes() || b.getMinutes() ? TIME : HOUR, a, b)
+// In English, the brand's own way with times (TIME in lib/format-locale.js), on the hour without minutes
+// unless the brand keeps them: 9.30am, 11am to 10.30pm. Another language keeps the locale's own.
+const SPAN = TIME_STYLE.onTheHour === "drop" ? "drop" : "pair"
+const timeOf = (d: Date) => (ENGLISH ? formatTime(d, { onTheHour: "drop" }) : fmt(d.getMinutes() ? TIME : HOUR).format(d))
+const spanOf = (a: Date, b: Date) => (ENGLISH ? formatTimeRange(a, b, { onTheHour: SPAN }) : range(a.getMinutes() || b.getMinutes() ? TIME : HOUR, a, b))
 const LONG_DAY: Intl.DateTimeFormatOptions = { weekday: "long", day: "numeric", month: "long", year: "numeric" }
 const WEEK_STARTS = firstDayOfWeek(LOCALE)
 

@@ -34,7 +34,11 @@ export function impeccablePlatform(platforms = []) {
 /** PRODUCT.md from product.json. A field the intake has not answered is a bracketed gap, never prose. */
 export function productMd({ product = {}, identity, brandName = null }) {
   const out = ['# Product', '', PRODUCT_SCHEMA, ''];
-  const section = (title, body) => { if (body && body.trim()) out.push(`## ${title}`, '', body.trim(), ''); };
+  // A section takes prose or a list: product.json's evidence is often written as a list, and a list once
+  // crashed the starter ("body.trim is not a function"). An item may be text or { claim, source }.
+  const item = (x) => (typeof x === 'string' ? x : x && typeof x === 'object' ? [x.claim ?? x.text ?? x.title, x.source && `(${x.source})`].filter(Boolean).join(' ') : String(x ?? ''));
+  const text = (body) => (Array.isArray(body) ? body.map(item).filter((x) => x.trim()).map((x) => `- ${x}`).join('\n') : typeof body === 'string' ? body : '');
+  const section = (title, body) => { const t = text(body).trim(); if (t) out.push(`## ${title}`, '', t, ''); };
   const surfaces = product.surfaces ?? [];
   section('Platform', impeccablePlatform([...(product.platforms ?? []), ...surfaces.flatMap((s) => s.platforms ?? [])]));
   section('Users', surfaces.map((s) =>

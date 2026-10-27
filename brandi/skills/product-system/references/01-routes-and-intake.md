@@ -97,8 +97,8 @@ the skill, not asked.
 
 Write the answers into `product/product.json` beside the roles, and every assumption into the open
 questions with what changes if it is wrong. The CLI reads the keys it needs (`name`, `roles`,
-`displayForTitles`, `displayCase`, `charts`, `brandColours`, `shape`, `lockup`, `brand`) and ignores
-the rest.
+`displayForTitles`, `displayCase`, `charts`, `time`, `brandColours`, `shape`, `lockup`, `brand`) and
+ignores the rest.
 
 ```json
 {

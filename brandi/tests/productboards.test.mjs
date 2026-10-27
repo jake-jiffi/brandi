@@ -94,8 +94,12 @@ describe('the boards a system generates for itself', () => {
     assert.deepEqual(check.errors, []);
 
     await rm(path.join(starter, 'components', 'system', 'badge.def.mjs'));
+    // An older run measured its pages inside the canvas folder and left them there.
+    await mkdir(path.join(dir, 'canvas', '.measure'), { recursive: true });
+    await writeFile(path.join(dir, 'canvas', '.measure', 'Old.preview.html'), '<p>old</p>');
     await B.writeBoards({ productDir: dir, starter, measure: false });
     const after = await readdir(path.join(dir, 'canvas'));
+    assert.equal(after.includes('.measure'), false, 'no measuring pages left in the canvas folder');
     assert.equal(after.includes('ComponentsStatus1440.dc.html'), false, 'a board for a group that no longer exists is removed');
     assert.ok(after.includes('ConsoleRosters1440.dc.html'));
     await rm(dir, { recursive: true, force: true });

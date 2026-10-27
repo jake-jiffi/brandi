@@ -5,6 +5,7 @@ const invoice = [
   { label: "Status", badge: { label: "Paid", tone: "success" } },
   { label: "Amount", value: "[$4,280.00]" },
   { label: "Due", value: "[14 June 2026]" },
+  { label: "Reminder", value: "[Sent 2 June]", badge: { label: "Opened", tone: "info" } },
   { label: "Purchase order", value: null },
   { label: "Delivery note", value: "[Leave at the side entrance and ring the bell twice; the front door is for patients only.]" },
 ]
@@ -31,7 +32,7 @@ export default {
   job: "Label and value pairs for a record's details, in two columns or stacked.",
   status: "proven",
   props: [
-    { name: "items", type: "{ label: string; value?: ReactNode; badge?: { label: string; tone?: BadgeTone }; empty?: string }[]", doc: "The pairs, in order. A missing value shows `empty`, \"Not set\" by default." },
+    { name: "items", type: "{ label: string; value?: ReactNode; badge?: { label: string; tone?: BadgeTone }; empty?: string }[]", doc: "The pairs, in order. A missing value shows `empty`, \"Not set\" by default. A badge shows on its own, or after the value when both are given." },
     { name: "layout", type: '"columns" | "stacked"', default: '"columns"', doc: "Columns: label beside value, stacking under 420px of its own width. Stacked: label above value, for side panes." },
     { name: "loading", type: "boolean", default: "false", doc: "The labels stay; each value waits as a skeleton." },
   ],
@@ -110,6 +111,15 @@ export default {
       },
     },
     {
+      name: "An item with a value and a badge shows both, the value first",
+      example: "columns",
+      async run({ scope, expect }) {
+        const item = scope.locator('[data-slot="description-item"]').filter({ hasText: "Reminder" })
+        expect.equal((await item.locator("dd").innerText()).replace(/\s+/g, " ").trim(), "[Sent 2 June] Opened", "the value, then its state")
+        expect.equal(await item.locator('[data-slot="badge"]').count(), 1, "the state is a badge")
+      },
+    },
+    {
       name: "Labels are text-subtle and values text, in both themes",
       example: "columns",
       themes: ["light", "dark"],
@@ -136,7 +146,7 @@ export default {
         const list = scope.locator('[data-slot="description-list"]')
         expect.equal(await list.getAttribute("aria-busy"), "true", "the list is busy")
         expect.equal(await list.locator("dt").first().innerText(), "Client", "the first label")
-        expect.equal(await list.locator('dd [data-slot="skeleton"]').count(), 6, "a skeleton for each value")
+        expect.equal(await list.locator('dd [data-slot="skeleton"]').count(), invoice.length, "a skeleton for each value")
       },
     },
   ],

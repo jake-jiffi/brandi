@@ -32,6 +32,12 @@ describe('PRODUCT.md, from the intake', () => {
     assert.ok(md.includes(CONTEXT_MARKER));
   });
 
+  test('evidence written as a list becomes bullets, a claim with its source, rather than crashing', () => {
+    const md = productMd({ identity, product: { evidence: ['Ordering moved online in 2024', { claim: 'Forty restaurants', source: 'guidelines p50' }, ''] } });
+    assert.match(md, /## Evidence on Hand\n\n- Ordering moved online in 2024\n- Forty restaurants \(guidelines p50\)\n/);
+    assert.match(productMd({ identity, product: { evidence: 'One line of prose.' } }), /## Evidence on Hand\n\nOne line of prose\.\n/);
+  });
+
   test('a section the intake never answered is left out, not filled with prose', () => {
     const md = productMd({ identity, product: {} });
     for (const h of ['## Users', '## Product Purpose', '## Positioning', '## Operating Context', '## Evidence on Hand']) {

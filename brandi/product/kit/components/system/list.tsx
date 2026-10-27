@@ -34,6 +34,8 @@ export interface ListProps extends Omit<React.HTMLAttributes<HTMLElement>, "chil
   loading?: boolean
   /** How many skeleton rows stand in while it loads. */
   loadingRows?: number
+  /** What leads each skeleton row: the rows' avatar or icon tile, or nothing. Taken from the items when there are any. */
+  loadingLeading?: "avatar" | "icon" | "none"
   /** What an empty list says: a sentence, the same as data, or an EmptyState. */
   empty?: React.ReactNode | ListStateText
   /** What it says when its rows could not load, naming the system: a sentence, the same as data, or an EmptyState. */
@@ -73,7 +75,7 @@ export function stateView(
 
 /** A column of ListRows: records on phones, inboxes, queues, and the left pane of list and detail. */
 export const List = React.forwardRef<HTMLElement, ListProps>(function List(
-  { items, boxed = true, divided = true, loading = false, loadingRows = 3, empty, error, onRetry, headingLevel = 3, className, children, ...rest },
+  { items, boxed = true, divided = true, loading = false, loadingRows = 3, loadingLeading, empty, error, onRetry, headingLevel = 3, className, children, ...rest },
   ref
 ) {
   const nested = React.useContext(cardNesting)
@@ -86,6 +88,9 @@ export const List = React.forwardRef<HTMLElement, ListProps>(function List(
 
   if (loading) {
     const count = Math.max(1, Math.min(12, Math.floor(Number(loadingRows)) || 3))
+    // A skeleton is the shape of the rows to come, so it leads with an avatar only where they have one.
+    const first = Array.isArray(items) ? items[0] : undefined
+    const lead = loadingLeading ?? (first?.avatar ? "avatar" : first?.icon ? "icon" : "none")
     return (
       <div ref={ref as React.Ref<HTMLDivElement>} data-slot="list" data-boxed={box || undefined} aria-busy="true" className={frame} {...rest}>
         {Array.from({ length: count }, (_, i) => (
@@ -95,7 +100,7 @@ export const List = React.forwardRef<HTMLElement, ListProps>(function List(
             data-slot="list-skeleton-row"
             className={cn("flex items-center gap-3 py-3", nested ? "px-6 @max-[359px]:px-4" : "px-4", divided && i > 0 && "border-t border-line")}
           >
-            <Skeleton circle width={40} />
+            {lead === "avatar" ? <Skeleton circle width={40} /> : lead === "icon" ? <Skeleton width={40} height={40} className="rounded-md" /> : null}
             <div className="flex min-w-0 flex-1 flex-col gap-2">
               <Skeleton height={12} width={["55%", "40%", "48%"][i % 3]} />
               <Skeleton height={10} width={["35%", "50%", "28%"][i % 3]} />

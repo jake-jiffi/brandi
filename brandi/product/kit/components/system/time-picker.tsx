@@ -4,8 +4,7 @@ import * as React from "react"
 
 import { inputBare, inputBox } from "@/components/ui/input"
 import { Popover as PopoverRoot, PopoverAnchor } from "@/components/ui/popover"
-import { formatNumber } from "@/lib/format"
-import { LOCALE } from "@/lib/format-locale"
+import { formatNumber, formatTime } from "@/lib/format"
 import { useMergedRef } from "@/lib/refs"
 import { cn } from "@/lib/utils"
 
@@ -15,11 +14,11 @@ import { useFieldControl } from "./field"
 const { OptionList, Panel, PanelPicture, Toggle } = comboboxParts
 
 const pad = (n: number) => String(n).padStart(2, "0")
-const clock = new Intl.DateTimeFormat(LOCALE, { hour: "numeric", minute: "2-digit" })
 
 /** Minutes after midnight to the market's way of writing a time: 9:30 pm in en-AU, 21:30 in en-GB. */
 function label(minutes: number) {
-  return clock.format(new Date(2026, 0, 1, Math.floor(minutes / 60), minutes % 60)).replace(/\s+/g, " ")
+  // Written the way the brand writes times (TIME in lib/format-locale.js): 9:30 am, or 9.30am.
+  return formatTime(minutes)
 }
 const toValue = (minutes: number) => `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
 /** "21:30" to minutes after midnight; null for anything else. */

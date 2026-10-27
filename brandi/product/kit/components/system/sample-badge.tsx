@@ -27,7 +27,9 @@ export const SampleBadge = React.forwardRef<HTMLSpanElement, SampleBadgeProps>(f
       variant="neutral"
       size={size}
       data-slot="sample-badge"
-      className={cn("border-dashed border-line-control bg-transparent text-text-muted", className)}
+      // Its own surface under the words, so it reads on any ground: on a brand-coloured field the muted
+      // words once fell to 3.4:1.
+      className={cn("border-dashed border-line-control bg-surface text-text-muted", className)}
       {...rest}
     >
       <Icon name="FlaskConical" size={12} />

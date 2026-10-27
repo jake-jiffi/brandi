@@ -216,6 +216,20 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
  * The generated part of lib/brand.ts, and any stills to copy into public/brand/. Throws, naming the
  * file, when a mark is missing or unsafe.
  */
+/**
+ * A PNG logo as an SVG the system can draw like any other mark: the picture inside a viewBox of its own
+ * size, so a lockup, a rail and an email size it by its shape. Some brands only supply the logo for a
+ * screen header as a PNG.
+ */
+export function rasterMark(bytes, where = 'a mark') {
+  const png = bytes.length > 24 && bytes.readUInt32BE(0) === 0x89504e47 && bytes.toString('ascii', 12, 16) === 'IHDR';
+  if (!png) throw new Error(`${where} is not a PNG or an SVG. Export it as either.`);
+  if (bytes.length > 400 * 1024) throw new Error(`${where} is ${Math.round(bytes.length / 1024)} KB. Export it at twice the largest size it is drawn at.`);
+  const w = bytes.readUInt32BE(16);
+  const h = bytes.readUInt32BE(20);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}"><image href="data:image/png;base64,${bytes.toString('base64')}" width="${w}" height="${h}"/></svg>`;
+}
+
 export function brandConstant(src, { publicDir = null, stills = new Map() } = {}) {
   const read = (rel, what) => {
     const file = path.resolve(src.base, rel);
@@ -225,6 +239,12 @@ export function brandConstant(src, { publicDir = null, stills = new Map() } = {}
   const marks = {};
   for (const [rendition, rel] of Object.entries(src.files ?? {})) {
     if (!RENDITIONS.includes(rendition)) throw new Error(`${src.from} names a mark "${rendition}"; the renditions are ${RENDITIONS.join(', ')}.`);
+    if (rel && /\.png$/i.test(rel)) {
+      // A picture cannot take the text colour, so an ink rendition stays an outline drawing.
+      if (rendition.endsWith('-ink')) throw new Error(`${src.from}: the ${rendition} mark has to be an SVG, because an ink rendition takes the text colour and a PNG cannot.`);
+      marks[rendition] = rasterMark(readFileSync(read(rel, `the ${rendition} mark`).file), rel);
+      continue;
+    }
     // An ink rendition is one colour by definition, so whatever its file's ink, it takes the text colour.
     if (rel) marks[rendition] = scopeClasses(tighten((rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel))), `brand-${rendition}-`);
   }
@@ -302,4 +322,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { shrinkStill, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
+export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };

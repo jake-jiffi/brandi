@@ -130,6 +130,10 @@ export const ListRow = React.forwardRef<HTMLElement, ListRowProps>(function List
     </ItemMedia>
   ) : null
 
+  // A short value alone (an amount, a count) stays on the right at any width: moved under the meta line on a
+  // phone it took a line of its own for a few characters. A badge still moves under the text.
+  const inline = !hasBadge && hasTrailing && (typeof trailing === "string" || typeof trailing === "number")
+
   const side =
     hasBadge || hasTrailing ? (
       // Never squeezed: the text gives way first, and under 480px of list the badge moves under it, whole.
@@ -156,8 +160,13 @@ export const ListRow = React.forwardRef<HTMLElement, ListRowProps>(function List
       {lead}
       {/* The text keeps at least 192px: on a crowded row the badge and value move under it, whole, rather than
           cutting the title to nothing. Under 480px of list they always go under it. */}
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5 @max-[479px]:flex-col @max-[479px]:flex-nowrap @max-[479px]:items-start">
-        <ItemContent className="w-full min-w-0 flex-[1_1_12rem] gap-0.5 @max-[479px]:flex-none">
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 items-center gap-x-3 gap-y-1.5",
+          inline ? "flex-nowrap @max-[479px]:items-start" : "flex-wrap @max-[479px]:flex-col @max-[479px]:flex-nowrap @max-[479px]:items-start"
+        )}
+      >
+        <ItemContent className={cn("w-full min-w-0 gap-0.5", inline ? "flex-1" : "flex-[1_1_12rem] @max-[479px]:flex-none")}>
           <span className="flex min-w-0 items-center gap-2">
             <span ref={setTitleEl} id={titleId} data-slot="list-row-title" className={cn("min-w-0 type-heading-sm text-text-strong", fit)}>
               {title}

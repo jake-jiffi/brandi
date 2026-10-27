@@ -42,7 +42,9 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
     <header
       ref={ref}
       data-slot="phone-top-bar"
-      className={cn("flex h-14 min-w-0 shrink-0 items-center gap-1 border-b border-rail-line bg-rail px-2 text-rail-text-strong [--focus:var(--rail-focus)]", className)}
+      // on-rail: the actions a product passes in are ghost buttons drawn in the page's roles, so the bar
+      // points those roles at the rail's.
+      className={cn("on-rail flex h-14 min-w-0 shrink-0 items-center gap-1 border-b border-rail-line bg-rail px-2 text-rail-text-strong", className)}
     >
       {back ? (
         <ButtonBase asChild variant="ghost" size="icon" className={control}>

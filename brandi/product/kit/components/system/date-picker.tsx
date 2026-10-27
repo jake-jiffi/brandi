@@ -379,6 +379,10 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
     <div
       ref={box}
       data-slot="date-picker"
+      // The design detector reads this field box as a card when it sits in a Card or FormSection and
+      // reports "card inside card". It is a field, so the box carries the detector's own ignore. axe and
+      // the scripted checks still run on everything inside it.
+      data-impeccable-ignore="nested-cards"
       data-size={size}
       data-state={design || shown ? "open" : "closed"}
       className={cn(inputBox, "pr-0.5 pointer-coarse:pr-0.5")}

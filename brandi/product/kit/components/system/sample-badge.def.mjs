@@ -25,6 +25,11 @@ export default {
       markup: `<div style="display: flex; align-items: center; gap: 12px;"><span style="font-family: var(--font-display); font-size: 26px; line-height: 32px; color: var(--text-strong);">Revenue</span><x-import component-from-global-scope="NS.SampleBadge"></x-import></div>`,
     },
     {
+      id: "on-brand",
+      title: "On a brand-coloured field",
+      markup: `<div style="display: flex; align-items: center; gap: 12px; padding: 16px; border-radius: 12px; background: var(--brand); color: var(--on-brand);"><span style="font-size: 16px;">Welcome back</span><x-import component-from-global-scope="NS.SampleBadge"></x-import></div>`,
+    },
+    {
       id: "sizes",
       title: "Sizes, and beside a status",
       markup: `<x-import component-from-global-scope="NS.SampleBadge" size="sm"></x-import>
@@ -44,6 +49,26 @@ export default {
         expect.equal(own, "dashed", "the sample badge is dashed")
         expect.equal(status, "solid", "a status badge is solid")
         expect.equal(await badge.locator("svg").getAttribute("aria-hidden"), "true", "its icon is decoration")
+      },
+    },
+    {
+      name: "Its words hold 4.5:1 on any ground, a brand-coloured field included, in both themes",
+      example: "on-brand",
+      themes: ["light", "dark"],
+      async run({ scope, expect, theme }) {
+        // Against the first painted ground under the words: the badge's own, or the field's when it has none.
+        const [fg, bg] = await scope.locator('[data-slot="sample-badge"]').evaluate((el) => {
+          let ground = "rgb(255, 255, 255)"
+          for (let n = el; n; n = n.parentElement) {
+            const c = getComputedStyle(n).backgroundColor
+            if (c !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(c)) { ground = c; break }
+          }
+          return [getComputedStyle(el).color, ground]
+        })
+        const rgb = (s) => (String(s).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+        const lum = ([r, g, b]) => [r, g, b].map((c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)).reduce((t, c, i) => t + c * [0.2126, 0.7152, 0.0722][i], 0)
+        const [hi, lo] = [lum(rgb(fg)), lum(rgb(bg))].sort((a, b) => b - a)
+        expect.atLeast(Math.round(((hi + 0.05) / (lo + 0.05)) * 100) / 100, 4.5, `its words on its own surface in ${theme}`)
       },
     },
     {

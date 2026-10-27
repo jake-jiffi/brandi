@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { formatNumber, NUMBER_STYLES } from '../product/kit/lib/format.js';
+import { formatNumber, formatTime, formatTimeRange, NUMBER_STYLES } from '../product/kit/lib/format.js';
 
 // The kit's one formatter: the starter imports it and the canvas bundle is built from it, so this
 // table is the parity proof for both. 7 styles by 17 values, the reference build's 119 cases.
@@ -187,3 +187,28 @@ describe('the number formatter', () => {
     assert.deepEqual(declared, [...NUMBER_STYLES]);
   });
 });
+
+describe('the time formatter', () => {
+  const at = (h, m) => new Date(2026, 0, 5, h, m);
+  test("the kit's own way: minutes kept, a space before am or pm", () => {
+    assert.equal(formatTime(570), '9:30 am', 'minutes after midnight');
+    assert.equal(formatTime(at(9, 0)), '9:00 am');
+    assert.equal(formatTime(at(0, 0), { onTheHour: 'drop' }), '12 am');
+    assert.equal(formatTime('9:30'), '', 'not a time, so nothing');
+  });
+
+  test('a span shares its am or pm, and "pair" drops minutes only when both ends are on the hour', () => {
+    assert.equal(formatTimeRange(at(8, 0), at(10, 0), { onTheHour: 'pair' }), '8 to 10 am');
+    assert.equal(formatTimeRange(at(8, 0), at(12, 0), { onTheHour: 'pair' }), '8 am to 12 pm');
+    assert.equal(formatTimeRange(at(7, 0), at(12, 30), { onTheHour: 'pair' }), '7:00 am to 12:30 pm');
+  });
+
+  test("a brand's own way reaches every time: 11am to 10.30pm", () => {
+    const time = { minutes: '.', onTheHour: 'drop', space: false };
+    assert.equal(formatTime(at(11, 0), { time }), '11am');
+    assert.equal(formatTime(at(22, 30), { time }), '10.30pm');
+    assert.equal(formatTimeRange(at(11, 0), at(22, 30), { time }), '11am to 10.30pm');
+    assert.equal(formatTimeRange(at(9, 0), at(11, 0), { time }), '9 to 11am');
+  });
+});
+

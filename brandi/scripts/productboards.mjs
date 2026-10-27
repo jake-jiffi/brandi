@@ -11,7 +11,8 @@
  * states, options) are never touched; they keep their place below the generated rows.
  */
 
-import { existsSync, readFileSync, readdirSync, writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, unlinkSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -275,9 +276,11 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
 
   // Measure each light board as rendered, then write it again at its true height.
   const heights = {};
+  // Measured from a folder of its own, removed after: the pages once stayed in the canvas folder. A
+  // rendered page sets its base to the canvas, so it loads the system from there wherever it sits.
+  rmSync(path.join(productDir, 'canvas', '.measure'), { recursive: true, force: true });
   if (measure && existsSync(path.join(starter, 'node_modules', 'playwright'))) {
-    const pagesDir = path.join(productDir, 'canvas', '.measure');
-    mkdirSync(pagesDir, { recursive: true });
+    const pagesDir = mkdtempSync(path.join(os.tmpdir(), 'brandi-measure-'));
     const pages = [];
     for (const b of lights) {
       const res = await previewArtboard(path.join(canvas, b.file), { outDir: pagesDir, width: W, height: 900, png: false });
@@ -286,6 +289,7 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
     writeFileSync(path.join(pagesDir, 'pages.json'), JSON.stringify(pages));
     const run = spawnSync(process.execPath, [path.join('tools', 'measure-boards.mjs'), '--pages', path.join(pagesDir, 'pages.json')], { cwd: starter, encoding: 'utf8', timeout: 600000 });
     try { Object.assign(heights, JSON.parse(run.stdout.trim().split('\n').pop())); } catch { log(`could not measure the boards: ${(run.stderr || run.stdout).slice(-300)}`); }
+    rmSync(pagesDir, { recursive: true, force: true });
   }
   const heightOf = (b) => (typeof heights[b.name] === 'number' ? Math.max(400, heights[b.name]) : 1600);
   const rewrite = (b) => b.source.replace(/"\$preview":\{"width":1440,"height":\d+\}/, `"$preview":{"width":1440,"height":${heightOf(b)}}`);

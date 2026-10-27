@@ -24,6 +24,7 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `roles.rail` | A signature navigation surface | None: the rail is a quiet surface |
 | `displayForTitles` | Whether the display face sets page titles | `true` |
 | `displayCase` | `"upper"` when the brand only ever sets its display face in capitals: the hero, display and title styles take capitals, tracked open a little | Unset: the face's own case |
+| `time` | How the brand writes a time, `{ "minutes": ":" or ".", "onTheHour": "keep" or "drop", "space": true or false }`. "11am to 10.30pm" is `{ ".", "drop", false }`. Every time the system writes follows it | 9:30 am: minutes kept, a space before am or pm |
 | `charts.avoid` | Colours the brand keeps off one theme's grounds, `{ "light": [...], "dark": [...] }`: no chart series takes them or their hue there | None |
 | `brandColours` | The brand book's named colours, emitted as `brand-*` | The primary and accents |
 

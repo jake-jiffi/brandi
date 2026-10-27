@@ -39,6 +39,7 @@ export default {
     { name: "divided", type: "boolean", default: "true", doc: "Hairlines between rows." },
     { name: "loading", type: "boolean", default: "false", doc: "The rows wait as skeletons, and the list says it is loading, once." },
     { name: "loadingRows", type: "number", default: "3", doc: "How many skeleton rows stand in." },
+    { name: "loadingLeading", type: '"avatar" | "icon" | "none"', doc: "What leads each skeleton row: the rows' avatar, their icon tile, or nothing. Taken from the items when there are any, nothing otherwise." },
     { name: "empty", type: "ReactNode | { title: ReactNode; description?: ReactNode; actions?: FeedbackAction[] }", default: '"Nothing to show yet."', doc: "What an empty list says: a sentence, the same as data, or an EmptyState." },
     { name: "error", type: "ReactNode | { title: ReactNode; description?: ReactNode; actions?: FeedbackAction[] }", doc: "What it says when its rows could not load, naming the system: a sentence, the same as data, or an EmptyState." },
     { name: "onRetry", type: "() => void", doc: "Adds Try again to the error." },
@@ -96,7 +97,7 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
       id: "loading",
       title: "Loading",
       layout: "block",
-      markup: `<div class="max-w-md"><x-import component-from-global-scope="NS.List" loading="{{yes}}"></x-import></div>`,
+      markup: `<div class="flex max-w-3xl flex-wrap items-start gap-6"><div class="w-80"><x-import component-from-global-scope="NS.List" loading="{{yes}}"></x-import></div><div class="w-80"><x-import component-from-global-scope="NS.List" loading="{{yes}}" loading-leading="avatar"></x-import></div></div>`,
     },
     {
       id: "empty",
@@ -172,10 +173,13 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
       name: "Loading says so once, and waits with skeleton rows hidden from screen readers",
       example: "loading",
       async run({ scope, expect }) {
-        const list = scope.locator('[data-slot="list"]')
+        const list = scope.locator('[data-slot="list"]').first()
         expect.equal(await list.getAttribute("aria-busy"), "true", "it is busy")
-        expect.equal((await scope.getByRole("status").textContent()).trim(), "Loading", "one polite status")
-        expect.equal(await scope.locator('[data-slot="list-skeleton-row"][aria-hidden="true"]').count(), 3, "three hidden skeleton rows")
+        expect.equal((await list.getByRole("status").textContent()).trim(), "Loading", "one polite status")
+        expect.equal(await scope.locator('[data-slot="list"]').first().locator('[data-slot="list-skeleton-row"][aria-hidden="true"]').count(), 3, "three hidden skeleton rows")
+        // The shape of the rows to come: no avatar circle unless the rows have avatars.
+        expect.equal(await scope.locator('[data-slot="list"]').first().locator(".rounded-full").count(), 0, "no avatar where the rows have none")
+        expect.equal(await scope.locator('[data-slot="list"]').nth(1).locator('[data-slot="list-skeleton-row"] .rounded-full').count(), 3, "an avatar on each row of a people list")
         expect.equal(await scope.getByRole("listitem").count(), 0, "no rows yet")
       },
     },

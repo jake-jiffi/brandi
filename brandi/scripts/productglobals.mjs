@@ -232,6 +232,19 @@ ${fontLine('mono', '--font-brand-mono', fam.mono, 'ui-monospace, monospace')}
 /* 5. Type styles: use these instead of combining text-sm, font-* and leading-*. */
 ${styles.map(([s, f]) => styleUtility(s, f)).join('\n')}
 
+/* A surface in the rail's colour away from the rail (a phone's top bar, a dark header on a board): the
+   roles a control reads become the rail's, so a ghost button, its hover and its focus read on it. On a
+   dark rail a ghost icon button drew the page's ink at 1.6:1. */
+@utility on-rail {
+  --text-strong: var(--rail-text-strong);
+  --text: var(--rail-text);
+  --text-muted: var(--rail-muted);
+  --hover: var(--rail-hover);
+  --pressed: var(--rail-selected);
+  --focus: var(--rail-focus);
+  --line: var(--rail-line);
+}
+
 /* Loading states: under a second, people see nothing; after that the skeleton fades in. */
 @utility appear-late {
   animation: appear-late 150ms var(--ease-standard) 800ms both;

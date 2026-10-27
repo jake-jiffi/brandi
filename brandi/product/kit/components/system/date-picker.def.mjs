@@ -54,6 +54,7 @@ export default {
       "Errors say what to enter: Enter a date as dd/mm/yyyy. Choose a date from 02/11/2026 to 27/11/2026.",
       "The calendar button is named for the field: Choose due date.",
     ],
+    Detector: ["Inside a Card or a FormSection the design detector reads the field box as a nested card. The box carries data-impeccable-ignore=\"nested-cards\", because it is a field. axe and every scripted check still run on it."],
     Rules: [
       "A date people know by heart (a birthday) is quicker typed: say the shape in the hint.",
       "Days are 36px, 44px on touch. The value is always yyyy-mm-dd; only what people read and type follows the locale.",

@@ -87,6 +87,12 @@ export function systemIdentity(config = {}, { brandName } = {}) {
     lang: config.lang ?? locale,
     // How the product name is set in the lockup: "label" (the default) or "eyebrow" (small, bold, upper case).
     lockupName: config.lockup?.name === 'eyebrow' ? 'eyebrow' : 'label',
+    // How the brand writes a time: "11am to 10.30pm" is { minutes: ".", onTheHour: "drop", space: false }.
+    time: {
+      minutes: config.time?.minutes === '.' ? '.' : ':',
+      onTheHour: config.time?.onTheHour === 'drop' ? 'drop' : 'keep',
+      space: config.time?.space !== false,
+    },
   };
 }
 
@@ -143,13 +149,26 @@ export function fontsModule(tokens) {
   ].join('\n');
 }
 
+/** lib/format-locale.js: the market's locale and currency, and how the brand writes a time. */
+export function localeModule(identity) {
+  const t = identity.time ?? { minutes: ':', onTheHour: 'keep', space: true };
+  return [
+    "// The market's locale and currency. `brandi product starter` writes this file from the system.",
+    `export const LOCALE = ${JSON.stringify(identity.locale)}`,
+    `export const CURRENCY = ${JSON.stringify(identity.currency)}`,
+    '// How a time is written: minutes after a ":" or a ".", minutes on the hour kept or dropped, a space before am or pm or not.',
+    `export const TIME = { minutes: ${JSON.stringify(t.minutes)}, onTheHour: ${JSON.stringify(t.onTheHour)}, space: ${t.space !== false} }`,
+    '',
+  ].join('\n');
+}
+
 /** Every file the system owns in a starter, as path -> content. */
 export function generatedFiles(tokens, identity) {
   return new Map([
     ['system/tokens.json', `${JSON.stringify(tokens, null, 2)}\n`],
     ['system/system.json', `${JSON.stringify({ ...identity, fontsUrl: hostedFontsUrl(tokens) }, null, 2)}\n`],
     ['app/globals.css', toStarterGlobals(tokens)],
-    ['lib/format-locale.js', `// The market's locale and currency. \`brandi product starter\` writes this file from the system.\nexport const LOCALE = ${JSON.stringify(identity.locale)}\nexport const CURRENCY = ${JSON.stringify(identity.currency)}\n`],
+    ['lib/format-locale.js', localeModule(identity)],
     ['lib/product.ts', `// The product's name and language, set once, and two things read off the system. \`brandi product starter\` writes this file.\n// railTone: whether the rail is dark in the light theme, so the rail's lockup takes the mark drawn for dark grounds.\n// lockupName: how the product name is set beside the mark, a brand-to-product decision.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)}, railTone: ${JSON.stringify(railTone(tokens))}, lockupName: ${JSON.stringify(identity.lockupName ?? 'label')} } as {\n  name: string\n  lang: string\n  railTone: "light" | "dark"\n  lockupName: "label" | "eyebrow"\n}\n`],
     ['app/fonts.ts', fontsModule(tokens)],
     ['tools/build-globals.mjs', readFileSync(GLOBALS_SOURCE, 'utf8')],

@@ -54,6 +54,7 @@ const LONG_TITLE = "Superannuation guarantee statement for [Harbour Physio Pty L
 const long = [
   { id: "s1", icon: "FileText", title: LONG_TITLE, meta: "Lodged by [Sam Lee] · due [28 July] · [12] staff", badge: { label: "Needs approval", tone: "highlight" }, href: "#statement-1" },
   { id: "s2", icon: "FileText", title: "BAS for [April to June]", meta: "Drafted by the assistant · [3] questions", badge: { label: "Draft", tone: "ai" }, href: "#statement-2" },
+  { id: "s4", icon: "Receipt", title: "Invoice [1047] for [Bayside Dental]", meta: "Sent [4 June] · due [30 June]", trailing: "[$880.00]", href: "#statement-4" },
   { id: "s3", icon: "Receipt", title: "Invoice [1046] for [Hillcrest Pharmacy]", meta: "Sent [3 June] · due [28 June]", badge: { label: "Waiting on finance approval", tone: "warning" }, trailing: "[$12,640.75]", chevron: true, href: "#statement-3" },
 ]
 
@@ -87,7 +88,7 @@ export default {
     ],
     Layout: [
       "On a wide list, long text in a row that opens is cut with an ellipsis, and shows in full on hover, on keyboard focus and on a long press. A row that opens nothing wraps instead, because nothing could show the rest.",
-      "Under 480px of list the row wraps: the text runs to as many lines as it needs, and a badge or a trailing value moves under it, whole. The action stays on the right. On a wider row the text keeps at least 192px, and a badge that would take it moves under the text, whole, too.",
+      "Under 480px of list the row wraps: the text runs to as many lines as it needs, and a badge, or a value beside a badge, moves under it, whole. A short value alone stays on the right, beside the title. The action stays on the right. On a wider row the text keeps at least 192px, and a badge that would take it moves under the text, whole, too.",
       "16px in from the list's edges, 24px inside a card, lining up with its title; 12px above and below. An avatar is 40px beside a meta line, 32px without one. A leading checkbox sits on the title's line.",
     ],
     States: [
@@ -289,6 +290,19 @@ approvedLine: self.state.approved ? "Approved " + self.state.approved + "." : "N
         const badge = await first.locator('[data-slot="badge"]').boundingBox()
         expect(badge.y >= meta.y + meta.height - 0.5, "the badge sits under the text")
         expect(await first.locator('[data-slot="badge-label"]').evaluate((el) => el.scrollWidth <= el.clientWidth), "the badge's word is whole")
+      },
+    },
+    {
+      name: "Under 480px of list a short value alone stays on the right, beside the title",
+      example: "narrow",
+      async run({ scope, expect }) {
+        const r = row(scope, "Invoice [1047]")
+        const title = await r.locator('[data-slot="list-row-title"]').boundingBox()
+        const meta = await r.locator('[data-slot="list-row-meta"]').boundingBox()
+        const value = await r.locator('[data-slot="list-row-side"]').boundingBox()
+        expect(value.x >= title.x + title.width - 0.5, "the value is to the right of the title")
+        expect(value.y < meta.y + meta.height, "and not on a line of its own under the meta line")
+        expect(await r.locator('[data-slot="list-row-side"] span').evaluate((el) => el.scrollWidth <= el.clientWidth), "the value is whole")
       },
     },
     {

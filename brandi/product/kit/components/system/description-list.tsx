@@ -10,7 +10,7 @@ export type DescriptionBadgeTone = BadgeTone
 export interface DescriptionItem {
   label: string
   value?: React.ReactNode
-  /** A state as a badge instead of a value: the word carries it, the tone backs it up. */
+  /** A state as a badge: on its own, or after the value. The word carries it, the tone backs it up. */
   badge?: { label: string; tone?: DescriptionBadgeTone }
   /** What a missing value says, "Not set" by default. Never blank. */
   empty?: string
@@ -59,6 +59,14 @@ export const DescriptionList = React.forwardRef<HTMLDListElement, DescriptionLis
           <dd className="min-w-0 type-body text-text wrap-anywhere">
             {loading ? (
               <Skeleton aria-hidden className={cn("my-0.5 h-4 rounded-xs", SKELETON_WIDTHS[index % SKELETON_WIDTHS.length])} />
+            ) : item.badge && !missing(item.value) ? (
+              // Both given, both shown: the value, then its state. A badge once replaced the value unseen.
+              <span className="inline-flex max-w-full flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="min-w-0">{item.value}</span>
+                <Badge tone={item.badge.tone ?? "neutral"} className="max-w-full">
+                  {item.badge.label}
+                </Badge>
+              </span>
             ) : item.badge ? (
               <Badge tone={item.badge.tone ?? "neutral"} className="max-w-full">
                 {item.badge.label}

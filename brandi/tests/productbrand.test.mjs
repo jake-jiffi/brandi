@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { cleanSvg, tighten, toInk, scopeClasses, clearSpaceRatio, brandSources, brandConstant, brandModule, shrinkStill, BRAND_MARKER } from '../scripts/productbrand.mjs';
+import { cleanSvg, rasterMark, tighten, toInk, scopeClasses, clearSpaceRatio, brandSources, brandConstant, brandModule, shrinkStill, BRAND_MARKER } from '../scripts/productbrand.mjs';
 import { encodePng } from '../scripts/png.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
@@ -48,6 +48,19 @@ describe('a mark, made safe to inline', () => {
     assert.match(a, /class="brand-full-cls-1"/);
     assert.match(b, /\.brand-full-on-dark-cls-1\{fill:#fff\}/);
     assert.equal(/\.cls-1\b/.test(a + b), false, 'no bare class rule is left to paint the page');
+  });
+
+  test('a PNG logo becomes a mark drawn in a viewBox of its own size; an ink rendition has to stay an SVG', async () => {
+    const onePixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+    const svg = rasterMark(onePixel, 'cropped.png');
+    assert.match(svg, /^<svg [^>]*viewBox="0 0 1 1"><image href="data:image\/png;base64,iVBOR[^"]+" width="1" height="1"\/><\/svg>$/);
+    assert.throws(() => rasterMark(Buffer.from('GIF89a and more bytes than that'), 'logo.gif'), /logo\.gif is not a PNG or an SVG/);
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-raster-'));
+    await writeFile(path.join(dir, 'cropped.png'), onePixel);
+    const out = brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: { full: 'cropped.png' }, logo: {} });
+    assert.match(out.source, /viewBox=\\?"0 0 1 1\\?"/, 'the brand constant carries it');
+    assert.throws(() => brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: { 'full-ink': 'cropped.png' }, logo: {} }), /has to be an SVG/);
+    await rm(dir, { recursive: true, force: true });
   });
 
   test('simple class styles become attributes, so a mark carries no stylesheet into an email or a page', () => {

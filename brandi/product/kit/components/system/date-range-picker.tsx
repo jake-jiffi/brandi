@@ -283,6 +283,8 @@ export const DateRangePicker = React.forwardRef<HTMLInputElement, DateRangePicke
       // A disabled group says so, so the faded "to" between the inputs counts as part of an inactive control.
       aria-disabled={disabled || undefined}
       data-slot="date-range-picker"
+      // As DatePicker's: the detector reads this field box as a card inside a Card. It is a field.
+      data-impeccable-ignore="nested-cards"
       data-size={size}
       data-state={design || shown ? "open" : "closed"}
       className={cn(inputBox, "pr-0.5 pointer-coarse:pr-0.5")}
