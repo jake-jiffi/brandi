@@ -7,11 +7,22 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 import { Slot } from "radix-ui"
 
+// Patched (07-starter.md, badge): gentle corners, never the pressable shape, because a badge is read and
+// not pressed. The system's status tones, two sizes, the type style, and an optional dot (BadgeDot). The
+// stock variants stay so code written against shadcn still renders.
 const badgeVariants = cva(
-  "group/badge inline-flex h-5 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden rounded-4xl border border-transparent px-2 py-0.5 text-xs font-medium whitespace-nowrap transition-all has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 aria-invalid:border-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex w-fit max-w-full min-w-0 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-xs border border-transparent type-caption whitespace-nowrap transition-colors has-[>[data-slot=badge-dot]:first-child]:pl-1.5 has-[>[data-slot=icon]:first-child]:pl-1.5 aria-invalid:border-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {
+        neutral: "border-line bg-tag-grey text-text-muted",
+        success: "border-success-line bg-success-surface text-success",
+        warning: "border-warning-line bg-warning-surface text-warning",
+        danger: "border-danger-line bg-danger-surface text-danger",
+        info: "border-info-line bg-info-surface text-info",
+        ai: "border-ai-line bg-ai-surface text-ai",
+        // "Needs you" is solid, so it never blurs with the tinted warning (round 1).
+        highlight: "bg-highlight text-on-highlight",
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
         secondary:
           "bg-secondary text-secondary-foreground [a]:hover:bg-secondary/80",
@@ -23,9 +34,14 @@ const badgeVariants = cva(
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      size: {
+        sm: "h-5 px-1.5",
+        md: "h-6 px-2",
+      },
     },
     defaultVariants: {
       variant: "default",
+      size: "md",
     },
   }
 )
@@ -33,6 +49,7 @@ const badgeVariants = cva(
 const Badge = React.forwardRef(function Badge({
   className,
   variant = "default",
+  size = "md",
   asChild = false,
   ...props
 }: React.ComponentProps<"span"> &
@@ -43,11 +60,18 @@ const Badge = React.forwardRef(function Badge({
     <Comp
       data-slot="badge"
       data-variant={variant}
-      className={cn(badgeVariants({ variant }), className)}
+      data-size={size}
+      className={cn(badgeVariants({ variant, size }), className)}
       {...props}
       ref={ref}
     />
   )
 })
 
-export { Badge, badgeVariants }
+// Patched (07-starter.md, badge): the dot, in the badge's own text colour. Forced colours draw it in
+// CanvasText (the base styles' badge-dot rule), so it never vanishes with the tint.
+const BadgeDot = React.forwardRef(function BadgeDot({ className, ...props }: React.ComponentProps<"span">, ref: React.ForwardedRef<any>) {
+  return <span data-slot="badge-dot" aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full bg-current", className)} {...props} ref={ref} />
+})
+
+export { Badge, BadgeDot, badgeVariants }

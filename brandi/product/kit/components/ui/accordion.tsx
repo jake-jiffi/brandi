@@ -8,7 +8,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Accordion as AccordionPrimitive } from "radix-ui"
 
-import { ChevronDownIcon, ChevronUpIcon } from "lucide-react"
+import { ChevronDownIcon } from "lucide-react"
 
 const Accordion = React.forwardRef(function Accordion({
   className,
@@ -24,6 +24,7 @@ const Accordion = React.forwardRef(function Accordion({
   )
 })
 
+// Patched (07-starter.md, accordion): the divider is the system's hairline.
 const AccordionItem = React.forwardRef(function AccordionItem({
   className,
   ...props
@@ -31,43 +32,54 @@ const AccordionItem = React.forwardRef(function AccordionItem({
   return (
     <AccordionPrimitive.Item
       data-slot="accordion-item"
-      className={cn("not-last:border-b", className)}
+      className={cn("border-line not-last:border-b", className)}
       {...props}
       ref={ref}
     />
   )
 })
 
+type HeadingLevel = 2 | 3 | 4 | 5 | 6
+
+// Patched (07-starter.md, accordion): the heading level is a prop, so no page skips one. The header is a
+// real heading in the strong text colour, a full step above the text it opens, at least 48px tall on every
+// screen, inset 12px so its hover wash fills the row (no underline). One chevron turns, only when motion is
+// welcome. Focus is the base styles' outline.
 const AccordionTrigger = React.forwardRef(function AccordionTrigger({
   className,
   children,
+  headingLevel = 3,
   ...props
-}: React.ComponentProps<typeof AccordionPrimitive.Trigger>, ref: React.ForwardedRef<any>) {
+}: React.ComponentProps<typeof AccordionPrimitive.Trigger> & { headingLevel?: HeadingLevel }, ref: React.ForwardedRef<any>) {
+  const level = [2, 3, 4, 5, 6].includes(Number(headingLevel)) ? Number(headingLevel) : 3
+  const Heading = `h${level}` as "h2" | "h3" | "h4" | "h5" | "h6"
+  // The type sits on the heading itself, so the heading measures its real size, and the button inherits it.
   return (
-    <AccordionPrimitive.Header className="flex">
-      <AccordionPrimitive.Trigger
-        data-slot="accordion-trigger"
-        className={cn(
-          "group/accordion-trigger relative flex flex-1 items-start justify-between rounded-md border border-transparent py-4 text-left text-sm font-medium transition-all hover:underline focus-visible:after:border-ring disabled:pointer-events-none disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-4 **:data-[slot=accordion-trigger-icon]:text-muted-foreground",
-          className
-        )}
-        {...props}
-      ref={ref}
-      >
-        {children}
-        <ChevronDownIcon
-          data-slot="accordion-trigger-icon"
-          className="pointer-events-none shrink-0 group-aria-expanded/accordion-trigger:hidden"
-        />
-        <ChevronUpIcon
-          data-slot="accordion-trigger-icon"
-          className="pointer-events-none hidden shrink-0 group-aria-expanded/accordion-trigger:inline"
-        />
-      </AccordionPrimitive.Trigger>
+    <AccordionPrimitive.Header asChild>
+      <Heading data-slot="accordion-header" className="m-0 flex type-heading-lg text-text-strong">
+        <AccordionPrimitive.Trigger
+          data-slot="accordion-trigger"
+          className={cn(
+            "group/accordion-trigger relative flex min-h-12 flex-1 items-center justify-between gap-4 rounded-sm px-3 py-3 text-left transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50 **:data-[slot=accordion-trigger-icon]:ml-auto **:data-[slot=accordion-trigger-icon]:size-5 **:data-[slot=accordion-trigger-icon]:text-text-muted",
+            className
+          )}
+          {...props}
+          ref={ref}
+        >
+          {children}
+          <ChevronDownIcon
+            data-slot="accordion-trigger-icon"
+            aria-hidden="true"
+            className="pointer-events-none shrink-0 motion-safe:transition-transform motion-safe:duration-200 group-aria-expanded/accordion-trigger:rotate-180"
+          />
+        </AccordionPrimitive.Trigger>
+      </Heading>
     </AccordionPrimitive.Header>
   )
 })
 
+// Patched (07-starter.md, accordion): the system's reading size, because what opens is prose, and the height
+// animates only when motion is welcome. Under reduced motion a section appears and goes at once.
 const AccordionContent = React.forwardRef(function AccordionContent({
   className,
   children,
@@ -76,13 +88,13 @@ const AccordionContent = React.forwardRef(function AccordionContent({
   return (
     <AccordionPrimitive.Content
       data-slot="accordion-content"
-      className="overflow-hidden text-sm data-open:animate-accordion-down data-closed:animate-accordion-up"
+      className="overflow-hidden type-body-lg text-text motion-safe:data-open:animate-accordion-down motion-safe:data-closed:animate-accordion-up"
       {...props}
       ref={ref}
     >
       <div
         className={cn(
-          "h-(--radix-accordion-content-height) pt-0 pb-4 [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-foreground [&_p:not(:last-child)]:mb-4",
+          "px-3 pt-0 pb-4 [&_a]:text-link [&_a]:underline [&_a]:underline-offset-3 [&_a]:hover:text-link-hover [&_p:not(:last-child)]:mb-3",
           className
         )}
       >
