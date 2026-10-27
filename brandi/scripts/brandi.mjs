@@ -2869,6 +2869,7 @@ async function cmdProduct(flags, positional) {
       roles: config.roles ?? {},
       displayForTitles: config.displayForTitles ?? true,
       brandColours: config.brandColours ?? null,
+      fonts: config.fonts ?? [],
       source,
     });
     const audit = auditProductTokens(tokens);

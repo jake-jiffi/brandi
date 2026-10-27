@@ -619,7 +619,24 @@ function productRadii(system) {
  * @param {boolean} [opts.displayForTitles] whether the display face sets titles (default true)
  * @param {object} [opts.source]            where the brand came from, recorded in meta
  */
-export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, source = null } = {}) {
+/**
+ * The faces a system ships as files: { family, file, weight, style }. A hosted face (Google) has no
+ * file and is named in the families only.
+ */
+export function checkFonts(fonts) {
+  if (!Array.isArray(fonts)) throw new TypeError('fonts must be a list of { family, file, weight, style }');
+  return fonts.map((f) => {
+    if (!f || typeof f.family !== 'string' || !f.family.trim() || /["']/.test(f.family)) throw new TypeError(`a font needs a bare family name, got ${JSON.stringify(f?.family)}`);
+    if (typeof f.file !== 'string' || !/^fonts\/[A-Za-z0-9_.-]+\.(woff2|woff|ttf|otf)$/.test(f.file)) throw new TypeError(`${f.family}: file must be fonts/<name>.woff2 (or .woff, .ttf, .otf), got ${JSON.stringify(f.file)}`);
+    const weight = String(f.weight ?? '400');
+    if (!/^\d{3}( \d{3})?$/.test(weight)) throw new TypeError(`${f.family}: weight is "400" or a range such as "300 900", got ${JSON.stringify(f.weight)}`);
+    const style = f.style ?? 'normal';
+    if (!['normal', 'italic', 'oblique'].includes(style)) throw new TypeError(`${f.family}: style is normal, italic or oblique`);
+    return { family: f.family.trim(), file: f.file, weight, style };
+  });
+}
+
+export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, source = null, fonts: fontFiles = [] } = {}) {
   if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved Brandi system');
 
   // Decided values arrive as people write them: "#fff" as often as "#FFFFFF",
@@ -710,7 +727,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
       tokens: [...primitives, ...roleTokens],
     },
     type: {
-      fonts: [],
+      fonts: checkFonts(fontFiles),
       families,
       groups: typeGroups({ displayForTitles }),
     },

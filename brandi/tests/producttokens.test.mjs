@@ -263,3 +263,18 @@ describe('an audit of a tokens file it did not write', () => {
     assert.ok(audit.pairs >= full - missing.length - 20, 'the rest are still measured');
   });
 });
+
+describe('faces the system ships as files', () => {
+  test('product.json can list them, and a bad entry is refused with the reason', () => {
+    const system = buildSystem({ primary: '#1F6F4A', type: { display: 'Bitter', body: 'Karla' } });
+    const fonts = [{ family: 'Karla', file: 'fonts/Karla-Variable.woff2', weight: '300 800', style: 'normal' }, { family: 'Bitter', file: 'fonts/Bitter-Book.otf', weight: 400 }];
+    const t = P.buildProductTokens(system, { fonts });
+    assert.deepEqual(t.type.fonts, [{ family: 'Karla', file: 'fonts/Karla-Variable.woff2', weight: '300 800', style: 'normal' }, { family: 'Bitter', file: 'fonts/Bitter-Book.otf', weight: '400', style: 'normal' }]);
+    assert.match(P.toProductCss(t), /@font-face \{ font-family: "Karla"; src: url\("fonts\/Karla-Variable\.woff2"\)/);
+    for (const bad of [{ family: '"Karla"', file: 'fonts/a.woff2' }, { family: 'Karla', file: '../a.woff2' }, { family: 'Karla', file: 'fonts/a.exe' }, { family: 'Karla', file: 'fonts/a.woff2', weight: 'bold' }, { family: 'Karla', file: 'fonts/a.woff2', style: 'slanted' }]) {
+      assert.throws(() => P.buildProductTokens(system, { fonts: [bad] }), TypeError, JSON.stringify(bad));
+    }
+    assert.deepEqual(P.buildProductTokens(system).type.fonts, []);
+  });
+});
+
