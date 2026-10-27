@@ -93,7 +93,7 @@ export const ShareBar = React.forwardRef<HTMLDivElement, ShareBarProps>(function
         <chart.Status
           state={view}
           height={view === "loading" ? BAR + 34 : 96}
-          icon="ChartColumn"
+          icon="ChartBarStacked"
           empty={empty}
           error={error}
           onRetry={onRetry}

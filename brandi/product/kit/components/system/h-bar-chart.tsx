@@ -85,7 +85,7 @@ export const HBarChart = React.forwardRef<HTMLDivElement, HBarChartProps>(functi
         <chart.Status
           state={view}
           height={Math.min(ROWS, Math.max(3, data.length || 5)) * 30}
-          icon="ChartColumn"
+          icon="ChartBarDecreasing"
           empty={empty}
           error={error}
           onRetry={onRetry}

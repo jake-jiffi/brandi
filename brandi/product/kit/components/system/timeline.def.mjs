@@ -5,7 +5,7 @@ const history = [
   { text: "The assistant drafted the [June] pay run from the approved timesheets", time: "Today, 9:12 am", icon: "Sparkles", tone: "ai" },
   { text: "[Priya Nair] asked for [Ravi Patel]'s overtime to be checked before Friday", time: "Yesterday, 4:05 pm", icon: "MessageSquare" },
   { text: "The export to [the bank] failed: [the bank] did not respond", time: "Mon 2 June, 11:20 am", icon: "CircleX", tone: "danger" },
-  { text: "[Alex Chen] created the pay run", time: "Mon 2 June, 9:03 am", icon: "FileText" },
+  { text: "[Alex Chen] created the pay run", time: "Mon 2 June, 9:03 am", icon: "FilePlus" },
 ]
 
 export default {

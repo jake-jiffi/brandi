@@ -3,7 +3,9 @@ import * as React from "react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
-export type DescriptionBadgeTone = "success" | "warning" | "danger" | "info" | "ai" | "highlight" | "neutral"
+import { Badge, type BadgeTone } from "./badge"
+
+export type DescriptionBadgeTone = BadgeTone
 
 export interface DescriptionItem {
   label: string
@@ -22,17 +24,6 @@ export interface DescriptionListProps extends React.HTMLAttributes<HTMLDListElem
   loading?: boolean
 }
 
-// Badge's tones, to its card, with the tone's edge so the tint reads on any ground. Badge replaces
-// this span when it lands in the kit.
-const TONE: Record<DescriptionBadgeTone, string> = {
-  success: "border-success-line bg-success-surface text-success",
-  warning: "border-warning-line bg-warning-surface text-warning",
-  danger: "border-danger-line bg-danger-surface text-danger",
-  info: "border-info-line bg-info-surface text-info",
-  ai: "border-ai-line bg-ai-surface text-ai",
-  highlight: "border-transparent bg-highlight text-on-highlight",
-  neutral: "border-line bg-surface-sunken text-text-muted",
-}
 const SKELETON_WIDTHS = ["w-2/5", "w-3/5", "w-1/3", "w-1/2"]
 
 const missing = (value: React.ReactNode) => value == null || value === "" || value === false
@@ -69,12 +60,9 @@ export const DescriptionList = React.forwardRef<HTMLDListElement, DescriptionLis
             {loading ? (
               <Skeleton aria-hidden className={cn("my-0.5 h-4 rounded-xs", SKELETON_WIDTHS[index % SKELETON_WIDTHS.length])} />
             ) : item.badge ? (
-              <span
-                data-slot="badge"
-                className={cn("inline-flex h-6 max-w-full items-center truncate rounded-sm border px-2 type-caption", TONE[item.badge.tone ?? "neutral"])}
-              >
+              <Badge tone={item.badge.tone ?? "neutral"} className="max-w-full">
                 {item.badge.label}
-              </span>
+              </Badge>
             ) : missing(item.value) ? (
               <span data-slot="description-empty" className="text-text-subtle">
                 {item.empty ?? "Not set"}

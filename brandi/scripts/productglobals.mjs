@@ -356,18 +356,6 @@ ${styles.map(([s, f]) => styleUtility(s, f)).join('\n')}
     background: Mark;
     color: MarkText;
   }
-  /* chart text and grid follow the system colours; the data marks keep their series colours */
-  .recharts-cartesian-axis-tick-value,
-  .recharts-text {
-    fill: CanvasText;
-  }
-  .recharts-cartesian-grid line {
-    stroke: GrayText;
-  }
-  /* an SVG keeps its own colour in forced colours: the wordmark follows the text instead */
-  [data-slot="wordmark"] {
-    color: CanvasText;
-  }
   [data-slot="badge-dot"] {
     forced-color-adjust: none;
     background: CanvasText;

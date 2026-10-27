@@ -111,8 +111,11 @@ export async function driftCheck({ productDir, starter }) {
   const sysDir = path.join(starter, 'components', 'system');
   if (existsSync(sysDir)) {
     const exported = new Set();
-    for (const f of readdirSync(sysDir).filter((x) => x.endsWith('.tsx'))) {
-      for (const m of readFileSync(path.join(sysDir, f), 'utf8').matchAll(/^export (?:const|function) ([A-Z]\w*)/gm)) exported.add(m[1]);
+    // Root, the board provider, lives with the canvas build rather than in components/system.
+    const canvasDir = path.join(starter, 'canvas');
+    const sourcesOf = (dir) => (existsSync(dir) ? readdirSync(dir).filter((x) => x.endsWith('.tsx') && x !== 'entry.tsx').map((x) => path.join(dir, x)) : []);
+    for (const file of [...sourcesOf(sysDir), ...sourcesOf(canvasDir)]) {
+      for (const m of readFileSync(file, 'utf8').matchAll(/^export (?:const|function) ([A-Z]\w*)/gm)) exported.add(m[1]);
     }
     const carded = new Set(defs.map((d) => d.name));
     for (const name of [...exported].sort()) if (!carded.has(name) && !defs.some((d) => (d.parts ?? []).includes(name))) add('catalogue', `components/system: ${name}`, 'has no card (definition)', 'a definition beside it, or fold it into a component that has one');

@@ -30,7 +30,7 @@ export const SampleBadge = React.forwardRef<HTMLSpanElement, SampleBadgeProps>(f
       className={cn("border-dashed border-line-control bg-transparent text-text-muted", className)}
       {...rest}
     >
-      <Icon name="Database" size={12} />
+      <Icon name="FlaskConical" size={12} />
       {children}
     </BadgeBase>
   )
