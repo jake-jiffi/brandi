@@ -122,6 +122,9 @@ describe('the monthly standards check', () => {
     assert.deepEqual(hig, { marker: '2025-12-16' });
     const learn = await S.fetchMarker('WIN-5', 'https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/typography', { fetchImpl: stub('<p>Last updated on 04/14/2026</p>') });
     assert.deepEqual(learn, { marker: '2026-04-14' });
+    // The served page carries the date in updated_at; ms.date is years older on some pages.
+    const served = await S.fetchMarker('WIN-12', 'https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/geometry', { fetchImpl: stub('<meta name="ms.date" content="2021-06-24T00:00:00Z"><meta name="updated_at" content="2026-02-19T16:38:00Z">') });
+    assert.deepEqual(served, { marker: '2026-02-19' });
     const material = await S.fetchMarker('MAT-5', 'https://m3.material.io/components/buttons/overview', { fetchImpl: stub('') });
     assert.match(material.error, /renders in a browser/);
     const down = await S.fetchMarker('AND-1', 'https://developer.android.com/x', { fetchImpl: stub('', false) });

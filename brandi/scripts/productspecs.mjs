@@ -274,8 +274,12 @@ export async function fetchMarker(key, url, { fetchImpl = globalThis.fetch } = {
     if (!res.ok) return { error: `answered ${res.status}` };
     const html = await res.text();
     if (/learn\.microsoft\.com/.test(url)) {
-      const updated = /Last updated on\s*([0-9/]+)/i.exec(html)?.[1] ?? /<meta name="ms\.date" content="([^"]+)"/i.exec(html)?.[1];
-      return updated && toDay(updated) ? { marker: toDay(updated) } : { error: 'no "Last updated on" or ms.date on the page' };
+      // The footer's "Last updated on" is drawn in the browser from updated_at. ms.date is when the page
+      // was first written, years earlier on some pages, so it is the last resort.
+      const updated = /Last updated on\s*([0-9/]+)/i.exec(html)?.[1]
+        ?? /<meta name="updated_at" content="([^"]+)"/i.exec(html)?.[1]
+        ?? /<meta name="ms\.date" content="([^"]+)"/i.exec(html)?.[1];
+      return updated && toDay(updated) ? { marker: toDay(updated) } : { error: 'no "Last updated on", updated_at or ms.date on the page' };
     }
     if (/developer\.android\.com/.test(url)) {
       const updated = /Last updated ([0-9]{4}-[0-9]{2}-[0-9]{2})/i.exec(html)?.[1];
