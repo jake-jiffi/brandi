@@ -11,11 +11,13 @@ owner's spelling.
 
 Four rules hold on every platform, stated once so they are not re-argued per component:
 
-1. **The platform owns behaviour. The brand owns expression, inside the platform's limits.** Apple
-   asks that a branded component keep its familiar sizing, placement and behaviour [APL-8].
-   Microsoft asks that control template changes stay limited to design intent [WIN-3]. Material
-   allows other colour roles on a button only if container and text keep 3:1 [MAT-5]. Every spec
-   ends by saying which is which.
+1. **The product's guidelines win.** Where a platform's guidance and the product's guidelines
+   differ, the product's guidelines apply, and the spec says so (2.3). What a platform does whatever
+   the app asks is behaviour, and the spec designs around it. Apple asks that a branded component
+   keep its familiar sizing, placement and behaviour [APL-8]. Microsoft asks that control template
+   changes stay limited to design intent [WIN-3]. Material allows other colour roles on a button
+   only if container and text keep 3:1 [MAT-5]. Every spec records that guidance, then ends by
+   saying what the brand may change and what the platform owns.
 2. **Nothing comes from memory.** A field that no primary page settles says "not confirmed". Never
    fill it from another platform's rule.
 3. **Units stay native.** Points on Apple platforms [APL-1], dp and sp on Android [MAT-7] [AND-5],
@@ -301,14 +303,27 @@ The marker is whatever the owner publishes. Section 5.3 lists which one to recor
 | Navigation placement | Which container holds it, and where on screen. |
 | Keyboard, pointer, trackpad | Activation keys, focus behaviour, hover and pointer effects. |
 | Haptics | The system haptic it plays, or none. |
-| Brand may change | What the brand controls, inside the platform's limits. |
-| Platform owns | What the brand never touches. |
+| Brand may change | What the product's guidelines set. Where they depart from the platform's guidance, name the guidance (2.3). |
+| Platform owns | What the platform does whatever the app asks, and what the product's guidelines leave to it. |
 | Not confirmed | Every field the sources did not settle. Never left out. |
 
 Every value cites a key. When two primary pages disagree, record both and name the conflict. Apple's
 Buttons page asks for title-style capitalisation on button labels [APL-2], and its Alerts page asks
 for sentence-style capitalisation on alert buttons [APL-13]. Both go in the spec, with the context
 each one applies to.
+
+### 2.3 The product's guidelines win
+
+Where a platform's guidance and the product's guidelines differ, the product's guidelines apply, on
+every platform. The spec records the platform's guidance with its key, then the product's rule, and
+says which one applies. A product written in sentence case keeps sentence case on iOS and macOS
+buttons, where Apple asks for title-style [APL-2].
+
+Guidance is what a platform asks for. Behaviour is what it does whatever the app asks: the user's
+accent replacing the app's on macOS [APL-4], text styles scaling with Dynamic Type [APL-3], contrast
+themes swapping in system colours on Windows [WIN-9]. The spec designs around behaviour and never
+tries to overrule it. The accessibility floors are never traded away either. They are part of the
+product's own bar (`08-quality-gates.md`), so the product's guidelines already include them.
 
 ---
 
@@ -383,7 +398,7 @@ APL-18, APL-19, APL-20, APL-21, APL-22, APL-23, APL-24, APL-29. Checked against 
 |---|---|
 | Native control | SwiftUI `Button` with the `glassProminent` style, iOS 26.0 and later, or `borderedProminent` [APL-21] [APL-22]. UIKit `UIButton` [APL-2]. Give it the primary role, never on a destructive action [APL-2]. |
 | Target and spacing | Hit region at least 44 × 44 pt [APL-2]. Control default 44 × 44 pt, minimum 28 × 28 pt, about 12 pt of padding around a bezelled button [APL-1]. |
-| Type | SF Pro through a text style, so the label follows Dynamic Type. Body is 17 pt at the default size and 53 pt at AX5 [APL-3]. Short labels, verb first, title-style capitalisation [APL-2]. Alert buttons take sentence-style capitalisation instead [APL-13]. |
+| Type | SF Pro through a text style, so the label follows Dynamic Type. Body is 17 pt at the default size and 53 pt at AX5 [APL-3]. Short labels, verb first, in the product's case. Apple asks for title-style capitalisation on buttons [APL-2] and sentence-style on alert buttons [APL-13]. The product's guidelines apply (2.3). |
 | Colour and theme | The prominent style puts the app accent on the button's background [APL-2] [APL-4]. One or two prominent buttons per view [APL-2]. Custom colours need light, dark and increased-contrast variants [APL-4]. Keep the label colour clear of colourful content behind it [APL-2]. |
 | States | Always draw a press state on a custom button [APL-2]. For a slow action, show an activity indicator inside the button, and optionally change the label, such as "Checkout" to "Checking out…" [APL-2]. Disabled styling: not confirmed. |
 | Motion | Liquid Glass reacts more strongly to touch than to a trackpad [APL-6]. Under Reduce Motion, cut automatic animation, tighten springs and swap slides for fades [APL-1]. Read `accessibilityReduceMotion` [APL-24]. |
@@ -512,7 +527,7 @@ Golden Gate [APL-32].
 |---|---|
 | Native control | SwiftUI `Table`, macOS 12.0 and later [APL-26], or AppKit `NSTableView`. An outline view for hierarchical rows [APL-14]. |
 | Target and spacing | Controls in the row: minimum 20 × 20 pt [APL-1]. Row height: not confirmed. |
-| Type | Body 13 pt [APL-3]. Header text in `headerTextColor` [APL-4]. Column headings are nouns in title-style capitalisation, with no ending punctuation [APL-14]. |
+| Type | Body 13 pt [APL-3]. Header text in `headerTextColor` [APL-4]. Column headings are nouns with no ending punctuation, in the product's case. Apple asks for title-style capitalisation here [APL-14]. The product's guidelines apply (2.3). |
 | Colour and theme | Striping in `alternatingContentBackgroundColors`. Selection in `selectedContentBackgroundColor` in the key window and `unemphasizedSelectedContentBackgroundColor` elsewhere. Grid lines in `gridColor`, selected text in `alternateSelectedControlTextColor` [APL-4]. |
 | States | Selected in the key window, selected in another window, sorted, resized [APL-4] [APL-14]. |
 | Motion | Reduce Motion rules [APL-1]. |
@@ -716,7 +731,8 @@ What the primary pages did not settle:
 Conflicts between primary pages, recorded rather than resolved:
 
 - Apple's Buttons page asks for title-style capitalisation on button labels [APL-2]. Its Alerts page
-  asks for sentence-style capitalisation on alert buttons [APL-13].
+  asks for sentence-style capitalisation on alert buttons [APL-13]. A product's own case settles
+  both (2.3).
 - Material lists wrap arrow-key focus at the ends [MAT-21]. APG data grids stop at the edges
   [WEB-4].
 - Android's versions index still features Android 16 [AND-11], while Android 17 shipped on 16 June

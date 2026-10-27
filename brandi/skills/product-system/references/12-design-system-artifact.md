@@ -87,6 +87,9 @@ system records the same id, and that is how the drift check knows which version 
 - **Content types.** Send TypeScript and Python files with an explicit `text/plain` type.
 - **Images go to the asset store** and are named in the index; each group's README is a file.
 - **Ask first.** Publishing or changing a live artifact waits for the person's yes, every time.
+- **Beside a live system, never over it.** When the brand already has a Design System artifact in
+  use, publish a new one with "(experimental)" in its title and compare the two. The live one stays
+  untouched until the person asks for it to change.
 
 ## Installing it on a canvas
 

@@ -194,8 +194,9 @@ if it met it.
 
 ### 8. Publish (asks first)
 
-Ask before publishing or changing any live artifact. Then publish the Design System artifact
-(`references/12-design-system-artifact.md`), the canvas with the system installed
+Ask before publishing or changing any live artifact. When the brand already has a live system,
+publish beside it as experimental, never over it (see the last section). Then publish the Design
+System artifact (`references/12-design-system-artifact.md`), the canvas with the system installed
 (`references/06-canvas.md`), and the starter with PRODUCT.md, DESIGN.md, the brand guardian, and CI
 running the detector and axe (`references/07-starter.md`). Read the Artifact type's current
 instructions at publish time: they change between releases.
@@ -242,6 +243,10 @@ approves, changes another system or deletes waits for a person to approve it, or
 
 **One primary action per view.** Everything else is secondary or quiet.
 
+**The product's guidelines win.** Where a platform's guidance differs from the product's guidelines,
+the product's guidelines apply on every surface, and the platform spec records the difference. What
+a platform does whatever the app asks is a fact to design around (`references/11-platform-layer.md`).
+
 **Real or labelled.** Live figures, or the sample-data badge.
 
 **Measure, don't eyeball.** Contrast is computed, line length is measured, focus is driven by
@@ -279,3 +284,9 @@ Lifting a system built before this skill, or adopting a shipped product, starts 
 with fixes. Pin the current tools, run every gate against what exists, and write the scores down:
 the last record may have been made with older tools, and a newer detector finds more. Then build the
 gap list against the bar, fix the fundamentals first, and only then add what is missing.
+
+Never publish over the live system. The lifted system goes out as new artifacts, a Design System
+artifact and a canvas, each with "(experimental)" in its title, together with a comparison against
+the live ones: token by token, component by component and gate by gate. Moving products onto the
+new system, or retiring the live artifacts, is the person's call after reading the comparison. Act
+on it only when they ask.

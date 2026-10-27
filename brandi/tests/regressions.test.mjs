@@ -71,6 +71,8 @@ describe('C1: the book never asserts what its own audit disproves', () => {
     const css = toCss(system);
     assert.match(css, /--focus-ring-width: 2px;/);
     assert.match(renderBrandBook({ brand, system }), /2px outline at 2px offset/);
+    // A clipping ancestor clips an outline exactly as it clips a box-shadow.
+    assert.doesNotMatch(system.focus.note, /not clipped|never clipped/);
   });
 });
 

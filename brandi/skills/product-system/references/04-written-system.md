@@ -249,7 +249,9 @@ what makes two products built by two teams sound like one.
   about its own work. Contractions, with "not" in full when the negative is the point. Name the
   thing doing the work, never "the system". Never blame the person. One idea per sentence.
 - **Capitals and punctuation.**
-  - Sentence case everywhere, with proper nouns (the intake's systems) in their own case.
+  - Sentence case everywhere, with proper nouns (the intake's systems) in their own case. That
+    holds on every platform, including where a platform asks for title-style, such as Apple's
+    buttons. The product's guidelines win (`11-platform-layer.md`, section 2.3).
   - Full stops on sentences only, with where that is and is not.
   - Uppercase is a style, not text. Write the words in sentence case and let the style uppercase
     them, so screen readers do not spell them out.

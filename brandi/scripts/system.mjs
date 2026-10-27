@@ -413,7 +413,7 @@ export function buildSystem(input = {}) {
     // rather than because someone typed it. 2px at 2px offset is the smallest
     // ring that stays visible against a busy surface without looking like a
     // border; the offset is what keeps it off the control's own edge.
-    focus: { widthPx: 2, offsetPx: 2, note: 'Outline, never a box-shadow: an outline is not clipped by overflow.' },
+    focus: { widthPx: 2, offsetPx: 2, note: 'Outline, never a box-shadow: an outline follows the corner radius and stays visible in forced colours mode, where a box-shadow ring is removed. Anything that clips its overflow clips the outline too, so inside a scroll container give it a negative offset.' },
     semantic: { light: semantic, dark: semanticDark },
   };
 
