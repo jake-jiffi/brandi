@@ -320,7 +320,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-2,120 tests. They include property tests over the colour and type engines against hundreds of random
+2,121 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

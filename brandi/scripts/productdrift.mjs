@@ -75,7 +75,9 @@ export async function driftCheck({ productDir, starter }) {
   // A definition with a row typed "native" passes its element's own props through (placeholder,
   // readonly, onClick), so a board may set any of them.
   const native = new Set(defs.filter((d) => d.props.some((p) => p.type === 'native')).map((d) => d.name));
-  propsOf.set('Root', new Set(['theme', 'background', 'shortcuts']));
+  // A kit without Root's definition still has the board provider; one with it says what Root takes, and
+  // a fixed list here once overwrote that and reported Root's own new prop as drift.
+  if (!propsOf.has('Root')) propsOf.set('Root', new Set(['theme', 'background', 'shortcuts', 'touch']));
   const boards = existsSync(canvas) ? readdirSync(canvas).filter((f) => f.endsWith('.dc.html')).sort() : [];
   let canvasManifest = null;
   try { canvasManifest = JSON.parse(readFileSync(path.join(canvas, 'canvas.json'), 'utf8')); } catch { /* none yet */ }

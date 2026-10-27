@@ -66,6 +66,17 @@ describe('the drift check', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test("Root's props come from its definition when it has one", async () => {
+    const { dir, starter } = await product();
+    await writeFile(path.join(starter, 'components', 'system', 'root.def.mjs'), `export default { name: "Root", group: "Foundations", job: "The theme.", status: "proven",
+  props: [{ name: "theme", type: "string", doc: "Light or dark." }, { name: "touch", type: "boolean", doc: "Touch sizes." }],
+  examples: [{ id: "a", title: "A", markup: '<x-import component-from-global-scope="NS.Root"></x-import>' }] }\n`);
+    await writeFile(path.join(dir, 'canvas', 'Main.dc.html'), artboard({ name: 'Main', system: 'acme', preview: { width: 600, height: 400 }, body: '<x-import component-from-global-scope="Acme.Root" theme="light" touch="{{yes}}" shortcuts="{{no}}"><x-import component-from-global-scope="Acme.Button">Go</x-import></x-import>' }));
+    const props = (await driftCheck({ productDir: dir, starter })).differences.filter((d) => d.area === 'prop').map((d) => d.found);
+    assert.deepEqual(props, ['Acme.Root shortcuts='], 'touch is declared, so it is not drift; shortcuts is not, so it is');
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('a product whose canvas, system and code agree has nothing to report', async () => {
     const { dir, starter } = await product();
     const result = await driftCheck({ productDir: dir, starter });
