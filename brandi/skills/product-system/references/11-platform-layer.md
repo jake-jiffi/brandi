@@ -739,8 +739,6 @@ What the primary pages did not settle:
   as betas but was last updated on 1 July 2026 [AND-8].
 - Android: whether Material buttons or list items play a haptic by default.
 - Android: rules for opting out of dynamic colour in favour of a fixed brand scheme.
-- Android: which colour role draws a selected list item. The roles are listed, and the mapping sits
-  in images [MAT-20].
 - Android: a click-label semantic for TalkBack. The Compose Semantics page does not cover one
   [AND-2].
 - Material: type weights. The token data holds more than one weight per style, varying by context,
