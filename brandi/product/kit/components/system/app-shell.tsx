@@ -180,8 +180,12 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
           </main>
           <div data-slot="app-shell-foot" className="shrink-0 @min-[640px]/shell:hidden">
             {tabBar ?? (
+              // A landmark of its own: it sits outside main so it never scrolls over what has focus, and the
+              // page's primary, moved here, was content outside every landmark.
               <div
                 ref={setActionBar}
+                role="region"
+                aria-label="Page actions"
                 data-slot="app-shell-action-bar"
                 className="flex gap-2 border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] empty:hidden *:flex-1"
               />

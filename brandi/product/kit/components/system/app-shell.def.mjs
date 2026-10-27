@@ -495,6 +495,7 @@ export default {
         const live = shell(scope, "live")
         const bar = live.locator('[data-slot="app-shell-action-bar"]')
         expect.equal(await bar.getByRole("button", { name: "Approve 3" }).count(), 1, "the primary is in the bar")
+        expect.equal(await live.getByRole("region", { name: "Page actions" }).count(), 1, "the bar is a landmark, so the primary is never outside one")
         expect.equal(await live.locator('[data-slot="page-header-actions"]').getByRole("button", { name: "Approve 3" }).count(), 0, "and not in the header")
         const top = (await bar.boundingBox()).y
         const main = live.locator('[data-slot="app-shell-main"]')
