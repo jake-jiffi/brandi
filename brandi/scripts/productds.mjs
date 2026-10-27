@@ -30,7 +30,8 @@ export function starterFiles(starter) {
       if (entry.isSymbolicLink()) continue;
       const from = path.join(dir, entry.name);
       const to = rel ? `${rel}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) { if (!(rel === 'canvas' && entry.name === 'dist')) walk(from, to); continue; }
+      // canvas/dist and canvas/previews are build output: the bundle and its rendered previews.
+      if (entry.isDirectory()) { if (!(rel === 'canvas' && (entry.name === 'dist' || entry.name === 'previews'))) walk(from, to); continue; }
       const name = RENAME[entry.name] ?? entry.name;
       const target = rel ? `${rel}/${name}` : name;
       if (REFUSED.test(target)) continue;

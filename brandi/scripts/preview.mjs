@@ -94,7 +94,8 @@ export function needsRuntime(source) {
 
 /** The runtime's script tags, for a board that needs one: the page's React, then the shim. */
 export function runtimeTags({ react, reactDom, shim }) {
-  return [react, reactDom, shim].map((f) => `<script src="${pathToFileURL(f).href}"></script>`).join('');
+  // A relative path stays relative, so a preview written beside its own copy of the runtime travels.
+  return [react, reactDom, shim].map((f) => `<script src="${path.isAbsolute(f) ? pathToFileURL(f).href : f}"></script>`).join('');
 }
 
 export const SHIM = path.join(path.dirname(fileURLToPath(import.meta.url)), 'runtime', 'dc-shim.js');

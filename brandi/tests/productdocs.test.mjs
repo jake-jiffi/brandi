@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -98,5 +99,31 @@ describe('what one definition writes', () => {
     const dts = typesFile([button, queue], system);
     assert.match(dts, /const Queue: ComponentType<QueueProps> & \{\n[\s\S]*?show: \(message: string\) => string\n {2}\}/);
     assert.match(dts, /const Button: ComponentType<ButtonProps>\n/, 'a component with none stays a plain component type');
+  });
+});
+
+describe('the kit against its catalogue', () => {
+  const catalogue = JSON.parse(readFileSync(path.join(path.dirname(KIT_SYSTEM), '..', '..', 'catalogue.json'), 'utf8')).components;
+
+  test('every component the catalogue names has a definition, with the same status', () => {
+    const byName = new Map(defs.map((d) => [d.name, d]));
+    const missing = catalogue.filter((c) => !byName.has(c.name)).map((c) => c.name);
+    assert.deepEqual(missing, [], 'catalogue names with no definition');
+    const unlisted = defs.filter((d) => !catalogue.some((c) => c.name === d.name)).map((d) => d.name);
+    assert.deepEqual(unlisted, [], 'definitions the catalogue does not list');
+    const status = catalogue.filter((c) => byName.get(c.name)?.status !== c.status).map((c) => `${c.name}: ${byName.get(c.name)?.status} for ${c.status}`);
+    assert.deepEqual(status, []);
+  });
+
+  test('every definition is complete, and every named type is declared by one definition only', () => {
+    assert.deepEqual(defs.flatMap(checkDefinition), []);
+    const declared = defs.flatMap((d) => (d.types ?? []).map((t) => [/^\s*(?:type|interface)\s+([A-Z]\w*)/.exec(t)?.[1], d.name]));
+    const seen = new Map();
+    const twice = [];
+    for (const [type, owner] of declared) {
+      if (seen.has(type)) twice.push(`${type} in ${seen.get(type)} and ${owner}`);
+      seen.set(type, owner);
+    }
+    assert.deepEqual(twice, []);
   });
 });

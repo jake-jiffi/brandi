@@ -429,7 +429,10 @@ starter carries them, so the system's rounds and every product repo run the same
 
 - **The behaviour suite.** `tools/check-components.mjs` runs every definition's checks on the built
   components in Chrome, with a real keyboard, touch emulation, reduced motion and forced colours on
-  request. The example product's routes get their own checks: the phone drawer and the action bar,
+  request. It runs on the previews `$A product bundle` renders into `canvas/previews/`, beside one
+  copy of the page's React, the runtime shim and the system, so a product repo needs neither Brandi
+  nor the network to run them. `canvas/previews/definitions.json` fingerprints the definitions the
+  previews were rendered from, and the suite fails when the folder is missing or older than them. The example product's routes get their own checks: the phone drawer and the action bar,
   focus after every action, tab state in the URL, and toasts. Each check runs on a fresh page. One
   page left with a modal open broke the checks after it.
 - **Chart axis contrast, in both themes.** Read the computed fill of every axis label and measure

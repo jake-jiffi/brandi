@@ -5,7 +5,7 @@ import { existsSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, GENERATED, KIT } from '../scripts/productstarter.mjs';
+import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, definitionsHash, GENERATED, KIT } from '../scripts/productstarter.mjs';
 import { toStarterGlobals } from '../scripts/productglobals.mjs';
 import { buildProductTokens } from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -128,5 +128,20 @@ describe('the canvas build', () => {
       runtime.jsx('span', { 'aria-label': 'Real', ariaLabel: 'Camel' });
       assert.equal(created[2].props['aria-label'], 'Real', 'a real attribute name wins over a camel-cased one');
     }
+  });
+});
+
+describe("a product repo's previews", () => {
+  test('the definitions fingerprint is the documented hash, and moves when any definition does', async () => {
+    const { createHash } = await import('node:crypto');
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-defs-'));
+    await writeFile(path.join(dir, 'b.def.mjs'), 'export default { name: "B" }\n');
+    await writeFile(path.join(dir, 'a.def.mjs'), 'export default { name: "A" }\n');
+    await writeFile(path.join(dir, 'a.tsx'), 'not a definition');
+    const expected = createHash('sha256').update('a.def.mjs\nexport default { name: "A" }\n\nb.def.mjs\nexport default { name: "B" }\n\n', 'utf8').digest('hex');
+    assert.deepEqual(definitionsHash(dir), { sha256: expected, files: 2 });
+    await writeFile(path.join(dir, 'b.def.mjs'), 'export default { name: "B", job: "Changed." }\n');
+    assert.notEqual(definitionsHash(dir).sha256, expected);
+    await rm(dir, { recursive: true, force: true });
   });
 });

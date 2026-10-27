@@ -17,11 +17,25 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 
 import { toStarterGlobals } from './productglobals.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
 import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
 import { brandSources, brandConstant, brandModule, shrinkStill } from './productbrand.mjs';
+import { toPreviewHtml, declaredFrame, SHIM } from './preview.mjs';
+import { ensurePageReact } from './pagereact.mjs';
+
+/**
+ * The definitions' fingerprint, which a product repo's component checks compare against its rendered
+ * previews: sha256 over each components/system/*.def.mjs in filename order, each "<name>\n<contents>\n".
+ */
+export function definitionsHash(systemDir) {
+  const files = readdirSync(systemDir).filter((f) => f.endsWith('.def.mjs')).sort();
+  const hash = createHash('sha256');
+  for (const f of files) hash.update(`${f}\n${readFileSync(path.join(systemDir, f), 'utf8')}\n`, 'utf8');
+  return { sha256: hash.digest('hex'), files: files.length };
+}
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const KIT = path.resolve(here, '..', 'product', 'kit');
@@ -250,8 +264,27 @@ export async function buildBundle({ starter, productDir }) {
     writeFileSync(path.join(dir, 'preview.html'), previewPage(def, system));
     writeFileSync(path.join(previews, `${def.name}Preview.dc.html`), previewBoard(def, system));
   }
-  // The system installed beside the preview boards and the canvas boards, as a canvas holds it.
-  for (const where of [previews, path.join(productDir, 'canvas')]) {
+  // The previews a product repo's CI runs the component checks on: rendered into the starter beside one
+  // copy of the runtime and of the system, so they need neither Brandi nor the network. The checks
+  // compare definitions.json with the definitions, so a stale set fails rather than passing.
+  const starterPreviews = path.join(starter, 'canvas', 'previews');
+  rmSync(starterPreviews, { recursive: true, force: true });
+  mkdirSync(path.join(starterPreviews, 'runtime'), { recursive: true });
+  let runtime = null;
+  try {
+    const page = await ensurePageReact();
+    for (const [key, file] of Object.entries({ react: page.react, reactDom: page.reactDom, shim: SHIM })) copyFileSync(file, path.join(starterPreviews, 'runtime', path.basename(file)));
+    runtime = { react: `runtime/${path.basename(page.react)}`, reactDom: `runtime/${path.basename(page.reactDom)}`, shim: `runtime/${path.basename(SHIM)}` };
+  } catch { /* offline with nothing cached: previews still written, and the checks will say they cannot mount */ }
+  for (const def of defs) {
+    const board = previewBoard(def, system);
+    const frame = declaredFrame(board) ?? { w: 960, h: 600 };
+    writeFileSync(path.join(starterPreviews, `${def.name}Preview.preview.html`), toPreviewHtml(board, { width: frame.w, height: frame.h, label: `${def.name}Preview.dc.html`, runtime }));
+  }
+  writeFileSync(path.join(starterPreviews, 'definitions.json'), `${JSON.stringify(definitionsHash(path.join(starter, 'components', 'system')))}\n`);
+
+  // The system installed beside the preview boards, the canvas boards and the starter's previews.
+  for (const where of [previews, path.join(productDir, 'canvas'), starterPreviews]) {
     const ds = path.join(where, 'ds', system.namespace);
     mkdirSync(path.join(ds, 'components'), { recursive: true });
     for (const f of ['bundle.js', 'bundle.css']) copyFileSync(path.join(dist, f), path.join(ds, 'components', f));
