@@ -69,9 +69,9 @@ export default {
     {
       name: "With href it is one link, named for the brand and the product",
       example: "link",
-      async run({ scope, expect }) {
+      async run({ scope, expect, brand }) {
         expect.equal(await scope.getByRole("link").count(), 1, "links in the lockup")
-        expect.equal(await scope.getByRole("link", { name: "Product [Rosters]" }).count(), 1, "the link's name")
+        expect.equal(await scope.getByRole("link", { name: `${brand.name} [Rosters]` }).count(), 1, "the link's name")
         expect.equal(await scope.locator('[data-slot="logo"]').getAttribute("aria-hidden"), "true", "the logo inside is hidden")
       },
     },
@@ -88,14 +88,14 @@ export default {
     {
       name: "A long name is cut with an ellipsis and stays inside the rail",
       example: "rail",
-      async run({ scope, expect }) {
+      async run({ scope, expect, brand }) {
         const name = scope.locator('[data-slot="product-lockup-name"]')
         const cut = await name.evaluate((el) => el.scrollWidth > el.clientWidth && getComputedStyle(el).textOverflow === "ellipsis")
         expect(cut, "the name is cut with an ellipsis")
         const rail = await scope.locator(".w-60").boundingBox()
         const lockup = await scope.locator('[data-slot="product-lockup"]').boundingBox()
         expect(lockup.x + lockup.width <= rail.x + rail.width, "the lockup stays inside the rail")
-        expect.equal(await scope.getByRole("link", { name: "Product [Workforce planning and rostering]" }).count(), 1, "the whole name in the link's name")
+        expect.equal(await scope.getByRole("link", { name: `${brand.name} [Workforce planning and rostering]` }).count(), 1, "the whole name in the link's name")
       },
     },
     {

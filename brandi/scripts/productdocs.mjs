@@ -263,6 +263,10 @@ export function typesFile(defs, system, { icons = [], numberStyles = [] } = {}) 
     '  const ICON_NAMES: readonly IconName[]',
     '  const NUMBER_STYLES: readonly NumberStyle[]',
     '  function formatNumber(value: number | string | null | undefined, style?: NumberStyle, options?: { locale?: string; currency?: string; digits?: number }): string',
+    '  /** The brand the bundle was built with: its name, marks and logo rules. */',
+    '  const BRAND: { name: string } & Record<string, unknown>',
+    '  /** The product\'s name and language, and how its lockup is set. */',
+    '  const PRODUCT: { name: string; lang: string; railTone: "light" | "dark"; lockupName: "label" | "eyebrow" }',
   ];
   // Root comes from its definition when the kit has one; a kit without it still gets the board provider.
   if (!defs.some((d) => d.name === 'Root')) {

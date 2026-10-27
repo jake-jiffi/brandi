@@ -257,7 +257,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     tokens: { summary: auditSummary(audit), fails: audit.fails.length, pairs: audit.pairs },
     drift: { differences: drift.differences, unchecked: drift.unchecked },
     detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null },
-    axe: { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, results: (axe.results ?? []).filter((r) => r.violations.length || r.error) },
+    axe: { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, skipped: axe.skipped ?? null, results: (axe.results ?? []).filter((r) => r.violations.length || r.error) },
     checks: { passed: checks.passed, failed: checks.failed },
   };
   writeFileSync(path.join(outDir, 'gates.json'), `${JSON.stringify(gates, null, 2)}\n`);
@@ -305,6 +305,7 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
 export function roundMarkdown(gates, judged, { system = {}, critique = null, rules = null, signOff = null } = {}) {
   const lines = [`# Round ${gates.round}: ${system.name ?? 'product system'} ${system.version ?? ''}`.trimEnd(), '', `Run ${gates.at}. ${judged.met ? 'The bar is met.' : 'The bar is not met yet.'}`, '', '| Gate | Result | Detail |', '| --- | --- | --- |'];
   for (const v of judged.verdicts) lines.push(`| ${v.gate} | ${v.pass ? 'pass' : 'fail'} | ${String(v.detail).replace(/\|/g, '\\|')} |`);
+  if (gates.axe.skipped?.rules?.length) lines.push('', `axe ran every rule on the routes. On ${gates.axe.skipped.kinds.map((k) => `${k} pages`).join(' and ')}, which show a page frame more than once, it skipped ${gates.axe.skipped.rules.join(', ')}.`);
   lines.push('', '## Tool versions', '');
   for (const [k, v] of Object.entries(gates.versions)) lines.push(`- ${k}: ${typeof v === 'object' && v ? `${v.version ?? ''} (${v.path ?? ''})` : v ?? 'not found'}`);
   if (gates.detector.findings.length) {

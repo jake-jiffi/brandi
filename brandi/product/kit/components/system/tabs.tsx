@@ -93,6 +93,8 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(function Tabs(
             <TabsTrigger key={t.value} value={t.value} id={t.id} aria-controls={t.controls ? t.panelId : undefined} aria-label={count ? `${t.label}, ${words}` : undefined}>
               {t.icon ? <Icon name={t.icon} /> : null}
               <span>{t.label}</span>
+              {/* A space between the word and the figure, so the visible text reads "Waiting 4" and stays inside the name (WCAG 2.5.3). */}
+              {count ? " " : null}
               {count ? (
                 <span
                   aria-hidden="true"

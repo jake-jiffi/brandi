@@ -91,8 +91,9 @@ frame?, state?, logic? }`.
 - `examples` are board markup mounting through `NS.<Export>` (the build swaps in the namespace).
   Non-string props go through `{{holes}}` with values in `vals`. Show every variant and every state
   the reference names, including empty, loading and error where the component has them.
-- `checks` run in Chrome through Playwright: `run({ page, scope, expect, theme })`, where `scope` is
-  the example's section. Options: `themes: ["light", "dark"]`, `touch`, `reducedMotion`,
+- `checks` run in Chrome through Playwright: `run({ page, scope, expect, theme, brand })`, where
+  `scope` is the example's section and `brand` is `{ name, product }`. Expect the brand's names from
+  `brand`, never as literals: a starter carries the brand's own. Options: `themes: ["light", "dark"]`, `touch`, `reducedMotion`,
   `forcedColors`, `viewport`. Every rule marked Review gets a check. Prove keyboard paths, focus
   return, Escape order and focus after an action with real key presses.
 

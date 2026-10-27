@@ -83,8 +83,8 @@ export default {
     {
       name: "The lockup is one link, named for the brand and the product",
       example: "menu",
-      async run({ scope, expect }) {
-        expect.equal(await scope.getByRole("link", { name: "Product [Front desk]" }).count(), 1, "the lockup's link")
+      async run({ scope, expect, brand }) {
+        expect.equal(await scope.getByRole("link", { name: `${brand.name} [Front desk]` }).count(), 1, "the lockup's link")
       },
     },
     {

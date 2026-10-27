@@ -44,7 +44,9 @@ more, and do not lower the bar to finish.
 1. **Deterministic checks first.** `$A product gates` runs the token audit, the drift check, the
    detector on every preview and board (and a running starter's routes, with `--route`) at 1440, 820
    and 390, light and dark, axe on every one of those renders, and every scripted check. Fix what
-   they find before the reviewers start.
+   they find before the reviewers start. A board can show a page frame more than once (a shell at
+   four widths, a flow of screens), so there axe skips the three rules about one page's landmarks.
+   The routes run every rule, and the round record names what was skipped.
 2. **Reviewers in parallel, each in its own context and its own folder.** Each reads its own skill's
    instructions and references first, then judges against the system's docs and the bar.
 3. **Evidence only.** A finding is backed by a screenshot, the DOM, a computed style or a keyboard

@@ -4,9 +4,9 @@
  *
  *   node tools/axe-pages.mjs --pages pages.json [--json results.json]
  *
- * pages.json is a list of { url, width, height, theme, label }. A board rendered through Brandi's runtime
- * shim is scanned once it says it is ready. Every violation is reported with its impact; the gate
- * counts any violation as a failure, whatever its impact.
+ * pages.json is a list of { url, width, height, theme, label, kind }. A board rendered through Brandi's
+ * runtime shim is scanned once it says it is ready. Every violation is reported with its impact; the
+ * gate counts any violation as a failure, whatever its impact.
  */
 
 import { chromium } from "playwright"
@@ -19,6 +19,11 @@ const arg = (k) => { const i = process.argv.indexOf(k); return i >= 0 ? process.
 const pages = JSON.parse(readFileSync(path.resolve(arg("--pages")), "utf8"))
 const axeSource = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8")
 const axeVersion = JSON.parse(readFileSync(require.resolve("axe-core/package.json"), "utf8")).version
+// A board or a component page shows a page frame more than once on purpose: a shell at four widths, or
+// a flow of screens side by side. These rules are about one page's own structure, so they run on the
+// starter's routes, where a page is one page, and the record says they were skipped everywhere else.
+const SPECIMEN = ["component", "board"]
+const PAGE_RULES = ["landmark-no-duplicate-main", "landmark-main-is-top-level", "landmark-unique"]
 
 let browser
 try { browser = await chromium.launch({ channel: "chrome", args: ["--allow-file-access-from-files"] }) } catch { browser = await chromium.launch({ args: ["--allow-file-access-from-files"] }) }
@@ -30,12 +35,14 @@ for (const p of pages) {
     await page.goto(p.url, { waitUntil: "load", timeout: 60000 })
     if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { timeout: 20000 })
     await page.addScriptTag({ content: axeSource })
-    const r = await page.evaluate(async () => {
+    // Label in name is WCAG 2.5.3, Level A, but axe ships it switched off as experimental.
+    const rules = { "label-content-name-mismatch": { enabled: true } }
+    if (SPECIMEN.includes(p.kind)) for (const id of PAGE_RULES) rules[id] = { enabled: false }
+    const r = await page.evaluate(async (rules) => {
       // eslint-disable-next-line no-undef
-      // Label in name is WCAG 2.5.3, Level A, but axe ships it switched off as experimental.
-      const res = await axe.run(document, { resultTypes: ["violations"], rules: { "label-content-name-mismatch": { enabled: true } } })
+      const res = await axe.run(document, { resultTypes: ["violations"], rules })
       return res.violations.map((v) => ({ id: v.id, impact: v.impact, help: v.help, nodes: v.nodes.slice(0, 5).map((n) => n.target.join(" ")) }))
-    })
+    }, rules)
     results.push({ ...p, violations: r })
   } catch (e) {
     results.push({ ...p, violations: [], error: String(e.message ?? e).split("\n")[0] })
@@ -46,7 +53,7 @@ for (const p of pages) {
 await browser.close()
 const violations = results.reduce((n, r) => n + r.violations.length, 0)
 const errors = results.filter((r) => r.error).length
-const out = { axe: axeVersion, pages: results.length, violations, errors, results }
+const out = { axe: axeVersion, pages: results.length, violations, errors, skipped: { kinds: SPECIMEN, rules: PAGE_RULES }, results }
 if (arg("--json")) writeFileSync(path.resolve(arg("--json")), `${JSON.stringify(out, null, 2)}\n`)
 process.stdout.write(`${JSON.stringify({ axe: axeVersion, pages: results.length, violations, errors })}\n`)
 if (violations || errors) process.exitCode = 1

@@ -92,6 +92,14 @@ describe('a round held against the bar', () => {
     assert.match(md, /- detector: 0\.1\.18\+engine/);
     assert.match(md, /ConsoleRosters1440 at 820, dark: side-tab on \.card/);
     assert.match(md, /Signed off by Jake\./);
+    assert.doesNotMatch(md, /skipped/, 'no axe scope line when nothing was skipped');
+  });
+
+  test('the record says which axe rules boards skipped, and that the routes ran them', () => {
+    const g = clean();
+    g.axe.skipped = { kinds: ['component', 'board'], rules: ['landmark-no-duplicate-main', 'landmark-main-is-top-level', 'landmark-unique'] };
+    const md = roundMarkdown(g, judgeRound(g), { system: { name: 'Acme' } });
+    assert.match(md, /axe ran every rule on the routes\. On component pages and board pages, which show a page frame more than once, it skipped landmark-no-duplicate-main, landmark-main-is-top-level, landmark-unique\./);
   });
 });
 

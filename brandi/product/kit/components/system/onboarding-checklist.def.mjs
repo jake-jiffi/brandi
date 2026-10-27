@@ -16,7 +16,14 @@ async function tabTo(page, locator, max = 40) {
   }
   return false
 }
-const nameOf = (page) => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent?.trim() ?? null)
+// What a screen reader hears from an element's content: aria-hidden parts left out, spaces collapsed. The
+// browser's own name puts a space before the state's comma, because the state is visually hidden text; the
+// role queries below allow it.
+const heardIn = (el) => {
+  const walk = (n) => (n.nodeType === 3 ? n.textContent : n.nodeType === 1 && n.getAttribute("aria-hidden") === "true" ? "" : Array.from(n.childNodes).map(walk).join(""))
+  return walk(el).replace(/\s+/g, " ").trim()
+}
+const nameOf = (page) => page.evaluate((src) => new Function(`return (${src})`)()(document.activeElement), heardIn.toString())
 
 const rgb = (s) => (String(s).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
 const luminance = ([r, g, b]) => {
@@ -105,10 +112,10 @@ export default {
       name: "Each task is named by its outcome and its state, and a finished one stays open to revisit",
       example: "progress",
       async run({ scope, expect }) {
-        const names = await scope.locator('[data-slot="onboarding-task"] > *').evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")))
+        const names = await scope.locator('[data-slot="onboarding-task"] > *').evaluateAll((els, src) => els.map(new Function(`return (${src})`)()), heardIn.toString())
         expect.equal(names.join(" | "), "Add your business details, Done | Invite your team, Done | Connect [your bank], Not started | Set up your first service, Not started | Send yourself a test invoice, Not started", "each name carries its state in words")
-        expect.equal(await scope.getByRole("link", { name: "Add your business details, Done" }).count(), 1, "a done task is still a link")
-        const described = await scope.getByRole("link", { name: "Connect [your bank], Not started" }).evaluate((el) => document.getElementById(el.getAttribute("aria-describedby"))?.textContent)
+        expect.equal(await scope.getByRole("link", { name: /^Add your business details ?, Done$/ }).count(), 1, "a done task is still a link")
+        const described = await scope.getByRole("link", { name: /^Connect \[your bank\] ?, Not started$/ }).evaluate((el) => document.getElementById(el.getAttribute("aria-describedby"))?.textContent)
         expect.equal(described, "So payments match their invoices without you.", "the line under it is its description")
         expect.equal((await scope.locator('[data-done] [data-slot="onboarding-task-done"]').allTextContents()).join(","), "Done,Done", "done tasks say Done in words")
       },
@@ -117,7 +124,7 @@ export default {
       name: "Tab moves through the tasks in order, and Enter opens one",
       example: "progress",
       async run({ page, scope, expect }) {
-        expect(await tabTo(page, scope.getByRole("link", { name: "Add your business details, Done" })), "Tab reaches the first task")
+        expect(await tabTo(page, scope.getByRole("link", { name: /^Add your business details ?, Done$/ })), "Tab reaches the first task")
         const order = [await nameOf(page)]
         for (let i = 0; i < 4; i++) {
           await page.keyboard.press("Tab")

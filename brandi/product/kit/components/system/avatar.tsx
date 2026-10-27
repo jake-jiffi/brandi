@@ -74,7 +74,12 @@ export const Avatar = React.forwardRef<HTMLSpanElement, AvatarProps>(function Av
       ) : (
         <>
           {src ? <AvatarImage src={src} alt="" /> : null}
-          <AvatarFallback className={tintOf(name)}>{initialsOf(name)}</AvatarFallback>
+          {/* The initials are drawn, not written: decoration inside a named image, so they never count as
+              visible text a control's name must contain (an account button named "[Name], account menu"
+              failed WCAG 2.5.3 on the initials beside the name). */}
+          <AvatarFallback className={tintOf(name)}>
+            <span aria-hidden="true" data-initials={initialsOf(name)} className="before:content-[attr(data-initials)]" />
+          </AvatarFallback>
         </>
       )}
       {status && !assistant ? (

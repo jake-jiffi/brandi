@@ -104,7 +104,9 @@ export default {
         }
         expect.equal(sizes.join(","), "24,28,32,40", "sizes")
         expect.equal(tints.size, 1, "the same name has the same tint at every size")
-        expect.equal((await avatars[0].innerText()).trim(), "AL", "initials without the brackets")
+        // Drawn as generated content, so read from the drawing rather than the text.
+        const drawn = await avatars[0].locator("[data-initials]").evaluate((el) => getComputedStyle(el, "::before").content)
+        expect.equal(drawn, '"AL"', "initials without the brackets")
       },
     },
     {

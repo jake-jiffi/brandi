@@ -258,10 +258,10 @@ export default {
     {
       name: "At 820 the top bar carries the menu button and the lockup, and the menu button opens the drawer from the keyboard, with focus on its close button",
       example: "tablet",
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, brand }) {
         const bar = shell(scope, "tablet").locator('[data-slot="phone-top-bar"]')
         expect.equal(await bar.getByRole("button", { name: "Open navigation" }).getAttribute("aria-haspopup"), "dialog", "the menu button is named Open navigation and opens a dialog")
-        expect.equal(await bar.getByRole("link", { name: "Product [Front desk]" }).count(), 1, "the lockup is beside it")
+        expect.equal(await bar.getByRole("link", { name: `${brand.name} [Front desk]` }).count(), 1, "the lockup is beside it")
         const { menu, drawer } = await openDrawer(page, scope, "tablet")
         expect.equal(await page.getByRole("dialog", { name: "Navigation" }).count(), 1, "a dialog named Navigation")
         expect.equal(await menu.getAttribute("aria-expanded"), "true", "the menu button says it is open")

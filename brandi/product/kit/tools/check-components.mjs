@@ -7,7 +7,8 @@
  *   node tools/check-components.mjs --previews <dir> [--only Button,Dialog] [--json results.json]
  *
  * <dir> holds each component's rendered preview (<Name>Preview.preview.html, written by Brandi's
- * preview.mjs). A check receives { page, scope, expect, theme }: scope is the example's section.
+ * preview.mjs). A check receives { page, scope, expect, theme, brand }: scope is the example's section,
+ * and brand is { name, product }, the names the bundle was built with.
  * Prints {"passed": n, "failed": [...]} and exits 1 when anything failed.
  */
 
@@ -59,7 +60,12 @@ for (const def of defs) {
         const boardError = await page.getAttribute("html", "data-dc-error")
         if (boardError) throw new Error(`the preview failed to render: ${boardError}`)
         const scope = check.example ? page.locator(`[data-example="${check.example}"]`) : page.locator("body")
-        await check.run({ page, scope, expect: makeExpect(), theme })
+        // A starter has the brand's own names, not the kit's placeholders, so checks read them from the bundle.
+        const brand = await page.evaluate(() => {
+          const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+          return { name: kit?.BRAND?.name ?? "Product", product: kit?.PRODUCT?.name ?? "Product" }
+        })
+        await check.run({ page, scope, expect: makeExpect(), theme, brand })
         if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`)
         passed.push(label)
       } catch (e) {

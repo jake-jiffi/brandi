@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -157,5 +157,14 @@ describe('what lib/product.ts reads off the system', () => {
   test('the lockup name style is the brand\'s choice, "label" unless product.json says "eyebrow"', () => {
     assert.equal(systemIdentity({}, { brandName: 'Acme' }).lockupName, 'label');
     assert.equal(systemIdentity({ lockup: { name: 'eyebrow' } }, { brandName: 'Acme' }).lockupName, 'eyebrow');
+  });
+
+  test("the generated file is the kit's own, with the product's values in it, so its types are the ones the components compile against", () => {
+    const kitFile = readFileSync(path.join(KIT, 'lib', 'product.ts'), 'utf8');
+    assert.equal(railTone(tokens), 'light', 'the fixture rail is light, as the kit file says');
+    const generated = generatedFiles(tokens, { name: 'Product', lang: 'en', locale: 'en-AU', currency: 'AUD' }).get('lib/product.ts');
+    assert.equal(generated, kitFile);
+    // A literal type here (as const) narrows railTone to "light", and the components that compare it with "dark" stop compiling.
+    assert.doesNotMatch(generated, /as const/);
   });
 });

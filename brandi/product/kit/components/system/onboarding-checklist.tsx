@@ -94,8 +94,9 @@ export const OnboardingChecklist = React.forwardRef<HTMLElement, OnboardingCheck
       <ul data-slot="onboarding-tasks" className="flex flex-col">
         {list.map((task, i) => {
           const descId = `${ids}-${i}`
-          // An exact name, as Stepper's steps have: the outcome, then its state in words.
-          const named = { "aria-label": `${task.label}, ${task.done ? "Done" : "Not started"}`, "aria-describedby": task.description ? descId : undefined }
+          // Named from its content, the outcome then its state in words, so the visible label stays inside the
+          // name (WCAG 2.5.3): an aria-label left the description outside it. The description is read as one.
+          const named = { "aria-describedby": task.description ? descId : undefined }
           const content = (
             <>
               <span
@@ -111,15 +112,16 @@ export const OnboardingChecklist = React.forwardRef<HTMLElement, OnboardingCheck
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span data-slot="onboarding-task-label" className={cn("type-label text-pretty", task.done ? "text-text-muted" : "text-text-strong")}>
                   {task.label}
+                  <span className="sr-only">, {task.done ? "Done" : "Not started"}</span>
                 </span>
                 {task.description ? (
-                  <span id={descId} data-slot="onboarding-task-description" className="type-meta text-pretty text-text-muted">
+                  <span id={descId} aria-hidden="true" data-slot="onboarding-task-description" className="type-meta text-pretty text-text-muted">
                     {task.description}
                   </span>
                 ) : null}
               </span>
               {task.done ? (
-                <span data-slot="onboarding-task-done" className="flex h-5 shrink-0 items-center type-meta text-success">
+                <span aria-hidden="true" data-slot="onboarding-task-done" className="flex h-5 shrink-0 items-center type-meta text-success">
                   Done
                 </span>
               ) : (

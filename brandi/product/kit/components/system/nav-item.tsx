@@ -98,6 +98,8 @@ export const NavItem = React.forwardRef<HTMLAnchorElement, NavItemProps>(functio
       <span data-slot="nav-item-label" className="min-w-0 flex-1 break-words @max-[160px]/rail:sr-only">
         {label}
       </span>
+      {/* A space between the word and the figure, so the visible text reads "Jobs 5" and stays inside the name (WCAG 2.5.3). */}
+      {n ? " " : null}
       {n ? (
         <span
           aria-hidden="true"

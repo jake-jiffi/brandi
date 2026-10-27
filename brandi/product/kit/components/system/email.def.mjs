@@ -167,7 +167,7 @@ export default {
     {
       name: "The lockup leads, named [Brand] [product], then the heading, the body, the action and the footer, in reading order",
       example: "timesheets",
-      async run({ scope, expect }) {
+      async run({ scope, expect, brand }) {
         const order = await scope.locator('[data-slot="email"]').evaluate((el) => {
           const named = el.querySelector('[role="img"], img')
           const parts = [named, el.querySelector(".em-card h3"), el.querySelector(".em-card p"), el.querySelector(".em-card a"), el.querySelector(".em-muted")]
@@ -175,13 +175,13 @@ export default {
           return { sorted, logo: named.getAttribute("aria-label") ?? named.getAttribute("alt"), lockup: named.closest("table").innerText.replace(/\s+/g, " ").trim() }
         })
         expect(order.sorted, "lockup, heading, body, action, footer, in that order")
-        expect.equal(`${order.logo} ${order.lockup}`, "Product Product", "the lockup reads as [Brand] [product]")
+        expect.equal(`${order.logo} ${order.lockup}`, `${brand.name} ${brand.product}`, "the lockup reads as [Brand] [product]")
       },
     },
     {
       name: "Email.html() is a whole document for mail clients, and Email.text() carries the same words with each link written out",
       example: "timesheets",
-      async run({ page, expect }) {
+      async run({ page, expect, brand }) {
         const out = await page.evaluate(([props, find]) => {
           const kit = new Function(`return (${find})`)()()
           return { html: kit.Email.html(props), text: kit.Email.text(props) }
@@ -197,7 +197,7 @@ export default {
         expect(/display:none[^"]*">\[14\] timesheets from last week are waiting on you\.<\/div>/.test(html), "the preheader is there, hidden")
         expect.equal((html.match(/<table /g) ?? []).length, (html.match(/<table role="presentation"/g) ?? []).length, "every table is presentation")
         const text = out.text.split("\n")
-        expect.equal(text[0], "Product Product", "the plain text opens with the lockup's words")
+        expect.equal(text[0], `${brand.name} ${brand.product}`, "the plain text opens with the lockup's words")
         expect(text.includes("[14] timesheets need your approval"), "the heading")
         expect(text.includes(email.body[1]), "every paragraph")
         expect(text.includes("Review timesheets: https://app.example.com/timesheets"), "the action, with its link written out")
@@ -207,7 +207,7 @@ export default {
     {
       name: "Only http, https and mailto addresses reach the markup",
       example: "timesheets",
-      async run({ page, expect }) {
+      async run({ page, expect, brand }) {
         const [html, logo, scripted] = await page.evaluate(([props, find]) => {
           const kit = new Function(`return (${find})`)()()
           return [
@@ -218,7 +218,9 @@ export default {
         }, [email, ns.toString()])
         expect(!/javascript:|data:text/i.test(html), "no script or data address")
         expect.equal((html.match(/href="#"/g) ?? []).length, 2, "an unsafe address becomes a harmless #")
-        expect(/<img src="data:image\/png;base64,iVBORw0KGgo=" alt="Product" width="\d+" height="\d+"/.test(logo), "a raster logo written in is kept, with both dimensions")
+        const img = /<img src="data:image\/png;base64,iVBORw0KGgo=" alt="([^"]*)" width="\d+" height="\d+"/.exec(logo)
+        expect(img, "a raster logo written in is kept, with both dimensions")
+        expect.equal(img?.[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"), brand.name, "named for the brand")
         expect(!/javascript:/i.test(scripted) && !/<img src=x/.test(scripted), "a hostile logo address is dropped and a hostile heading is escaped")
       },
     },

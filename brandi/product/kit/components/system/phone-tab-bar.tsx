@@ -55,12 +55,16 @@ export const PhoneTabBar = React.forwardRef<HTMLElement, PhoneTabBarProps>(funct
                 aria-current={current ? "page" : undefined}
                 data-slot="phone-tab"
                 className={cn(
-                  "group/tab flex min-h-12 w-full min-w-0 flex-col items-center justify-center gap-0.5 rounded-control px-1 pt-1 pb-0.5 type-caption text-rail-text transition-colors duration-(--duration-fast) hover:text-rail-text-strong focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px]",
+                  "group/tab flex min-h-12 w-full min-w-0 flex-col-reverse items-center justify-center gap-0.5 rounded-control px-1 pt-1 pb-0.5 type-caption text-rail-text transition-colors duration-(--duration-fast) hover:text-rail-text-strong focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px]",
                   current && "text-rail-text-strong",
                   // Forced colours paint no fills, so the current place is outlined instead.
                   "forced-colors:aria-[current=page]:outline-2 forced-colors:aria-[current=page]:-outline-offset-2 forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-[color:Highlight]"
                 )}
               >
+                {/* The label comes first in the source and draws under the icon, so the visible text reads "Approvals 3"
+                    and stays inside the name (WCAG 2.5.3). */}
+                <span className="max-w-full truncate">{item.label}</span>
+                {n ? " " : null}
                 <span
                   data-slot="phone-tab-icon"
                   className={cn(
@@ -84,7 +88,6 @@ export const PhoneTabBar = React.forwardRef<HTMLElement, PhoneTabBarProps>(funct
                     ) : null}
                   </span>
                 </span>
-                <span className="max-w-full truncate">{item.label}</span>
               </Link>
             </li>
           )

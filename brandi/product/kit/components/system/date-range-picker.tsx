@@ -280,6 +280,8 @@ export const DateRangePicker = React.forwardRef<HTMLInputElement, DateRangePicke
       role="group"
       aria-labelledby={field?.labelId}
       aria-label={field ? undefined : label}
+      // A disabled group says so, so the faded "to" between the inputs counts as part of an inactive control.
+      aria-disabled={disabled || undefined}
       data-slot="date-range-picker"
       data-size={size}
       data-state={design || shown ? "open" : "closed"}
@@ -309,6 +311,7 @@ export const DateRangePicker = React.forwardRef<HTMLInputElement, DateRangePicke
       <input
         ref={endInput}
         {...inputProps}
+        id={`${endWord}-input`}
         value={endText}
         aria-labelledby={namedBy(endWord)}
         aria-label={field ? undefined : `${label ?? "Period"} last day`}
@@ -320,12 +323,19 @@ export const DateRangePicker = React.forwardRef<HTMLInputElement, DateRangePicke
           if (!design) setEndText(event.target.value)
         }}
       />
-      <span id={startWord} hidden>
+      {/* Visually hidden rather than hidden, and the last day has a real label of its own: inside a Field only
+          the first input is the Field label's, and a name made from hidden text read as no label at all. */}
+      <span id={startWord} className="sr-only">
         first day
       </span>
-      <span id={endWord} hidden>
+      <span id={endWord} className="sr-only">
         last day
       </span>
+      {field ? (
+        <label htmlFor={`${endWord}-input`} className="sr-only">
+          last day
+        </label>
+      ) : null}
       {design ? (
         <IconButton icon="CalendarRange" label={`Choose ${what}`} size="sm" className={iconSize} aria-expanded aria-haspopup="dialog" data-state="open" disabled={disabled} />
       ) : (

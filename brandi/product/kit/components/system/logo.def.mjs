@@ -87,10 +87,10 @@ export default {
     {
       name: "It is an image named for the brand, drawn from the artwork and never set in type",
       example: "renditions",
-      async run({ scope, expect }) {
+      async run({ scope, expect, brand }) {
         const logo = scope.locator('[data-slot="logo"]').first()
         expect.equal(await logo.getAttribute("role"), "img", "its role")
-        expect.equal(await logo.getAttribute("aria-label"), "Product", "its accessible name")
+        expect.equal(await logo.getAttribute("aria-label"), brand.name, "its accessible name")
         expect.equal((await logo.innerText()).trim(), "", "text inside the logo")
         expect.atLeast(await logo.locator("svg").count(), 1, "SVG renditions")
       },

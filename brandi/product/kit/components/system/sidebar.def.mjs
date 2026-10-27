@@ -114,10 +114,10 @@ export default {
     {
       name: "One nav landmark named Main holds the lockup, search, the groups, the footer and the account button",
       example: "rail",
-      async run({ scope, expect }) {
+      async run({ scope, expect, brand }) {
         const nav = scope.getByRole("navigation", { name: "Main" })
         expect.equal(await nav.count(), 1, "a nav named Main")
-        expect.equal(await nav.getByRole("link", { name: "Product [Front desk]" }).count(), 1, "the lockup, as one link")
+        expect.equal(await nav.getByRole("link", { name: `${brand.name} [Front desk]` }).count(), 1, "the lockup, as one link")
         expect.equal(await nav.getByRole("button", { name: "Search or ask", exact: true }).count(), 1, "the search button")
         expect.equal(await nav.getByRole("list", { name: "Work" }).count(), 1, "the Work group")
         expect.equal(await nav.getByRole("link", { name: "Settings" }).count(), 1, "the footer")
@@ -178,12 +178,12 @@ export default {
     {
       name: "Icons only, it is 72px wide: the symbol, a search icon, 40px items and the avatar",
       example: "collapsed",
-      async run({ scope, expect }) {
+      async run({ scope, expect, brand }) {
         const nav = scope.getByRole("navigation", { name: "Main" })
         expect.equal(Math.round((await nav.boundingBox()).width), 72, "72px wide")
         expect.equal(await nav.getAttribute("data-collapsed"), "true", "it says it is collapsed")
         expect.equal(await nav.locator('[data-slot="product-lockup"]').isVisible(), false, "the lockup gives way")
-        expect(await nav.getByRole("link", { name: "Product [Front desk]" }).isVisible(), "to the symbol, still one link with the same name")
+        expect(await nav.getByRole("link", { name: `${brand.name} [Front desk]` }).isVisible(), "to the symbol, still one link with the same name")
         const search = await nav.getByRole("button", { name: "Search or ask", exact: true }).boundingBox()
         expect.equal(`${Math.round(search.width)}x${Math.round(search.height)}`, "40x40", "search is a 40px icon button")
         for (const link of await nav.getByRole("list").getByRole("link").all()) {
