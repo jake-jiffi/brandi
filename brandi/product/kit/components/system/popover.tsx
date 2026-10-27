@@ -98,6 +98,7 @@ export const Popover = React.forwardRef<HTMLButtonElement, PopoverProps>(functio
   )
 
   // Design mode draws a still picture: the trigger, and the open panel under it, with nothing listening,
+  // in the board's own stacking (z-10, not the popover layer), so a live sheet or dialog still covers it,
   // so a board never loses a key, a press or a tab stop to it.
   if (design) {
     return (
@@ -115,7 +116,7 @@ export const Popover = React.forwardRef<HTMLButtonElement, PopoverProps>(functio
             aria-label={title ? undefined : label}
             data-slot="popover-content"
             data-side={placement}
-            className={cn(popoverContentVariants({ look: "panel" }), (PANEL_PICTURE[placement] ?? PANEL_PICTURE.bottom)[align] ?? PANEL_PICTURE.bottom.start, className)}
+            className={cn(popoverContentVariants({ look: "panel" }), "z-10", (PANEL_PICTURE[placement] ?? PANEL_PICTURE.bottom)[align] ?? PANEL_PICTURE.bottom.start, className)}
           >
             {body}
           </div>

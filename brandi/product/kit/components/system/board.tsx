@@ -538,7 +538,7 @@ export const Board = React.forwardRef<HTMLDivElement, BoardProps>(function Board
                             label={named}
                             items={items}
                             align="end"
-                            trigger={<IconButton icon="Ellipsis" label={named} size="sm" data-board-no-drag="" className="relative z-10 -mt-0.5 -mr-1.5" />}
+                            trigger={<IconButton icon="ArrowRightLeft" label={named} size="sm" data-board-no-drag="" className="relative z-10 -mt-0.5 -mr-1.5" />}
                           />
                         </div>
                         {card.person || card.badge ? (

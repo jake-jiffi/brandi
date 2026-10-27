@@ -88,9 +88,6 @@ export default {
     { name: "error", type: "ReactNode", doc: "The cards could not load: name the system that failed. Cards given stay, as the last good copy." },
     { name: "empty", type: "ReactNode", default: '"Nothing here yet"', doc: "What an empty column says, in a dashed space a card can be dropped into." },
   ],
-  types: [
-    'type BadgeTone = "success" | "warning" | "danger" | "info" | "ai" | "highlight" | "neutral"',
-  ],
   notes: {
     Behaviour: [
       "Moving never depends on dragging. Every card has a Move button, named Move [card], whose menu moves it to any other column, or up and down its own. It is the keyboard path and the single-pointer path (WCAG 2.5.7).",
@@ -115,9 +112,6 @@ export default {
     Rules: [
       "For work that moves through stages. A list that only needs sorting or filtering is a DataTable.",
       "One state per card, as a Badge with the system's status words. A count that waits on the reader takes attention; the rest stay grey.",
-    ],
-    Open: [
-      "The Move button uses the more icon, because lib/icons.ts has no move glyph. A two-way arrow (ArrowRightLeft) would say it better.",
     ],
   },
   frame: { width: 1120, height: 1460 },
