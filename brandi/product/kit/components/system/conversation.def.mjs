@@ -41,7 +41,7 @@ const groundOf = (locator) =>
 const THREAD = [
   { id: "m1", author: "[Jo Ellis]", time: "Yesterday, 4:12 pm", dateTime: "2026-10-26T16:12", text: "Hi, can you resend [Invoice 1042]? I can't find the original email." },
   { id: "m2", author: "You", own: true, status: "sent", time: "Yesterday, 4:30 pm", dateTime: "2026-10-26T16:30", text: "Of course. I've resent it to [jo@northside.example]. Let me know if it doesn't arrive." },
-  { id: "m3", author: "Assistant", assistant: true, time: "Today, 8:02 am", dateTime: "2026-10-27T08:02", text: "[Jo Ellis] opened the invoice email at [7:58 am]. The invoice is still unpaid." },
+  { id: "m3", author: "Assistant", assistant: true, time: "Today, 8:02 am", dateTime: "2026-10-27T08:02", text: "[Jo Ellis] opened the invoice email at 7:58 am. The invoice is still unpaid." },
   { id: "m4", author: "[Jo Ellis]", unread: true, time: "Today, 9:41 am", dateTime: "2026-10-27T09:41", text: "Got it, thanks. We'll pay it on Friday." },
 ]
 const FRAME = "background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; box-sizing: border-box;"

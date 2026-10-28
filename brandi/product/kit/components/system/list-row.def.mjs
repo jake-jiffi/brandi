@@ -41,7 +41,7 @@ const anatomy = [
   { id: "t1", avatar: "[Priya Nair]", title: "[Priya Nair]", meta: "Timesheet for [3 to 9 June] · [38.5 h]", badge: { label: "Needs you", tone: "highlight" }, unread: true, href: "#timesheet-priya" },
   { id: "i1", icon: "Receipt", title: "Invoice [1042]", meta: "[Harbour Physio] · due [Friday]", trailing: "[$4,280.00]", chevron: true, href: "#invoice-1042" },
   { id: "l1", avatar: "[Sam Lee]", title: "[Sam Lee]", meta: "Leave from [14 July] · [3] days", badge: { label: "Approved", tone: "success" }, href: "#leave-sam" },
-  { id: "n1", icon: "Bell", title: "Payroll closes on [Thursday]", meta: "Anything approved after [5 pm] goes in the next pay run." },
+  { id: "n1", icon: "Bell", title: "Payroll closes on [Thursday]", meta: "Anything approved after 5 pm goes in the next pay run." },
 ]
 
 const queue = [

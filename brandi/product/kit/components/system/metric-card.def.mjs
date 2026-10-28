@@ -82,7 +82,7 @@ export default {
     Copy: [
       'The label says exactly what is counted: "Net revenue, before GST", never "Revenue".',
       'The footnote says what is left out: "Excludes invoices still in draft."',
-      'Unavailable names the source and when it last answered: "[Bank feed] is not responding. Last answered at [9:42 am]."',
+      'Unavailable names the source and when it last answered: "[Bank feed] is not responding. Last answered at 9:42 am."',
     ],
     Rules: [
       "Two to four in a row, and one hero per row at most. Tabular figures.",
@@ -124,7 +124,7 @@ export default {
       markup: grid(
         "repeat(3, minmax(0, 1fr))",
         `<x-import component-from-global-scope="NS.MetricCard" label="Net revenue" state="loading" format="compact-currency"></x-import>
-<x-import component-from-global-scope="NS.MetricCard" label="Cash in the bank" state="unavailable" unavailable-text="[Bank feed] is not responding. Last answered at [9:42 am]."></x-import>
+<x-import component-from-global-scope="NS.MetricCard" label="Cash in the bank" state="unavailable" unavailable-text="[Bank feed] is not responding. Last answered at 9:42 am."></x-import>
 <x-import component-from-global-scope="NS.MetricCard" label="Refunds this month" value="{{nothing}}" format="currency" footnote="No refunds have synced from [the payments system] yet."></x-import>`
       ),
       vals: { nothing: null },
@@ -219,7 +219,7 @@ export default {
         expect.equal(await down.getAttribute("data-state"), "unavailable", "its state")
         const text = await down.innerText()
         expect(text.includes("Unavailable"), "it says unavailable")
-        expect(text.includes("[Bank feed] is not responding. Last answered at [9:42 am]."), "which source, and when it last answered")
+        expect(text.includes("[Bank feed] is not responding. Last answered at 9:42 am."), "which source, and when it last answered")
         expect.equal(await down.locator('[data-slot="metric-card-value"]').count(), 0, "no figure")
       },
     },

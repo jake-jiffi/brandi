@@ -5,7 +5,8 @@
  * from the definitions' own examples, so the canvas and the cards cannot show different things. Each
  * board gets a dark twin that imports it with the theme flipped, a contents board leads (Main), and
  * canvas.json lays the rows out under title notes. Heights are measured in a real browser, because a
- * frame shorter than its content clips.
+ * frame shorter than its content clips. A group's board taller than the canvas takes (8000px) is split
+ * between its components into parts that each fit.
  *
  * Generated boards carry a marker and are rewritten on every run. Boards a person authored (screens,
  * states, options) are never touched; they keep their place below the generated rows.
@@ -17,7 +18,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { artboard, canvasManifest } from './canvas.mjs';
+import { artboard, canvasManifest, FRAME_LIMIT } from './canvas.mjs';
 import { loadDefinitions, resolveNs, resolveLogicNs, GROUPS } from './productdocs.mjs';
 import { auditProductTokens } from './producttokens.mjs';
 import { previewArtboard } from './preview.mjs';
@@ -27,6 +28,10 @@ const W = 1440;
 const ROW_GAP_X = 120;
 const NOTE_GAP = 300;
 const ROW_GAP_Y = 420;
+// Room left under the canvas's limit, so a part measured just under it still fits once fonts settle.
+const MEASURE_MARGIN = 400;
+// The shell's gap between its sections, which a section's own measured height leaves out.
+const SECTION_GAP = 40;
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const pascal = (s) => String(s).split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('');
@@ -177,43 +182,86 @@ export function scopeHoles(markup, prefix) {
  * showed another component's data or failed to render.
  */
 export function componentBoards(defs, system) {
-  const out = [];
-  for (const group of GROUPS) {
-    const members = defs.filter((d) => d.group === group);
-    if (!members.length) continue;
-    const vals = {};
-    const state = {};
-    const scopes = [];
-    const body = members.map((d, i) => {
-      const prefix = `c${i}`;
-      for (const ex of d.examples) for (const [k, v] of Object.entries(ex.vals ?? {})) vals[`${prefix}_${k}`] = v;
-      if (d.state) state[prefix] = d.state;
-      if (d.logic) scopes.push(`scoped(${JSON.stringify(prefix)}, (self) => ({ ${resolveLogicNs(d.logic, system.global)} }));`);
-      return [
-        `<section style="display: flex; flex-direction: column; gap: 20px; padding-top: 32px; border-top: 1px solid var(--line);">`,
-        `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
-        ...d.examples.map((ex) => `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}">${scopeHoles(resolveNs(ex.markup, system.global).trim(), prefix)}</div></div>`),
-        '</section>',
-      ].join('\n');
-    }).join('\n');
-    const name = `Components${pascal(group === 'The assistant' ? 'Assistant' : group)}1440`;
-    const logic = [
-      `state = ${JSON.stringify(state)};`,
-      'renderVals() {',
-      `  const vals = Object.assign(${JSON.stringify(vals)}, { theme: this.props.dark ? "dark" : "light" });`,
-      '  const scoped = (prefix, build) => {',
-      '    const slice = this.state[prefix] || {};',
-      '    const self = { props: this.props, state: slice, setState: (patch) => this.setState({ [prefix]: Object.assign({}, this.state[prefix] || {}, typeof patch === "function" ? patch(this.state[prefix] || {}) : patch) }) };',
-      '    const made = build(self);',
-      '    for (const key in made) vals[prefix + "_" + key] = made[key];',
-      '  };',
-      ...scopes.map((line) => `  ${line}`),
-      '  return vals;',
-      '}',
+  return GROUPS.map((group) => groupBoard(system, group, defs.filter((d) => d.group === group))).filter(Boolean);
+}
+
+const groupWord = (group) => (group === 'The assistant' ? 'Assistant' : group);
+
+/**
+ * One group's board, or one part of it (`part`: { index, count }). The first part keeps the group's own name,
+ * so links to it hold; each later part is named for its first component, and every part's title says which of
+ * how many it is.
+ */
+function groupBoard(system, group, members, part = null) {
+  if (!members.length) return null;
+  const vals = {};
+  const state = {};
+  const scopes = [];
+  const body = members.map((d, i) => {
+    const prefix = `c${i}`;
+    for (const ex of d.examples) for (const [k, v] of Object.entries(ex.vals ?? {})) vals[`${prefix}_${k}`] = v;
+    if (d.state) state[prefix] = d.state;
+    if (d.logic) scopes.push(`scoped(${JSON.stringify(prefix)}, (self) => ({ ${resolveLogicNs(d.logic, system.global)} }));`);
+    return [
+      `<section data-board-section="${esc(d.name)}" style="display: flex; flex-direction: column; gap: 20px; padding-top: 32px; border-top: 1px solid var(--line);">`,
+      `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
+      ...d.examples.map((ex) => `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}">${scopeHoles(resolveNs(ex.markup, system.global).trim(), prefix)}</div></div>`),
+      '</section>',
     ].join('\n');
-    out.push(board(system, name, `Components: ${group === 'The assistant' ? 'the assistant' : group.toLowerCase()}`, body, { logic }));
+  }).join('\n');
+  const name = `Components${pascal(groupWord(group))}${part && part.index > 1 ? pascal(members[0].name) : ''}1440`;
+  const title = `Components: ${group === 'The assistant' ? 'the assistant' : group.toLowerCase()}${part && part.count > 1 ? `, ${part.index} of ${part.count}` : ''}`;
+  const logic = [
+    `state = ${JSON.stringify(state)};`,
+    'renderVals() {',
+    `  const vals = Object.assign(${JSON.stringify(vals)}, { theme: this.props.dark ? "dark" : "light" });`,
+    '  const scoped = (prefix, build) => {',
+    '    const slice = this.state[prefix] || {};',
+    '    const self = { props: this.props, state: slice, setState: (patch) => this.setState({ [prefix]: Object.assign({}, this.state[prefix] || {}, typeof patch === "function" ? patch(this.state[prefix] || {}) : patch) }) };',
+    '    const made = build(self);',
+    '    for (const key in made) vals[prefix + "_" + key] = made[key];',
+    '  };',
+    ...scopes.map((line) => `  ${line}`),
+    '  return vals;',
+    '}',
+  ].join('\n');
+  return { ...board(system, name, title, body, { logic }), group, members: members.map((d) => d.name) };
+}
+
+/**
+ * How a group's board splits so each part fits the canvas: its components packed in order, each part at most the
+ * limit less a margin, measured. `sections` is each component's measured height, in order; the rest of `total`
+ * (the title and the padding) comes with every part. A component too tall to fit even alone is reported, and
+ * takes a part of its own.
+ */
+export function packParts({ total, sections, limit = FRAME_LIMIT.max, margin = MEASURE_MARGIN }) {
+  const names = Object.keys(sections);
+  const budget = limit - margin;
+  if (total <= budget || names.length < 2) return { parts: [names], tooTall: total > limit && names.length === 1 ? [{ name: names[0], height: total }] : [] };
+  const overhead = Math.max(0, total - names.reduce((n, k) => n + sections[k] + SECTION_GAP, 0));
+  const parts = [];
+  const tooTall = [];
+  let current = [];
+  let height = overhead;
+  for (const k of names) {
+    const h = sections[k] + SECTION_GAP;
+    if (current.length && height + h > budget) {
+      parts.push(current);
+      current = [];
+      height = overhead;
+    }
+    current.push(k);
+    height += h;
+    if (overhead + h > limit) tooTall.push({ name: k, height: Math.round(overhead + h) });
   }
-  return out;
+  parts.push(current);
+  return { parts, tooTall };
+}
+
+/** A group's board split into parts, in order: each a board of its own, titled "n of m". */
+export function partBoards(defs, system, group, parts) {
+  const byName = new Map(defs.filter((d) => d.group === group).map((d) => [d.name, d]));
+  return parts.map((names, i) => groupBoard(system, group, names.map((n) => byName.get(n)).filter(Boolean), { index: i + 1, count: parts.length }));
 }
 
 /** A dark twin: one line importing its light board with the theme flipped, so the two cannot drift. */
@@ -262,7 +310,7 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   for (const f of readdirSync(canvas).filter((x) => x.endsWith('.dc.html'))) if (isGenerated(path.join(canvas, f))) unlinkSync(path.join(canvas, f));
 
   const foundations = [colourBoard(tokens, system), typeBoard(tokens, system), shapeBoard(tokens, system), iconBoard(system)];
-  const components = componentBoards(defs, system);
+  let components = componentBoards(defs, system);
   const sections = [
     { label: 'Foundations', first: foundations[0].file, note: 'Colour, type, space, corners, depth and icons, from the tokens.' },
     { label: 'Components', first: components[0]?.file ?? foundations[0].file, note: `${defs.length} components in ${components.length} groups, mounted from the bundle.` },
@@ -276,24 +324,58 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
 
   // Measure each light board as rendered, then write it again at its true height.
   const heights = {};
+  const sectionsOf = {};
   // Measured from a folder of its own, removed after: the pages once stayed in the canvas folder. A
   // rendered page sets its base to the canvas, so it loads the system from there wherever it sits.
   rmSync(path.join(productDir, 'canvas', '.measure'), { recursive: true, force: true });
-  if (measure && existsSync(path.join(starter, 'node_modules', 'playwright'))) {
+  const measuring = measure && existsSync(path.join(starter, 'node_modules', 'playwright'));
+  const measureAll = async (list) => {
     const pagesDir = mkdtempSync(path.join(os.tmpdir(), 'brandi-measure-'));
     const pages = [];
-    for (const b of lights) {
+    for (const b of list) {
       const res = await previewArtboard(path.join(canvas, b.file), { outDir: pagesDir, width: W, height: 900, png: false });
       pages.push({ url: pathToFileURL(res.html).href, width: W, label: b.name });
     }
     writeFileSync(path.join(pagesDir, 'pages.json'), JSON.stringify(pages));
     const run = spawnSync(process.execPath, [path.join('tools', 'measure-boards.mjs'), '--pages', path.join(pagesDir, 'pages.json')], { cwd: starter, encoding: 'utf8', timeout: 600000 });
-    try { Object.assign(heights, JSON.parse(run.stdout.trim().split('\n').pop())); } catch { log(`could not measure the boards: ${(run.stderr || run.stdout).slice(-300)}`); }
+    try {
+      const { __sections = {}, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
+      Object.assign(heights, measured);
+      Object.assign(sectionsOf, __sections);
+    } catch { log(`could not measure the boards: ${(run.stderr || run.stdout).slice(-300)}`); }
     rmSync(pagesDir, { recursive: true, force: true });
-  }
+  };
+  if (measuring) await measureAll(lights);
+
+  // A group's board taller than the canvas takes is split between its components, packed in order by their
+  // measured heights. A starter whose measuring tool reports no sections splits them evenly instead, and the
+  // parts are measured again either way. A component too tall to fit alone is reported, never clipped quietly.
+  const tooTall = [];
+  const parts = [];
+  components = components.flatMap((b) => {
+    const total = heights[b.name];
+    if (typeof total !== 'number' || total <= FRAME_LIMIT.max - MEASURE_MARGIN) return [b];
+    const even = Object.fromEntries(b.members.map((m) => [m, (total - 200) / b.members.length - SECTION_GAP]));
+    const packed = packParts({ total, sections: sectionsOf[b.name] ?? even });
+    for (const t of packed.tooTall) {
+      tooTall.push({ board: b.name, component: t.name, height: t.height });
+      log(`${t.name} is ${t.height}px tall on its own, past the canvas's ${FRAME_LIMIT.max}px: give it fewer examples or a shorter frame.`);
+    }
+    if (packed.parts.length < 2) return [b];
+    unlinkSync(path.join(canvas, b.file));
+    const split = partBoards(defs, system, b.group, packed.parts);
+    for (const p of split) writeFileSync(path.join(canvas, p.file), p.source);
+    parts.push(...split);
+    log(`${b.title} is ${total}px tall, past the canvas's ${FRAME_LIMIT.max}px: split into ${split.length} boards.`);
+    return split;
+  });
+  if (measuring && parts.length) await measureAll(parts);
+  for (const p of parts) if (typeof heights[p.name] === 'number' && heights[p.name] > FRAME_LIMIT.max) tooTall.push({ board: p.name, component: null, height: heights[p.name] });
+
+  const generated = [main, ...foundations, ...components];
   const heightOf = (b) => (typeof heights[b.name] === 'number' ? Math.max(400, heights[b.name]) : 1600);
   const rewrite = (b) => b.source.replace(/"\$preview":\{"width":1440,"height":\d+\}/, `"$preview":{"width":1440,"height":${heightOf(b)}}`);
-  for (const b of lights) writeFileSync(path.join(canvas, b.file), rewrite(b));
+  for (const b of generated) writeFileSync(path.join(canvas, b.file), rewrite(b));
   const twins = [...foundations, ...components].map((b) => twin(b, system, heightOf(b)));
   for (const t of twins) writeFileSync(path.join(canvas, t.file), t.source);
 
@@ -339,7 +421,7 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
       : [...(existing?.designSystems ?? []), { title: `${system.name} product system`, namespace: system.namespace }],
   });
   writeFileSync(path.join(canvas, 'canvas.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { boards: [...lights, ...twins].map((b) => b.file), measured: Object.keys(heights).length, shifted: shift, manifest };
+  return { boards: [...generated, ...twins].map((b) => b.file), measured: Object.keys(heights).length, shifted: shift, tooTall, manifest };
 }
 
-export default { writeBoards, colourBoard, typeBoard, shapeBoard, iconBoard, componentBoards, twin, contentsBoard, MARKER };
+export default { writeBoards, colourBoard, typeBoard, shapeBoard, iconBoard, componentBoards, packParts, partBoards, twin, contentsBoard, MARKER };

@@ -25,6 +25,9 @@ const SUPPORT_LINE = '<script src="./support.js"></script>';
 const DC_SCRIPT_ATTRS = 'type="text/x-dc" data-dc-script';
 
 /** Frame sizes the canvas and the real world agree on. */
+/** The frame the Design canvas accepts, each way, in CSS px: a board outside it cannot be published. */
+export const FRAME_LIMIT = Object.freeze({ min: 40, max: 8000 });
+
 export const FRAMES = Object.freeze({
   phone: { w: 390, h: 844, note: 'iPhone logical resolution' },
   phoneLarge: { w: 430, h: 932 },
@@ -706,7 +709,12 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
         err('data-props must be single-quoted.', "Write data-props='{...}' so JSON double quotes survive.");
       }
       try {
-        decodeProps(propsAttr[2]);
+        const preview = decodeProps(propsAttr[2])?.$preview;
+        for (const [side, px] of [['width', preview?.width], ['height', preview?.height]]) {
+          if (typeof px === 'number' && (px < FRAME_LIMIT.min || px > FRAME_LIMIT.max)) {
+            err(`The ${side} in $preview is ${px}px; the Design canvas takes a frame of ${FRAME_LIMIT.min} to ${FRAME_LIMIT.max}px each way, so ${name} cannot be published.`, 'Split the board into parts that each fit, or make it smaller.');
+          }
+        }
       } catch (e) {
         err(`data-props is not valid JSON after entity decoding: ${e.message}`, null);
       }
@@ -902,6 +910,11 @@ export function validateCanvas({ artboards, manifest, brandFonts = [], systems =
           errors.push({ file: b.file, message: `${k} is ${JSON.stringify(b[k])}, which the seeder cannot lay out.`, fix: 'Rebuild the manifest with canvasManifest, which refuses non-finite geometry.' });
         }
       }
+      for (const [k, side] of [['w', 'wide'], ['h', 'tall']]) {
+        if (Number.isFinite(b[k]) && (b[k] < FRAME_LIMIT.min || b[k] > FRAME_LIMIT.max)) {
+          errors.push({ file: b.file, message: `Its frame is ${b[k]}px ${side}; the Design canvas takes ${FRAME_LIMIT.min} to ${FRAME_LIMIT.max}px each way, so it cannot be published.`, fix: 'Split the board into parts that each fit (brandi product boards splits its own), or make it smaller.' });
+        }
+      }
     }
     for (const clash of findOverlaps(manifest)) {
       errors.push({ file: clash.a, message: `Overlaps ${clash.b}, including the name strip above each frame.`, fix: 'Leave at least 80px between frames in a row and 120px between rows.' });
@@ -919,7 +932,7 @@ export function validateCanvas({ artboards, manifest, brandFonts = [], systems =
 }
 
 export default {
-  artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding,
+  artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding, FRAME_LIMIT,
   forDesignCanvas, designIndex, encodeProps, decodeProps, FRAMES, BANNED_FONTS, DEFAULT_FONTS,
   systemHeadLines, checkSystemRecord, NAMESPACE_RE,
 };

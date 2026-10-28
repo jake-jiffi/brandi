@@ -73,7 +73,7 @@ const SOURCES = [
   { label: "[Aged receivables] report", icon: "ChartColumn", href: "#aged-receivables" },
 ]
 const CHECKED = [
-  { label: "Found [12] overdue invoices", status: "done", detail: "From [accounting system], today at [9:41 am]" },
+  { label: "Found [12] overdue invoices", status: "done", detail: "From [accounting system], today at 9:41 am" },
   { label: "Checked the totals against [bank feed]", status: "done", detail: "[3] are unpaid, [9] were paid late" },
   { label: "Worked out the amounts", status: "done" },
 ]
@@ -189,7 +189,7 @@ ${answer('question="What did [Kim\'s Cafe] order last month?" thinking="{{thinki
       markup: `<div style="max-width: 640px;">${answer('question="Which clients have not been invoiced for [October]?" steps="{{stoppedSteps}}" status="Stopped" sources="{{stoppedSources}}" caveat="Check [the October jobs] first." actions="{{stoppedActions}}"', "So far, [Kim's Cafe] and [Harbour Physio] have jobs in [October] with no invoice.")}</div>`,
       vals: {
         stoppedSteps: [
-          { label: "Found [41] jobs in [October]", status: "done", detail: "From [booking system], today at [10:02 am]" },
+          { label: "Found [41] jobs in [October]", status: "done", detail: "From [booking system], today at 10:02 am" },
           { label: "Checking each job for an invoice", status: "running" },
           { label: "Listing the clients", status: "waiting" },
         ],
@@ -234,7 +234,7 @@ ${answer('question="What did [Kim\'s Cafe] order last month?" thinking="{{thinki
     stopB: () => self.setState({ stopB: true }),
     stepsC: self.state.retryC === "done"
       ? ${JSON.stringify(CHECKED)}
-      : [${JSON.stringify(CHECKED[0])}, { label: "Checking the totals against [bank feed]", status: self.state.retryC === "working" ? "running" : "failed", detail: self.state.retryC === "working" ? undefined : "It has not answered since [9:42 am]" }, { label: "Working out the amounts", status: "waiting" }],
+      : [${JSON.stringify(CHECKED[0])}, { label: "Checking the totals against [bank feed]", status: self.state.retryC === "working" ? "running" : "failed", detail: self.state.retryC === "working" ? undefined : "It has not answered since 9:42 am" }, { label: "Working out the amounts", status: "waiting" }],
     statusC: "Answered",
     failedC: self.state.retryC === "failed" ? "Couldn't reach [bank feed], so nothing is checked yet." : undefined,
     sourcesC: self.state.retryC === "done" ? ${JSON.stringify(SOURCES)} : undefined,

@@ -63,7 +63,7 @@ const groundOf = (locator) =>
     return getComputedStyle(document.body).backgroundColor
   })
 
-const FOUND = { label: "Found [12] overdue invoices", status: "done", detail: "From [accounting system], today at [9:41 am]" }
+const FOUND = { label: "Found [12] overdue invoices", status: "done", detail: "From [accounting system], today at 9:41 am" }
 const CHECKING = { label: "Checking the totals against [bank feed]", status: "running" }
 const DRAFTING = { label: "Drafting the reminders", status: "waiting" }
 const PANE = "background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px 20px; box-sizing: border-box;"
@@ -197,7 +197,7 @@ ${steps('steps="{{longJob}}" default-open="{{yes}}"')}
   state: { retried: false, finished: false },
   logic: `retrySteps: self.state.finished
       ? [${JSON.stringify(FOUND)}, { label: React.createElement("span", null, "Checked the totals against ", React.createElement("strong", null, "[bank feed]")), status: "done" }, { label: "Drafted [3] reminders", status: "done" }]
-      : [${JSON.stringify(FOUND)}, { label: React.createElement("span", null, "Checking the totals against ", React.createElement("strong", null, "[bank feed]")), status: self.state.retried ? "running" : "failed", detail: self.state.retried ? undefined : "Couldn't reach [bank feed]. It has not answered since [9:42 am]." }, { label: "Drafting the reminders", status: "waiting" }],
+      : [${JSON.stringify(FOUND)}, { label: React.createElement("span", null, "Checking the totals against ", React.createElement("strong", null, "[bank feed]")), status: self.state.retried ? "running" : "failed", detail: self.state.retried ? undefined : "Couldn't reach [bank feed]. It has not answered since 9:42 am." }, { label: "Drafting the reminders", status: "waiting" }],
     retryRun: () => {
       self.setState({ retried: true })
       setTimeout(() => self.setState({ finished: true }), 1500)

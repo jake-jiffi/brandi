@@ -25,7 +25,7 @@ export interface BannerProps extends Omit<React.ComponentPropsWithoutRef<"div">,
   dismissLabel?: string
   /** status, because a banner is usually there on arrival. alert when it appears because something broke while the person was on the page. */
   role?: "alert" | "status"
-  /** The consequence, on the same line: "Invoices below are from [9:42 am]." */
+  /** The consequence, on the same line: "Invoices below are from 9:42 am." */
   children?: React.ReactNode
 }
 

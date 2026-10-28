@@ -49,6 +49,12 @@ export function PageSkeleton() {
 // any retry to answer, and short enough that a later, separate failure on the same address starts plainly.
 let retried: { path: string; at: number } | null = null
 
+/** The line for a page drawn after a Try again on this address that failed, or nothing. */
+function stillNotLoading() {
+  if (typeof window === "undefined" || !retried || retried.path !== window.location.pathname || Date.now() - retried.at > 60000) return ""
+  return `Still not loading. Tried again at ${formatTime(new Date())}.`
+}
+
 /**
  * The page failed. One heading, Try again, a way home, and a reference for support in a disclosure. Never a
  * cause or a promise nobody can know. When Try again fails too, focus goes to the heading, never the page body,
@@ -56,7 +62,7 @@ let retried: { path: string; at: number } | null = null
  */
 export function PageError({ error, retry }: { error: unknown; retry: () => void }) {
   const root = React.useRef<HTMLDivElement | null>(null)
-  const [again, setAgain] = React.useState("")
+  const line = React.useRef<HTMLParagraphElement | null>(null)
   // A server error carries a digest that support can find in the logs; an error in the browser has none.
   const digest = typeof error === "object" && error !== null && "digest" in error ? String((error as { digest?: unknown }).digest ?? "") : ""
   // When it happened, read once, in the product's date and time styles. It shows only inside the closed
@@ -69,9 +75,12 @@ export function PageError({ error, retry }: { error: unknown; retry: () => void 
   React.useEffect(() => {
     // Where a product reports errors. The example logs them.
     console.error(error)
-    if (!retried || retried.path !== window.location.pathname || Date.now() - retried.at > 60000) return
+    const words = stillNotLoading()
+    if (!words) return
     retried = null
-    setAgain(`Still not loading. Tried again at ${formatTime(new Date())}.`)
+    // Written into the status after it is on the page, never drawn with it: a live region that arrives already
+    // holding its words is not read out. It has no children of React's, so a later render leaves the words be.
+    if (line.current) line.current.textContent = words
     const heading = root.current?.querySelector<HTMLElement>("h1")
     if (heading) {
       heading.tabIndex = -1
@@ -101,9 +110,7 @@ export function PageError({ error, retry }: { error: unknown; retry: () => void 
         Try again, or go back to Home. If it keeps happening, send the details below to your support team.
       </EmptyState>
       {/* Here from the start and empty (out of sight, so it takes no room), so the line is read when a retry fails and never on load. */}
-      <p role="status" data-slot="page-error-retry" className={again ? "text-center type-meta text-text-muted" : "sr-only"}>
-        {again}
-      </p>
+      <p ref={line} role="status" data-slot="page-error-retry" className="text-center type-meta text-text-muted empty:sr-only" />
       <Accordion items={[{ id: "support", title: "Details for support", content: <DescriptionList items={details} /> }]} headingLevel={2} />
     </div>
   )

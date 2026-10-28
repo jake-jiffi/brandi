@@ -56,6 +56,38 @@ describe('the boards a system generates for itself', () => {
     assert.match(data.source, /state = \{"c0":\{"open":false\},"c1":\{"open":true\}\}/, 'each slice of state is its own');
     assert.equal(B.scopeHoles('{{theme}} {{x.y}}', 'c2'), '{{theme}} {{c2_x.y}}');  });
 
+  test('a group too tall for the canvas packs into parts in order, each under the limit, and a giant is reported', () => {
+    // A Data board measured 20,251px; the canvas takes 8000. Sections are the components' measured heights.
+    const sections = { Card: 3000, MetricCard: 2500, DataTable: 4200, Pagination: 900, List: 2600, ListRow: 2200, Timeline: 1800 };
+    const total = 154 + Object.values(sections).reduce((n, h) => n + h + 40, 0);
+    const { parts, tooTall } = B.packParts({ total, sections });
+    assert.deepEqual(parts.flat(), Object.keys(sections), 'every component, once, in order');
+    assert.ok(parts.length >= 3, `${parts.length} parts`);
+    for (const part of parts) {
+      const h = 154 + part.reduce((n, k) => n + sections[k] + 40, 0);
+      assert.ok(h <= 8000 - 400, `a part of ${part.join(', ')} is ${h}px, past the limit less its margin`);
+    }
+    assert.deepEqual(tooTall, []);
+    assert.deepEqual(B.packParts({ total: 6000, sections: { A: 3000, B: 2800 } }).parts, [['A', 'B']], 'a board that fits stays whole');
+    const giant = B.packParts({ total: 154 + 9000 + 40 + 500 + 40, sections: { Huge: 9000, Small: 500 } });
+    assert.deepEqual(giant.parts, [['Huge'], ['Small']], 'a component too tall alone takes a part of its own');
+    assert.deepEqual(giant.tooTall.map((t) => t.name), ['Huge'], 'and is reported, not clipped quietly');
+  });
+
+  test('the parts of a split group are boards of their own: the first keeps the group\'s name, each says which of how many it is', () => {
+    const mk = (name) => ({ name, group: 'Data', job: 'A thing.', status: 'proven', props: [], examples: [{ id: 'a', title: 'A', markup: `<x-import component-from-global-scope="NS.${name}"></x-import>` }] });
+    const defs = ['Card', 'MetricCard', 'DataTable', 'Pagination'].map(mk);
+    const parts = B.partBoards(defs, system, 'Data', [['Card', 'MetricCard'], ['DataTable'], ['Pagination']]);
+    assert.deepEqual(parts.map((p) => p.name), ['ComponentsData1440', 'ComponentsDataDataTable1440', 'ComponentsDataPagination1440']);
+    assert.deepEqual(parts.map((p) => p.title), ['Components: data, 1 of 3', 'Components: data, 2 of 3', 'Components: data, 3 of 3']);
+    for (const p of parts) assert.match(p.name, /^[A-Z][A-Za-z0-9]*$/, 'a name the board rules take');
+    assert.match(parts[1].source, /data-board-section="DataTable"/);
+    assert.equal(/Acme\.Card"/.test(parts[1].source), false, 'each part holds only its own components');
+    assert.equal(validateCanvas({ artboards: parts.map((p) => ({ file: p.file, source: p.source })), systems: ['acme'] }).errors.length, 0);
+    const twin = B.twin(parts[1], system, 5200);
+    assert.equal(twin.file, 'ComponentsDataDataTable1440Dark.dc.html', 'its dark twin splits the same way');
+  });
+
   test('a dark twin imports its light board with the theme flipped', () => {
     const light = B.colourBoard(tokens, system);
     const t = B.twin(light, system, 2400);

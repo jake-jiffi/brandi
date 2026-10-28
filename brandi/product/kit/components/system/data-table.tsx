@@ -540,11 +540,13 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
       const n = numberOf(value)
       return n === null ? "" : formatNumber((n / (col.max && col.max > 0 ? col.max : 100)) * 100, "percent", { digits: 0 })
     }
-    if (type === "stack") return isObject(value) ? wordsOf(value.title) : wordsOf(value)
+    // A stack keeps its second line on the phone, as it shows it at desktop width: a field folded into it is not lost.
+    if (type === "stack") return isObject(value) ? [wordsOf(value.title), wordsOf(value.sub)].filter(Boolean).join(" · ") : wordsOf(value)
     if (type === "badge") return badgeOf(value)?.label ?? ""
     return wordsOf(value)
   }
 
+  const nameCol = cols.find((c) => c.key === nameKey)
   const phone = {
     meta: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && ["meta", "labelled"].includes(c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta"))),
     badge: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && (c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta")) === "badge"),
@@ -764,12 +766,16 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
       >
         {view === "rows"
           ? shown.map(({ row, key, name }) => {
+              // The naming column is the row's title; a stack's second line under it leads the meta line instead.
+              const naming = row[nameKey]
+              const namingSub = nameCol && typeOf(nameCol) === "stack" && isObject(naming) ? wordsOf(naming.sub) : ""
               const words = phone.meta
                 .map((col) => {
                   const said = phoneWords(col, row)
                   return said && col.phone === "labelled" ? `${col.label} ${said}` : said
                 })
                 .filter(Boolean)
+              if (namingSub) words.unshift(namingSub)
               const badges = phone.badge.map((col) => badgeOf(row[col.key])).filter((b): b is ListRowBadge => b !== null)
               const primary = phone.primary ? cellContent(phone.primary, row, name) : null
               const menu = phone.actions ? <Menu label={`More actions for ${name}`} items={menuFor(phone.actions, row)} align="end" /> : null

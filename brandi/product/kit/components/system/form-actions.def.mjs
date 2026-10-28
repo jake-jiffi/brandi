@@ -22,7 +22,10 @@ export default {
       "The tab order follows the screen: the destructive action first when it sits on the left.",
       "With changed, an Unsaved changes warning badge shows beside the actions, in a polite status that is there from the start, so it is said once when the first change makes it appear.",
     ],
-    Layout: ["Buttons wrap rather than overflow a narrow form, and the destructive action keeps its end."],
+    Layout: [
+      "Buttons wrap rather than overflow a narrow form, and the destructive action keeps its end.",
+      "Cancel and the primary wrap as one: on a phone the Unsaved changes warning keeps the first line and the two buttons move under it together, so the primary never sits alone.",
+    ],
     Rules: [
       "Cancel immediately left of the one primary, right-aligned above a hairline.",
       "A destructive action sits apart, on the left, as a danger button.",
@@ -31,7 +34,7 @@ export default {
     ],
     Review: ["A settings page showed two primary Saves, both live with nothing changed (a pilot's round 1)."],
   },
-  frame: { width: 960, height: 560 },
+  frame: { width: 960, height: 700 },
   logic: `els: (() => {
   for (const key of Object.keys(window)) {
     try {
@@ -61,6 +64,12 @@ export default {
       markup: `<div class="flex flex-col gap-6"><div data-section="rest"><x-import component-from-global-scope="NS.FormActions">${button("Cancel")}${button("Save approvals")}</x-import></div>
 <div data-section="changed"><x-import component-from-global-scope="NS.FormActions" changed="{{yes}}">${button("Cancel")}${button("Save pay calendar", "primary")}</x-import></div></div>`,
       vals: { yes: true },
+    },
+    {
+      id: "changed-phone",
+      title: "With unsaved changes, at phone width",
+      layout: "block",
+      markup: `<div style="width: 343px;"><x-import component-from-global-scope="NS.FormActions" changed="{{yes}}">${button("Cancel")}${button("Save pay calendar", "primary")}</x-import></div>`,
     },
     {
       id: "start",
@@ -97,6 +106,22 @@ export default {
         const cancel = await scope.locator('[data-section="changed"]').getByRole("button", { name: "Cancel" }).boundingBox()
         expect(badge.x + badge.width <= cancel.x, "the warning sits before Cancel, beside the actions")
         expect.equal(await scope.getByRole("button", { name: "Save pay calendar" }).getAttribute("data-variant"), "default", "Save is the one primary once changed")
+      },
+    },
+    {
+      name: "At phone width with unsaved changes, Cancel and the primary stay together on one line",
+      example: "changed-phone",
+      async run({ scope, expect }) {
+        const [badge, cancel, save] = await Promise.all([
+          scope.locator('[data-slot="form-actions-status"]').boundingBox(),
+          scope.getByRole("button", { name: "Cancel" }).boundingBox(),
+          scope.getByRole("button", { name: "Save pay calendar" }).boundingBox(),
+        ])
+        expect(Math.abs(cancel.y - save.y) < 1, `Cancel (${Math.round(cancel.y)}) and Save (${Math.round(save.y)}) share a line`)
+        expect(cancel.x + cancel.width < save.x, "Cancel before the primary")
+        expect(badge.y + badge.height <= cancel.y + 1 || Math.abs(badge.y - cancel.y) < 8, "the warning keeps the first line, or shares theirs")
+        const row = await scope.locator('[data-slot="form-actions"]').boundingBox()
+        expect(save.x + save.width <= row.x + row.width + 0.5, "nothing spills past the row")
       },
     },
     {

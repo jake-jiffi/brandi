@@ -80,7 +80,7 @@ this file wins.
 
 Sentence case. Australian English. No em dashes anywhere, code strings and definitions included.
 Status copy names the state, then the next step; errors name the system that failed. Sample names
-go in [brackets]. Buttons are one to three words, verb first.
+go in [brackets]; a time is not a name, so it never does. Buttons are one to three words, verb first.
 
 ## The definition
 

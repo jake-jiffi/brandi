@@ -51,7 +51,11 @@ export const FormActions = React.forwardRef<HTMLDivElement, FormActionsProps>(fu
           </Badge>
         ) : null}
       </span>
-      {children}
+      {/* Cancel and the primary wrap as one, so on a phone the primary never drops onto a line of its own: when
+          room runs out the warning keeps the first line and the buttons move under it together. */}
+      <div data-slot="form-actions-buttons" className="flex flex-wrap items-center gap-3">
+        {children}
+      </div>
       {end ? null : apart}
     </div>
   )

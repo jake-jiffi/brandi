@@ -89,8 +89,8 @@ export default {
       title: "Tones",
       layout: "stack",
       markup: `<x-import component-from-global-scope="NS.Alert" icon="Lock" title="Read only">You can view this pay run but not change it. Ask [Sam Lee] for edit access.</x-import>
-<x-import component-from-global-scope="NS.Alert" tone="info" title="Pay runs lock at [5 pm] on Thursdays">Changes made after that go into next week's run.</x-import>
-<x-import component-from-global-scope="NS.Alert" tone="success" title="[Accounting system] connected">Invoices sync every [15] minutes. The last sync was at [9:40 am].</x-import>
+<x-import component-from-global-scope="NS.Alert" tone="info" title="Pay runs lock at 5 pm on Thursdays">Changes made after that go into next week's run.</x-import>
+<x-import component-from-global-scope="NS.Alert" tone="success" title="[Accounting system] connected">Invoices sync every [15] minutes. The last sync was at 9:40 am.</x-import>
 <x-import component-from-global-scope="NS.Alert" tone="warning" title="Your [accounting system] connection expires in [3] days" actions="{{reconnect}}">After that, invoices stop syncing.</x-import>
 <x-import component-from-global-scope="NS.Alert" tone="danger" title="Overdue invoices could not load" actions="{{retry}}">[Accounting system] did not answer. Everything else on this page is up to date.</x-import>
 <x-import component-from-global-scope="NS.Alert" tone="ai" title="The assistant drafted [3] replies">Read them before they go. Nothing is sent until you press Send.</x-import>`,
@@ -110,7 +110,7 @@ export default {
       id: "dismissible",
       title: "Dismissible",
       layout: "stack",
-      markup: `<sc-if value="{{approvedShown}}"><x-import component-from-global-scope="NS.Alert" tone="success" title="Pay run approved" on-dismiss="{{dismissApproved}}">[12] payslips go out at [5 pm] today.</x-import></sc-if>
+      markup: `<sc-if value="{{approvedShown}}"><x-import component-from-global-scope="NS.Alert" tone="success" title="Pay run approved" on-dismiss="{{dismissApproved}}">[12] payslips go out at 5 pm today.</x-import></sc-if>
 <x-import component-from-global-scope="NS.Button" icon="FileText">View payslips</x-import>`,
     },
     {

@@ -16,6 +16,8 @@ const email = {
 }
 
 const ns = () => Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+// What the lockup is called, as ProductLockup names it: the brand once when the product carries its name.
+const lockupWords = (brand, product) => (product.trim().toLowerCase() === brand.name.trim().toLowerCase() ? brand.name : `${brand.name} ${product}`)
 
 const rgb = (s) => (String(s).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
 const luminance = ([r, g, b]) => {
@@ -38,7 +40,7 @@ export default {
     { name: "action", type: "{ label: string; href: string }", doc: "The one primary action, verb first. A link, because it goes somewhere." },
     { name: "preheader", type: "string", doc: "The line inboxes show after the subject. Hidden in the email itself." },
     { name: "footer", type: "Array<string | { label: string; href: string }>", doc: "Small print under the card: why they got it, a settings link, who sent it." },
-    { name: "product", type: "string", doc: "The product's name in the lockup. The name in lib/product.ts by default." },
+    { name: "product", type: "string", doc: "The product's name in the lockup. The name in lib/product.ts by default. A product named for the brand shows the mark alone." },
     { name: "logoSrc", type: "string", doc: "The logo as a hosted image, for sending: a PNG of the wordmark from public/brand/. Without it the mark is drawn inline, which a board and Apple Mail show and Gmail does not." },
     { name: "scheme", type: '"light" | "dark"', default: '"light"', doc: "Shows how a mail app in light or dark mode draws it. A sent email carries both." },
     { name: "headingLevel", type: "1 | 2 | 3 | 4", default: "1", doc: "The heading's level on a board. In a sent email it is always the one h1." },
@@ -67,7 +69,8 @@ export default {
       "Send logoSrc: Gmail and Outlook draw no inline SVG. Check each email in light and dark mail apps before it ships.",
     ],
   },
-  frame: { width: 960, height: 1240 },
+  frame: { width: 960, height: 1620 },
+  logic: `brandName: NS.BRAND.name`,
   examples: [
     {
       id: "timesheets",
@@ -77,12 +80,37 @@ export default {
       vals: { emailBody: email.body, emailAction: email.action, emailFooter: email.footer, h3: 3 },
     },
     {
+      id: "same-name",
+      title: "A product named for the brand: the mark alone",
+      layout: "block",
+      markup: `<x-import component-from-global-scope="NS.Email" product="{{brandName}}" heading="${email.heading}" body="{{emailBody}}" scheme="{{theme}}" heading-level="{{h3}}"></x-import>`,
+    },
+    {
       id: "phone",
       title: "On a phone",
       markup: `<div style="width: 375px;"><x-import component-from-global-scope="NS.Email" heading="${email.heading}" body="{{emailBody}}" action="{{emailAction}}" footer="{{emailFooter}}" scheme="{{theme}}" heading-level="{{h3}}"></x-import></div>`,
     },
   ],
   checks: [
+    {
+      name: "A product named for the brand is the mark alone, in the email and its plain text; another product keeps its name",
+      async run({ page, expect, brand }) {
+        const lockup = await page.locator('[data-example="same-name"] [data-slot="email"]').evaluate((el) => {
+          const mark = el.querySelector('[role="img"], img')
+          const row = mark.closest("table")
+          return { words: row.innerText.replace(/\s+/g, " ").trim(), rule: row.querySelectorAll(".em-rule").length, name: mark.getAttribute("aria-label") ?? mark.getAttribute("alt") }
+        })
+        expect.equal(lockup.words, "", "no name beside the mark")
+        expect.equal(lockup.rule, 0, "and no hairline")
+        expect.equal(lockup.name, brand.name, "the mark names the brand, once")
+        const [same, other] = await page.evaluate(([props, find, name]) => {
+          const kit = new Function(`return (${find})`)()()
+          return [kit.Email.text({ ...props, product: name }).split("\n")[0], kit.Email.text({ ...props, product: "[Rosters]" }).split("\n")[0]]
+        }, [email, ns.toString(), brand.name])
+        expect.equal(same, brand.name, "the plain text names the brand once")
+        expect.equal(other, `${brand.name} [Rosters]`, "another product keeps its name")
+      },
+    },
     {
       name: "Layout tables carry no table meaning, and every style is inline: no stylesheet, no class style, no custom property",
       example: "timesheets",
@@ -165,7 +193,7 @@ export default {
       },
     },
     {
-      name: "The lockup leads, named [Brand] [product], then the heading, the body, the action and the footer, in reading order",
+      name: "The lockup leads, named as ProductLockup names it, then the heading, the body, the action and the footer, in reading order",
       example: "timesheets",
       async run({ scope, expect, brand }) {
         const order = await scope.locator('[data-slot="email"]').evaluate((el) => {
@@ -175,7 +203,7 @@ export default {
           return { sorted, logo: named.getAttribute("aria-label") ?? named.getAttribute("alt"), lockup: named.closest("table").innerText.replace(/\s+/g, " ").trim() }
         })
         expect(order.sorted, "lockup, heading, body, action, footer, in that order")
-        expect.equal(`${order.logo} ${order.lockup}`, `${brand.name} ${brand.product}`, "the lockup reads as [Brand] [product]")
+        expect.equal([order.logo, order.lockup].filter(Boolean).join(" "), lockupWords(brand, brand.product), "the lockup reads as [Brand] [product], or the brand once")
       },
     },
     {
@@ -197,7 +225,7 @@ export default {
         expect(/display:none[^"]*">\[14\] timesheets from last week are waiting on you\.<\/div>/.test(html), "the preheader is there, hidden")
         expect.equal((html.match(/<table /g) ?? []).length, (html.match(/<table role="presentation"/g) ?? []).length, "every table is presentation")
         const text = out.text.split("\n")
-        expect.equal(text[0], `${brand.name} ${brand.product}`, "the plain text opens with the lockup's words")
+        expect.equal(text[0], lockupWords(brand, brand.product), "the plain text opens with the lockup's words")
         expect(text.includes("[14] timesheets need your approval"), "the heading")
         expect(text.includes(email.body[1]), "every paragraph")
         expect(text.includes("Review timesheets: https://app.example.com/timesheets"), "the action, with its link written out")

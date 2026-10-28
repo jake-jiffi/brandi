@@ -186,7 +186,7 @@ ${proposal('title="Delete 3 draft invoices?" danger="{{yes}}" confirm-label="Del
       layout: "block",
       markup: `<div style="${GRID} align-items: stretch;">
 ${proposal('title="Send reminders for 2 invoices?" state="working" result="Sending 2 reminders by [email system]…"')}
-${proposal('title="Send reminders for 2 invoices?" state="done" result="Sent 2 reminders by [email system] at [10:14 am]."')}
+${proposal('title="Send reminders for 2 invoices?" state="done" result="Sent 2 reminders by [email system] at 10:14 am."')}
 ${proposal('title="Send reminders for 2 invoices?" state="dismissed" on-undo="{{noop}}"')}
 ${proposal('title="Send reminders for 2 invoices?" state="failed" result="Couldn\'t send: [email system] did not answer. Nothing was sent." on-retry="{{noop}}" on-edit="{{noop}}" on-dismiss="{{noop}}"')}
 </div>`,
@@ -196,7 +196,7 @@ ${proposal('title="Send reminders for 2 invoices?" state="failed" result="Couldn
   logic: `noop: () => {},
     approvals: self.state.approvals,
     approveState: self.state.approve,
-    approveResult: self.state.approve === "working" ? "Sending 2 reminders by [email system]…" : "Sent 2 reminders by [email system] at [10:14 am].",
+    approveResult: self.state.approve === "working" ? "Sending 2 reminders by [email system]…" : "Sent 2 reminders by [email system] at 10:14 am.",
     // As a product would: the request goes out, and the proposal hears back a moment later.
     approve: () => {
       self.setState((s) => ({ approvals: s.approvals + 1 }))
@@ -264,7 +264,7 @@ ${proposal('title="Send reminders for 2 invoices?" state="failed" result="Couldn
         await wait(page, 1600)
         f = await focused(page)
         expect.equal(f.slot, "ai-proposal-outcome", "focus stays on the outcome as the work finishes")
-        expect.equal((await spoken(page)).join(" | "), "Done. Sent 2 reminders by [email system] at [10:14 am].", "the finish is said once")
+        expect.equal((await spoken(page)).join(" | "), "Done. Sent 2 reminders by [email system] at 10:14 am.", "the finish is said once")
       },
     },
     {

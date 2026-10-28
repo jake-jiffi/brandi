@@ -3,6 +3,8 @@ import * as React from "react"
 import { BRAND, type MarkRendition } from "@/lib/brand"
 import { PRODUCT } from "@/lib/product"
 import { cn } from "@/lib/utils"
+
+import { lockupLabel } from "./product-lockup"
 // A namespace import read by property, so the bundle keeps only the keys the email uses.
 import * as tokens from "@/system/tokens.json"
 
@@ -144,7 +146,10 @@ function bodyHtml({ props, scheme, level, bothMarks }: Built) {
     : bothMarks
       ? `<div class="em-mark-light">${inlineMark("light", h, BRAND.name, scope)}</div><div class="em-mark-dark" style="display:none;mso-hide:all">${inlineMark("dark", h, BRAND.name, scope)}</div>`
       : inlineMark(scheme, h, BRAND.name, scope)
-  const lockup = `${table()}<tr><td style="vertical-align:middle">${mark}</td><td style="padding:0 12px;vertical-align:middle">${table()}<tr><td class="em-rule" width="1" height="20" style="${css({ width: "1px", height: "20px", "background-color": c("line"), "font-size": "0", "line-height": "0" })}">&nbsp;</td></tr></table></td><td class="em-strong" style="${css({ ...type("heading"), color: c("text-strong"), "vertical-align": "middle" })}">${esc(product)}</td></tr></table>`
+  // A product named for the brand is the mark alone, as in ProductLockup: "[Brand] / [Brand]" says it twice.
+  const alone = lockupLabel(product) === BRAND.name
+  const named = alone ? "" : `<td style="padding:0 12px;vertical-align:middle">${table()}<tr><td class="em-rule" width="1" height="20" style="${css({ width: "1px", height: "20px", "background-color": c("line"), "font-size": "0", "line-height": "0" })}">&nbsp;</td></tr></table></td><td class="em-strong" style="${css({ ...type("heading"), color: c("text-strong"), "vertical-align": "middle" })}">${esc(product)}</td>`
+  const lockup = `${table()}<tr><td style="vertical-align:middle">${mark}</td>${named}</tr></table>`
   const radius = RADII.get("radius-md") ?? "12px"
   const pill = RADII.get("radius-action") ?? "9999px"
   const tag = `h${level}`
@@ -219,7 +224,7 @@ function html(props: EmailProps) {
 /** The plain-text part every email carries: the same words, in the same order, with each link written out. */
 function text(props: EmailProps) {
   const product = props.product ?? PRODUCT.name
-  const lines = [`${BRAND.name} ${product}`.trim(), "", props.heading.trim(), "", ...paragraphs(props.body).flatMap((p) => [p, ""])]
+  const lines = [lockupLabel(product).trim(), "", props.heading.trim(), "", ...paragraphs(props.body).flatMap((p) => [p, ""])]
   if (props.action) lines.push(`${props.action.label}: ${props.action.href}`, "")
   for (const line of props.footer ?? []) lines.push(typeof line === "string" ? line : `${line.label}: ${line.href}`)
   return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`

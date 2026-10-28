@@ -132,7 +132,7 @@ export default {
     { name: "headingLevel", type: "2 | 3 | 4 | 5 | 6", default: "3", doc: "The level of an empty or error state's title." },
   ],
   types: [
-    'type DataTableColumn = { key: string; label: string; type?: "text" | "strong" | "stack" | "person" | "badge" | "tags" | NumberStyle | "delta" | "progress" | "actions"; sortable?: boolean; align?: "start" | "end"; width?: number | string; wrap?: boolean; maxWidth?: number | string; empty?: string; items?: Array<{ label: string; icon?: IconName; danger?: boolean; disabled?: boolean; onSelect?: (row: Record<string, unknown>) => void } | "separator" | { group: string }> | ((row: Record<string, unknown>) => Array<{ label: string; icon?: IconName; danger?: boolean; disabled?: boolean; onSelect?: (row: Record<string, unknown>) => void } | "separator" | { group: string }>); render?: (row: Record<string, unknown>) => ReactNode; phone?: "meta" | "labelled" | "badge" | "hidden"; format?: NumberStyle; goodWhen?: "up" | "down" | "neither"; max?: number; editable?: boolean; validate?: (value: string, row: Record<string, unknown>) => string | null | undefined }',
+    'type DataTableColumn = { key: string; label: string; type?: "text" | "strong" | "stack" | "person" | "badge" | "tags" | NumberStyle | "delta" | "progress" | "actions"; sortable?: boolean; align?: "start" | "end"; width?: number | string; wrap?: boolean; maxWidth?: number | string; empty?: string; items?: Array<{ label: string; icon?: IconName; danger?: boolean; disabled?: boolean; onSelect?: (row: Record<string, unknown>) => void } | "separator" | { group: string }> | ((row: Record<string, unknown>) => Array<{ label: string; icon?: IconName; danger?: boolean; disabled?: boolean; onSelect?: (row: Record<string, unknown>) => void } | "separator" | { group: string }>); render?: (row: Record<string, unknown>) => ReactNode; phone?: "meta" | "labelled" | "badge" | "action" | "hidden"; format?: NumberStyle; goodWhen?: "up" | "down" | "neither"; max?: number; editable?: boolean; validate?: (value: string, row: Record<string, unknown>) => string | null | undefined }',
   ],
   tables: [
     {
@@ -162,7 +162,7 @@ export default {
       "The row's menu is a Menu named \"More actions for [record]\": it opens in a portal, never clipped by the table, closes at once, and gives focus back to its button.",
     ],
     Layout: [
-      "Under 640px of its own width it shows the same rows as a list (ListRow): the naming column is the title, the others make a meta line, badges sit on a line of their own, the checkbox leads and the row's menu stays on the right. A column's phone sends it to meta (the default), labelled (the meta line with the column's name in front, so two figures can share it), badge or hidden. Sorting moves to the page's own controls.",
+      "Under 640px of its own width it shows the same rows as a list (ListRow): the naming column is the title, the others make a meta line, badges sit on a line of their own, the checkbox leads and the row's menu stays on the right. A column's phone sends it to meta (the default), labelled (the meta line with the column's name in front, so two figures can share it), badge, action (the row's one primary action, beside its menu) or hidden. A stack column keeps its second line there too: the naming column's leads the meta line, and another stack reads title · second line. Sorting moves to the page's own controls.",
       "The head is on surface-subtle in short uppercase labels, with hairlines between rows and no zebra stripes. Rows are 48px, or 40px compact; on a touch screen too.",
       "Cells sit 16px in from the table's edges, and 24px inside a card, lining up with its title; the toolbar then sticks on the card's surface. Text that is capped by maxWidth wraps inside the cap rather than being cut, so nothing needs a mouse to read.",
       "An editable column marks its head with a pencil, so its cells can be found without hovering.",
@@ -505,6 +505,16 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
         expect(first.includes("Due [14 June]"), "a labelled column carries its name")
         expect(first.includes("Overdue"), "the badge is on its own line")
         expect(!first.includes("[Priya Nair]"), "a column sent nowhere stays off the phone")
+      },
+    },
+    {
+      name: "At 390px a stack column keeps its second line: the naming column's leads the meta line",
+      example: "phone",
+      async run({ scope, expect }) {
+        const row = scope.locator('[data-slot="data-table-list"] [data-key="1042"]')
+        expect.equal((await row.locator('[data-slot="list-row-title"]').innerText()).trim(), "[Harbour Physio]", "the title is the stack's first line")
+        const meta = (await row.locator('[data-slot="list-row-meta"]').innerText()).trim()
+        expect(meta.startsWith("Invoice [1042]"), `its second line leads the meta line (${meta})`)
       },
     },
     {

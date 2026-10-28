@@ -484,7 +484,7 @@ const checks = [
   {
     name: "A new page of results adds a history entry; filters and a record's tab replace theirs",
     viewport: DESKTOP,
-    async run({ page, expect }) {
+    async run({ page }) {
       await open(page, "/")
       await press(page, page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: /^Jobs/ }))
       await landed(page, "/jobs")

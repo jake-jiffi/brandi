@@ -513,6 +513,23 @@ describe('validateCanvas', () => {
   });
 });
 
+describe('the frame the Design canvas takes', () => {
+  test('validate refuses a frame past 8000px, naming the limit and the board', () => {
+    const src = K.artboard({ name: 'ComponentsData1440', body: '<p>x</p>', preview: { width: 1440, height: 20251 } });
+    const art = K.validateArtboard(src, { name: 'ComponentsData1440.dc.html' });
+    assert.equal(art.ok, false);
+    assert.ok(art.errors.some((e) => /20251px/.test(e.message) && /8000px/.test(e.message) && /ComponentsData1440/.test(e.message)), JSON.stringify(art.errors));
+    const m = K.canvasManifest([{ file: 'Main.dc.html', w: 1440, h: 900 }, { file: 'ComponentsData1440.dc.html', w: 1440, h: 20251 }]);
+    const fits = K.artboard({ name: 'Main', body: '<p>x</p>' });
+    const r = K.validateCanvas({ artboards: [{ file: 'Main.dc.html', source: fits }, { file: 'ComponentsData1440.dc.html', source: fits }], manifest: m });
+    const e = r.errors.find((x) => x.file === 'ComponentsData1440.dc.html' && /8000px/.test(x.message));
+    assert.ok(e, JSON.stringify(r.errors));
+    assert.match(e.message, /20251px tall/);
+    assert.equal(K.FRAME_LIMIT.max, 8000);
+    assert.equal(K.validateCanvas({ artboards: [{ file: 'Main.dc.html', source: fits }], manifest: K.canvasManifest([{ file: 'Main.dc.html', w: 1440, h: 8000 }]) }).errors.length, 0, '8000 itself is fine');
+  });
+});
+
 describe('frames', () => {
   test('print frames are correct at 96 pixels per inch', () => {
     // A4 is 210 x 297 mm. 210mm = 8.268in x 96 = 794px. 297mm = 11.693in x 96 = 1123px.

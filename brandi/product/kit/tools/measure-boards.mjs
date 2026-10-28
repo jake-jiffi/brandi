@@ -6,7 +6,8 @@
  *   node tools/measure-boards.mjs --pages pages.json
  *
  * pages.json is a list of { url, width, label }. Prints { "<label>": height } once every board has
- * rendered through the runtime shim.
+ * rendered through the runtime shim, and under "__sections" each board's [data-board-section] heights in
+ * order, so a board too tall for the canvas can be split between its sections.
  */
 
 import { chromium } from "playwright"
@@ -18,6 +19,7 @@ const pages = JSON.parse(readFileSync(path.resolve(arg("--pages")), "utf8"))
 let browser
 try { browser = await chromium.launch({ channel: "chrome", args: ["--allow-file-access-from-files"] }) } catch { browser = await chromium.launch({ args: ["--allow-file-access-from-files"] }) }
 const heights = {}
+const sections = {}
 for (const p of pages) {
   const context = await browser.newContext({ viewport: { width: p.width, height: 900 } })
   const page = await context.newPage()
@@ -30,6 +32,8 @@ for (const p of pages) {
       root.style.minHeight = "0"
       return Math.ceil(Math.max(root.scrollHeight, root.getBoundingClientRect().height))
     })
+    const parts = await page.evaluate(() => [...document.querySelectorAll("[data-board-section]")].map((el) => [el.getAttribute("data-board-section"), Math.ceil(el.getBoundingClientRect().height)]))
+    if (parts.length) sections[p.label] = Object.fromEntries(parts)
   } catch (e) {
     heights[p.label] = { error: String(e.message ?? e).split("\n")[0] }
   } finally {
@@ -37,4 +41,4 @@ for (const p of pages) {
   }
 }
 await browser.close()
-process.stdout.write(`${JSON.stringify(heights)}\n`)
+process.stdout.write(`${JSON.stringify({ ...heights, __sections: sections })}\n`)
