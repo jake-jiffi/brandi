@@ -22,7 +22,7 @@ export default function InvoicesPage() {
         description={`Invoices and payments from ${ACCOUNTING.name}, which syncs every 15 minutes.`}
         meta={
           <>
-            <Badge tone="danger" icon>
+            <Badge tone="warning" icon>
               Sync failed
             </Badge>
             <SampleBadge />

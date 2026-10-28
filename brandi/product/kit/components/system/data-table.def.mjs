@@ -186,6 +186,8 @@ export default {
       "Selecting a row opened it, rows could not be reached by keyboard, and some data crashed it (round 1): checks select with Space and with a press, open with Enter, and tab through every row.",
       "Bulk approve acted on rows that were not on screen (round 3): bulk actions get the keys of selected rows on screen, and a check reads them.",
       "Tables kept their desktop layout at phone width (round 4): a check at 390px finds the list and nothing scrolling sideways.",
+      "On a touch tablet the sort buttons were 16px and the row's name 20px, the only control that opens the row for a screen reader (a pilot's round 1): each now takes its whole cell as the tap area, and a check taps the top and the foot of the cell.",
+      "A search that emptied the table said nothing, because the count in the footer unmounted with the rows (a pilot's round 1): the footer stays mounted under the empty state, out of sight.",
     ],
     Accepted: [
       "The actions column's menu stands in for Menu until it lands in the kit: the same props and behaviour on the same primitive. Swapping it is one import.",
@@ -194,7 +196,7 @@ export default {
       "Up and Down between a list and its detail is still left to the page, as the reference left it.",
     ],
   },
-  frame: { width: 960, height: 3220 },
+  frame: { width: 960, height: 3520 },
   state: { opened: "", reminded: "", retried: 0 },
   logic: `openedLine: self.state.opened ? "Opened " + self.state.opened + "." : "No invoice open.",
 openInvoice: (row) => self.setState({ opened: (row.client && row.client.title) || String(row.id) }),
@@ -219,6 +221,11 @@ filtered: {
   ],
 },
 pages: window.React.createElement(NS.Pagination, { page: 1, pageSize: 6, total: 48 }),
+noMatchPages: window.React.createElement(NS.Pagination, { page: 1, pageSize: 6, total: 0, empty: "No invoices match these filters." }),
+remindColumns: ${JSON.stringify(invoiceColumns.filter((c) => c.key !== "actions"))}.concat([
+  { key: "remind", label: "Remind", phone: "action", render: (row) => window.React.createElement(NS.Button, { size: "sm", icon: "Send", "aria-label": "Remind " + row.client.title, onClick: () => self.setState({ reminded: row.client.title }) }, "Remind") },
+  { key: "actions", label: "Actions", type: "actions", items: ${JSON.stringify(MENU)} },
+]),
 personHref: (row) => "#person-" + row.id,
 shiftHref: (row) => "#" + row.id,
 retry: () => self.setState({ retried: self.state.retried + 1 }),
@@ -269,6 +276,15 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
 <p data-slot="example-status" class="type-meta text-text-muted">{{openedLine}}</p>`,
     },
     {
+      id: "phone-action",
+      title: "At 390px a row's primary action stays on the row",
+      layout: "block",
+      width: 390,
+      markup: `<x-import component-from-global-scope="NS.DataTable" caption="Invoices to chase" columns="{{remindColumns}}" rows="{{chase}}"></x-import>
+<p data-slot="example-status" class="type-meta text-text-muted">{{remindedLine}}</p>`,
+      vals: { chase: invoices.slice(0, 2) },
+    },
+    {
       id: "wide",
       title: "Wider than its box, it scrolls inside it and the menu sticks to the edge",
       layout: "block",
@@ -287,7 +303,7 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
       id: "empty",
       title: "Empty, keeping the head and the toolbar",
       layout: "block",
-      markup: `<x-import component-from-global-scope="NS.DataTable" caption="Invoices" columns="{{invoiceColumns}}" rows="{{none}}" toolbar="{{filtered}}" empty="{{noMatch}}"></x-import>`,
+      markup: `<x-import component-from-global-scope="NS.DataTable" caption="Invoices" columns="{{invoiceColumns}}" rows="{{none}}" toolbar="{{filtered}}" empty="{{noMatch}}" footer="{{noMatchPages}}"></x-import>`,
       vals: { noMatch: { title: "No invoices match these filters.", description: "Try another search, or clear the filters to see every invoice.", actions: [{ label: "Clear filters", icon: "X" }] } },
     },
     {
@@ -523,6 +539,21 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
       },
     },
     {
+      name: "At 390px a column marked phone action stays on its row, beside the menu, and still works",
+      example: "phone-action",
+      async run({ page, scope, expect }) {
+        const row = scope.locator('[data-slot="data-table-list"] [data-key="1042"]')
+        const remind = row.getByRole("button", { name: "Remind [Harbour Physio]" })
+        expect(await remind.isVisible(), "the primary action shows on the row")
+        expect(await row.getByRole("button", { name: "More actions for [Harbour Physio]" }).isVisible(), "beside the row's menu")
+        const [action, menu] = await Promise.all([remind.boundingBox(), row.getByRole("button", { name: "More actions for [Harbour Physio]" }).boundingBox()])
+        expect(action.x + action.width <= menu.x, "the action comes before the menu")
+        await remind.focus()
+        await page.keyboard.press("Enter")
+        expect.equal((await scope.locator('[data-slot="example-status"]').textContent()).trim(), "Reminders queued for invoices [Harbour Physio].", "the press runs the action, not the row")
+      },
+    },
+    {
       name: "Loading keeps the head, says so once, and waits with skeleton rows",
       example: "loading",
       async run({ scope, expect }) {
@@ -541,6 +572,44 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
         expect.equal(await scope.getByRole("heading", { name: "No invoices match these filters." }).count(), 1, "what is empty")
         expect.equal(await scope.locator("tr[data-key]").count(), 0, "no rows")
         expect.equal(await scope.getByRole("button", { name: "Clear filters" }).count(), 1, "what to do next")
+      },
+    },
+    {
+      name: "Under the empty state the footer stays mounted, out of sight, so its live count says nothing matches",
+      example: "empty",
+      async run({ scope, expect }) {
+        const footer = scope.locator('[data-slot="data-table-footer"]')
+        expect.equal(await footer.count(), 1, "the footer is still there")
+        const box = await footer.boundingBox()
+        expect(!box || (box.width <= 1 && box.height <= 1), "out of sight: the empty state already says so on screen")
+        expect.equal((await footer.getByRole("status").textContent()).trim(), "No invoices match these filters.", "the count, a live region that never unmounted, says nothing matches")
+        const foot = await scope.locator('[data-slot="table-container"]').evaluate((el) => getComputedStyle(el).borderBottomLeftRadius)
+        expect(foot !== "0px", "the rows round off the box's foot, with the footer out of sight")
+      },
+    },
+    {
+      name: "On a touch screen the sort buttons and each row's name take their whole cell, 40px at least, looking no different",
+      example: "invoices",
+      touch: true,
+      async run({ scope, expect }) {
+        // A tap just inside the top and the bottom of the cell, beside the control: which control does it reach?
+        const reach = (control, slot) =>
+          control.evaluate((el, slot) => {
+            const cell = el.closest("td, th").getBoundingClientRect()
+            const x = el.getBoundingClientRect().left + 2
+            const at = (y) => document.elementFromPoint(x, y)?.closest(`[data-slot="${slot}"]`)?.textContent.trim() ?? null
+            return { cell: cell.height, own: el.getBoundingClientRect().height, hits: [at(cell.top + 1), at(cell.bottom - 2)] }
+          }, slot)
+        const sort = scope.locator('[data-slot="data-table-sort"]').first()
+        const s = await reach(sort, "data-table-sort")
+        expect.atLeast(Math.round(s.cell), 40, "the head's cell")
+        expect(s.own < 40, `the sort button itself stays ${Math.round(s.own)}px tall`)
+        expect(s.hits.every((t) => t === "Client"), `a tap at the top and the foot of its cell reaches the sort button (${s.hits.join(" | ")})`)
+        for (const name of ["[Harbour Physio]", "[Northside Vets]"]) {
+          const n = await reach(scope.locator('[data-slot="data-table-wide"] [data-slot="data-table-open"]').filter({ hasText: name }), "data-table-open")
+          expect.atLeast(Math.round(n.cell), 40, `${name}'s cell`)
+          expect(n.hits.every((t) => t === name), `a tap at the top and the foot of its cell reaches ${name}'s link (${n.hits.join(" | ")})`)
+        }
       },
     },
     {

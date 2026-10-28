@@ -227,7 +227,7 @@ export function generatedFiles(tokens, identity) {
     ['system/system.json', `${JSON.stringify({ ...identity, fontsUrl: hostedFontsUrl(tokens) }, null, 2)}\n`],
     ['app/globals.css', toStarterGlobals(tokens)],
     ['lib/format-locale.js', localeModule(identity)],
-    ['lib/product.ts', `// The product's name and language, set once, and two things read off the system. \`brandi product starter\` writes this file.\n// railTone: whether the rail is dark in the light theme, so the rail's lockup takes the mark drawn for dark grounds.\n// lockupName: how the product name is set beside the mark, a brand-to-product decision.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)}, railTone: ${JSON.stringify(railTone(tokens))}, lockupName: ${JSON.stringify(identity.lockupName ?? 'label')} } as {\n  name: string\n  lang: string\n  railTone: "light" | "dark"\n  lockupName: "label" | "eyebrow"\n}\n`],
+    ['lib/product.ts', `// The product's name and language, set once, and three things read off the system. \`brandi product starter\` writes this file.\n// railTone: whether the rail is dark in the light theme, so the rail's lockup takes the mark drawn for dark grounds.\n// lockupName: how the product name is set beside the mark, a brand-to-product decision.\n// avoidTags: tag tints on a hue the brand keeps off its grounds (charts.avoid), which a name's hash never lands on.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)}, railTone: ${JSON.stringify(railTone(tokens))}, lockupName: ${JSON.stringify(identity.lockupName ?? 'label')}, avoidTags: ${JSON.stringify(tokens.meta?.avoidTags ?? [])} } as {\n  name: string\n  lang: string\n  railTone: "light" | "dark"\n  lockupName: "label" | "eyebrow"\n  avoidTags: string[]\n}\n`],
     ['app/fonts.ts', fontsModule(tokens)],
     ['tools/build-globals.mjs', readFileSync(GLOBALS_SOURCE, 'utf8')],
   ]);
@@ -274,16 +274,18 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   let brandMarks = null;
   if (src) {
     const file = path.join(out, 'lib', 'brand.ts');
-    // Pose stills go into the bundle drawn down, so boards on the canvas show them too.
+    // Pose stills go into the bundle drawn down, so boards on the canvas show them too. Headless Chrome can miss
+    // one under load, so each gets three tries; one it never draws goes in at full size rather than as a path.
     const stills = new Map();
     for (const rel of [...Object.values(src.character?.poses ?? {}), ...Object.values(src.character?.flat ?? {})]) {
       const still = path.resolve(src.base, rel);
       if (/\.(png|jpe?g|webp)$/i.test(rel) && existsSync(still) && !stills.has(still)) {
-        const uri = await shrinkStill(still);
+        let uri = null;
+        for (let i = 0; i < 3 && !uri; i++) uri = await shrinkStill(still);
         if (uri) stills.set(still, uri);
       }
     }
-    const generated = brandConstant(src, { publicDir: path.join(out, 'public', 'brand'), stills });
+    const generated = brandConstant(src, { stills });
     // A starter made before the kit had lib/brand.ts takes the types from the kit's copy.
     const current = readFileSync(existsSync(file) ? file : path.join(kit, 'lib', 'brand.ts'), 'utf8');
     const next = brandModule(current, generated.source);

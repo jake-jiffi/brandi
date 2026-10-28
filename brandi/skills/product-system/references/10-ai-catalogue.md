@@ -33,7 +33,7 @@ a review can cite them.
 2. Anything that sends, pays, approves, changes another system or deletes goes through an
    approval card (a proposal, 4.1) first.
 3. One proposal waits at a time, and its action is the only primary on screen. So while it
-   waits, every other primary drops to secondary, Send included.
+   waits, every other primary drops to secondary, the Ask panel's Ask included.
 4. A person approves each action, or approves the rule behind it. An approved rule can then act
    on its own, and the interface shows which rule acted (4.7).
 
@@ -63,7 +63,7 @@ a review can cite them.
 
 | Press | Focus lands on |
 |---|---|
-| Send, a follow-up, or Ask from search | The new answer |
+| Ask in the panel, a follow-up, or Ask from search | The new answer |
 | Stop | The "Stopped at step N of M" line |
 | Try again | The step being retried |
 | Approve | The outcome line that replaces the proposal |
@@ -168,7 +168,7 @@ adds a looping, muted video under the row, with a "Video unavailable" fallback.
 **Keyboard.**
 
 - Listing: nothing to operate.
-- This system: Stop belongs to the running answer. In the Ask panel it takes the place of Send.
+- This system: Stop belongs to the running answer. In the Ask panel it takes the place of Ask.
   Anywhere else it sits at the end of the status line.
 
 **Screen reader.**
@@ -449,7 +449,8 @@ control.
 
 - Listing: Enter sends. Tabs are toggle buttons. A click anywhere in the composer focuses the
   field. There is no Stop.
-- This system: Send becomes Stop while an answer runs. Focus follows the table in section 1. The
+- This system: the composer's button says Ask, the verb AskBar uses (Send is what a person does
+  to an email), and becomes Stop while an answer runs. Focus follows the table in section 1. The
   composer comes after the thread in the tab order, so it is the next stop after the new
   answer's own controls.
 
@@ -493,8 +494,8 @@ focus to the field. The demo plays itself until the first pointer or key press.
 | Drafting | Send enabled | Same |
 | Menu open, no matches | "No matches for …" | Same, with the result count in words |
 | Listening | Dictation pressed, "Listening…" | Same, on demand |
-| Working | Not in the listing | Send becomes Stop |
-| Proposal waiting | Not in the listing | Send drops to secondary (Rule 3) |
+| Working | Not in the listing | Ask becomes Stop |
+| Proposal waiting | Not in the listing | Ask drops to secondary (Rule 3) |
 
 **Keyboard.** @ or / opens a menu. Up and Down move the highlight, wrapping at the ends.
 Enter or Tab picks. Escape closes. Enter sends, Shift+Enter adds a line, and Enter during IME
@@ -1179,7 +1180,7 @@ Every product system gets the core. The rest are added when a product needs them
 | Answer | 03 Streaming Text | Every reply carries source chips, the caveat and follow-ups (Rules 5, 6, 8). Built once, so no surface can ship an answer without them |
 | Status line | 01 Loading State | It holds the answer's one live region (Rule 13), and Stop when there is no composer |
 | Steps log | 02 Thinking (Steps), 06 Task Rows | Rules 9 to 11 need one place to say what ran, where it stopped and what failed |
-| Composer | 08 Prompt Bar | Every Ask surface needs input, Send and Stop |
+| Composer | 08 Prompt Bar | Every Ask surface needs input, its Ask button and Stop |
 | Ask panel | 07 Chat | It holds the thread, the empty state and the focus targets in Rule 12 |
 | Proposal card, with the rule line | 4.1 and 4.7, drawing on 09 and 11 | Rules 2 to 4. It has to exist before the assistant's first action ships |
 | AI-drafted marker | 4.3 | Drafts are the assistant's main output (Rule 1). Each one says who asked and how the brand check went |

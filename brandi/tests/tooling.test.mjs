@@ -404,6 +404,27 @@ describe('the canvas fallback under attack', () => {
     assert.ok(hits > 50000, `a space in the path lost the image: ${hits} magenta pixels`);
   });
 
+  test('a link to a section stays in the board, though the base points elsewhere', { skip: P.findChrome() ? false : 'no headless browser on this machine' }, async () => {
+    // A settings board emptied on any click in its section list: "#approvals" resolved against the base,
+    // the source directory, and the page left the board for a folder listing.
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const dir = await mkdtemp(path.join(tmpdir(), 'brandi-hash-'));
+    try {
+      const src = artboard({ name: 'Settings', body: '<a id="go" href="#approvals">Approvals</a><div style="height: 2000px"></div><h2 id="approvals">Approvals</h2>' })
+        .replace('</body>', '<script>addEventListener("load",()=>{document.getElementById("go").click();setTimeout(()=>document.body.setAttribute("data-at",location.href.split("/").pop()+"|"+Math.round(document.getElementById("approvals").getBoundingClientRect().top)),300)})</script></body>');
+      const file = path.join(dir, 'Settings.preview.html');
+      await writeFile(file, P.toPreviewHtml(src, { width: 800, base: pathToFileURL(path.join(dir, 'elsewhere') + path.sep).href }));
+      const { stdout } = await promisify(execFile)(P.findChrome(), ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--allow-file-access-from-files', '--virtual-time-budget=4000', '--window-size=800,600', '--dump-dom', pathToFileURL(file).href], { timeout: 45000, maxBuffer: 16 * 1024 * 1024 });
+      const at = /data-at="([^"]+)"/.exec(stdout)?.[1] ?? '';
+      const [where, top] = at.split('|');
+      assert.equal(where, 'Settings.preview.html#approvals', `the page stayed on the board, at the section: ${at || 'it left the board'}`);
+      assert.ok(Number(top) < 600, `the section scrolled into view (${top}px from the top)`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test('an artboard that sets its own base keeps it', () => {
     // The first base with an href wins, so injecting ours ahead of the
     // artboard's would silently redirect every relative URL it owns.

@@ -190,21 +190,25 @@ export function solveForContrast(seed, against, min, { margin = MARGIN, mode = '
 }
 
 /**
- * A hover or pressed state for a filled control. It moves away from the label's
- * lightness, which keeps or gains contrast, unless the fill is already near that
- * end (a near-black fill cannot get visibly darker); then it turns back, and is
- * solved so the label still reads. A state that quietly drops its label below
- * 4.5:1 is the failure this exists to prevent.
+ * Which way a fill's states move, decided once per fill: away from the label's lightness, which keeps or gains
+ * contrast, unless the deepest state (selected, STEP.selected) cannot be reached that way with a little room to
+ * spare; then towards it. A dark navy cannot get far enough darker to be seen (1.16:1 against black at most), and
+ * a cream fill reaches the deepest step only at white, where pressed and selected would both stop. Decided per
+ * state, hover went darker while pressed, needing more, flipped lighter: one button's states moving opposite ways.
+ */
+export function stateDirection(fill, label) {
+  const away = toOklch(label).L > toOklch(fill).L ? -1 : 1;
+  const deepest = STEP.selected + 0.05;
+  return contrastRatio(visibleShift(fill, away * 0.1, deepest), fill) >= deepest ? away : -away;
+}
+
+/**
+ * A hover, pressed or selected state for a filled control: a step in the fill's one direction, each state further
+ * than the last, solved so the label still reads. A state that quietly drops its label below 4.5:1 is the
+ * failure this exists to prevent.
  */
 export function stateOf(fill, label, amount, min = STEP.hover) {
-  const L = toOklch(fill).L;
-  const away = toOklch(label).L > L ? -1 : 1;
-  const room = away < 0 ? L : 1 - L;
-  const dir = room >= amount + 0.04 ? away : -away;
-  // A dark navy cannot get far enough darker to be seen (1.16:1 against black at most), so a state that
-  // cannot reach its step one way takes it the other.
-  let hex = visibleShift(fill, dir * amount, min);
-  if (contrastRatio(hex, fill) < min) hex = visibleShift(fill, -dir * amount, min);
+  const hex = visibleShift(fill, stateDirection(fill, label) * amount, min);
   return contrastRatio(hex, label) >= FLOORS.text + MARGIN ? hex : solveForContrast(hex, [label], FLOORS.text).hex;
 }
 
@@ -730,6 +734,12 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   const light = themeValues(system, 'light', roles, ai, brandInk, avoid('light'));
   const dark = themeValues(system, 'dark', roles, ai, brandInk, avoid('dark'));
   const railDecided = Boolean(roles.rail?.light || roles.rail?.dark);
+  // A tag on a hue the brand keeps off either theme's grounds is never handed out by a name's hash (an avatar's
+  // tint): a person cannot choose their name, so a tint the brand bars anywhere is left out of the draw everywhere.
+  const barredHues = [...avoid('light'), ...avoid('dark')].map((c) => safeHue(toOklch(c).h));
+  const avoidTags = Array.from({ length: SERIES_COUNT }, (_, i) => i + 1)
+    .filter((n) => [light, dark].some((t) => barredHues.some((h) => hueGap(h, safeHue(toOklch(t.values[`series-${n}`]).h)) < 25)))
+    .map((n) => `tag-${n}`);
 
   const primitives = (brandColours ?? [
     { name: 'primary', hex: hexOf(system.palettes.brand.seed) ?? hexOf(system.palettes.brand.light.steps[8]) },
@@ -786,6 +796,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
       builtBy: 'brandi product',
       source,
       roles: Object.fromEntries(Object.entries(roles).filter(([, val]) => val)),
+      avoidTags,
       notes,
     },
     color: {

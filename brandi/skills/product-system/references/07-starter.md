@@ -57,7 +57,9 @@ Each SVG is inlined after a safety pass: no scripts, handlers or outside referen
 size. Its viewBox is cut to the ink, because brand files carry clear space inside it and the product
 applies clear space in layout. An `-ink` rendition is turned to `currentColor` whatever its file's ink. A still (PNG, WebP) is
 drawn down to a small WebP inside the bundle, because the canvas has no public folder; without
-Chrome it is copied to `public/brand/` instead, and boards on the canvas will not show it. On route A with no block, the logo master in brand.json supplies `full`,
+Chrome, or when Chrome cannot draw it in three tries, it goes into the bundle at full size, which
+every board shows but which weighs more. A pose is never a path from the page root: on a canvas that
+is a broken image no gate saw. On route A with no block, the logo master in brand.json supplies `full`,
 `full-on-dark` (the reversed master) and `full-ink`, the clear space and the minimum size. A value
 the record lacks keeps the kit default, and the file says which. The tight-viewBox wordmark files ship in
 `public/brand/`, for email and Open Graph.
@@ -100,7 +102,8 @@ starter/
     build-canvas.mjs          the canvas bundle, from these components
     build-index.mjs           components/system/index.ts
     check-components.mjs      every definition's scripted checks, in Chrome
-    axe-pages.mjs             axe on a list of pages
+    axe-pages.mjs             axe on a list of pages, and every image loading
+    reflow-pages.mjs          nothing scrolls sideways at 320px (WCAG 1.4.10)
   public/brand/               the wordmark as files
 ```
 
@@ -242,7 +245,7 @@ clipped.
 | sidebar, with `hooks/use-mobile.ts` | The drawer threshold is the system's tablet breakpoint, read from the media query, false on the server. Rail, icon and drawer widths from the system. The drawer is a dialog named "Navigation" that gives focus back to the menu button. Cmd or Ctrl B is ignored while typing. Rows 36px, 44 on touch. Eyebrow group labels and an `attention` badge in the highlight | The system's rail. shadcn's own hook switches at a narrower width (general knowledge). The drawer opens from a button outside it, so Radix has no trigger to return focus to |
 | button | The system's shape (pills, where the radius rule says a pill is pressable). Variants: `default` (the one primary per view), `outline` and `secondary`, `ghost`, `brand`, `destructive` (tinted, in flow), `destructive-solid` (only a destructive dialog's final confirm) and `link`. `loading` keeps the width, shows a spinner, sets `aria-busy` and `aria-disabled`, and ignores presses. A client component, with touch sizes | One primary per view. A loading button must block a second press without dropping keyboard focus, which `disabled` would do |
 | badge | Gentle corners, the status tones, an optional `dot` | Badges are read, not pressed |
-| avatar | Initials in bold on a tag tint, in the strong text colour, sized to the circle. Always with the name nearby | Matches the Avatar card |
+| avatar | Initials in bold on a tag tint, sized to the circle, in `foreground`: the page's text colour, the role measured on the tag tints, which the rail's `on-rail` remapping never reaches. Always with the name nearby | Matches the Avatar card. On a dark rail the strong text colour turned white, and white initials on a pale tint measured 1.2:1 |
 | kbd | The system's key style, a rail variant, hidden on touch screens. The command menu's shortcuts use it | One key style everywhere, and no hand-styled `kbd` in product code |
 | alert | The status tones. Only danger and warning interrupt (`role="alert"`). The rest are `role="status"`. An alert already showing when the page loads, such as a source that is down, takes `role="status"` too. `AlertAction` sits in the grid: under the text on phones, beside it from 640px | Only news interrupts. shadcn's action floats over the text once it is wider than an icon |
 | card | `radius-md`, a hairline, `shadow-sm`. `CardTitle` is an `h2`, with `as` for `h3` and `h4` | A real outline under the page's one `h1` |
@@ -346,8 +349,14 @@ The system's Building it section states these in full. Every product inherits th
   and helpers a server page calls live in `lib/`, never in a client file.
 - Every page exports `metadata` with a title, so the browser tab and the route announcer name it.
 - State people would share lives in the URL: the tab, filters, search, sort, page and the open
-  record. Read it on the server inside Suspense, and keep it in step on the client with
-  `history.replaceState`.
+  record. Read it on the server inside Suspense, and keep it in step on the client through the
+  history API (`components/app/use-address-state.ts`). A new page of results pushes an entry, so
+  Back returns to the page before, as it does between pages of search results. Filters, search,
+  sort and a record's tab replace the entry, so typing never fills the back button, and Back from
+  a record leaves it. Back to a list brings back all of it: the address wins over the props Next
+  restores a page with, which are the ones it was first drawn with. Never write the address with
+  `history.replaceState(null, …)` from a page's first render: on a page Back brought back, that
+  writes the stale props over the state people came back for.
 - No raw values. Text sizes come from the `type-*` utilities, everything else from the tokens. Only
   a component's own file may set a size its card names. A value the tokens lack goes into the
   system first.

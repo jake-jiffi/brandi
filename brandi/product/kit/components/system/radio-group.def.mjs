@@ -134,6 +134,14 @@ export default {
       },
     },
     {
+      name: "Each option's description is tied to its radio, so a screen reader hears it with the option",
+      async run({ page, expect }) {
+        const radio = page.getByRole("radio", { name: "Once a day" })
+        expect.equal(await radio.evaluate((el) => (el.getAttribute("aria-describedby") ?? "").split(" ").map((id) => document.getElementById(id)?.textContent.trim()).join(" ")), "One batch at 5 pm.", "described by the line under it")
+        expect.equal(await page.getByRole("radio", { name: "Courier" }).evaluate((el) => document.getElementById(el.getAttribute("aria-describedby"))?.textContent.trim()), "Not available for this address.", "a disabled option says why")
+      },
+    },
+    {
       name: "The legend names the group, and the hint and error are read with it and announced",
       example: "states",
       async run({ page, scope, expect }) {

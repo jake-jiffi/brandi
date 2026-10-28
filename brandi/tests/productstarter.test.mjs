@@ -167,6 +167,13 @@ describe('what lib/product.ts reads off the system', () => {
     // A literal type here (as const) narrows railTone to "light", and the components that compare it with "dark" stop compiling.
     assert.doesNotMatch(generated, /as const/);
   });
+
+  test('the tags the tokens keep out of a name\'s hash reach lib/product.ts, where Avatar reads them', () => {
+    const barred = { ...tokens, meta: { ...tokens.meta, avoidTags: ['tag-3', 'tag-6'] } };
+    const generated = generatedFiles(barred, { name: 'Product', lang: 'en', locale: 'en-AU', currency: 'AUD' }).get('lib/product.ts');
+    assert.match(generated, /avoidTags: \["tag-3","tag-6"\]/);
+    assert.match(readFileSync(path.join(KIT, 'components', 'system', 'avatar.tsx'), 'utf8'), /PRODUCT\.avoidTags/, 'Avatar leaves them out');
+  });
 });
 
 describe('a kit refresh takes back what the kit dropped', () => {

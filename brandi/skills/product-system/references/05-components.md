@@ -374,16 +374,20 @@ The pressable action.
 | `link` | An inline text action |
 
 - **Contract.** `variant` (`secondary` default). `size` (`sm` 32, `md` 36, `lg` 44px). `icon`,
-  `iconRight`, `loading`, `block`, `href`, `disabled`.
+  `iconRight`, `loading`, `block`, `href`, `disabled`, `disabledReason`.
 - **States.** Loading keeps the width, shows a spinner, sets `aria-busy` and `aria-disabled`, and
   ignores further presses. It stays focusable, so focus never drops. Disabled says why, nearby or in
-  a tooltip.
+  a tooltip: `disabledReason` ("Confirm 2 checks first") keeps the button focusable and
+  `aria-disabled`, shows the reason in a tooltip and its description, and ignores presses. A bare
+  `aria-disabled` still hears the press, for a control that explains itself when pressed. Disabled
+  and `aria-disabled` fade alike, to `opacity-disabled`.
 - **Rules.** Secondary then primary, right-aligned, with Cancel immediately left of the primary.
   Prefer an enabled button that explains the problem when pressed to a disabled one.
 - **Copy.** One to three words, verb first, in sentence case: Approve, Save draft, Delete 3
   invoices. Never "Submit", "OK" or "Click here". While loading, the label says what is happening
   ("Saving…").
-- **Review.** `loading` did not block a second press (round 1).
+- **Review.** `loading` did not block a second press (round 1). A disabled primary said nothing
+  about why.
 
 #### IconButton
 
@@ -399,9 +403,13 @@ An icon-only button.
 
 An underlined inline link in the `link` colour.
 
-- **Contract.** `href`, `icon`, `iconRight`.
+- **Contract.** `href`, `icon`, `iconRight`. `standalone` for a link on its own (a card's "See
+  all", "Forgot your password?"): its tap area grows to 40px on touch, looking no different.
 - **Rules.** The text says where it goes and is unique on the page, never "here" or "more". Links
   navigate and buttons act, so "Try again" is a Button, even inside an alert.
+- **Review.** Standalone links were 26 to 28px on touch. In a sentence a link keeps the 24px WCAG
+  target, so it never reaches over the lines beside it; on its own it is pressable like any
+  control, and takes 40px.
 
 #### ButtonGroup
 
@@ -424,9 +432,10 @@ Two to five views of the same content: Day, Week, Month; List, Board.
 
 A filter over what is already on screen, pressed on and off.
 
-- **Contract.** `selected` or `defaultSelected`, `onChange`. `count`, `attention`, `icon`.
+- **Contract.** `selected` or `defaultSelected`, `onChange`. `count`, `attention`, `noun`, `icon`.
 - **States.** Pressed takes `selected-strong` and a check. An `attention` count takes the highlight.
-- **Behaviour.** An `attention` count is read as "12 need you".
+- **Behaviour.** The count is read once: "12 need you" with `attention`, or in its `noun`
+  ("Needs you, 2 jobs"). A label that already says "needs you" is never followed by it again.
 - **Rules.** One row, above the list or table it filters. The count is how many items match if the
   chip is applied. Only "needs you" counts get `attention`. 40px on touch.
 
@@ -576,7 +585,10 @@ narrower than 180px. Only for fields that belong together, such as suburb, state
 
 The row that ends a form: Cancel, then the one primary, right-aligned above a hairline. `align`
 (`end` default, `start` for narrow forms). A destructive action sits apart, on the left, as a
-`danger` button. The primary names the result ("Save billing"), never "Submit".
+`danger` button. The primary names the result ("Save billing"), never "Submit". Save stays quiet
+until the section has changes: `changed` makes Save the one primary and shows an "Unsaved changes"
+warning beside it, said once; at rest Save is secondary. A page of sections then never shows two
+live primaries, and says which one is unsaved.
 
 ### 3.6 Status
 
@@ -587,7 +599,9 @@ A person, as a photo or initials on a tinted circle. The assistant has an avatar
 - **Contract.** `name`, `src`. `size` (24, 28, 32 or 40). `assistant`. `status` (`online`, `away`,
   `offline`).
 - **Behaviour.** The status is read with the name: "[Name], online".
-- **Rules.** Always with the person's name nearby.
+- **Rules.** Always with the person's name nearby. A name's tint is drawn from the tag tints, never
+  one on a hue the brand keeps off its grounds (`charts.avoid`, recorded as the tokens' `avoidTags`).
+  The initials are in `foreground`, the page's text colour, which a rail's remapping never reaches.
 
 #### AvatarGroup
 
@@ -659,6 +673,9 @@ Change against a comparison, as an arrow and a value.
 - **Rules.** The success colour when the change is good, danger when bad, neutral when flat or
   neither. Always say what it is compared with. Costs, overdue amounts and churn are
   `goodWhen="down"`. A change in a rate is in points ("3 pts"), never a percent of a percent.
+- **Review.** Better or worse showed only in colour outside forced colours, and whether up is
+  good depends on `goodWhen`, which no arrow shows. The word now sits beside the figure in every
+  mode: "↑ 6.2% better vs last month".
 
 #### Progress
 
@@ -690,7 +707,8 @@ The container on the canvas: a title, an optional description and actions, a bod
 - **Contract.** `title`, `description`, `actions`, `footer`, `icon`. `href` (the title becomes a
   link that covers the card; buttons inside stay pressable). `flat` (inside a pane: no shadow).
   `interactive` (lifts on hover). `selected`. `flush` (no body padding, for tables and lists).
-  `headingLevel` (2 by default). `as`.
+  `headingLevel` (2 by default). `as`. `chevron` (with `href`: a chevron at the end of the title's
+  line, the cue that the whole card opens something, as ListRow has).
 - **Rules.** Never a card inside a card. The title says what the card shows, in sentence case, with
   no small uppercase label above it. One idea per card: a card that needs tabs is a page.
 - **Review.** An uppercase kicker sat above card titles, which the craft gate bans (round 1).
@@ -737,8 +755,10 @@ definition.
   that takes focus, so the keyboard can scroll it, and the actions column sticks to the right edge.
 - **Layout.** Under 640px of its own width it shows the same rows as a list. The naming column is
   the title, the others make a meta line, badges sit on a line of their own, and the row's menu
-  stays on the right. A column's `phone` sends it to `meta` (the default), `badge` or `hidden`.
-  Sorting moves to the page's own controls.
+  stays on the right. A column's `phone` sends it to `meta` (the default), `labelled`, `badge`,
+  `action` or `hidden`. `action` keeps a row's one primary action (a column whose cell is a Button)
+  on the row, beside its menu, rather than letting it disappear into More actions. Sorting moves to
+  the page's own controls.
 - **States.** The empty state replaces the rows and keeps the header and the toolbar.
 - **Rules.**
   - The first column names the record. Seven columns at most; the rest belong in the detail view.
@@ -749,7 +769,9 @@ definition.
     with a selection bar that says how many.
 - **Review.** Selecting a row opened it, rows could not be reached by keyboard, and some data
   crashed it (round 1). Bulk approve acted on rows that were not on screen (round 3). Tables kept
-  their desktop layout at phone width (round 4).
+  their desktop layout at phone width (round 4). On a touch tablet the sort buttons and the row's
+  link were 16 and 20px; each now takes its whole cell. A search that emptied the table said
+  nothing, because the count in the footer unmounted; the footer stays mounted, out of sight.
 - **Open.** No shift-click range selection. Up and Down between a list and its detail, which
   `03-fundamentals-first.md` §5 requires, was left to each product.
 
@@ -910,6 +932,9 @@ is down, offline.
 - **Rules.** One at a time, under the page header. Dismissible unless the state still applies. Under
   a down source, the last good data stays, marked with its time. Offline is a `neutral` banner
   saying changes will save when the connection is back.
+- **Review.** A starter showed its down source as `danger`. A source behind the page that is down
+  is `warning`: nothing the person did failed, and the rest of the page works. `danger` is for a
+  section that could not load or a save that did not go through.
 
 #### Toast
 
@@ -1094,15 +1119,18 @@ NavItems on the rail under a short uppercase label, optionally collapsible. `lab
 One destination on the rail: an icon, a label and an optional count.
 
 - **Contract.** `icon`, `label`, `href`. `current`. `count`, `attention`. `sub` (a nested item).
-- **States.** The current page takes `rail-selected` with a hairline. A count is highlight with
-  `attention` and grey without, and zero shows nothing.
+- **States.** The current page takes `rail-selected` with a hairline, and a 3px bar in
+  `rail-text-strong` at its start: the fill is a step off the rail, about 1.3:1, so the bar carries
+  the state at 3:1 or more. PhoneTabBar marks its current place the same way, with the bar along the
+  top. A count is highlight with `attention` and grey without, and zero shows nothing.
 - **Behaviour.** The current page carries `aria-current="page"`. Counts are read as words:
   "Approvals, 3 need you" ("1 needs you") with `attention`, and "[Place], 12 waiting on others"
   without.
 - **Rules.** Counts mean work: a highlight count is waiting on the reader, a grey count on someone
   else.
 - **Review.** The needs-you count was white on the highlight, at 1.12:1 (round 1). The count's text
-  is `on-highlight`, solved for contrast.
+  is `on-highlight`, solved for contrast. The current page was marked by its fill alone, 1.32:1 on
+  a dark rail.
 
 #### PageHeader
 

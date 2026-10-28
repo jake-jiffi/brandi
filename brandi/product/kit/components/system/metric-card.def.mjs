@@ -267,7 +267,7 @@ export default {
       },
     },
     {
-      name: "Forced colours take the delta's colour away, so its judgement shows as a word",
+      name: "Forced colours take the delta's colour away, and its judgement still shows as a word",
       example: "row",
       forcedColors: true,
       async run({ scope, expect }) {

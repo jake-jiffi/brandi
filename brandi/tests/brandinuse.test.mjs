@@ -77,6 +77,30 @@ describe('the illustration library', () => {
     assert.match(page, /Bath day/);
   });
 
+  test('book --publish writes the deck as a page with every image beside it, and the call that sends them', async () => {
+    const r = await cli(['book', '--publish']);
+    assert.ok(!r.failed, r.out);
+    const inline = await readFile(path.join(dir, 'brand', 'brand-book.html'), 'utf8');
+    const pageFile = r.publish.page;
+    const page = await readFile(pageFile, 'utf8');
+    assert.ok(pageFile.endsWith(path.join('brand', '.publish', 'muddy-paws-brand-book', 'brand-book.html')), pageFile);
+    assert.doesNotMatch(page, /data:image\//, 'no image left inline');
+    // The artifact wraps the page in its own document, so the book's wrapper comes off and its title stays.
+    assert.doesNotMatch(page, /<!doctype|<\/?html\b|<\/?head\b|<\/?body\b|<meta charset|name="viewport"/i);
+    assert.match(page.slice(0, 8192), /<title>[^<]+<\/title>/, 'the title is in the first 8KB, where the publish reads it');
+    assert.match(inline, /data:image\/svg\+xml;base64,/, 'the book itself still stands alone');
+    const named = [...new Set([...page.matchAll(/src="(book-assets\/[^"]+)"/g)].map((m) => m[1]))];
+    assert.ok(named.length >= 2, 'both drawings at least');
+    assert.deepEqual([...named].sort(), [...r.publish.files].sort(), 'every image the page names is a file, and no file is unused');
+    for (const f of named) {
+      const bytes = await readFile(path.join(r.publish.root, f));
+      assert.ok(inline.includes(bytes.toString('base64')), `${f} holds the image the book inlined`);
+    }
+    assert.equal(r.publish.calls.length, 1);
+    assert.deepEqual(Object.keys(r.publish.calls[0].files).sort(), [...named].sort());
+    assert.equal(r.publish.calls[0].file_path, pageFile);
+  });
+
   test('the handover carries every drawing, filed by set', async () => {
     const out = path.join(dir, 'handover');
     const r = await cli(['handoff', '--out', out]);

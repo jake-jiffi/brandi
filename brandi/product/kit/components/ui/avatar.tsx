@@ -53,12 +53,14 @@ const AvatarFallback = React.forwardRef(function AvatarFallback({
   ...props
 }: React.ComponentProps<typeof AvatarPrimitive.Fallback>, ref: React.ForwardedRef<any>) {
   return (
-    // Patched (07-starter.md, avatar): initials in bold on a tag tint, in the strong text colour, sized to
-    // the circle. The system's Avatar picks the tint from the name.
+    // Patched (07-starter.md, avatar): initials in bold on a tag tint, sized to the circle. The system's Avatar
+    // picks the tint from the name. The ink is foreground, the page's text colour set where the theme is: text is
+    // the role measured on the tag tints, and foreground is the copy of it that the rail's on-rail remapping never
+    // reaches (on a dark rail it turned text-strong white, which put white initials on a pale tint at 1.2:1).
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "flex size-full items-center justify-center rounded-full bg-tag-grey type-heading-sm text-text-strong group-data-[size=lg]/avatar:type-heading group-data-[size=md]/avatar:type-eyebrow group-data-[size=sm]/avatar:type-eyebrow",
+        "flex size-full items-center justify-center rounded-full bg-tag-grey type-heading-sm text-foreground group-data-[size=lg]/avatar:type-heading group-data-[size=md]/avatar:type-eyebrow group-data-[size=sm]/avatar:type-eyebrow",
         className
       )}
       {...props}

@@ -137,7 +137,11 @@ export function toPreviewHtml(source, { width, height, label, base, runtime, boa
   // An artboard that sets its own base means it: the first base with an href
   // wins, so injecting ours ahead of it would silently redirect its images.
   if (base && !/<base\s[^>]*href=/i.test(out)) {
-    const tag = `<base href="${base}">`;
+    // With a base, a link to "#section" resolves to the source directory and leaves the board: a settings
+    // board emptied on any click in its section list. The canvas scrolls within the board, so the preview
+    // does the same, for a press nothing else has handled.
+    const hashLinks = '<script>document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href^=\'#\']");if(!a||e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();location.hash=a.getAttribute("href");});</script>';
+    const tag = `<base href="${base}">${hashLinks}`;
     out = /<head[^>]*>/i.test(out) ? out.replace(/<head[^>]*>/i, (m) => `${m}${tag}`) : `${tag}${out}`;
   }
   return out;

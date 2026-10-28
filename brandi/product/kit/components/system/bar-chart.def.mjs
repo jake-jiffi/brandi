@@ -390,6 +390,14 @@ export default {
       },
     },
     {
+      name: "In forced colours a comparison marker takes the system's text colour, so it stands clear of the gridlines",
+      example: "grouped",
+      forcedColors: true,
+      async run({ page, scope, expect }) {
+        expect.equal(await c.paint(scope.locator('[data-slot="chart-compare"]').first(), "stroke"), await c.colour(page, "CanvasText"), "the target is CanvasText")
+      },
+    },
+    {
       name: "A tap shows the tooltip on a touch screen, and lifting the finger leaves it there",
       example: "single",
       touch: true,

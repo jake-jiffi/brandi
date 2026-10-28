@@ -287,6 +287,14 @@ const SANS_FACE = /\b(sans|grotesk|grotesque|gothic|geometric)\b/i;
  * Names are single-quoted: the book and the sheets put a stack inside a double-quoted style attribute,
  * and a double quote ended the attribute there, taking the face, the size and the weight with it.
  */
+/** A role's family as a CSS stack, with the fallback a token file needs: a bare family falls back to the browser's serif. */
+export function fontStack(role, family) {
+  if (Array.isArray(family)) return family.join(', ');
+  const name = String(family ?? '').trim();
+  const fallback = role === 'display' ? displayFallback(name) : role === 'mono' ? 'ui-monospace, SFMono-Regular, Menlo, monospace' : 'system-ui, sans-serif';
+  return name ? `'${name}', ${fallback}` : fallback;
+}
+
 export function displayFallback(face) {
   const name = String(face ?? '');
   if (CONDENSED_FACE.test(name)) return "Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif";

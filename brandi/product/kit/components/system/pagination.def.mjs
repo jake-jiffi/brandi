@@ -12,18 +12,20 @@ export default {
     { name: "pageSize", type: "number", default: "25", doc: "Rows per page. Keep the size the person chose." },
     { name: "total", type: "number", doc: "Rows across every page." },
     { name: "onPage", type: "(page: number) => void", doc: "Called with the page to show." },
+    { name: "empty", type: "string", default: '"No results"', doc: "What the count says at zero, such as No jobs match “boiler”." },
   ],
   notes: {
     Behaviour: [
       "Previous and Next are buttons: Tab reaches them, Enter or Space moves a page, and focus stays where it was.",
       "At either end the button stays focusable and says it is unavailable, so focus never drops to the page.",
       'Where you are is a polite status, "26 to 50 of 312": read out when the page changes, never on load.',
+      "Keep it mounted while a search or filter finds nothing, with `empty` saying so: a status that unmounts says nothing, and comes back silent. DataTable keeps its footer out of sight under the empty state for this.",
     ],
     Layout: [
       "The count on the left, the buttons at the far end. In a narrow footer the buttons wrap under the count, still at the end.",
       "40px targets on a touch screen, 8px apart.",
     ],
-    Copy: ['"1 to 25 of 312", in the formatter\'s numbers. "No results" at zero.'],
+    Copy: ['"1 to 25 of 312", in the formatter\'s numbers. "No results" at zero, or what `empty` says: "No jobs match “boiler”".'],
     Rules: [
       "No buttons when everything fits on one page.",
       "Prefer filters and search to deep paging. Keep the page size the person chose, and keep the page in the URL.",
@@ -61,6 +63,13 @@ setTablePage: (page) => self.setState({ page })`,
       layout: "block",
       markup: `<div class="max-w-2xl"><x-import component-from-global-scope="NS.Pagination" page="{{p1}}" total="{{t0}}"></x-import></div>`,
       vals: { t0: 0 },
+    },
+    {
+      id: "none-search",
+      title: "A search that finds nothing",
+      layout: "block",
+      markup: `<div class="max-w-2xl"><x-import component-from-global-scope="NS.Pagination" page="{{p1}}" total="{{t0}}" empty="No jobs match “boiler”"></x-import></div>`,
+      vals: { p1: 1, t0: 0 },
     },
     {
       id: "narrow",
@@ -111,6 +120,7 @@ setTablePage: (page) => self.setState({ page })`,
         expect.equal(await at("one-page").getByRole("button").count(), 0, "buttons when everything fits")
         expect.equal(await at("none").getByRole("status").innerText(), "No results", "at zero")
         expect.equal(await at("none").getByRole("button").count(), 0, "buttons at zero")
+        expect.equal(await at("none-search").getByRole("status").innerText(), "No jobs match “boiler”", "at zero, in the words it was given")
       },
     },
     {

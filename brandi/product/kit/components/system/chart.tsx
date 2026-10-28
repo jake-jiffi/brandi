@@ -62,10 +62,12 @@ export const paintFill: Record<ChartPaint, string> = {
   4: "fill-series-4",
   5: "fill-series-5",
   6: "fill-series-6",
-  compare: "fill-chart-compare",
+  compare: "fill-chart-compare forced-colors:fill-[CanvasText]",
   other: "fill-chart-compare",
 }
 
+// The series keep their colours in forced colours, but the comparison's grey would sink among the gridlines (which
+// take GrayText there), so it takes the system's text colour and stays dashed.
 export const paintStroke: Record<ChartPaint, string> = {
   1: "stroke-series-1",
   2: "stroke-series-2",
@@ -73,7 +75,7 @@ export const paintStroke: Record<ChartPaint, string> = {
   4: "stroke-series-4",
   5: "stroke-series-5",
   6: "stroke-series-6",
-  compare: "stroke-chart-compare",
+  compare: "stroke-chart-compare forced-colors:stroke-[CanvasText]",
   other: "stroke-chart-compare",
 }
 

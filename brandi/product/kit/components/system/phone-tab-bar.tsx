@@ -55,8 +55,10 @@ export const PhoneTabBar = React.forwardRef<HTMLElement, PhoneTabBarProps>(funct
                 aria-current={current ? "page" : undefined}
                 data-slot="phone-tab"
                 className={cn(
-                  "group/tab flex min-h-12 w-full min-w-0 flex-col-reverse items-center justify-center gap-0.5 rounded-control px-1 pt-1 pb-0.5 type-caption text-rail-text transition-colors duration-(--duration-fast) hover:text-rail-text-strong focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px]",
-                  current && "text-rail-text-strong",
+                  "group/tab relative flex min-h-12 w-full min-w-0 flex-col-reverse items-center justify-center gap-0.5 rounded-control px-1 pt-1 pb-0.5 type-caption text-rail-text transition-colors duration-(--duration-fast) hover:text-rail-text-strong focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px]",
+                  // The icon's fill is a step off the bar, about 1.3:1, so a bar along the top in rail-text-strong carries
+                  // the state at 3:1 or more (WCAG 1.4.11) in every brand.
+                  current && "text-rail-text-strong before:absolute before:inset-x-[calc(50%-16px)] before:top-0 before:h-[3px] before:rounded-full before:bg-rail-text-strong",
                   // Forced colours paint no fills, so the current place is outlined instead.
                   "forced-colors:aria-[current=page]:outline-2 forced-colors:aria-[current=page]:-outline-offset-2 forced-colors:aria-[current=page]:outline-solid forced-colors:aria-[current=page]:outline-[color:Highlight]"
                 )}
@@ -80,7 +82,9 @@ export const PhoneTabBar = React.forwardRef<HTMLElement, PhoneTabBarProps>(funct
                         data-slot="phone-tab-count"
                         className={cn(
                           "absolute -top-1.5 left-3 inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 type-caption tabular-nums",
-                          item.attention ? "bg-highlight text-on-highlight" : "bg-rail text-rail-text shadow-[inset_0_0_0_1px_var(--rail-line)]"
+                          // A grey count's chip is edged in rail-muted, 3:1 or more on the bar, so it reads as a count and
+                          // not a stray figure: rail-line is only a step off the bar.
+                          item.attention ? "bg-highlight text-on-highlight" : "bg-rail text-rail-text shadow-[inset_0_0_0_1px_var(--rail-muted)]"
                         )}
                       >
                         {formatNumber(n, "number")}

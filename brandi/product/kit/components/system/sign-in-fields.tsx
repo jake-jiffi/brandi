@@ -217,7 +217,7 @@ export const SignInFields = React.forwardRef<HTMLDivElement, SignInFieldsProps>(
   if (mode === "code") {
     return (
       <div ref={ref} data-slot="sign-in-fields" data-mode="code" className={cn("flex flex-col gap-5", className)} style={style}>
-        <Field label="Verification code" hint={`Enter the ${length}-digit code we sent to ${sentTo ?? "you"}.`} error={codeError}>
+        <Field label="Verification code" hint={`Enter the ${length}-digit code we sent to ${sentTo ?? "you"}.`} error={codeError} required>
           <CodeInput length={length} name="code" size={size} onValue={(v) => tell("code", v)} onComplete={onCodeComplete} />
         </Field>
       </div>
@@ -227,7 +227,7 @@ export const SignInFields = React.forwardRef<HTMLDivElement, SignInFieldsProps>(
   const fresh = mode === "new-password"
   return (
     <div ref={ref} data-slot="sign-in-fields" data-mode={mode} className={cn("flex flex-col gap-5", className)} style={style}>
-      <Field label="Email" error={emailError}>
+      <Field label="Email" error={emailError} required>
         <TextInput
           type="email"
           name="email"
@@ -242,11 +242,11 @@ export const SignInFields = React.forwardRef<HTMLDivElement, SignInFieldsProps>(
         />
       </Field>
       <div className="flex flex-col gap-1.5">
-        <Field label={fresh ? "New password" : "Password"} hint={fresh ? (passwordRule ?? `At least ${minLength} characters.`) : undefined} error={passwordError}>
+        <Field label={fresh ? "New password" : "Password"} hint={fresh ? (passwordRule ?? `At least ${minLength} characters.`) : undefined} error={passwordError} required>
           <PasswordInput autoComplete={fresh ? "new-password" : "current-password"} size={size} name="password" minLength={fresh ? minLength : undefined} onValue={(v) => tell("password", v)} />
         </Field>
         {forgotHref && !fresh ? (
-          <TextLink href={forgotHref} className="self-start type-body">
+          <TextLink href={forgotHref} standalone className="self-start type-body">
             Forgot your password?
           </TextLink>
         ) : null}

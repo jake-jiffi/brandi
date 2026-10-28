@@ -41,11 +41,14 @@ export default {
       "Links render through the system's link, so production gets client navigation.",
     ],
     Layout: [
-      "Each place is 48px tall, at least the 44px a thumb needs, with 8px between places and the icon over a one-word label. The current place's icon sits in rail-selected with a hairline.",
+      "Each place is 48px tall, at least the 44px a thumb needs, with 8px between places and the icon over a one-word label. The current place's icon sits in rail-selected with a hairline, under a 3px bar in rail-text-strong along the top: the fill is a step off the bar, about 1.3:1, so the bar carries the state at 3:1 or more (WCAG 1.4.11).",
       "It keeps clear of a phone's home indicator. Inside AppShell it takes the foot on a phone, and the page's primary stays in its header.",
     ],
     States: [
-      "The current place takes rail-text-strong, and in forced colours an outline. A count sits on the icon's corner: the highlight with on-highlight text when it waits on the reader, the rail with a hairline when it waits on someone else.",
+      "The current place takes rail-text-strong, and in forced colours an outline. A count sits on the icon's corner: the highlight with on-highlight text when it waits on the reader, the rail edged in rail-muted when it waits on someone else, so it reads as a count and not a stray figure.",
+    ],
+    Review: [
+      "The current place was marked by the icon's fill alone, 1.32:1 on a dark bar, and a grey count's hairline edge did not show, so it read as a stray digit (a second brand's round 2).",
     ],
     Rules: [
       "Three to five places, each one word. More than five belong in the drawer.",
@@ -123,6 +126,32 @@ export default {
         const chip = scope.getByRole("link", { name: "Approvals, 3 need you" }).locator('[data-slot="phone-tab-count"]')
         const [fg, bg] = await chip.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor])
         expect.atLeast(Number(contrast(fg, bg).toFixed(2)), 4.5, `the count's contrast in ${theme}`)
+      },
+    },
+    {
+      name: "The current place is marked at 3:1 or more against the bar and the icon's fill, and a grey count's chip edge shows, in both themes",
+      themes: ["light", "dark"],
+      async run({ page, expect, theme }) {
+        const four = page.locator('[data-example="four"]')
+        const bar = await four.locator('[data-slot="phone-tab-bar"]').evaluate((el) => getComputedStyle(el).backgroundColor)
+        const current = four.getByRole("link", { name: "Approvals, 3 need you" })
+        const [mark, height, fill] = await current.evaluate((el) => [getComputedStyle(el, "::before").backgroundColor, getComputedStyle(el, "::before").height, getComputedStyle(el.querySelector('[data-slot="phone-tab-icon"]')).backgroundColor])
+        expect.equal(height, "3px", "a 3px bar")
+        expect.atLeast(Number(contrast(mark, bar).toFixed(2)), 3, `${theme}: the bar against the tab bar`)
+        expect.atLeast(Number(contrast(mark, fill).toFixed(2)), 3, `${theme}: the bar against the icon's fill`)
+        expect.equal(await four.locator('[data-slot="phone-tab"]:not([aria-current])').evaluateAll((all) => all.filter((el) => getComputedStyle(el, "::before").content !== "none").length), 0, "no other place carries a bar")
+        const grey = page.locator('[data-example="five"]').getByRole("link", { name: "Invoices, 12 waiting on others" }).locator('[data-slot="phone-tab-count"]')
+        // The edge is rail-muted: read the role where the chip sits, and find it in the chip's shadow.
+        const [edge, shadow] = await grey.evaluate((el) => {
+          const p = document.createElement("span")
+          p.style.color = "var(--rail-muted)"
+          el.appendChild(p)
+          const colour = getComputedStyle(p).color
+          p.remove()
+          return [colour, getComputedStyle(el).boxShadow]
+        })
+        expect(shadow.includes(edge) && /inset/.test(shadow), `the chip is edged in rail-muted (${shadow})`)
+        expect.atLeast(Number(contrast(edge, bar).toFixed(2)), 3, `${theme}: the grey count's chip edge against the bar`)
       },
     },
     {

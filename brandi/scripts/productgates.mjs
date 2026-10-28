@@ -7,6 +7,7 @@
  *   tokens     every declared contrast pair, both themes          brandi product audit
  *   detector   the pinned Impeccable engine at 1440, 820 and 390, light and dark
  *   axe        axe-core in Chrome, light and dark
+ *   reflow     every fluid board and route at 320px wide: nothing scrolls sideways (WCAG 1.4.10)
  *   checks     every definition's scripted checks, real keyboard
  *
  * The judged gates (the Impeccable craft critique against Nielsen's heuristics, the ui-ux-pro-max
@@ -26,6 +27,8 @@ import { previewArtboard, manifestFrames, declaredFrame, findChrome } from './pr
 import { driftCheck } from './productdrift.mjs';
 
 export const WIDTHS = Object.freeze([1440, 820, 390]);
+/** WCAG 1.4.10's width: 1280 at 400% zoom, and a small phone. Only reflow is measured here. */
+export const REFLOW_WIDTH = 320;
 export const BAR = Object.freeze({
   craftTotal: 34,
   craftMinimum: 3,
@@ -134,11 +137,20 @@ export async function collectPages({ productDir, outDir, widths = WIDTHS, only =
       // A twin that is already dark is scanned as it is; a board with a dark tweak, both ways.
       const themes = /Dark\.dc\.html$/.test(f) ? ['dark'] : /"dark":\{"editor":"boolean"/.test(src) ? ['light', 'dark'] : ['light'];
       for (const width of fluid ? widths : [frame.w]) {
-        for (const theme of themes) pages.push({ kind: 'board', label: f.replace(/\.dc\.html$/, ''), url, width, height: frame.h, theme });
+        for (const theme of themes) pages.push({ kind: 'board', label: f.replace(/\.dc\.html$/, ''), url, width, height: frame.h, theme, fluid });
       }
     }
   }
   return pages;
+}
+
+/**
+ * The pages reflow is measured on: each fluid board and each route once, at 320px, in light. A board drawn at a
+ * fixed frame is a picture of one width, so it is left out; overflow does not change with the theme.
+ */
+export function reflowPages(pages) {
+  const picked = pages.filter((p) => (p.kind === 'board' && p.fluid) || p.kind === 'route');
+  return [...new Map(picked.map((p) => [p.url, { kind: p.kind, label: p.label, url: p.url, width: REFLOW_WIDTH, height: 800 }])).values()];
 }
 
 const withTheme = (page) => (page.theme === 'dark' && page.kind !== 'route' ? `${page.url}${page.url.includes('?') ? '&' : '?'}props=${encodeURIComponent('{"dark":true}')}` : page.kind === 'route' && page.theme === 'dark' ? `${page.url}${page.url.includes('?') ? '&' : '?'}theme=dark` : page.url);
@@ -259,6 +271,22 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   const axe = existsSync(path.join(outDir, 'axe.json')) ? JSON.parse(readFileSync(path.join(outDir, 'axe.json'), 'utf8')) : { violations: null, errors: 1, results: [], failure: axeRun.out.slice(-400) };
   log(`axe: ${axe.violations} violations on ${axe.pages ?? 0} pages${axe.errors ? `, ${axe.errors} not scanned` : ''}`);
 
+  // Reflow at 320px on the fluid boards and the routes: the website header that overflowed there was seen by
+  // no gate, because none looked below 390.
+  const reflowList = reflowPages(pages);
+  let reflow = { width: REFLOW_WIDTH, pages: 0, overflow: [], errors: [] };
+  if (reflowList.length && !existsSync(path.join(starter, 'tools', 'reflow-pages.mjs'))) {
+    reflow.errors.push({ page: 'runner', error: 'the starter has no tools/reflow-pages.mjs: refresh its kit with brandi product starter --kit' });
+  } else if (reflowList.length) {
+    writeFileSync(path.join(outDir, 'reflow-pages.json'), JSON.stringify(reflowList, null, 2));
+    const reflowRun = nodeScript(starter, 'reflow-pages.mjs', ['--pages', path.join(outDir, 'reflow-pages.json'), '--json', path.join(outDir, 'reflow.json')]);
+    const measured = existsSync(path.join(outDir, 'reflow.json')) ? JSON.parse(readFileSync(path.join(outDir, 'reflow.json'), 'utf8')) : null;
+    reflow = measured
+      ? { width: REFLOW_WIDTH, pages: measured.pages, overflow: measured.results.filter((r) => r.overflow).map((r) => ({ page: r.label, kind: r.kind, scrollWidth: r.scrollWidth, clientWidth: r.clientWidth, worst: r.worst })), errors: measured.results.filter((r) => r.error).map((r) => ({ page: r.label, error: r.error })) }
+      : { width: REFLOW_WIDTH, pages: 0, overflow: [], errors: [{ page: 'runner', error: reflowRun.out.slice(-400) }] };
+  }
+  log(`reflow: ${reflow.overflow.length} of ${reflow.pages} pages scroll sideways at ${REFLOW_WIDTH}px${reflow.errors.length ? `, ${reflow.errors.length} not measured` : ''}`);
+
   const previews = path.join(productDir, 'components', 'previews');
   const checkRun = existsSync(previews)
     ? nodeScript(starter, 'check-components.mjs', ['--previews', pagesDir, ...(only ? ['--only', only.join(',')] : []), '--json', path.join(outDir, 'checks.json')])
@@ -275,6 +303,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     drift: { differences: drift.differences, unchecked: drift.unchecked },
     detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null, unscanned: detection.unscanned ?? [] },
     axe: { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, skipped: axe.skipped ?? null, results: (axe.results ?? []).filter((r) => r.violations.length || r.error) },
+    reflow,
     checks: { passed: checks.passed, failed: checks.failed },
   };
   writeFileSync(path.join(outDir, 'gates.json'), `${JSON.stringify(gates, null, 2)}\n`);
@@ -296,8 +325,11 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
     !Array.isArray(differences) ? 'no drift check recorded for this round' : differences.length ? `${differences.length} differences between the canvas, the system and the code` : 'canvas, system and code agree; screens checked by eye are noted in the record');
   add('Detector', !gates.detector.skipped && gates.detector.findings.length === 0 && gates.detector.errors.length === 0,
     gates.detector.skipped ?? `${gates.detector.findings.length} findings across ${gates.detector.pages} renders at ${gates.widths.join(', ')}, light and dark`);
-  add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0,
-    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed`);
+  // A round from before the reflow measure has none to count; one that measured fails on any page that overflowed.
+  const overflow = gates.reflow?.overflow?.length ?? 0;
+  const unmeasured = gates.reflow?.errors?.length ?? 0;
+  add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0 && overflow === 0 && unmeasured === 0,
+    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
   if (critique) {
     const scores = critique.heuristics ?? [];
     const total = scores.reduce((n, h) => n + h.score, 0);
@@ -335,6 +367,11 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     lines.push('', '## axe', '');
     for (const r of gates.axe.results) lines.push(`- ${r.label} at ${r.width}, ${r.theme}: ${r.error ?? r.violations.map((v) => `${v.id} (${v.impact})`).join(', ')}`);
   }
+  if (gates.reflow?.overflow?.length || gates.reflow?.errors?.length) {
+    lines.push('', `## Reflow at ${gates.reflow.width}px`, '');
+    for (const r of gates.reflow.overflow) lines.push(`- ${r.page}: ${r.scrollWidth}px wide in a ${r.clientWidth}px window${r.worst ? `, furthest out ${r.worst.what} at ${r.worst.right}px` : ''}`);
+    for (const r of gates.reflow.errors) lines.push(`- ${r.page}: not measured (${r.error})`);
+  }
   if (gates.drift?.differences?.length) {
     lines.push('', '## Drift', '');
     for (const d of gates.drift.differences) lines.push(`- ${d.area}: ${d.where}${d.found ? ` ${d.found}` : ''}, ${d.expected}`);
@@ -357,4 +394,4 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   return lines.join('\n');
 }
 
-export default { runGates, judgeRound, roundMarkdown, findDetector, toolVersions, collectPages, runDetector, WIDTHS, BAR };
+export default { runGates, judgeRound, roundMarkdown, findDetector, toolVersions, collectPages, runDetector, reflowPages, WIDTHS, REFLOW_WIDTH, BAR };

@@ -27,7 +27,7 @@ export const WORKSPACES = [
 ]
 
 /** The outside system the invoices come from, and the last time it answered. */
-export const ACCOUNTING = { name: "[Accounting system]", lastAnswered: `[${formatTime(at(9, 42))}]` }
+export const ACCOUNTING = { name: "[Accounting system]", lastAnswered: formatTime(at(9, 42)) }
 
 /** When the morning summary goes out. */
 export const SUMMARY_TIME = formatTime(at(7))
@@ -224,7 +224,7 @@ export const RECENT_ACTIVITY: TimelineItem[] = [
 
 export const NOTIFICATIONS: NotificationItem[] = [
   { id: "n-1042", text: "[Sam Reid] asked you to approve the quote for J-1042", time: when(TODAY, at(8, 15)), icon: "FileText", unread: true, href: "/jobs/J-1042" },
-  { id: "n-sync", text: `${ACCOUNTING.name} stopped answering at ${ACCOUNTING.lastAnswered}`, time: when(TODAY, at(9, 47)), tone: "danger", unread: true, href: "/invoices" },
+  { id: "n-sync", text: `${ACCOUNTING.name} stopped answering at ${ACCOUNTING.lastAnswered}`, time: when(TODAY, at(9, 47)), tone: "warning", unread: true, href: "/invoices" },
   { id: "n-1053", text: "[Harbour Café] accepted the quote for J-1053", time: when(addDays(TODAY, -1), at(16, 2)), tone: "success", unread: true, href: "/jobs/J-1053" },
   { id: "n-1029", text: "[Priya Nair] finished J-1029 at [Summit Fitness]", time: when("2026-10-23", at(14, 30)), tone: "success", href: "/jobs/J-1029" },
   { id: "n-1031", text: "J-1031 at [Riverside Physio] is overdue", time: when("2026-10-23", at(9)), tone: "warning", href: "/jobs/J-1031" },

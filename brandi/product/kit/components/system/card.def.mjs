@@ -24,6 +24,7 @@ export default {
     { name: "footer", type: "ReactNode", doc: "A row under a hairline, on the subtle surface." },
     { name: "icon", type: "IconName", doc: "An icon before the title, in the muted text colour." },
     { name: "href", type: "string", doc: "The title becomes a link that covers the card; buttons inside stay pressable." },
+    { name: "chevron", type: "boolean", default: "false", doc: "A chevron at the end of the title's line, the cue that the whole card opens something, as ListRow has. Use it with href." },
     { name: "flat", type: "boolean", default: "false", doc: "Inside a pane: no shadow." },
     { name: "interactive", type: "boolean", default: "false", doc: "Lifts on hover." },
     { name: "selected", type: "boolean", default: "false", doc: "The selected tint and a 2px edge. Say it in words in the card too." },
@@ -49,7 +50,7 @@ export default {
     ],
     Review: ["An uppercase kicker sat above card titles, which the craft gate bans (round 1)."],
   },
-  frame: { width: 960, height: 1500 },
+  frame: { width: 960, height: 1700 },
   logic: `els: (() => {
   for (const key of Object.keys(window)) {
     try {
@@ -77,6 +78,11 @@ export default {
       title: "A link that covers the card",
       markup: `<div class="w-80"><x-import component-from-global-scope="NS.Card" title="Timesheets" icon="Clock" href="#" interactive="{{yes}}" actions="{{els.menuAction}}">${body("[6] need your approval before Friday.")}</x-import></div>`,
       vals: { yes: true },
+    },
+    {
+      id: "chevron",
+      title: "A linked card with its chevron",
+      markup: `<div class="w-80"><x-import component-from-global-scope="NS.Card" title="[Northside] team" href="#team" chevron="{{yes}}" interactive="{{yes}}">${body("[12] people, [3] on leave this week.")}</x-import></div>`,
     },
     {
       id: "states",
@@ -118,6 +124,21 @@ ${body("[Priya Nair] has [11.5] days of annual leave.")}
     },
   ],
   checks: [
+    {
+      name: "A linked card's chevron ends the title's line, is decoration, and the card is still one link",
+      example: "chevron",
+      async run({ scope, expect }) {
+        const card = await scope.locator('[data-slot="card"]').first().boundingBox()
+        const chevron = scope.locator('[data-slot="card-chevron"]')
+        expect.equal(await chevron.getAttribute("aria-hidden"), "true", "decoration: the link says where it goes")
+        const c = await chevron.boundingBox()
+        const title = await scope.getByRole("heading", { name: "[Northside] team" }).boundingBox()
+        expect(Math.abs(c.y + c.height / 2 - (title.y + title.height / 2)) <= 2, "on the title's line")
+        expect(card.x + card.width - (c.x + c.width) <= 32, "at the end of the card, inside its inset")
+        expect.equal(await scope.getByRole("link").count(), 1, "one link")
+        expect.equal(await scope.getByRole("link", { name: "[Northside] team" }).count(), 1, "named by the title alone")
+      },
+    },
     {
       name: "Titles are h2 by default, and h3 or h4 when asked",
       example: "levels",

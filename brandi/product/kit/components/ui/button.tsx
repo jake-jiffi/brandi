@@ -9,9 +9,10 @@ import { Slot } from "radix-ui"
 
 // Patched (07-starter.md, button): the system's variants and shape, touch sizes, a press nudge on transform
 // (so it adds to a caller's translate instead of replacing it), and a disabled state
-// that keeps pointer events, so a tooltip can still say why. Focus is the base styles' outline.
+// that keeps pointer events, so a tooltip can still say why. Focus is the base styles' outline. Disabled and
+// aria-disabled fade alike, to the opacity-disabled token: aria-disabled at 60% read close to enabled on a dark primary.
 const buttonVariants = cva(
-  "group/button relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-action border border-transparent bg-clip-padding type-label whitespace-nowrap transition-colors select-none active:not-aria-[haspopup]:[transform:translateY(1px)] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-invalid:border-danger-line [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-action border border-transparent bg-clip-padding type-label whitespace-nowrap transition-colors select-none active:not-aria-[haspopup]:[transform:translateY(1px)] disabled:cursor-not-allowed disabled:opacity-(--opacity-disabled) disabled:shadow-none aria-disabled:cursor-not-allowed aria-disabled:opacity-(--opacity-disabled) aria-invalid:border-danger-line [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {

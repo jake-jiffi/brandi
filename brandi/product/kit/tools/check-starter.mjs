@@ -9,9 +9,9 @@
  *
  * They cover what the shell and the patterns promise (03-fundamentals-first.md, 07-starter.md section 6): the
  * drawer opens, holds focus and gives it back; the phone action bar; focus after every navigation and action,
- * never left on the page body; filters and the open tab in the address; a decision's toast with Undo; and the
- * shortcuts setting turning single keys and their hints off. Prints {"passed": n, "failed": [...]} and exits 1
- * when anything failed.
+ * never left on the page body; filters and the open tab in the address, and Back bringing a list back as it was
+ * left; a decision's toast with Undo; and the shortcuts setting turning single keys and their hints off. Prints
+ * {"passed": n, "failed": [...]} and exits 1 when anything failed.
  */
 
 import { chromium } from "playwright"
@@ -82,6 +82,52 @@ const press = async (page, locator, key = "Enter") => {
   await locator.focus()
   await page.keyboard.press(key)
 }
+
+/** Waits for React to take over a page Back or a reload brought back. */
+const hydrated = (page, what) => until(() => page.evaluate(() => Object.keys(document.querySelector("main") ?? {}).some((k) => k.startsWith("__react"))), `${what} never hydrated`, 15000)
+
+const contrast = (a, b) => {
+  const lum = (css) => {
+    const [r, g, b] = (css.match(/[\d.]+/g) ?? []).slice(0, 3).map((v) => (Number(v) / 255 <= 0.03928 ? Number(v) / 255 / 12.92 : ((Number(v) / 255 + 0.055) / 1.055) ** 2.4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+/** What a fixed or sticky element covers of the focused control, in words, or null when nothing does. */
+const covered = (page) =>
+  page.evaluate(() => {
+    const a = document.activeElement
+    if (!a || a === document.body || a.id === "main") return null
+    const r = a.getBoundingClientRect()
+    if (!r.height) return null
+    for (const el of document.querySelectorAll("body *")) {
+      if (el.contains(a) || el.getAttribute("data-slot") === "toast-region") continue
+      const cs = getComputedStyle(el)
+      if (!(cs.position === "fixed" || cs.position === "sticky") || cs.display === "none" || cs.visibility === "hidden") continue
+      const b = el.getBoundingClientRect()
+      const over = Math.min(b.bottom, r.bottom) - Math.max(b.top, r.top)
+      if (b.width && b.height && b.left < r.right && b.right > r.left && over / r.height > 0.05) {
+        return `"${(a.getAttribute("aria-label") || a.textContent || "").trim().slice(0, 30)}" is ${Math.round((over / r.height) * 100)}% under ${el.getAttribute("data-slot") ?? el.tagName.toLowerCase()}`
+      }
+    }
+    return null
+  })
+
+const zoomCheck = (viewport, band) => ({
+  name: `Shift+Tab up the jobs list never leaves the focused control under a bar that sticks (${band})`,
+  viewport,
+  async run({ page, expect }) {
+    await open(page, "/jobs")
+    await page.getByRole("button", { name: "Next" }).focus()
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press("Shift+Tab")
+      const under = await covered(page)
+      expect(!under, `WCAG 2.4.11: ${under}`)
+    }
+  },
+})
 
 const drawerCheck = (viewport, band) => ({
   name: `The drawer opens from the menu button, holds focus, and gives it back on Escape (${band})`,
@@ -210,6 +256,16 @@ const checks = [
       expect.equal(await page.getByRole("link", { name: "J-1042" }).count(), 0, "a job outside the filter does not")
       await open(page, "/jobs?page=2")
       expect((await page.locator('[data-slot="pagination-range"]').textContent()).startsWith("11 to 20"), "page 2 opens from the address")
+    },
+  },
+  {
+    name: "Each filter chip says its count once, in jobs",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/jobs")
+      const names = await page.locator('[data-slot="filter-chip"]').evaluateAll((all) => all.map((el) => el.getAttribute("aria-label") ?? el.textContent))
+      expect.atLeast(names.length, 1, "chips to read")
+      for (const name of names) expect(/^[^,]+, [\d,]+ jobs?$/.test(name) && !/need.*need/i.test(name), `"${name}" says its count once`)
     },
   },
   {
@@ -396,6 +452,210 @@ const checks = [
       expect(await page.getByRole("link", { name: "Go to Home" }).isVisible(), "it offers a way home")
     },
   },
+  {
+    name: "Back from a record brings the list back as it was left: filters, search, sort and page",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/jobs")
+      await press(page, page.getByRole("button", { name: /^Scheduled, / }), "Space")
+      await press(page, page.getByRole("button", { name: /^Done, / }), "Space")
+      await page.getByRole("searchbox", { name: "Search jobs" }).fill("a")
+      await press(page, page.getByRole("button", { name: /^Customer/ }))
+      await until(() => new URL(page.url()).searchParams.get("sort") === "customer", "the sort did not reach the address")
+      await press(page, page.getByRole("button", { name: "Next" }))
+      await until(() => new URL(page.url()).searchParams.get("page") === "2", "the page did not reach the address")
+      const left = new URL(page.url()).search
+      const range = await page.locator('[data-slot="pagination-range"]').textContent()
+      await press(page, page.locator('[data-slot="data-table-wide"] [data-slot="data-table-open"]').first())
+      await until(() => new URL(page.url()).pathname.startsWith("/jobs/J-"), "the record did not open")
+      await hydrated(page, "the record")
+      await page.goBack()
+      await until(() => new URL(page.url()).pathname === "/jobs", "Back did not return to the list")
+      await hydrated(page, "the list")
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+      expect.equal(new URL(page.url()).search, left, "the address is the one the list was left at")
+      expect.equal(await page.getByRole("button", { name: /^Scheduled, / }).getAttribute("aria-pressed"), "true", "the first filter is still on")
+      expect.equal(await page.getByRole("button", { name: /^Done, / }).getAttribute("aria-pressed"), "true", "the second filter is still on")
+      expect.equal(await page.getByRole("searchbox", { name: "Search jobs" }).inputValue(), "a", "the search is still there")
+      expect.equal(await page.getByRole("columnheader", { name: /^Customer/ }).getAttribute("aria-sort"), "ascending", "the sort is still there")
+      expect.equal(await page.locator('[data-slot="pagination-range"]').textContent(), range, "the same page of results")
+    },
+  },
+  {
+    name: "A new page of results adds a history entry; filters and a record's tab replace theirs",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/")
+      await press(page, page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: /^Jobs/ }))
+      await landed(page, "/jobs")
+      await press(page, page.getByRole("button", { name: "Next" }))
+      await until(() => new URL(page.url()).searchParams.get("page") === "2", "the page did not reach the address")
+      await page.goBack()
+      await until(() => new URL(page.url()).pathname === "/jobs" && !new URL(page.url()).searchParams.has("page"), "Back from page 2 did not return to page 1")
+      await until(async () => (await page.locator('[data-slot="pagination-range"]').textContent()).startsWith("1 to 10"), "page 1 did not show again")
+      await press(page, page.getByRole("button", { name: /^Overdue, / }), "Space")
+      await until(() => new URL(page.url()).searchParams.get("status") === "overdue", "the filter did not reach the address")
+      await page.goBack()
+      await until(() => new URL(page.url()).pathname === "/", "Back after a filter should leave the list, because the filter replaced its entry")
+      await open(page, "/jobs/J-1042")
+      await press(page, page.getByRole("tablist", { name: "J-1042 sections" }).getByRole("tab", { name: "Quote" }))
+      await until(() => new URL(page.url()).searchParams.get("tab") === "quote", "the tab did not reach the address")
+      await page.goBack()
+      await until(() => new URL(page.url()).pathname === "/", "Back after a tab should leave the record, because the tab replaced its entry")
+    },
+  },
+  zoomCheck({ width: 640, height: 400 }, "200% zoom, 640 by 400"),
+  zoomCheck({ width: 320, height: 256 }, "400% zoom, 320 by 256"),
+  zoomCheck(PHONE, "phone, where the toolbar sticks"),
+  {
+    name: "A search that finds nothing says so in the one live count, which never unmounts and speaks again when rows come back",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/jobs")
+      await page.locator('[data-slot="pagination-range"]').evaluate((el) => el.setAttribute("data-probe", "count"))
+      const search = page.getByRole("searchbox", { name: "Search jobs" })
+      await search.fill("zzzz")
+      const count = page.locator('[data-slot="pagination-range"]')
+      await until(async () => (await count.textContent()) === "No jobs match “zzzz”", "the count did not say nothing matches")
+      expect.equal(await count.getAttribute("data-probe"), "count", "the same live region, never unmounted")
+      expect.equal(await count.getAttribute("role"), "status", "a polite status")
+      const box = await page.locator('[data-slot="data-table-footer"]').boundingBox()
+      expect(!box || box.height <= 1, "the footer is out of sight while the empty state says so on screen")
+      expect(await page.getByRole("heading", { name: "No jobs match “zzzz”" }).isVisible(), "the empty state shows")
+      await search.fill("")
+      await until(async () => (await count.textContent()).startsWith("1 to 10 of"), "the count did not come back with the rows")
+      expect.equal(await count.getAttribute("data-probe"), "count", "still the same live region")
+    },
+  },
+  {
+    name: "Try again that fails again moves focus to the heading and says it tried, never leaving focus on the page body",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/jobs/J-1050")
+      await until(() => page.getByRole("heading", { level: 1, name: "This page did not load." }).isVisible(), "the failed page does not say so")
+      const line = page.locator('[data-slot="page-error-retry"]')
+      expect.equal(await line.getAttribute("role"), "status", "a polite status, there from the start")
+      expect.equal((await line.textContent()).trim(), "", "and quiet on arrival")
+      await press(page, page.getByRole("button", { name: "Try again" }))
+      await until(async () => /^Still not loading\. Tried again at .+\.$/.test(((await line.textContent()) ?? "").trim()), "the retry said nothing")
+      const f = await until(async () => {
+        const now = await focused(page)
+        return now.tag === "h1" ? now : null
+      }, "focus did not move to the heading after the retry failed")
+      expect.equal(f.name, "This page did not load.", "focus is on the page's one heading")
+    },
+  },
+  {
+    name: "A field is checked when it is left, its error goes as soon as it is right, required fields say so, and Save stays quiet until something changes",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/settings")
+      expect.equal(await page.getByRole("button", { name: "Save profile" }).getAttribute("data-variant"), "secondary", "Save is quiet while nothing has changed")
+      const name = page.getByRole("textbox", { name: "Name" })
+      const email = page.getByRole("textbox", { name: "Email" })
+      expect.equal(await name.getAttribute("aria-required"), "true", "Name is required for screen readers")
+      expect.equal(await email.getAttribute("aria-required"), "true", "Email is required for screen readers")
+      await name.fill("")
+      expect.equal(await name.getAttribute("aria-invalid"), null, "no error while typing")
+      await page.keyboard.press("Tab")
+      await until(async () => (await name.getAttribute("aria-invalid")) === "true", "leaving an empty Name did not mark it")
+      expect(await page.getByText("Enter your name, as your team knows you.").isVisible(), "and its error shows")
+      await name.focus()
+      await page.keyboard.type("A")
+      await until(async () => (await name.getAttribute("aria-invalid")) === null, "the error stayed after the name was right")
+      expect.equal(await page.getByText("Enter your name, as your team knows you.").count(), 0, "the error went at once")
+      const save = page.getByRole("button", { name: "Save profile" })
+      const status = page.locator('#profile [data-slot="form-actions-status"]')
+      expect.equal((await status.textContent()).trim(), "Unsaved changes", "a change says the section is unsaved")
+      expect.equal(await save.getAttribute("data-variant"), "default", "and makes Save the primary")
+      await email.fill("not an email")
+      await press(page, save)
+      await until(() => email.evaluate((el) => el === document.activeElement), "Save did not move focus to the first field in error, the email")
+      expect.equal(await email.getAttribute("aria-invalid"), "true", "and Save still checks it")
+    },
+  },
+  {
+    name: "A source that is down shows as a warning, never danger",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/invoices")
+      const banner = page.locator('[data-slot="banner"]')
+      expect.equal(await banner.getAttribute("data-tone"), "warning", "the banner")
+      expect.equal(await page.locator('[data-slot="page-header-meta"] [data-slot="badge"]').filter({ hasText: "Sync failed" }).getAttribute("data-tone"), "warning", "the header's badge")
+      expect.equal(await page.locator('[data-tone="danger"]').filter({ hasText: /not responding|Sync failed|stopped answering/ }).count(), 0, "nothing about the source is danger")
+    },
+  },
+  {
+    name: "Home's See all link counts what it opens, and no time wears the brackets that mark invented names",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      for (const route of ["/", "/invoices"]) {
+        await open(page, route)
+        const text = await page.locator("main").innerText()
+        expect(!/\[\d{1,2}[:.]\d{2}/.test(text), `${route} shows a time in brackets`)
+      }
+      await open(page, "/")
+      const link = page.getByRole("link", { name: /^See all \d+ jobs that need you or are overdue$/ })
+      const n = Number((await link.textContent()).match(/\d+/)[0])
+      await press(page, link)
+      await until(() => new URL(page.url()).pathname === "/jobs", "See all did not open the jobs")
+      await until(async () => ((await page.locator('[data-slot="pagination-range"]').textContent()) ?? "").endsWith(`of ${n}`), `the list it opened does not hold ${n} jobs`)
+    },
+  },
+  {
+    name: "On a phone the standalone See all link takes a 40px tap, and the bell's count sits on the bell",
+    viewport: PHONE,
+    touch: true,
+    async run({ page, expect }) {
+      await open(page, "/")
+      const link = page.getByRole("link", { name: /^See all / })
+      await link.scrollIntoViewIfNeeded()
+      const reach = await link.evaluate((el) => {
+        const r = el.getBoundingClientRect()
+        const x = r.left + 4
+        const mid = r.top + r.height / 2
+        return [mid - 19, mid + 19].every((y) => document.elementFromPoint(x, y)?.closest("a") === el)
+      })
+      expect(reach, "a tap 19px above and below its middle still reaches it")
+      const bar = page.locator('[data-slot="phone-top-bar"]')
+      const [top, glyph, count] = await Promise.all([bar.boundingBox(), bar.locator('[data-slot="notification-trigger"] [data-slot="icon"]').boundingBox(), bar.locator('[data-slot="notification-count"]').boundingBox()])
+      expect(Math.abs(count.x + count.width / 2 - (glyph.x + glyph.width)) <= 4 && Math.abs(count.y + count.height / 2 - glyph.y) <= 4, "the count is on the bell's corner")
+      expect.atLeast(Math.round(count.y - top.y), 8, "and clear of the top of the bar")
+    },
+  },
+  {
+    name: "On a touch tablet a tap anywhere in a job's name cell or a sort head reaches its control",
+    viewport: TABLET,
+    touch: true,
+    async run({ page, expect }) {
+      await open(page, "/jobs")
+      for (const [control, slot] of [[page.getByRole("link", { name: "J-1042" }), "data-table-open"], [page.getByRole("button", { name: /^Customer/ }), "data-table-sort"]]) {
+        const r = await control.evaluate((el, slot) => {
+          const cell = el.closest("td, th").getBoundingClientRect()
+          const x = el.getBoundingClientRect().left + 2
+          return { cell: Math.round(cell.height), own: Math.round(el.getBoundingClientRect().height), hits: [cell.top + 1, cell.bottom - 2].map((y) => document.elementFromPoint(x, y)?.closest(`[data-slot="${slot}"]`) === el) }
+        }, slot)
+        expect.atLeast(r.cell, 40, `${slot}'s cell`)
+        expect(r.hits.every(Boolean), `a tap at the top and the foot of the ${r.own}px ${slot}'s cell reaches it`)
+      }
+    },
+  },
+  {
+    name: "The rail names its lockup once, and the avatar's initials hold 4.5:1 in both themes",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      for (const route of ["/", "/?theme=dark"]) {
+        await open(page, route)
+        const rail = page.getByRole("navigation", { name: "Main" })
+        const lockup = rail.locator('[data-slot="product-lockup"]')
+        const name = await lockup.getAttribute("aria-label")
+        expect(!/^(.+) \1$/i.test(name ?? ""), `the lockup's link is named "${name}", the same name twice`)
+        const avatar = rail.locator('[data-slot="sidebar-account"] [data-slot="avatar-fallback"]')
+        const [ink, ground] = await avatar.evaluate((el) => [getComputedStyle(el.querySelector("[data-initials]"), "::before").color, getComputedStyle(el).backgroundColor])
+        expect.atLeast(Math.round(contrast(ink, ground) * 100) / 100, 4.5, `${route}: the initials on their tint`)
+      }
+    },
+  },
 ]
 
 let browser
@@ -407,7 +667,7 @@ try {
 const passed = []
 const failed = []
 for (const check of checks) {
-  const context = await browser.newContext({ viewport: check.viewport })
+  const context = await browser.newContext({ viewport: check.viewport, hasTouch: Boolean(check.touch) })
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(e.message))

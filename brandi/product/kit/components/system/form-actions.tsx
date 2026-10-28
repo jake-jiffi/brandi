@@ -2,16 +2,26 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+import { Badge } from "./badge"
+
 export interface FormActionsProps extends React.HTMLAttributes<HTMLDivElement> {
   /** `end` by default; `start` for narrow forms. */
   align?: "end" | "start"
   /** A destructive action, a `danger` Button, kept apart from the others. */
   destructive?: React.ReactNode
+  /**
+   * The section has changes nobody has saved: an "Unsaved changes" warning shows beside the actions and is said
+   * once, politely. Make Save `primary` while it is set and `secondary` at rest, so a page with several sections
+   * shows one primary, on the section that changed.
+   */
+  changed?: boolean
+  /** The warning's words. */
+  changedLabel?: string
 }
 
 /** The row that ends a form: Cancel, then the one primary, above a hairline. */
 export const FormActions = React.forwardRef<HTMLDivElement, FormActionsProps>(function FormActions(
-  { align = "end", destructive, className, children, ...rest },
+  { align = "end", destructive, changed = false, changedLabel = "Unsaved changes", className, children, ...rest },
   ref
 ) {
   const end = align !== "start"
@@ -32,6 +42,15 @@ export const FormActions = React.forwardRef<HTMLDivElement, FormActionsProps>(fu
       {...rest}
     >
       {end ? apart : null}
+      {/* Here from the start and empty at rest (out of sight, so it takes no room in the row), so the warning is
+          read when a change makes it appear. */}
+      <span role="status" data-slot="form-actions-status" className={changed ? "inline-flex" : "sr-only"}>
+        {changed ? (
+          <Badge tone="warning" icon>
+            {changedLabel}
+          </Badge>
+        ) : null}
+      </span>
       {children}
       {end ? null : apart}
     </div>

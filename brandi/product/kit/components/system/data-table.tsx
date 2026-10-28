@@ -80,9 +80,10 @@ export interface DataTableColumn {
   /**
    * Where the column goes when the table becomes a list under 640px: the meta line (the default), the
    * meta line with its name in front ("labelled": Net $73,368.09, so two figures can share the line),
-   * the badge line, or nowhere.
+   * the badge line, the row's end as its one primary action ("action": a column whose cell is a Button,
+   * shown beside the row's menu instead of disappearing into it), or nowhere.
    */
-  phone?: "meta" | "labelled" | "badge" | "hidden"
+  phone?: "meta" | "labelled" | "badge" | "action" | "hidden"
   /** A delta's number style (percent by default, points for a rate), or a progress figure's. */
   format?: NumberStyle
   /** A delta's better direction. */
@@ -149,7 +150,7 @@ export interface DataTableProps extends Omit<React.HTMLAttributes<HTMLDivElement
   density?: "comfortable" | "compact"
   /** The rows scroll under a head that sticks. px, or any CSS length. */
   maxHeight?: number | string
-  /** Under the rows, on the subtle surface: put Pagination here. */
+  /** Under the rows, on the subtle surface: put Pagination here. Under the empty state it stays mounted, out of sight, so keep controls that must stay usable there out of it. */
   footer?: React.ReactNode
   /** A Toolbar above the table, told how many rows are selected. */
   toolbar?: DataTableToolbar
@@ -402,9 +403,16 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
     view === "empty" ? stateView(empty as React.ReactNode | DataTableStateText, { kind: "empty", headingLevel, fallback: `No ${lowerFirst(caption)} yet.` }) : null
   const errorNode =
     view === "error" ? stateView(error as React.ReactNode | DataTableStateText, { kind: "error", headingLevel, onRetry, fallback: "These rows could not load." }) : null
+  // Under the empty state the footer steps out of sight, because the state already says nothing matches, but
+  // stays mounted: a live count in it then says so, and speaks again when the rows come back.
+  const footed = Boolean(footer) && view !== "empty"
 
   // -- Cells --
-  const openClass = "rounded-xs text-left type-label text-text-strong underline-offset-4 hover:underline"
+  // On touch the row's link and each sort button take their whole cell as the tap area (48 or 40px of row, 40px of
+  // head), through an ::after stretched over the cell, with no change to how they look. The naming cell is made the
+  // positioned box for it; the head's cells already are, because they stick.
+  const stretch = "pointer-coarse:after:absolute pointer-coarse:after:inset-0"
+  const openClass = cn("rounded-xs text-left type-label text-text-strong underline-offset-4 hover:underline", stretch)
   const opener = (row: DataTableRow, content: React.ReactNode) => {
     const href = rowHref?.(row)
     if (href) {
@@ -540,6 +548,8 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
   const phone = {
     meta: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && ["meta", "labelled"].includes(c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta"))),
     badge: cols.filter((c) => c.key !== nameKey && typeOf(c) !== "actions" && (c.phone ?? (typeOf(c) === "badge" ? "badge" : "meta")) === "badge"),
+    // One primary action per row, drawn as its cell draws it, at the row's end before the menu.
+    primary: cols.find((c) => c.key !== nameKey && typeOf(c) !== "actions" && c.phone === "action"),
     actions: cols.find((c) => typeOf(c) === "actions" && c.phone !== "hidden"),
   }
 
@@ -579,7 +589,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
         tabIndex: scrollable ? 0 : undefined,
         "data-scrolls": scrollable ? (scrolls.x ? "x" : "y") : undefined,
         // The head is 40px: scrolling to a focused row leaves it clear of the head, so sticking never hides focus.
-        className: cn("overflow-auto scroll-pt-10 focus-visible:outline-offset-[-2px]", box && "rounded-t-[calc(var(--radius-md)-1px)]", box && !footer && "rounded-b-[calc(var(--radius-md)-1px)]"),
+        className: cn("overflow-auto scroll-pt-10 focus-visible:outline-offset-[-2px]", box && "rounded-t-[calc(var(--radius-md)-1px)]", box && !footed && "rounded-b-[calc(var(--radius-md)-1px)]"),
         style: maxHeight !== undefined ? { maxHeight: length(maxHeight) } : undefined,
       } as React.HTMLAttributes<HTMLDivElement>}
     >
@@ -629,6 +639,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
                     className={cn(
                       // Top-aligned, so a head whose icon leads still sits on the same line as the plain heads.
                       "-mx-1 inline-flex items-center gap-1 rounded-xs px-1 align-top uppercase hover:text-text-strong focus-visible:outline-offset-0",
+                      stretch,
                       end && "flex-row-reverse"
                     )}
                   >
@@ -706,6 +717,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
                           className={cn(
                             edge,
                             end && "text-right",
+                            openable && col.key === nameKey && "pointer-coarse:relative",
                             (col.wrap || col.maxWidth !== undefined) && "whitespace-normal",
                             col.wrap && col.maxWidth === undefined && "min-w-48",
                             // The actions column sticks to the right edge while a wide table scrolls, on the row's own wash.
@@ -747,7 +759,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
         // The rows' washes round to the box's corners where they meet them, so nothing needs clipping.
         className={cn(
           box && !selectable && "[&>li:first-child]:rounded-t-[calc(var(--radius-md)-1px)]",
-          box && !footer && "[&>li:last-child]:rounded-b-[calc(var(--radius-md)-1px)]"
+          box && !footed && "[&>li:last-child]:rounded-b-[calc(var(--radius-md)-1px)]"
         )}
       >
         {view === "rows"
@@ -759,6 +771,8 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
                 })
                 .filter(Boolean)
               const badges = phone.badge.map((col) => badgeOf(row[col.key])).filter((b): b is ListRowBadge => b !== null)
+              const primary = phone.primary ? cellContent(phone.primary, row, name) : null
+              const menu = phone.actions ? <Menu label={`More actions for ${name}`} items={menuFor(phone.actions, row)} align="end" /> : null
               return (
                 <ListRow
                   key={key}
@@ -767,7 +781,14 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
                   meta={words.length ? words.join(" · ") : undefined}
                   badges={badges.length ? badges : undefined}
                   leading={selectable ? rowBox(key, name) : undefined}
-                  action={phone.actions ? <Menu label={`More actions for ${name}`} items={menuFor(phone.actions, row)} align="end" /> : undefined}
+                  action={
+                    primary && menu ? (
+                      <span data-slot="data-table-phone-actions" className="flex items-center gap-2">
+                        {primary}
+                        {menu}
+                      </span>
+                    ) : (primary ?? menu ?? undefined)
+                  }
                   href={rowHref?.(row)}
                   onClick={!rowHref && onRowClick ? () => onRowClick(row) : undefined}
                   className={chosen.includes(key) ? "bg-selected hover:bg-selected-strong" : undefined}
@@ -810,7 +831,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
         {footer ? (
           <div
             data-slot="data-table-footer"
-            className={cn("border-t border-line bg-surface-subtle py-2.5", nested ? "px-6" : "px-4", box && "rounded-b-[calc(var(--radius-md)-1px)]")}
+            className={footed ? cn("border-t border-line bg-surface-subtle py-2.5", nested ? "px-6" : "px-4", box && "rounded-b-[calc(var(--radius-md)-1px)]") : "sr-only"}
           >
             {footer}
           </div>

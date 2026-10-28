@@ -55,7 +55,7 @@ $A tokens                       # DTCG json, css, tailwind, typescript
 $A sheets                       # write the specification artboards
 $A validate --dir brand/canvas  # check artboards before publishing
 $A canvas --dir brand/canvas --title "Acme brand" --out acme-brand.html
-$A book --pdf                   # the brand book: a 16:9 deck (add --print for the A4 book)
+$A book --pdf                   # the brand book: a 16:9 deck (add --print for the A4 book, --publish for a page)
 $A guardian                     # the companion enforcement skill
 $A check <paths>                # hold real work against the brand
 $A complete <phase>             # mark a phase done and advance
@@ -434,6 +434,11 @@ $A tokens && $A book --pdf && $A guardian
 The book is a landscape deck, one idea per page, that shows the logo, draws the rules, prints the
 illustration library, and ends on the brand in use: every application artboard and every mockup.
 `$A book --print --pdf` writes the A4 print book as well.
+
+The deck also goes out as a page, so people can read it from a link. With the person's yes,
+`$A book --publish` writes it under `brand/.publish/` with its images moved out beside it (an
+artifact page takes 16MB, and a book with real logos and photographs inlines more) and prints the
+`Artifact` call that sends them. Publish the page, never the PDF: the PDF is for print and email.
 
 Before `$A book`, `$A validate` must not report `no-real-world-proof` or `illustration-not-recorded`.
 Those two are what a person remembers a brand book by. Then open the PDF and look at the

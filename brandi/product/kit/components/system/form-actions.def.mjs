@@ -13,18 +13,25 @@ export default {
   props: [
     { name: "align", type: '"end" | "start"', default: '"end"', doc: "Right-aligned by default; start for narrow forms." },
     { name: "destructive", type: "ReactNode", doc: "A destructive action, a danger Button, kept apart at the other end of the row." },
+    { name: "changed", type: "boolean", default: "false", doc: "The section has changes nobody has saved: an Unsaved changes warning shows beside the actions, said once. Save is primary while it is set, secondary at rest." },
+    { name: "changedLabel", type: "string", default: '"Unsaved changes"', doc: "The warning's words." },
     { name: "children", type: "ReactNode", doc: "Cancel, then the one primary." },
   ],
   notes: {
-    Behaviour: ["The tab order follows the screen: the destructive action first when it sits on the left."],
+    Behaviour: [
+      "The tab order follows the screen: the destructive action first when it sits on the left.",
+      "With changed, an Unsaved changes warning badge shows beside the actions, in a polite status that is there from the start, so it is said once when the first change makes it appear.",
+    ],
     Layout: ["Buttons wrap rather than overflow a narrow form, and the destructive action keeps its end."],
     Rules: [
       "Cancel immediately left of the one primary, right-aligned above a hairline.",
       "A destructive action sits apart, on the left, as a danger button.",
       'The primary names the result ("Save billing"), never "Submit".',
+      "Save stays quiet until the section has changes: secondary at rest, the one primary once changed, with the warning beside it. A page of sections then never shows two live primaries, and says which section is unsaved.",
     ],
+    Review: ["A settings page showed two primary Saves, both live with nothing changed (a pilot's round 1)."],
   },
-  frame: { width: 960, height: 420 },
+  frame: { width: 960, height: 560 },
   logic: `els: (() => {
   for (const key of Object.keys(window)) {
     try {
@@ -48,6 +55,14 @@ export default {
       markup: `<x-import component-from-global-scope="NS.FormActions" destructive="{{els.remove}}">${button("Cancel")}${button("Save client", "primary")}</x-import>`,
     },
     {
+      id: "changed",
+      title: "At rest, and with unsaved changes",
+      layout: "block",
+      markup: `<div class="flex flex-col gap-6"><div data-section="rest"><x-import component-from-global-scope="NS.FormActions">${button("Cancel")}${button("Save approvals")}</x-import></div>
+<div data-section="changed"><x-import component-from-global-scope="NS.FormActions" changed="{{yes}}">${button("Cancel")}${button("Save pay calendar", "primary")}</x-import></div></div>`,
+      vals: { yes: true },
+    },
+    {
       id: "start",
       title: "Start, for a narrow form",
       layout: "block",
@@ -65,6 +80,23 @@ export default {
         expect(Math.abs(save.x + save.width - (row.x + row.width)) < 1, "the primary at the right edge")
         expect(cancel.x + cancel.width < save.x, "Cancel before the primary")
         expect.atLeast(Math.round(save.x - (cancel.x + cancel.width)), 8, "space between the two")
+      },
+    },
+    {
+      name: "At rest nothing is said and Save is quiet; with changes a polite warning shows beside the one primary",
+      example: "changed",
+      async run({ scope, expect }) {
+        const rest = scope.locator('[data-section="rest"] [data-slot="form-actions-status"]')
+        expect.equal(await rest.getAttribute("role"), "status", "the status is there at rest, ready to speak")
+        expect.equal((await rest.textContent()).trim(), "", "and says nothing")
+        expect.equal(await scope.locator('[data-section="rest"]').getByRole("button", { name: "Save approvals" }).getAttribute("data-variant"), "secondary", "Save is quiet at rest")
+        const changed = scope.locator('[data-section="changed"] [data-slot="form-actions-status"]')
+        expect.equal((await changed.textContent()).trim(), "Unsaved changes", "the warning, in words")
+        expect.equal(await changed.locator('[data-slot="badge"]').getAttribute("data-tone"), "warning", "a warning badge")
+        const badge = await changed.boundingBox()
+        const cancel = await scope.locator('[data-section="changed"]').getByRole("button", { name: "Cancel" }).boundingBox()
+        expect(badge.x + badge.width <= cancel.x, "the warning sits before Cancel, beside the actions")
+        expect.equal(await scope.getByRole("button", { name: "Save pay calendar" }).getAttribute("data-variant"), "default", "Save is the one primary once changed")
       },
     },
     {

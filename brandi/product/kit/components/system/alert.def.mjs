@@ -45,8 +45,8 @@ export default {
         ["neutral", "Info", "Facts with no status: read only, a tip, offline"],
         ["info", "Info", "Something to know before acting"],
         ["success", "CircleCheck", "A finished change worth keeping on screen"],
-        ["warning", "TriangleAlert", "Heads up: due soon, stale, near a limit"],
-        ["danger", "CircleAlert", "Something is wrong: a source down, a failed sync"],
+        ["warning", "TriangleAlert", "Heads up: due soon, stale, near a limit, a source that is down while its last good data still shows"],
+        ["danger", "CircleAlert", "Something failed: a section that could not load, a save or a sync that did not go through"],
         ["ai", "Sparkles", "What the assistant made or suggested"],
       ],
     },
@@ -66,7 +66,7 @@ export default {
       "Six tones, each on its own tint and edge. With or without a title, actions and dismiss.",
     ],
     Copy: [
-      'State, then consequence, then the fix: "[Source] is not responding. Invoices below are from [9:42 am]." with Try again.',
+      'State, then consequence, then the fix: "[Source] is not responding. Invoices below are from 9:42 am." with Try again.',
       "Name the system that failed and what still works. Never a vague apology in place of the cause, and never blame the person.",
     ],
     Rules: [
@@ -92,7 +92,7 @@ export default {
 <x-import component-from-global-scope="NS.Alert" tone="info" title="Pay runs lock at [5 pm] on Thursdays">Changes made after that go into next week's run.</x-import>
 <x-import component-from-global-scope="NS.Alert" tone="success" title="[Accounting system] connected">Invoices sync every [15] minutes. The last sync was at [9:40 am].</x-import>
 <x-import component-from-global-scope="NS.Alert" tone="warning" title="Your [accounting system] connection expires in [3] days" actions="{{reconnect}}">After that, invoices stop syncing.</x-import>
-<x-import component-from-global-scope="NS.Alert" tone="danger" title="[Source] is not responding" actions="{{retry}}">Invoices below are from [9:42 am].</x-import>
+<x-import component-from-global-scope="NS.Alert" tone="danger" title="Overdue invoices could not load" actions="{{retry}}">[Accounting system] did not answer. Everything else on this page is up to date.</x-import>
 <x-import component-from-global-scope="NS.Alert" tone="ai" title="The assistant drafted [3] replies">Read them before they go. Nothing is sent until you press Send.</x-import>`,
       vals: { reconnect: [{ label: "Reconnect", icon: "RefreshCw" }], retry: [{ label: "Try again", icon: "RotateCcw" }] },
     },
@@ -101,9 +101,9 @@ export default {
       title: "Actions under the text below 640px, beside it from 640px",
       layout: "stack",
       markup: `<div style="width: 360px; max-width: 100%;">
-<x-import component-from-global-scope="NS.Alert" tone="danger" title="[Source] is not responding" actions="{{retryBoth}}">Invoices below are from [9:42 am].</x-import>
+<x-import component-from-global-scope="NS.Alert" tone="warning" title="[Source] is not responding" actions="{{retryBoth}}">Invoices below are from 9:42 am.</x-import>
 </div>
-<x-import component-from-global-scope="NS.Alert" tone="danger" title="[Source] is not responding" actions="{{retryBoth}}">Invoices below are from [9:42 am].</x-import>`,
+<x-import component-from-global-scope="NS.Alert" tone="warning" title="[Source] is not responding" actions="{{retryBoth}}">Invoices below are from 9:42 am.</x-import>`,
       vals: { retryBoth: [{ label: "Try again", icon: "RotateCcw" }, { label: "View status", variant: "ghost" }] },
     },
     {

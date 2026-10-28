@@ -12,7 +12,7 @@ reviewers are briefed, and what goes in the record.
 | Detector | No findings at 1440, 820 and 390 wide, in light and dark: every component preview, every starter route and state, every canvas board |
 | Craft (Impeccable critique) | 34/40 or better on Nielsen's ten heuristics, none under 3, no P0, P1 or P2 open |
 | Rules (ui-ux-pro-max) | No Critical, High or Medium open |
-| Accessibility | axe clean; every scripted behaviour check passing |
+| Accessibility | axe clean, every image loaded; nothing scrolls sideways at 320px wide on a fluid board or route; every scripted behaviour check passing |
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree (`09-operate.md`) |
 | Record | Every tool's version pinned and written down |
@@ -46,7 +46,10 @@ more, and do not lower the bar to finish.
    and 390, light and dark, axe on every one of those renders, and every scripted check. Fix what
    they find before the reviewers start. A board can show a page frame more than once (a shell at
    four widths, a flow of screens), so there axe skips the three rules about one page's landmarks.
-   The routes run every rule, and the round record names what was skipped.
+   The routes run every rule, and the round record names what was skipped. Every fluid board and
+   route is also opened at 320px wide (WCAG 1.4.10: 1280 at 400% zoom, and a small phone) and fails
+   when the page scrolls sideways; no detector or axe there, just the overflow, with what sticks out
+   named in the record.
 2. **Reviewers in parallel, each in its own context and its own folder.** Each reads its own skill's
    instructions and references first, then judges against the system's docs and the bar.
 3. **Evidence only.** A finding is backed by a screenshot, the DOM, a computed style or a keyboard
@@ -101,6 +104,10 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
   text gets its own check, in both themes.
 - **Dark mode under the detector.** The detector cannot set a theme. Build a temporary dark variant,
   run the detector, then restore light, or set the theme attribute on each page before it is scanned.
+- **An image that did not load.** axe passes it (`alt=""` is fine, a 0px picture draws nothing to
+  judge) and so does the detector. A character pose given as a path from the page root broke on
+  every board that way. `axe-pages.mjs` reports every image that does not load and decode as
+  `image-not-loaded`.
 - **State bleeding between checks.** A test page left with a modal open breaks every check after it.
   Run each stateful check on a fresh page.
 - **Copies that drift.** When the bundle CSS lives in three places (source, the system, the canvas),

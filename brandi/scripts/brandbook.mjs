@@ -18,6 +18,8 @@
  * one is worse than no brand book at all.
  */
 
+import { createHash } from 'node:crypto';
+
 import { resolveToken } from './system.mjs';
 import { displayFallback } from './type.mjs';
 import { contrastRatio, apcaContrast, bestTextOn, simulateCvd } from './color.mjs';
@@ -946,5 +948,37 @@ export function pdfChromeArgs({ htmlUrl, pdfPath }) {
   ];
 }
 
-export default { renderBrandBook, pdfChromeArgs };
+const IMAGE_EXT = { png: 'png', jpeg: 'jpg', gif: 'gif', webp: 'webp', avif: 'avif', 'svg+xml': 'svg' };
+
+/**
+ * The book with every inlined image moved out into a file beside it, for publishing as a page.
+ *
+ * The book inlines its logos and photographs so the HTML and the PDF stand alone. A real
+ * client's deck came to 20MB that way, and an artifact page takes 16MB. Each image becomes
+ * `<prefix><hash>.<ext>`, named by its content, so an image the book shows twice is one file.
+ */
+export function splitInlineImages(html, { prefix = 'book-assets/' } = {}) {
+  const files = new Map();
+  const out = html.replace(/data:image\/(png|jpeg|gif|webp|avif|svg\+xml);base64,([A-Za-z0-9+/=]+)/g, (match, type, b64) => {
+    const bytes = Buffer.from(b64, 'base64');
+    const name = `${prefix}${createHash('sha256').update(bytes).digest('hex').slice(0, 16)}.${IMAGE_EXT[type]}`;
+    files.set(name, bytes);
+    return name;
+  });
+  return { html: out, files: [...files].map(([name, bytes]) => ({ name, bytes })) };
+}
+
+/**
+ * The book as the inside of a page. An artifact page is wrapped in its own doctype, head and body, with the
+ * charset and viewport set, so the book's wrapper tags and those two metas come off; everything else, the
+ * title, the font links and the styles included, stays in order.
+ */
+export function asPageFragment(html) {
+  return html
+    .replace(/^\s*<!doctype html>\s*/i, '')
+    .replace(/<\/?(?:html|head|body)\b[^>]*>\s*/gi, '')
+    .replace(/<meta\s+(?:charset=[^>]*|name="viewport"[^>]*)>\s*/gi, '');
+}
+
+export default { renderBrandBook, pdfChromeArgs, splitInlineImages, asPageFragment };
 

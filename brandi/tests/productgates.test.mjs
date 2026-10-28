@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { judgeRound, roundMarkdown, findDetector, collectPages, runDetector, BAR, WIDTHS } from '../scripts/productgates.mjs';
+import { judgeRound, roundMarkdown, findDetector, collectPages, runDetector, reflowPages, BAR, WIDTHS, REFLOW_WIDTH } from '../scripts/productgates.mjs';
 
 const clean = () => ({
   round: 3,
@@ -44,6 +44,8 @@ describe('a round held against the bar', () => {
       [(g) => { g.versions.detector = null; }, 'Record'],
       [(g) => { g.drift.differences.push({ area: 'prop', where: 'Main.dc.html', found: 'Acme.Button tone=', expected: 'the definition has no tone' }); }, 'Drift'],
       [(g) => { delete g.drift; }, 'Drift'],
+      [(g) => { g.reflow = { width: 320, pages: 4, overflow: [{ page: 'WebHome1440', kind: 'board', scrollWidth: 347, clientWidth: 320 }], errors: [] }; }, 'Accessibility'],
+      [(g) => { g.reflow = { width: 320, pages: 0, overflow: [], errors: [{ page: 'runner', error: 'no tool' }] }; }, 'Accessibility'],
     ];
     for (const [mutate, gate] of cases) {
       const g = clean();
@@ -135,6 +137,50 @@ describe('the pages a round scans', () => {
     const poster = pages.filter((p) => p.label === 'Poster1440');
     assert.deepEqual(poster.map((p) => p.width), [1440], 'the fixed board at its own width only');
     assert.match(await readFile(new URL(poster[0].url), 'utf8'), /body > x-dc \{ width: 1440px/);
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('reflow at 320px', () => {
+  test('each fluid board and each route is measured once at 320, in light; a fixed board is not', () => {
+    const pages = [
+      ...WIDTHS.flatMap((width) => ['light', 'dark'].map((theme) => ({ kind: 'board', label: 'Home1440', url: 'file:///home.html', width, theme, fluid: true }))),
+      { kind: 'board', label: 'Poster1440', url: 'file:///poster.html', width: 1440, theme: 'light', fluid: false },
+      { kind: 'component', label: 'Button', url: 'file:///button.html', width: 960, theme: 'light' },
+      ...WIDTHS.map((width) => ({ kind: 'route', label: 'Jobs', url: 'http://localhost:3000/jobs', width, theme: 'light' })),
+    ];
+    const picked = reflowPages(pages);
+    assert.equal(REFLOW_WIDTH, 320);
+    assert.deepEqual(picked.map((p) => `${p.kind} ${p.label} ${p.width}`), ['board Home1440 320', 'route Jobs 320']);
+  });
+
+  test('a page that scrolls sideways at 320 fails the round, and the record names it and what sticks out', () => {
+    const g = clean();
+    g.reflow = { width: 320, pages: 3, overflow: [{ page: 'WebHome1440', kind: 'board', scrollWidth: 347, clientWidth: 320, worst: { what: 'button.menu', right: 347 } }], errors: [] };
+    const judged = judgeRound(g, { critique: critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3]), rules: rules([]) });
+    const verdict = judged.verdicts.find((v) => v.gate === 'Accessibility');
+    assert.equal(verdict.pass, false);
+    assert.match(verdict.detail, /at 320px 1 of 3 pages scroll sideways/);
+    const md = roundMarkdown(g, judged);
+    assert.match(md, /## Reflow at 320px/);
+    assert.match(md, /WebHome1440: 347px wide in a 320px window, furthest out button\.menu at 347px/);
+    const passing = clean();
+    passing.reflow = { width: 320, pages: 3, overflow: [], errors: [] };
+    assert.equal(judgeRound(passing, { critique: critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3]), rules: rules([]) }).verdicts.find((v) => v.gate === 'Accessibility').pass, true, 'nothing overflowing passes');
+  });
+
+  test('a fluid board carries its fluid mark, so reflow can find it', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-reflow-'));
+    await mkdir(path.join(dir, 'canvas'), { recursive: true });
+    const board = (name) => `<!doctype html><html><head><meta charset="utf-8"><script src="./support.js"></script></head><body><x-dc><p>${name}</p></x-dc></body></html>`;
+    await writeFile(path.join(dir, 'canvas', 'Home1440.dc.html'), board('Home'));
+    await writeFile(path.join(dir, 'canvas', 'Poster1440.dc.html'), board('Poster'));
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify({ artboards: [
+      { file: 'Home1440.dc.html', frame: [1440, 900], expand: 'fill' },
+      { file: 'Poster1440.dc.html', frame: [1440, 900] },
+    ] }));
+    const picked = reflowPages(await collectPages({ productDir: dir, outDir: path.join(dir, 'out') }));
+    assert.deepEqual(picked.map((p) => p.label), ['Home1440']);
     await rm(dir, { recursive: true, force: true });
   });
 });

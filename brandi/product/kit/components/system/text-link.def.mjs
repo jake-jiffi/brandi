@@ -21,6 +21,7 @@ export default {
     { name: "icon", type: "IconName", doc: "An icon before the text, such as ArrowLeft for a way back." },
     { name: "iconRight", type: "IconName", doc: "An icon after the text, such as ArrowRight, or ExternalLink for another site." },
     { name: "target", type: "string", doc: "_blank opens a new tab: screen readers hear that it does, and rel gets noopener." },
+    { name: "standalone", type: "boolean", default: "false", doc: "On its own, not in a sentence: a card's See all, Forgot your password?. Its tap area grows to 40px on touch, looking no different." },
   ],
   notes: {
     Behaviour: [
@@ -30,6 +31,7 @@ export default {
     ],
     Layout: [
       "It flows inside a sentence and wraps with it. Vertical padding gives every link a 24px target without moving the line it sits on.",
+      "A standalone link (a card's See all, Forgot your password?) is pressable like any control, so on touch its tap area is 40px, centred on it. In a sentence it stays 24px, so it never reaches over the lines beside it.",
     ],
     Rules: [
       "The text says where it goes and is unique on the page, never here or more.",
@@ -37,7 +39,10 @@ export default {
       "Underlined at rest, always: colour alone never marks a link.",
       "Its colour and underline are fixed. Neither a className nor a canvas board's base styles can turn it back into plain text.",
     ],
-    Review: ["Links in a sentence or a breadcrumb trail need a 24px target everywhere (section 2.5): it is measured inside a sentence, on a desktop and on touch."],
+    Review: [
+      "Links in a sentence or a breadcrumb trail need a 24px target everywhere (section 2.5): it is measured inside a sentence, on a desktop and on touch.",
+      "A standalone See all and Forgot your password? were 26 to 28px on touch (a pilot's round 1): standalone grows the tap area to 40px.",
+    ],
   },
   examples: [
     {
@@ -54,6 +59,13 @@ export default {
 <x-import component-from-global-scope="NS.TextLink" href="https://portal.example.com" icon-right="ExternalLink" target="_blank">Open [supplier portal]</x-import>`,
     },
     {
+      id: "standalone",
+      title: "On its own, under a card or a form",
+      layout: "block",
+      markup: `<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 16px;"><x-import component-from-global-scope="NS.TextLink" href="#all-jobs" standalone="{{yes}}">See all [12] jobs that need you</x-import><x-import component-from-global-scope="NS.TextLink" href="#reset" standalone="{{yes}}">Forgot your password?</x-import></div>`,
+      vals: { yes: true },
+    },
+    {
       id: "wrapping",
       title: "A long link wraps with its sentence",
       layout: "block",
@@ -61,7 +73,7 @@ export default {
       markup: `<p style="margin: 0;">Payments from <x-import component-from-global-scope="NS.TextLink" href="#overdue">[Northern Rivers Veterinary Partners] overdue invoices</x-import> are listed first.</p>`,
     },
   ],
-  frame: { width: 960, height: 400 },
+  frame: { width: 960, height: 480 },
   checks: [
     {
       name: "A real link, named by its text, that Enter follows",
@@ -79,7 +91,7 @@ export default {
       name: "Every link has a 24px target, in a sentence too",
       async run({ page, expect }) {
         const links = await page.locator('[data-slot="text-link"]').all()
-        expect.equal(links.length, 5, "five links on the board")
+        expect.equal(links.length, 7, "seven links on the board")
         for (const link of links) {
           const rects = await link.evaluate((el) => [...el.getClientRects()].map((r) => r.height))
           for (const h of rects) expect.atLeast(Math.round(h), 24, "link target height")
@@ -93,6 +105,26 @@ export default {
         for (const link of await page.locator('[data-slot="text-link"]').all()) {
           for (const h of await link.evaluate((el) => [...el.getClientRects()].map((r) => r.height))) expect.atLeast(Math.round(h), 24, "touch target height")
         }
+      },
+    },
+    {
+      name: "On touch a standalone link takes a 40px tap, looking no different; a link in a sentence keeps its 24px",
+      touch: true,
+      async run({ page, expect }) {
+        const reach = (link) =>
+          link.evaluate((el) => {
+            const r = el.getBoundingClientRect()
+            const x = r.left + 4
+            const mid = r.top + r.height / 2
+            return { own: r.height, top: document.elementFromPoint(x, mid - 19)?.closest('[data-slot="text-link"]') === el, foot: document.elementFromPoint(x, mid + 19)?.closest('[data-slot="text-link"]') === el }
+          })
+        for (const link of await page.locator('[data-example="standalone"] [data-slot="text-link"]').all()) {
+          const r = await reach(link)
+          expect(r.own < 40, `the link itself stays ${Math.round(r.own)}px tall`)
+          expect(r.top && r.foot, `a tap 19px above and below the middle of "${(await link.textContent()).trim()}" reaches it`)
+        }
+        const inline = await page.locator('[data-example="sentence"] [data-slot="text-link"]').evaluate((el) => getComputedStyle(el, "::after").position)
+        expect(inline !== "absolute", "a link in a sentence grows no tap area over the lines beside it")
       },
     },
     {

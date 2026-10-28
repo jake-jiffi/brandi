@@ -44,11 +44,19 @@ export function PageSkeleton() {
   )
 }
 
+// A retry that fails again draws this page afresh, and the button that was pressed goes with the page it was on.
+// So the press is noted here, outside the page, and the page that comes back says so. A minute is long enough for
+// any retry to answer, and short enough that a later, separate failure on the same address starts plainly.
+let retried: { path: string; at: number } | null = null
+
 /**
  * The page failed. One heading, Try again, a way home, and a reference for support in a disclosure. Never a
- * cause or a promise nobody can know.
+ * cause or a promise nobody can know. When Try again fails too, focus goes to the heading, never the page body,
+ * and one polite line says it was tried, so a retry that failed never sounds like one that did nothing.
  */
 export function PageError({ error, retry }: { error: unknown; retry: () => void }) {
+  const root = React.useRef<HTMLDivElement | null>(null)
+  const [again, setAgain] = React.useState("")
   // A server error carries a digest that support can find in the logs; an error in the browser has none.
   const digest = typeof error === "object" && error !== null && "digest" in error ? String((error as { digest?: unknown }).digest ?? "") : ""
   // When it happened, read once, in the product's date and time styles. It shows only inside the closed
@@ -61,25 +69,41 @@ export function PageError({ error, retry }: { error: unknown; retry: () => void 
   React.useEffect(() => {
     // Where a product reports errors. The example logs them.
     console.error(error)
+    if (!retried || retried.path !== window.location.pathname || Date.now() - retried.at > 60000) return
+    retried = null
+    setAgain(`Still not loading. Tried again at ${formatTime(new Date())}.`)
+    const heading = root.current?.querySelector<HTMLElement>("h1")
+    if (heading) {
+      heading.tabIndex = -1
+      heading.focus()
+    }
   }, [error])
+  const tryAgain = () => {
+    retried = { path: window.location.pathname, at: Date.now() }
+    retry()
+  }
   const details = [
     { label: "Reference", value: digest, empty: "None: it happened in this browser" },
     { label: "When", value: at },
   ]
   return (
-    <div className="mx-auto flex w-full max-w-measure flex-col gap-4">
+    <div ref={root} className="mx-auto flex w-full max-w-measure flex-col gap-4">
       <EmptyState
         size="page"
         headingLevel={1}
         icon="CloudOff"
         title="This page did not load."
         actions={[
-          { label: "Try again", icon: "RotateCcw", variant: "primary", onClick: retry },
+          { label: "Try again", icon: "RotateCcw", variant: "primary", onClick: tryAgain },
           { label: "Go to Home", icon: "House", href: "/" },
         ]}
       >
         Try again, or go back to Home. If it keeps happening, send the details below to your support team.
       </EmptyState>
+      {/* Here from the start and empty (out of sight, so it takes no room), so the line is read when a retry fails and never on load. */}
+      <p role="status" data-slot="page-error-retry" className={again ? "text-center type-meta text-text-muted" : "sr-only"}>
+        {again}
+      </p>
       <Accordion items={[{ id: "support", title: "Details for support", content: <DescriptionList items={details} /> }]} headingLevel={2} />
     </div>
   )

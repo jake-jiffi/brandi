@@ -22,7 +22,9 @@ export function SourceDownBanner() {
   }
   return (
     <Banner
-      tone="danger"
+      // A source behind the page that is down is a warning, never danger: nothing the person did went wrong, and the
+      // rest of the page still works.
+      tone="warning"
       title={`${ACCOUNTING.name} is ${tries ? "still " : ""}not responding`}
       actions={
         <Button size="sm" icon="RotateCcw" loading={trying} onClick={retry}>

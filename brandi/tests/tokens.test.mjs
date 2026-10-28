@@ -184,6 +184,16 @@ describe('CSS output', () => {
   });
 });
 
+describe('font stacks', () => {
+  test('a font token carries a fallback stack, so code using it never lands on the browser serif', () => {
+    const condensed = buildSystem({ name: 'Stack', primary: '#1F6F4A', type: { display: 'League Gothic', body: 'Libre Franklin' } });
+    for (const css of [T.toCss(condensed), T.toTailwind(condensed)]) {
+      assert.match(css, /--font-display: 'League Gothic', Impact, Haettenschweiler, 'Arial Narrow Bold', 'Arial Narrow', sans-serif;/);
+      assert.match(css, /--font-body: 'Libre Franklin', system-ui, sans-serif;/);
+    }
+  });
+});
+
 describe('Tailwind output', () => {
   const tw = T.toTailwind(sys);
 

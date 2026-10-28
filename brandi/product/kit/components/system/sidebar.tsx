@@ -3,7 +3,6 @@
 import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
-import { BRAND } from "@/lib/brand"
 import { useLink } from "@/lib/link"
 import { PRODUCT } from "@/lib/product"
 import { useMergedRef } from "@/lib/refs"
@@ -16,7 +15,7 @@ import { Kbd } from "./kbd"
 import { Logo } from "./logo"
 import { NavGroup, type NavGroupProps } from "./nav-group"
 import { railContext, type NavItemProps } from "./nav-item"
-import { ProductLockup } from "./product-lockup"
+import { lockupLabel, ProductLockup } from "./product-lockup"
 import { Tooltip } from "./tooltip"
 import { accountButton as AccountButton, type AccountUser } from "./workspace-switcher"
 
@@ -153,12 +152,12 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
           <AccountButton user={user} detail={user.role} aria-label={`${person}, account menu`} onClick={onUser} />
         )
       ) : (
-        <div data-slot="sidebar-user" className="flex h-12 min-w-0 items-center gap-2.5 px-3 @max-[160px]/rail:size-10 @max-[160px]/rail:justify-center @max-[160px]/rail:p-0">
-          {/* The name beside it says who this is, so the avatar is not read as well. */}
+        <div data-slot="sidebar-user" className="flex min-h-12 min-w-0 items-center gap-2.5 px-3 py-1.5 @max-[160px]/rail:size-10 @max-[160px]/rail:min-h-0 @max-[160px]/rail:justify-center @max-[160px]/rail:p-0">
+          {/* The name beside it says who this is, so the avatar is not read as well. It wraps rather than cutting short. */}
           <Avatar name={user.name} src={user.src} size={32} aria-hidden="true" />
           <span className="flex min-w-0 flex-1 flex-col @max-[160px]/rail:sr-only">
-            <span className="truncate type-label text-rail-text-strong">{user.name}</span>
-            {user.role ? <span className="truncate type-meta text-rail-text">{user.role}</span> : null}
+            <span className="type-label wrap-break-word text-rail-text-strong">{user.name}</span>
+            {user.role ? <span className="type-meta wrap-break-word text-rail-text">{user.role}</span> : null}
           </span>
         </div>
       )
@@ -199,14 +198,14 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
           {home ? (
             <Link
               href={home}
-              aria-label={`${BRAND.name} ${name}`}
+              aria-label={lockupLabel(name)}
               className="hidden size-10 items-center justify-center rounded-control focus-visible:outline-rail-focus @max-[160px]/rail:flex"
             >
               <Logo mark="symbol" title="" />
             </Link>
           ) : (
             <span className="hidden @max-[160px]/rail:flex">
-              <Logo mark="symbol" title={`${BRAND.name} ${name}`} />
+              <Logo mark="symbol" title={lockupLabel(name)} />
             </span>
           )}
         </div>

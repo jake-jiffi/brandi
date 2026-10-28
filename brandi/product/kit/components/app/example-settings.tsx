@@ -43,20 +43,35 @@ const useInBrowser = () =>
     () => false
   )
 
-/** The only section with fields to type in, so the only one with a Save. */
+type ProfileErrors = { name?: string; email?: string }
+
+const PROFILE_RULES = {
+  name: (value: string) => (value.trim() ? undefined : "Enter your name, as your team knows you."),
+  email: (value: string) => (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? undefined : "Enter an email address, such as owner@example.com."),
+}
+
+/**
+ * The only section with fields to type in, so the only one with a Save. A field is checked when it is left and
+ * again on Save, never while it is typed in, and its error goes as soon as the value is right.
+ */
 export function ProfileSection() {
   const [name, setName] = React.useState(PERSON.name)
   const [email, setEmail] = React.useState(PERSON.email)
-  const [errors, setErrors] = React.useState<{ name?: string; email?: string }>({})
+  // What was last saved, so Save stays quiet until something differs from it.
+  const [saved, setSaved] = React.useState({ name: PERSON.name, email: PERSON.email })
+  const changed = name !== saved.name || email !== saved.email
+  const [errors, setErrors] = React.useState<ProfileErrors>({})
   const [saving, setSaving] = React.useState(false)
   const form = React.useRef<HTMLFormElement | null>(null)
 
+  const leave = (key: keyof ProfileErrors, value: string) => setErrors((was) => ({ ...was, [key]: PROFILE_RULES[key](value) }))
+  const settle = (key: keyof ProfileErrors, value: string) => {
+    if (errors[key] && !PROFILE_RULES[key](value)) setErrors((was) => ({ ...was, [key]: undefined }))
+  }
+
   const save = (event: React.FormEvent) => {
     event.preventDefault()
-    const found = {
-      name: name.trim() ? undefined : "Enter your name, as your team knows you.",
-      email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? undefined : "Enter an email address, such as owner@example.com.",
-    }
+    const found = { name: PROFILE_RULES.name(name), email: PROFILE_RULES.email(email) }
     setErrors(found)
     if (found.name || found.email) {
       requestAnimationFrame(() => form.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
@@ -65,6 +80,7 @@ export function ProfileSection() {
     setSaving(true)
     window.setTimeout(() => {
       setSaving(false)
+      setSaved({ name, email })
       ToastRegion.show("Profile saved.", { tone: "success" })
     }, 600)
   }
@@ -72,14 +88,31 @@ export function ProfileSection() {
   return (
     <FormSection id="profile" title="Profile" description="How you appear to your team, and where the product writes to you." className="scroll-mt-6">
       <form ref={form} noValidate onSubmit={save} className="flex flex-col gap-5">
-        <Field label="Name" error={errors.name}>
-          <TextInput value={name} autoComplete="name" onChange={(event) => setName(event.target.value)} />
+        <Field label="Name" error={errors.name} required>
+          <TextInput
+            value={name}
+            autoComplete="name"
+            onChange={(event) => {
+              setName(event.target.value)
+              settle("name", event.target.value)
+            }}
+            onBlur={(event) => leave("name", event.target.value)}
+          />
         </Field>
-        <Field label="Email" hint="Quotes, summaries and sign-in links go here." error={errors.email}>
-          <TextInput type="email" value={email} autoComplete="email" onChange={(event) => setEmail(event.target.value)} />
+        <Field label="Email" hint="Quotes, summaries and sign-in links go here." error={errors.email} required>
+          <TextInput
+            type="email"
+            value={email}
+            autoComplete="email"
+            onChange={(event) => {
+              setEmail(event.target.value)
+              settle("email", event.target.value)
+            }}
+            onBlur={(event) => leave("email", event.target.value)}
+          />
         </Field>
-        <FormActions>
-          <Button variant="primary" type="submit" loading={saving}>
+        <FormActions changed={changed}>
+          <Button variant={changed ? "primary" : "secondary"} type="submit" loading={saving}>
             Save profile
           </Button>
         </FormActions>

@@ -42,6 +42,7 @@ export default {
     ],
     Rules: [
       "The page brings the form, the button and any account links: these are only the fields.",
+      "Every field is required (required and aria-required). Give the form noValidate, so its own errors, not the browser's, say what is missing.",
       "Never block paste, never cap a password below 64 characters, and never ask for a password twice; the toggle lets people check it.",
     ],
     Accepted: [
@@ -86,6 +87,24 @@ ${card(fields('size="md" default-email="[name]@example.com" password-error="That
         expect.equal(await read(create.getByLabel("New password", { exact: true })), "password|new-password|-", "new-password")
         expect.equal(await create.getByLabel("New password", { exact: true }).getAttribute("minlength"), "12", "with its minimum length")
         expect.equal(await read(verify.getByRole("textbox", { name: "Verification code" })), "text|one-time-code|numeric", "one-time-code, with the number pad")
+      },
+    },
+    {
+      name: "Every field is required, and a screen reader hears it",
+      example: "modes",
+      async run({ scope, expect }) {
+        const [signIn, create, verify] = await scope.locator('[data-slot="sign-in-fields"]').all()
+        const fields = [
+          signIn.getByRole("textbox", { name: "Email" }),
+          signIn.getByLabel("Password", { exact: true }),
+          create.getByLabel("New password", { exact: true }),
+          verify.getByRole("textbox", { name: "Verification code" }),
+        ]
+        for (const field of fields) {
+          const [aria, native, label] = await field.evaluate((el) => [el.getAttribute("aria-required"), el.required, el.labels?.[0]?.textContent ?? el.name])
+          expect.equal(aria, "true", `${label} has aria-required`)
+          expect(native, `${label} is required for the browser too`)
+        }
       },
     },
     {

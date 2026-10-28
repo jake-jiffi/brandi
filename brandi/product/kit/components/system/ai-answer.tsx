@@ -228,7 +228,8 @@ export const AIAnswer = React.forwardRef<HTMLElement, AIAnswerProps>(function AI
         <div
           ref={body}
           data-slot="ai-answer-body"
-          className="flex min-w-0 flex-col gap-3 type-body text-pretty text-text wrap-break-word [&>ol]:max-w-measure [&>p]:max-w-measure [&>ul]:max-w-measure"
+          // Reading text, so body-lg at every width (the type scale's own usage), never the interface's body.
+          className="flex min-w-0 flex-col gap-3 type-body-lg text-pretty text-text wrap-break-word [&>ol]:max-w-measure [&>p]:max-w-measure [&>ul]:max-w-measure"
         >
           {typeof children === "string" || typeof children === "number" ? (
             <p className="max-w-measure">

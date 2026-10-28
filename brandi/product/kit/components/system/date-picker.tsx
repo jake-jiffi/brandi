@@ -318,10 +318,8 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
   ref
 ) {
   const [wrong, setWrong] = React.useState(false)
-  const control = useFieldControl({ id, invalid: invalid || wrong, required })
-  const field = control.field
+  const dayId = React.useId()
   const label = ariaLabelProp ?? ariaLabel
-  const what = field?.labelText ? lowerFirst(field.labelText) : label ? lowerFirst(label) : "a date"
   const min = fromIso(minProp)
   const max = fromIso(maxProp)
 
@@ -335,6 +333,14 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
   const date = fromIso(current)
   const [text, setText] = React.useState(() => (date ? numeric.format(date) : ""))
   const [shown, setShown] = React.useState(false)
+  // The day of the week shows beside a chosen date, and is read with it: 29/10/2026 alone leaves people counting.
+  const settled = date && text === numeric.format(date) ? date : undefined
+  const control = useFieldControl({ id, invalid: invalid || wrong, required, describedBy: settled ? dayId : undefined })
+  const field = control.field
+  // Named so it reads with any label, as it is written: "Open calendar, Starts", never "Choose starts".
+  const named = field?.labelText ?? label
+  const buttonName = named ? `Open calendar, ${named}` : "Open calendar"
+  const panelName = named ? `Calendar, ${named}` : "Calendar"
 
   // A value set from outside shows at once, unless the person is typing in the field.
   const shownValue = React.useRef(current)
@@ -419,11 +425,19 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
           }
         }}
       />
+      {settled ? (
+        <span aria-hidden="true" data-slot="date-picker-day" className="shrink-0 type-meta text-text-muted select-none">
+          {shortWeekday.format(settled)}
+        </span>
+      ) : null}
+      <span id={dayId} hidden>
+        {settled ? longWeekday.format(settled) : ""}
+      </span>
       {design ? (
-        <IconButton icon="Calendar" label={`Choose ${what}`} size="sm" className={iconSize} aria-expanded aria-haspopup="dialog" data-state="open" disabled={disabled} />
+        <IconButton icon="Calendar" label={buttonName} size="sm" className={iconSize} aria-expanded aria-haspopup="dialog" data-state="open" disabled={disabled} />
       ) : (
         <PopoverTrigger asChild>
-          <IconButton ref={button} icon="Calendar" label={`Choose ${what}`} size="sm" className={iconSize} disabled={disabled} />
+          <IconButton ref={button} icon="Calendar" label={buttonName} size="sm" className={iconSize} disabled={disabled} />
         </PopoverTrigger>
       )}
     </div>
@@ -451,7 +465,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
       {design ? (
         <>
           {fieldBox}
-          <div role="dialog" aria-label={`Choose ${what}`} data-slot="date-picker-panel" className={cn(popoverContentVariants({ look: "panel" }), panelLook, "absolute top-full right-0 mt-1.5")}>
+          <div role="dialog" aria-label={panelName} data-slot="date-picker-panel" className={cn(popoverContentVariants({ look: "panel" }), panelLook, "absolute top-full right-0 mt-1.5")}>
             {calendarFor(true)}
           </div>
         </>
@@ -467,7 +481,7 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
           <PopoverContent
             align="end"
             data-slot="date-picker-panel"
-            aria-label={`Choose ${what}`}
+            aria-label={panelName}
             className={panelLook}
             // The calendar puts focus on the chosen day, or today, itself.
             onOpenAutoFocus={(event) => event.preventDefault()}

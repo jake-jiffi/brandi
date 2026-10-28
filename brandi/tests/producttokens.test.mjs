@@ -70,6 +70,25 @@ describe('stateOf: hover and pressed never cost the label its contrast', () => {
   }
 });
 
+describe("stateOf: one fill's states all move the same way, each further than the last", () => {
+  // A dark navy-like fill, a mid fill, a cream and a near-white: a dark fill whose hover went darker while
+  // its press, needing more, flipped lighter read as two different buttons.
+  for (const [fill, label] of [['#101436', '#ffffff'], ['#1A1A2E', '#ffffff'], ['#2F4F8F', '#ffffff'], ['#E8E4D8', '#111111'], ['#F5F5F5', '#111111'], ['#FFD23F', '#111111']]) {
+    test(`${fill} with a ${label} label`, () => {
+      const hover = P.stateOf(fill, label, 0.05, P.STEP.hover);
+      const pressed = P.stateOf(fill, label, 0.09, P.STEP.pressed);
+      const selected = P.stateOf(fill, label, 0.1, P.STEP.selected);
+      const side = (hex) => Math.sign(toOklch(hex).L - toOklch(fill).L);
+      assert.equal(new Set([side(hover), side(pressed), side(selected)]).size, 1, `hover ${hover}, pressed ${pressed} and selected ${selected} sit on one side of ${fill}`);
+      assert.notEqual(side(hover), 0, 'and off the fill');
+      assert.ok(contrastRatio(pressed, fill) > contrastRatio(hover, fill), `pressed ${pressed} (${contrastRatio(pressed, fill).toFixed(2)}) goes further than hover ${hover} (${contrastRatio(hover, fill).toFixed(2)})`);
+      assert.ok(contrastRatio(selected, fill) >= contrastRatio(pressed, fill), 'and selected at least as far as pressed');
+      assert.ok(contrastRatio(selected, fill) >= P.STEP.selected, 'the deepest step is reached');
+      assert.equal(P.stateDirection(fill, label), side(hover), 'the direction is decided once for the fill');
+    });
+  }
+});
+
 describe('buildProductTokens on a real brand file', () => {
   const tokens = P.buildProductTokens(system, { name: 'Muddy Paws' });
   const audit = P.auditProductTokens(tokens);
@@ -179,6 +198,16 @@ describe('brand rules the tokens keep', () => {
     assert.ok(series(kept, 'light').some(near), 'light keeps it');
     assert.equal(new Set(series(kept, 'dark').map((h) => h.toUpperCase())).size, 6, 'six distinct series still');
     assert.equal(P.auditProductTokens(kept).fails.length, 0);
+  });
+
+  test("a tag on a barred hue is kept out of a name's hash in both themes, because a person cannot choose their name", () => {
+    const accented = buildSystem({ primary: '#1F6F4A', accents: ['#D63384'], type: { display: 'Bitter', body: 'Karla', mono: 'JetBrains Mono' } });
+    const gap = (a, b) => { const d = Math.abs(toOklch(a).h - toOklch(b).h); return Math.min(d, 360 - d); };
+    const kept = P.buildProductTokens(accented, { charts: { avoid: { dark: ['#D63384'] } } });
+    const lightNear = Array.from({ length: 6 }, (_, i) => i + 1).filter((n) => gap(P.resolveColour(kept, `series-${n}`, 'light'), '#D63384') < 25).map((n) => `tag-${n}`);
+    assert.ok(lightNear.length > 0, 'light keeps a series on the barred hue');
+    assert.deepEqual(kept.meta.avoidTags, lightNear, 'its tag is left out of the draw, though only dark bars the hue');
+    assert.deepEqual(P.buildProductTokens(accented, {}).meta.avoidTags, [], 'with nothing barred, every tag is in the draw');
   });
 
   test('a display face set only in capitals takes them in the title styles, and nowhere else', () => {

@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { Avatar as AvatarBase, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { PRODUCT } from "@/lib/product"
 import { cn } from "@/lib/utils"
 
 import { Icon, type IconSize } from "./icon"
@@ -13,7 +14,10 @@ export type AvatarStatus = "online" | "away" | "offline"
 const SIZE = { 24: "sm", 28: "md", 32: "default", 40: "lg" } as const
 const ICON_SIZE: Record<AvatarSize, IconSize> = { 24: 12, 28: 14, 32: 16, 40: 20 }
 const DOT_SIZE: Record<AvatarSize, string> = { 24: "size-2", 28: "size-2.5", 32: "size-2.5", 40: "size-3" }
-const TINTS = ["bg-tag-1", "bg-tag-2", "bg-tag-3", "bg-tag-4", "bg-tag-5", "bg-tag-6"]
+// A name's hash lands on any tag tint but those on a hue the brand keeps off its grounds (lib/product.ts).
+const ALL_TINTS = ["bg-tag-1", "bg-tag-2", "bg-tag-3", "bg-tag-4", "bg-tag-5", "bg-tag-6"]
+const allowed = ALL_TINTS.filter((_, i) => !PRODUCT.avoidTags.includes(`tag-${i + 1}`))
+const TINTS = allowed.length ? allowed : ["bg-tag-grey"]
 // Three shapes as well as three colours: full, half and empty, so the status never rides on colour alone.
 const STATUS_DOT: Record<AvatarStatus, string> = {
   online: "bg-success-solid",

@@ -39,7 +39,14 @@ export function WaitingOnYou() {
     <Card
       title="Waiting on you"
       flush
-      footer={waiting.length > 5 ? <TextLink href="/jobs?status=needs-you,overdue">See all {formatNumber(waiting.length)} jobs waiting on you</TextLink> : undefined}
+      // The link says what it opens, both filters, so its count never reads against the summary's "5 waiting on you".
+      footer={
+        waiting.length > 5 ? (
+          <TextLink href="/jobs?status=needs-you,overdue" standalone>
+            See all {formatNumber(waiting.length)} jobs that need you or are overdue
+          </TextLink>
+        ) : undefined
+      }
     >
       <List items={items} empty={{ title: "Nothing is waiting on you.", description: "Quotes to approve and visits to rebook show here." }} />
     </Card>

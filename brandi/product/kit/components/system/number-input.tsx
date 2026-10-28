@@ -20,6 +20,8 @@ export interface NumberInputProps
   max?: number
   /** How far a step button or an arrow key moves the value. 1 by default. */
   step?: number
+  /** Whole numbers only, for a count: a typed decimal is refused and says so. */
+  integer?: boolean
   /** 32, 36 or 44px tall; 40, 44 or 48px on a touch screen, with 16px text there. */
   size?: "sm" | "md" | "lg"
   /** Text before the value, such as $. Read with the field. */
@@ -76,6 +78,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     min: minProp,
     max: maxProp,
     step: stepProp = 1,
+    integer = false,
     size = "md",
     prefix,
     suffix,
@@ -127,14 +130,15 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current])
 
+  const kind = integer ? "a whole number" : "a number"
   const range =
     min !== undefined && max !== undefined
-      ? `Enter a number from ${formatNumber(min)} to ${formatNumber(max)}`
+      ? `Enter ${kind} from ${formatNumber(min)} to ${formatNumber(max)}`
       : min !== undefined
-        ? `Enter ${formatNumber(min)} or more`
+        ? integer ? `Enter a whole number, ${formatNumber(min)} or more` : `Enter ${formatNumber(min)} or more`
         : max !== undefined
-          ? `Enter ${formatNumber(max)} or less`
-          : "Enter a number"
+          ? integer ? `Enter a whole number, ${formatNumber(max)} or less` : `Enter ${formatNumber(max)} or less`
+          : `Enter ${kind}`
 
   const commit = (next: number | null) => {
     setWrong(false)
@@ -159,7 +163,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
   const check = () => {
     if (text.trim() === "") return commit(null)
     const n = parse(text, prefix, suffix)
-    if (n === null || n !== clamp(n)) {
+    if (n === null || n !== clamp(n) || (integer && !Number.isInteger(n))) {
       setWrong(true)
       field?.report(range)
       own.current?.setCustomValidity(range)
@@ -173,7 +177,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
   const atMax = current !== null && max !== undefined && current >= max
   // Phone keypads: digits for whole numbers, a decimal point for amounts. Only a range below zero needs the full
   // keyboard, because the keypads have no minus sign.
-  const mode = inputMode ?? (min !== undefined && min < 0 ? "text" : decimals(step) === 0 ? "numeric" : "decimal")
+  const mode = inputMode ?? (min !== undefined && min < 0 ? "text" : integer || decimals(step) === 0 ? "numeric" : "decimal")
 
   const stepButton = (direction: 1 | -1) => (
     <button
@@ -188,12 +192,11 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         setSpoken(`${typeof prefix === "string" ? prefix : ""}${show(next)}${typeof suffix === "string" ? ` ${suffix}` : ""}`)
       }}
       data-slot="number-input-step"
-      // Side by side at the end on a desktop; on touch, Decrease moves to the start, so the two targets sit apart.
+      // Decrease at the start and Increase at the end, on every screen, so it reads minus, value, plus, and on
+      // touch the two targets sit apart.
       className={cn(
-        "grid h-full w-9 shrink-0 place-items-center border-l border-line text-text-muted transition-colors hover:bg-hover hover:text-text-strong active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent pointer-coarse:w-11",
-        direction > 0
-          ? "rounded-r-[calc(var(--radius-control)-1px)]"
-          : "pointer-coarse:order-first pointer-coarse:rounded-l-[calc(var(--radius-control)-1px)] pointer-coarse:border-r pointer-coarse:border-l-0"
+        "grid h-full w-9 shrink-0 place-items-center border-line text-text-muted transition-colors hover:bg-hover hover:text-text-strong active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent pointer-coarse:w-11",
+        direction > 0 ? "rounded-r-[calc(var(--radius-control)-1px)] border-l" : "rounded-l-[calc(var(--radius-control)-1px)] border-r"
       )}
     >
       <Icon name={direction > 0 ? "Plus" : "Minus"} />
@@ -204,7 +207,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
     <div
       data-slot="number-input"
       data-size={size}
-      className={cn(inputBox, !readOnly && "pr-0 pointer-coarse:pl-0", className)}
+      className={cn(inputBox, !readOnly && "px-0", className)}
       style={style}
       onMouseDown={(event) => {
         if (event.target !== own.current && !(event.target as Element).closest("button") && !disabled) {
@@ -213,6 +216,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         }
       }}
     >
+      {readOnly ? null : stepButton(-1)}
       {prefix ? (
         <span id={prefixId} data-slot="number-input-prefix" className="shrink-0 text-text-muted select-none">
           {prefix}
@@ -255,14 +259,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           {suffix}
         </span>
       ) : null}
-      {readOnly ? (
-        <Icon name="Lock" size={14} className="text-text-subtle" />
-      ) : (
-        <div data-slot="number-input-steps" className="flex h-full shrink-0 self-stretch pointer-coarse:contents">
-          {stepButton(-1)}
-          {stepButton(1)}
-        </div>
-      )}
+      {readOnly ? <Icon name="Lock" size={14} className="text-text-subtle" /> : stepButton(1)}
       <span className="sr-only" aria-live="polite">
         {spoken}
       </span>

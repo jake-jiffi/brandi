@@ -43,7 +43,7 @@ export default {
     { name: "label", type: "string", doc: "The destination, as people say it: Approvals." },
     { name: "href", type: "string", doc: "Where it goes, through the system's link, so production gets client navigation." },
     { name: "icon", type: "IconName", doc: "18px on the rail. The icons-only rail shows nothing else, so every top-level item has one." },
-    { name: "current", type: "boolean", default: "false", doc: 'The page people are on: rail-selected with a hairline, and aria-current="page".' },
+    { name: "current", type: "boolean", default: "false", doc: 'The page people are on: rail-selected with a hairline, a bar in rail-text-strong, and aria-current="page".' },
     { name: "count", type: "number", doc: "Work waiting there. Zero shows nothing." },
     { name: "attention", type: "boolean", default: "false", doc: "The count waits on the reader: it takes the highlight and reads 3 need you. Without it the count is grey and reads 3 waiting on others." },
     { name: "sub", type: "boolean", default: "false", doc: "A nested item under the one above: indented under its label, without an icon. The icons-only rail leaves it out." },
@@ -62,6 +62,7 @@ export default {
     ],
     States: [
       "The current page takes rail-selected with a 1px hairline in rail-line, and its text and icon take rail-text-strong. Hover takes rail-hover.",
+      "The fill is a step off the rail, about 1.3:1, so a 3px bar at the item's start, in rail-text-strong, carries the state at 3:1 or more against the rail and the fill (WCAG 1.4.11).",
       "A count takes the highlight with on-highlight text when it waits on the reader, and rail-muted when it waits on someone else. On the current row a grey count switches to rail-text.",
       "Focus is drawn inside the item in rail-focus, because the rail's list scrolls and would clip a ring outside it. In forced colours the current page is outlined, with a double line when it also has focus.",
     ],
@@ -69,7 +70,10 @@ export default {
       "Counts mean work: a highlight count is waiting on the reader, a grey count on someone else. Never a count of things nobody has to act on.",
       "Only rail-* tokens and the highlight live on the rail.",
     ],
-    Review: ["The needs-you count was white on the highlight, at 1.12:1 (round 1). Its text is on-highlight, solved for contrast."],
+    Review: [
+      "The needs-you count was white on the highlight, at 1.12:1 (round 1). Its text is on-highlight, solved for contrast.",
+      "The current page was marked by its fill alone, 1.32:1 on a dark rail (a second brand's round 2): the bar carries it at 3:1 or more.",
+    ],
   },
   frame: { width: 960, height: 900 },
   examples: [
@@ -117,6 +121,24 @@ export default {
         expect.equal(bg, want, "the current page's fill")
         expect.equal(colour, strong, "the current page's text")
         expect(shadow.includes("inset") && shadow.includes("1px"), `a 1px hairline (${shadow})`)
+      },
+    },
+    {
+      name: "The current page is marked at 3:1 or more, against the rail and against its own fill, in both themes",
+      example: "states",
+      themes: ["light", "dark"],
+      async run({ scope, expect, theme }) {
+        const link = scope.getByRole("link", { name: "Approvals, 3 need you" })
+        const [bar, width, fill, ground] = await link.evaluate((el, p) => {
+          const f = new Function(`return (${p})`)()
+          const s = getComputedStyle(el, "::before")
+          return [s.backgroundColor, s.width, getComputedStyle(el).backgroundColor, f(el, "backgroundColor", "var(--rail)")]
+        }, probe.toString())
+        expect.equal(width, "3px", "a 3px bar")
+        expect.atLeast(Number(contrast(bar, ground).toFixed(2)), 3, `${theme}: the bar against the rail`)
+        expect.atLeast(Number(contrast(bar, fill).toFixed(2)), 3, `${theme}: the bar against the current fill`)
+        const others = await scope.locator('[data-slot="sidebar-menu-button"]:not([aria-current])').evaluateAll((all) => all.filter((el) => getComputedStyle(el, "::before").content !== "none").length)
+        expect.equal(others, 0, "no other item carries a bar")
       },
     },
     {

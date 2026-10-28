@@ -8,7 +8,7 @@
  */
 
 import { execFile } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -153,6 +153,9 @@ export function clearSpaceRatio(rule) {
   return m[2] ? Number(m[2]) : { half: 0.5, 'a third': 1 / 3, 'a quarter': 0.25, 'one quarter': 0.25 }[m[1].toLowerCase()];
 }
 
+/** A still's media type, from its name. */
+const stillType = (file) => (/\.webp$/i.test(file) ? 'image/webp' : /\.jpe?g$/i.test(file) ? 'image/jpeg' : 'image/png');
+
 /**
  * A pose still small enough to carry in the bundle, drawn down in headless Chrome to WebP. The canvas
  * has no public folder, so a still referenced by path shows as a broken image on every board; an
@@ -160,7 +163,7 @@ export function clearSpaceRatio(rule) {
  */
 export async function shrinkStill(file, { maxSide = 320, quality = 0.82, chrome = findChrome() } = {}) {
   if (!chrome) return null;
-  const type = /\.webp$/i.test(file) ? 'image/webp' : /\.jpe?g$/i.test(file) ? 'image/jpeg' : 'image/png';
+  const type = stillType(file);
   const dir = mkdtempSync(path.join(tmpdir(), 'brandi-still-'));
   try {
     const page = path.join(dir, 'still.html');
@@ -213,10 +216,6 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
 }
 
 /**
- * The generated part of lib/brand.ts, and any stills to copy into public/brand/. Throws, naming the
- * file, when a mark is missing or unsafe.
- */
-/**
  * A PNG logo as an SVG the system can draw like any other mark: the picture inside a viewBox of its own
  * size, so a lockup, a rail and an email size it by its shape. Some brands only supply the logo for a
  * screen header as a PNG.
@@ -230,7 +229,13 @@ export function rasterMark(bytes, where = 'a mark') {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}"><image href="data:image/png;base64,${bytes.toString('base64')}" width="${w}" height="${h}"/></svg>`;
 }
 
-export function brandConstant(src, { publicDir = null, stills = new Map() } = {}) {
+/**
+ * The generated part of lib/brand.ts. A pose still comes from `stills`, drawn down; one that could not be drawn
+ * down goes in at full size, as a data URI, and is named in `stills` on the result. Never a path from the page
+ * root: the canvas has no public folder, so a board shows that as a broken image. Throws, naming the file, when a
+ * mark is missing or unsafe.
+ */
+export function brandConstant(src, { stills = new Map() } = {}) {
   const read = (rel, what) => {
     const file = path.resolve(src.base, rel);
     if (!existsSync(file)) throw new Error(`${what}: ${rel} does not exist (from ${src.from}).`);
@@ -268,7 +273,7 @@ export function brandConstant(src, { publicDir = null, stills = new Map() } = {}
   if (logo.height < logo.minHeight) logo.height = logo.minHeight;
 
   let character = null;
-  const copied = [];
+  const full = [];
   if (src.character?.poses) {
     const poses = (map) => {
       const out = {};
@@ -277,17 +282,13 @@ export function brandConstant(src, { publicDir = null, stills = new Map() } = {}
         if (/\.svg$/i.test(rel)) { out[state] = scopeClasses(cleanSvg(read(rel, `the ${state} pose`).text, rel), `brand-${state}-`); continue; }
         const { file } = read(rel, `the ${state} pose`);
         if (stills.has(file)) { out[state] = stills.get(file); continue; }
-        copied.push(file);
-        out[state] = `/brand/${path.basename(file)}`;
+        if (!full.includes(file)) full.push(file);
+        out[state] = `data:${stillType(file)};base64,${readFileSync(file).toString('base64')}`;
       }
       return out;
     };
     character = { name: src.character.name ?? src.name ?? 'Character', poses: poses(src.character.poses) };
     if (src.character.flat) character.flat = poses(src.character.flat);
-  }
-  if (publicDir && copied.length) {
-    mkdirSync(publicDir, { recursive: true });
-    for (const f of copied) copyFileSync(f, path.join(publicDir, path.basename(f)));
   }
 
   const json = (v) => JSON.stringify(v);
@@ -309,7 +310,7 @@ export function brandConstant(src, { publicDir = null, stills = new Map() } = {}
     lines.push('  },');
   }
   lines.push('}', '');
-  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: copied.map((f) => path.basename(f)), character: Boolean(character) };
+  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character) };
 }
 
 /**

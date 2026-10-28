@@ -9,6 +9,7 @@ import { useMergedRef } from "@/lib/refs"
 import { cn } from "@/lib/utils"
 
 import { Icon } from "./icon"
+import { Tooltip } from "./tooltip"
 
 export type ButtonVariant = "primary" | "secondary" | "ghost" | "brand" | "danger" | "danger-solid" | "link"
 export type ButtonSize = "sm" | "md" | "lg"
@@ -33,6 +34,11 @@ export interface ButtonProps extends Omit<React.ComponentPropsWithoutRef<"button
   iconRight?: IconName
   /** Keeps the width, shows a spinner, sets aria-busy and ignores presses. It stays focusable. */
   loading?: boolean
+  /**
+   * Why it cannot be pressed yet: "Confirm 2 checks first". It stays focusable, is aria-disabled, says why in a
+   * tooltip and in its description, and ignores presses. Prefer it to `disabled`, which drops focus and says nothing.
+   */
+  disabledReason?: string
   block?: boolean
   /** Renders a link that looks like a button. Links navigate; buttons act. */
   href?: string
@@ -41,7 +47,7 @@ export interface ButtonProps extends Omit<React.ComponentPropsWithoutRef<"button
 
 /** The pressable action. One to three words, verb first, in sentence case. */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "secondary", size = "md", icon, iconRight, loading = false, block = false, href, className, style, children, onClick, type, disabled, ...rest },
+  { variant = "secondary", size = "md", icon, iconRight, loading = false, disabledReason, block = false, href, className, style, children, onClick, type, disabled, ...rest },
   ref
 ) {
   const own = React.useRef<HTMLButtonElement | null>(null)
@@ -63,7 +69,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
   )
   const classes = cn(block && "w-full", className)
 
-  if (href && !disabled && !loading) {
+  const reason = disabledReason?.trim() || undefined
+  // A reason swallows the press, as loading does. A caller's own aria-disabled still hears it: AskBar's empty Ask
+  // moves focus to the field, which is how it explains itself.
+  const blocked = loading || Boolean(reason)
+
+  if (href && !disabled && !loading && !reason) {
     // Through the product's link, so a link that looks like a button still navigates on the client.
     return (
       <ButtonBase asChild variant={VARIANT[variant]} size={SIZE[size]} className={classes} style={style}>
@@ -72,7 +83,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
     )
   }
 
-  return (
+  const button = (
     <ButtonBase
       ref={merged}
       type={type ?? "button"}
@@ -82,17 +93,26 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       style={minWidth ? { ...style, minWidth } : style}
       disabled={disabled}
       aria-busy={loading || undefined}
-      aria-disabled={loading || undefined}
+      {...rest}
+      aria-disabled={loading || reason ? true : rest["aria-disabled"]}
       onClick={(event) => {
-        if (loading) {
+        if (blocked) {
           event.preventDefault()
           return
         }
         onClick?.(event)
       }}
-      {...rest}
     >
       {content}
     </ButtonBase>
+  )
+  // The tooltip says why on hover, keyboard focus and a long press, and describes the button, so a screen reader
+  // hears the reason after the name.
+  return reason ? (
+    <Tooltip content={reason} className={block ? "flex w-full" : undefined}>
+      {button}
+    </Tooltip>
+  ) : (
+    button
   )
 })

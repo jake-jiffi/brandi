@@ -37,11 +37,11 @@ export default {
     ],
     States: [
       "Better, worse, neither and no change. Every number style. Missing: \"No comparison\", never 0%.",
-      "Forced colours take away the colour that says better or worse, so the word appears beside the figure instead.",
+      "Better or worse is a word beside the figure in every mode, before the comparison: colour alone fails anyone who cannot tell success from danger, and whether up is good depends on goodWhen.",
     ],
     Copy: ['The suffix names the comparison: "vs last month", "vs the same week last year", "vs target".'],
     Rules: [
-      "Success when the change is good, danger when bad, neutral when flat or neither. The arrow says which way; the words say whether that is good.",
+      "Success when the change is good, danger when bad, neutral when flat or neither. The arrow says which way; the word says whether that is good, and the colour backs it up.",
       "Always say what it is compared with.",
       "Costs, overdue amounts and churn are goodWhen=\"down\".",
       'A change in a rate is in points ("3 pts"), never a percent of a percent.',
@@ -133,12 +133,15 @@ export default {
       },
     },
     {
-      name: "Without forced colours the judgement word stays out of sight, and is never read twice",
+      name: "Better or worse shows as a word in every mode, not only in colour, and is never read twice",
       example: "judgements",
       async run({ scope, expect }) {
-        const shown = await scope.locator('[data-slot="delta-judgement"]').evaluateAll((els) => els.filter((el) => getComputedStyle(el).display !== "none").length)
-        expect.equal(shown, 0, "colour carries it on screen")
-        expect.equal(await scope.locator('[data-slot="delta-judgement"]:not([aria-hidden="true"] *)').count(), 0, "the word sits inside the hidden figure, so the sentence is the only reading")
+        const words = await scope.locator('[data-slot="delta-judgement"]').evaluateAll((els) => els.map((el) => (el.getClientRects().length ? el.textContent : "")))
+        expect.equal(words.join(","), "better,better,worse,worse", "each judged change says its judgement on screen")
+        const seen = await scope.locator('[data-slot="delta"]').evaluateAll((els) => els.map((el) => [...el.querySelectorAll(':scope > [aria-hidden="true"]')].map((part) => part.textContent.trim()).join(" ")))
+        expect.equal(seen[0], "6.2% better vs last month", "the word sits between the figure and the comparison")
+        expect.equal(seen[4], "2.3% vs last quarter", "neither has no word")
+        expect.equal(await scope.locator('[data-slot="delta-judgement"]:not([aria-hidden="true"] *)').count(), 0, "the word is hidden from screen readers, so the sentence is the only reading")
       },
     },
     {

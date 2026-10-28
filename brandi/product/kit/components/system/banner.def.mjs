@@ -25,7 +25,7 @@ export default {
   props: [
     { name: "tone", type: '"neutral" | "info" | "success" | "warning" | "danger" | "ai"', default: '"neutral"', doc: "As Alert. Offline is neutral." },
     { name: "title", type: "ReactNode", doc: 'The state, in a few words: "[Source] is not responding".' },
-    { name: "children", type: "ReactNode", doc: 'The consequence, on the same line: "Invoices below are from [9:42 am]."' },
+    { name: "children", type: "ReactNode", doc: 'The consequence, on the same line: "Invoices below are from 9:42 am."' },
     { name: "icon", type: "IconName", doc: "Replaces the tone's icon: WifiOff for offline, Lock for read only." },
     { name: "actions", type: "ReactNode | FeedbackAction[]", doc: "Buttons, or the same as data ({ label, variant, icon, href, onClick }). Under the text below 640px of the banner's width, beside it from 640px." },
     { name: "onDismiss", type: "() => void", doc: "Shows a dismiss button. Leave it out while the state still applies." },
@@ -43,15 +43,17 @@ export default {
     ],
     States: ["Sample data, read only, a source that is down, offline, and a source that is back (dismissible)."],
     Copy: [
-      'Name the state, then the consequence: "[Source] is not responding. Invoices below are from [9:42 am]."',
+      'Name the state, then the consequence: "[Source] is not responding. Invoices below are from 9:42 am." A time is real, never in brackets.',
       'Offline: "You\'re offline. Changes will save when the connection is back."',
     ],
     Rules: [
       "One at a time, under the page header.",
       "Dismissible unless the state still applies: sample data and read only stay.",
       "Under a down source, the last good data stays on screen, marked with its time.",
+      "A source behind the page that is down is warning, never danger: nothing the person did failed, its last good data still shows and the rest of the page works.",
       "Offline is a neutral banner that says changes will save when the connection is back.",
     ],
+    Review: ["A starter showed its down source as a danger banner, against the pattern (a pilot's round 1). A down source is warning."],
   },
   frame: { width: 960, height: 720 },
   examples: [
@@ -61,7 +63,7 @@ export default {
       layout: "stack",
       markup: `<x-import component-from-global-scope="NS.Banner" title="Sample data">Figures and names on this screen are made up.</x-import>
 <x-import component-from-global-scope="NS.Banner" icon="Lock" title="Read only">You can view this pay run but not change it.</x-import>
-<x-import component-from-global-scope="NS.Banner" tone="danger" title="[Source] is not responding" actions="{{bannerRetry}}">Invoices below are from [9:42 am].</x-import>
+<x-import component-from-global-scope="NS.Banner" tone="warning" title="[Source] is not responding" actions="{{bannerRetry}}">Invoices below are from 9:42 am.</x-import>
 <x-import component-from-global-scope="NS.Banner" icon="WifiOff" title="You're offline">Changes will save when the connection is back.</x-import>`,
       vals: { bannerRetry: [{ label: "Try again", icon: "RotateCcw" }] },
     },
@@ -70,20 +72,20 @@ export default {
       title: "Below 640px of its own width",
       layout: "stack",
       markup: `<div style="width: 360px; max-width: 100%;">
-<x-import component-from-global-scope="NS.Banner" tone="danger" title="[Source] is not responding" actions="{{bannerRetry}}">Invoices below are from [9:42 am].</x-import>
+<x-import component-from-global-scope="NS.Banner" tone="warning" title="[Source] is not responding" actions="{{bannerRetry}}">Invoices below are from 9:42 am.</x-import>
 </div>`,
     },
     {
       id: "broke",
       title: "Broke while the person was on the page",
       layout: "stack",
-      markup: `<x-import component-from-global-scope="NS.Banner" tone="danger" role="alert" title="[Source] stopped responding" actions="{{bannerRetry}}">Invoices below are from [9:42 am].</x-import>`,
+      markup: `<x-import component-from-global-scope="NS.Banner" tone="warning" role="alert" title="[Source] stopped responding" actions="{{bannerRetry}}">Invoices below are from 9:42 am.</x-import>`,
     },
     {
       id: "dismissible",
       title: "Dismissible once the state has passed",
       layout: "stack",
-      markup: `<sc-if value="{{backShown}}"><x-import component-from-global-scope="NS.Banner" tone="success" title="[Source] is back" on-dismiss="{{dismissBack}}">Invoices are up to date as of [9:58 am].</x-import></sc-if>
+      markup: `<sc-if value="{{backShown}}"><x-import component-from-global-scope="NS.Banner" tone="success" title="[Source] is back" on-dismiss="{{dismissBack}}">Invoices are up to date as of 9:58 am.</x-import></sc-if>
 <x-import component-from-global-scope="NS.Button" icon="Receipt">View invoices</x-import>`,
     },
   ],
@@ -97,6 +99,17 @@ export default {
       async run({ page, scope, expect }) {
         for (const banner of await scope.locator('[data-slot="banner"]').all()) expect.equal(await banner.getAttribute("role"), "status", "a banner on arrival")
         expect.equal(await page.locator('[data-example="broke"] [data-slot="banner"]').getAttribute("role"), "alert", "a banner that broke while the person was there")
+      },
+    },
+    {
+      name: "A source that is down is a warning, never danger, with its own icon",
+      async run({ page, expect }) {
+        const down = page.locator('[data-slot="banner"]').filter({ hasText: /not responding|stopped responding/ })
+        expect.atLeast(await down.count(), 3, "the down-source banners on the board")
+        for (const banner of await down.all()) {
+          expect.equal(await banner.getAttribute("data-tone"), "warning", "a down source is a warning")
+          expect.equal(await banner.locator('[data-slot="alert-grid"] > svg').getAttribute("data-icon"), "TriangleAlert", "with the warning's icon, so it never rides on colour")
+        }
       },
     },
     {

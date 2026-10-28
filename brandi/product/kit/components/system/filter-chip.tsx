@@ -19,6 +19,8 @@ export interface FilterChipProps extends Omit<React.ComponentPropsWithoutRef<"bu
   count?: number
   /** The count is waiting on the reader: it takes the highlight and is read as "12 need you". */
   attention?: boolean
+  /** What the count counts, one and many: ["job", "jobs"] reads "Needs you, 2 jobs", saying the count once. */
+  noun?: [string, string]
   /** An icon before the label. A check takes its place while the chip is on. */
   icon?: IconName
   /** The label: what the filter keeps, in a word or two. */
@@ -27,7 +29,7 @@ export interface FilterChipProps extends Omit<React.ComponentPropsWithoutRef<"bu
 
 /** A filter over what is already on screen, pressed on and off. */
 export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(function FilterChip(
-  { selected, defaultSelected = false, onChange, count, attention = false, icon, className, children, ...rest },
+  { selected, defaultSelected = false, onChange, count, attention = false, noun, icon, className, children, ...rest },
   ref
 ) {
   const [inner, setInner] = React.useState(defaultSelected)
@@ -35,10 +37,19 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
   const known = typeof count === "number" && Number.isFinite(count)
   const needsYou = attention && known && count > 0
   const figure = known ? formatNumber(count) : ""
-  const spoken = !known ? null : needsYou ? `${figure} ${count === 1 ? "needs" : "need"} you` : `${figure} ${count === 1 ? "item" : "items"}`
   // A text label gets an exact name ("Overdue, 12 need you"): a hidden span after it would be read with a
   // stray pause, because browsers treat it as a block. Anything else falls back to the hidden span.
   const textLabel = typeof children === "string" || typeof children === "number" ? String(children) : null
+  // The count is said once: in the noun it counts when there is one, and never "need you" again after a label
+  // that already says it ("Needs you, 2 need you" said it twice).
+  const said = textLabel !== null && /\bneeds? you\b/i.test(textLabel)
+  const spoken = !known
+    ? null
+    : Array.isArray(noun) && noun.length === 2
+      ? `${figure} ${count === 1 ? noun[0] : noun[1]}`
+      : needsYou && !said
+        ? `${figure} ${count === 1 ? "needs" : "need"} you`
+        : `${figure} ${count === 1 ? "item" : "items"}`
 
   return (
     <Toggle

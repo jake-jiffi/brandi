@@ -18,10 +18,20 @@ export interface ProductLockupProps extends Omit<React.HTMLAttributes<HTMLElemen
   layout?: "inline" | "stacked"
   /** The mark's height in px, the logo system's preferred size by default. */
   height?: number
-  /** Makes the whole lockup one link, named "[Brand] [product]". */
+  /** Makes the whole lockup one link, named "[Brand] [product]", or the brand alone when the product has its name. */
   href?: string
   /** `rail` for the rail and the top bar: the name takes the rail's strong text colour, so it never sinks into a dark rail. */
   tone?: "default" | "rail"
+}
+
+const sameName = (a: string, b: string) => a.trim().toLocaleLowerCase() === b.trim().toLocaleLowerCase()
+
+/**
+ * What the lockup is called: the brand and the product, or the brand once when the product carries the brand's own
+ * name, which a lockup would otherwise show twice ("[Brand] / [BRAND]") and a screen reader read twice.
+ */
+export function lockupLabel(product: string) {
+  return sameName(product, BRAND.name) ? BRAND.name : `${BRAND.name} ${product}`
 }
 
 /** The mark with the product's name, for the top of the rail, sign-in and product emails. */
@@ -32,24 +42,28 @@ export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(f
   const Link = useLink()
   const h = Math.max(height ?? BRAND.logo.height, BRAND.logo.minHeight)
   const ink = color === "ink"
+  // A product named for the brand is the mark alone: the mark already says the name.
+  const alone = sameName(product, BRAND.name)
   const content = (
     <>
       <Logo color={color} height={h} title={href ? "" : undefined} className={tone === "rail" && !ink ? "text-rail-text-strong" : undefined} />
-      {layout === "inline" ? (
+      {!alone && layout === "inline" ? (
         // A border, not a fill, so the hairline survives forced colours.
         <span aria-hidden data-slot="product-lockup-rule" className={cn("my-0.5 w-0 self-stretch border-l", ink ? "border-current/40" : "border-line")} />
       ) : null}
-      <span
-        data-slot="product-lockup-name"
-        // Never larger than the mark: the name steps down with a small one.
-        className={cn(
-          "min-w-0 truncate",
-          PRODUCT.lockupName === "eyebrow" ? "type-eyebrow" : h >= 24 ? "type-heading" : h >= 20 ? "type-label" : "type-caption",
-          ink ? "text-current" : tone === "rail" ? "text-rail-text-strong" : "text-text-strong"
-        )}
-      >
-        {product}
-      </span>
+      {alone ? null : (
+        <span
+          data-slot="product-lockup-name"
+          // Never larger than the mark: the name steps down with a small one.
+          className={cn(
+            "min-w-0 truncate",
+            PRODUCT.lockupName === "eyebrow" ? "type-eyebrow" : h >= 24 ? "type-heading" : h >= 20 ? "type-label" : "type-caption",
+            ink ? "text-current" : tone === "rail" ? "text-rail-text-strong" : "text-text-strong"
+          )}
+        >
+          {product}
+        </span>
+      )}
     </>
   )
   const classes = cn(
@@ -63,7 +77,7 @@ export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(f
       <Link
         ref={ref as never}
         href={href}
-        aria-label={`${BRAND.name} ${product}`}
+        aria-label={lockupLabel(product)}
         data-slot="product-lockup"
         className={cn(classes, "min-h-6 rounded-xs pointer-coarse:min-h-10", layout === "stacked" && "justify-center")}
         {...rest}

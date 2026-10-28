@@ -646,8 +646,9 @@ drawn from the intake.
   span zones.
 - **Freshness and trust.** Every figure says where it came from and when. Data older than its
   normal sync turns into a warning badge with Sync now. When a source is down, the last good
-  figures stay, marked with their time, under a banner. Anything the assistant calculated carries
-  the `ai` tone and its sources. Real or labelled.
+  figures stay, marked with their time, under a warning banner (never danger: the page still
+  works). Anything the assistant calculated carries the `ai` tone and its sources. Real or
+  labelled.
 - **Numbers.** A table, Style | Example | Where, from the formatter contract in
   `03-fundamentals-first.md`. Cards and axes round; tables, detail views and exports stay exact.
   Then the parity record between the bundle's formatter and the starter's, with its case count.

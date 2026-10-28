@@ -16,7 +16,8 @@
  *   brandi sheets [--out <dir>]       write the specification artboards
  *   brandi canvas --dir <dir> --title "Acme brand" [--live <canvas.json>] [--json]   the files and calls for a Design canvas
  *   brandi validate --dir <dir>       check artboards before they are published
- *   brandi book [--pdf] [--print]     the brand book: a 16:9 deck, or the A4 print book with --print
+ *   brandi book [--pdf] [--print] [--publish]  the brand book: a 16:9 deck, or the A4 print book with --print;
+ *                                     --publish writes it as a page to publish, its images beside it
  *   brandi logo <plan|refine|trace|wordmark|lockup|import|audit|board|pick|master|colour|status>
  *   brandi images <dir> [--check]      measure supplied photography before planning
  *   brandi illustration [add <files...> --set "Christmas" | remove <files...>]
@@ -84,7 +85,7 @@ import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
 import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES, forDesignCanvas, designIndex } from './canvas.mjs';
 import { extractColors } from './color.mjs';
-import { renderBrandBook, renderBrandDeck, pdfChromeArgs } from './brandbook.mjs';
+import { renderBrandBook, renderBrandDeck, pdfChromeArgs, splitInlineImages, asPageFragment } from './brandbook.mjs';
 import { toPreviewHtml, screenshot, findChrome, runChrome, declaredFrame } from './preview.mjs';
 import { emitGuardianSkill, checkFiles, checkPromises, linkForCodex, GENERATED_MARKER } from './guardian.mjs';
 import { buildAssetPack } from './assets.mjs';
@@ -2579,6 +2580,43 @@ async function cmdIllustration(flags, positional) {
   );
 }
 
+// An artifact page takes 16MB and a file 15MB. One publish call carries 255 files and 64MB, so the
+// images go 250 and 48MB to a call, which leaves room for the page that rides in each.
+const PAGE_BYTES = 16 * 1024 * 1024;
+const BOOK_CALL_BYTES = 48 * 1024 * 1024;
+
+/** Writes the book as a page with its images beside it, and the Artifact calls that send them. */
+async function writeBookPublish({ html, dir, stem, title }) {
+  const root = path.join(dir, '.publish', `${slugify(title)}-${stem}`);
+  const split = splitInlineImages(asPageFragment(html));
+  const pageBytes = Buffer.byteLength(split.html);
+  if (pageBytes > PAGE_BYTES) {
+    throw new Error(`The book is ${(pageBytes / 1048576).toFixed(1)}MB as a page with its images moved out, over the 16MB a page takes.`);
+  }
+  const big = split.files.filter((f) => f.bytes.length > CANVAS_FILE_BYTES);
+  if (big.length) {
+    throw new Error(`Too large to publish (15MB a file): ${big.map((f) => `${f.name} ${(f.bytes.length / 1048576).toFixed(1)}MB`).join(', ')}. Write a smaller copy of the image the brand file names.`);
+  }
+  await rm(root, { recursive: true, force: true });
+  await mkdir(path.join(root, 'book-assets'), { recursive: true });
+  const page = path.join(root, `${stem}.html`);
+  await writeFile(page, split.html);
+  for (const f of split.files) await writeFile(path.join(root, f.name), f.bytes);
+  const groups = [];
+  let current = null;
+  for (const f of split.files) {
+    if (!current || current.count >= 250 || current.bytes + f.bytes.length > BOOK_CALL_BYTES) {
+      current = { files: {}, count: 0, bytes: 0 };
+      groups.push(current);
+    }
+    current.files[f.name] = f.name;
+    current.count += 1;
+    current.bytes += f.bytes.length;
+  }
+  const calls = (groups.length ? groups : [{ files: {} }]).map((g) => ({ root, file_path: page, files: g.files }));
+  return { root, page, pageBytes, files: split.files.map((f) => f.name), calls };
+}
+
 async function cmdBook(flags) {
   const { file, brand, system } = await resolveSystem(flags);
   const dir = path.dirname(file);
@@ -2610,6 +2648,24 @@ async function cmdBook(flags) {
   await writeFile(htmlPath, html);
   const written = [path.relative(process.cwd(), htmlPath)];
   const format = print ? 'print' : 'deck';
+  let published = null;
+  if (flags.publish) {
+    try {
+      published = await writeBookPublish({ html, dir, stem, title: brand.meta?.name ?? 'brand' });
+    } catch (e) {
+      return fail(e.message);
+    }
+  }
+  const publishLines = published ? [
+    '',
+    `Wrote the book as a page to publish: ${path.relative(process.cwd(), published.root)}`,
+    `  ${(published.pageBytes / 1048576).toFixed(1)}MB page, ${plural(published.files.length, 'image')} beside it, ${plural(published.calls.length, 'publish call')}`,
+    'Publish it with the Artifact tool, as a page (the PDF stays a file, for print and email):',
+    ...published.calls.map((c, i) => (i === 0
+      ? `  1. root: "${c.root}", file_path: "${c.file_path}", files: ${JSON.stringify(c.files)}, icon "book". Keep the url it returns.`
+      : `  ${i + 1}. url: that url, root: "${c.root}", file_path: "${c.file_path}", files: ${JSON.stringify(c.files)}`)),
+    'Republishing: the same calls with url set to the page that exists.',
+  ] : [];
 
   let pdfPath = null;
   if (flags.pdf) {
@@ -2635,8 +2691,9 @@ async function cmdBook(flags) {
     `Wrote ${written.join('\n       ')}\n       ${count}, ${print ? 'A4 print book' : '1920x1080 deck'}.` +
       (named && embedded < named ? `\n\n${named - embedded} of ${named} logo files could not be embedded, so the logo chapter names them instead of showing them.` : '') +
       (leftOut.length ? `\n\nLeft out of Brand in use, because no application lists them and they are not mockups:\n  ${leftOut.join('\n  ')}\nList an application's file under applications to put it in the book.` : '') +
-      (print ? '' : '\nThe A4 print book is still available: brandi book --print.'),
-    { ok: true, files: written, pdf: pdfPath, logosEmbedded: embedded, logosNamed: named, format, pages, sections, leftOut },
+      (print ? '' : '\nThe A4 print book is still available: brandi book --print.') +
+      publishLines.join('\n'),
+    { ok: true, files: written, pdf: pdfPath, logosEmbedded: embedded, logosNamed: named, format, pages, sections, leftOut, publish: published },
   );
 }
 

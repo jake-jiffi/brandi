@@ -119,6 +119,7 @@ export default {
     Layout: [
       "No box of its own: answers stack in one column no wider than 880px, newest last, and an AIProposal inside one is the only card.",
       "The question, who made it, the steps, the answer capped at the measure, its sources, the caveat, then the footer: the status, the actions and the line's Stop or Try again. Follow-ups sit last. The footer wraps on a narrow answer.",
+      "The answer is reading text, so it is body-lg at every width, phones included.",
     ],
     States: ["Thinking, working through steps, streaming, Drafted, Answered, Stopped, Failed, and waiting while a proposal inside it asks."],
     Copy: [
@@ -306,6 +307,25 @@ ${answer('question="What did [Kim\'s Cafe] order last month?" thinking="{{thinki
         expect.equal(failures[0], "Failed. Couldn't reach [ordering system].", "it names the system")
         await wait(page, 5200)
         expect.equal((await answer.locator('[data-slot="status-line-live"]').textContent()).trim(), "", "the spoken line does not stay in the tree")
+      },
+    },
+    {
+      name: "The answer reads in body-lg, the reading style, at every width",
+      example: "answered",
+      async run({ page, scope, expect }) {
+        const want = await page.evaluate(() => {
+          const probe = document.createElement("p")
+          probe.className = "type-body-lg"
+          document.body.append(probe)
+          const s = getComputedStyle(probe)
+          const out = `${s.fontSize}/${s.lineHeight}`
+          probe.remove()
+          return out
+        })
+        for (const body of await page.locator('[data-slot="ai-answer-body"]').all()) {
+          expect.equal(await body.evaluate((el) => `${getComputedStyle(el).fontSize}/${getComputedStyle(el).lineHeight}`), want, "the answer's size and leading")
+        }
+        expect.atLeast(await scope.locator('[data-slot="ai-answer-body"]').count(), 1, "an answer to measure")
       },
     },
     {

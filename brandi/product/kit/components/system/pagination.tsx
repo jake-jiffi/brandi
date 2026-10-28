@@ -15,11 +15,13 @@ export interface PaginationProps extends React.HTMLAttributes<HTMLElement> {
   pageSize?: number
   total: number
   onPage?: (page: number) => void
+  /** What the count says at zero, such as No jobs match “boiler”. It stays in the live region, so a search that finds nothing is read out. */
+  empty?: string
 }
 
 /** The footer of a long table: where you are, in words, with previous and next. */
 export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(function Pagination(
-  { page, pageSize = 25, total, onPage, className, ...rest },
+  { page, pageSize = 25, total, onPage, empty, className, ...rest },
   ref
 ) {
   // A board passes attributes as strings, so anything that is not a number reads as the default.
@@ -31,7 +33,7 @@ export const Pagination = React.forwardRef<HTMLElement, PaginationProps>(functio
   const last = Math.min(current * size, count)
   const where =
     count === 0
-      ? "No results"
+      ? empty || "No results"
       : `${formatNumber(first, "number")} to ${formatNumber(last, "number")} of ${formatNumber(count, "number")}`
   const go = (to: number) => {
     if (to >= 1 && to <= pages && to !== current) onPage?.(to)

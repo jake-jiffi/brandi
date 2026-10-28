@@ -79,6 +79,7 @@ export function JobsBoard({ initial }: { initial: JobsQuery }) {
   const page = Math.min(query.page, pages)
   const onScreen = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const count = (status: JobStatus) => searched.filter((j) => j.status === status).length
+  const none = query.q ? `No jobs match “${query.q}”` : "No jobs match these filters"
   const needYou = active.filter((j) => j.status === "needs-you").length
 
   const change = (next: Partial<JobsQuery>) => apply({ ...query, page: 1, ...next })
@@ -202,6 +203,7 @@ export function JobsBoard({ initial }: { initial: JobsQuery }) {
                   onChange={(on) => toggleStatus(f.value, on)}
                   count={count(f.value)}
                   attention={f.value === "needs-you"}
+                  noun={["job", "jobs"]}
                 >
                   {f.label}
                 </FilterChip>
@@ -214,12 +216,14 @@ export function JobsBoard({ initial }: { initial: JobsQuery }) {
           ),
         }}
         empty={{
-          title: query.q ? `No jobs match “${query.q}”` : "No jobs match these filters",
+          title: none,
           description: "Try another search, or clear the filters to see every job.",
           actions: [{ label: "Clear filters", icon: "X", onClick: clearFilters }],
         }}
-        // With nothing to show, the empty state says so; a footer saying "No results" under it would say it twice.
-        footer={sorted.length ? <Pagination page={page} pageSize={PAGE_SIZE} total={sorted.length} onPage={(p) => apply({ ...query, page: p })} /> : undefined}
+        // The count is the one live region for results, so it stays mounted at zero and says nothing matches; the
+        // table keeps it out of sight under the empty state, which says so on screen. A new page of results adds a
+        // history entry, so Back returns to the page before.
+        footer={<Pagination page={page} pageSize={PAGE_SIZE} total={sorted.length} empty={none} onPage={(p) => apply({ ...query, page: p }, { push: true })} />}
       />
       <NewJobDialog
         open={formOpen}

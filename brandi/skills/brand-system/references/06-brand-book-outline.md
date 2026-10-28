@@ -26,6 +26,7 @@ carry a bracketed prompt until they are set.
 | `$A book` | `brand/brand-book.html` | A 1920 × 1080 deck, one idea per page, in eight chapters. This is the deliverable |
 | `$A book --pdf` | `brand/brand-book.pdf` as well | One PDF page per deck page, through headless Chrome, fonts embedded |
 | `$A book --print` | `brand/brand-book-print.html` (and `.pdf` with `--pdf`) instead of the deck | The earlier flowing A4 document, for anyone who wants paper |
+| `$A book --publish` | `brand/.publish/<brand>-brand-book/`: the deck as a page, its images beside it, and the `Artifact` call | Read from a link. A page takes 16MB, so the inlined images move out into files |
 
 The deck is a desktop and print document. On a phone the pages reflow, but the PDF is the thing to
 send. `$A book --json` lists every page with its number, chapter and, for a page that could not be

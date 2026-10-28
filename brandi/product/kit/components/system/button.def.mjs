@@ -10,6 +10,7 @@ export default {
     { name: "icon", type: "IconName", doc: "An icon before the label." },
     { name: "iconRight", type: "IconName", doc: "An icon after the label, for a menu or a step forward." },
     { name: "loading", type: "boolean", default: "false", doc: "Keeps the width, shows a spinner, sets aria-busy and ignores presses. It stays focusable." },
+    { name: "disabledReason", type: "string", doc: "Why it cannot be pressed yet: Confirm 2 checks first. It stays focusable and aria-disabled, says why in a tooltip and its description, and ignores presses. Prefer it to disabled." },
     { name: "block", type: "boolean", default: "false", doc: "Fills its container's width." },
     { name: "href", type: "string", doc: "Renders a link that looks like a button. Links navigate; buttons act." },
     { name: "disabled", type: "boolean", default: "false", doc: "Faded and unpressable. Say why nearby or in a tooltip." },
@@ -45,6 +46,8 @@ export default {
     States: [
       "Loading keeps the width, shows a spinner, sets aria-busy and aria-disabled, and ignores further presses. It stays focusable, so focus never drops.",
       "Disabled says why, nearby or in a tooltip. It keeps pointer events, so the tooltip still shows.",
+      "disabledReason is the way to say not yet: the button stays focusable and aria-disabled, its reason shows in a tooltip on hover, focus and a long press, a screen reader hears it after the name, and presses do nothing. A bare aria-disabled still hears the press, for a control that explains itself when pressed (an empty Ask moves focus to its field).",
+      "Disabled and aria-disabled fade alike, to the opacity-disabled token.",
     ],
     Copy: [
       "One to three words, verb first, in sentence case: Approve, Save draft, Delete 3 invoices.",
@@ -54,7 +57,10 @@ export default {
       "Secondary then primary, right-aligned, with Cancel immediately left of the primary.",
       "Prefer an enabled button that explains the problem when pressed to a disabled one.",
     ],
-    Review: ["loading did not block a second press (round 1)."],
+    Review: [
+      "loading did not block a second press (round 1).",
+      "A disabled Approve said nothing about why (a pilot's round 1): disabledReason says why, stays focusable and swallows the press.",
+    ],
   },
   examples: [
     {
@@ -82,7 +88,16 @@ export default {
 <x-import component-from-global-scope="NS.Button" disabled="{{yes}}">Export</x-import>`,
       vals: { yes: true },
     },
+    {
+      id: "reason",
+      title: "Not yet, saying why",
+      markup: `<x-import component-from-global-scope="NS.Button" variant="primary" icon="Check" disabled-reason="Confirm 2 checks first" on-click="{{press}}">Approve pay run</x-import>
+<p data-slot="example-status" class="type-meta text-text-muted">{{pressedLine}}</p>`,
+    },
   ],
+  state: { pressed: 0 },
+  logic: `press: () => self.setState({ pressed: self.state.pressed + 1 }),
+pressedLine: "Pressed " + self.state.pressed + " times."`,
   checks: [
     {
       name: "A loading button ignores a second press and keeps focus",
@@ -93,6 +108,36 @@ export default {
         await page.keyboard.press("Enter")
         expect(await button.evaluate((el) => document.activeElement === el), "focus stays on the loading button")
         expect.equal(await button.getAttribute("aria-busy"), "true", "it says it is busy")
+      },
+    },
+    {
+      name: "A button that cannot be pressed yet stays focusable, says why, and ignores presses",
+      example: "reason",
+      async run({ page, scope, expect }) {
+        const button = scope.getByRole("button", { name: "Approve pay run" })
+        await button.focus()
+        expect(await button.evaluate((el) => document.activeElement === el), "it takes focus")
+        const tip = page.getByRole("tooltip")
+        const shown = await tip.waitFor({ timeout: 3000 }).then(() => true, () => false)
+        expect(shown, "the tooltip opens on focus")
+        expect.equal((await tip.textContent()).trim(), "Confirm 2 checks first", "and says why")
+        expect.equal(await button.getAttribute("aria-disabled"), "true", "it says it is unavailable")
+        expect.equal(await button.evaluate((el) => el.disabled), false, "without dropping out of the tab order")
+        const described = await button.evaluate((el) => (el.getAttribute("aria-describedby") ?? "").split(" ").map((id) => document.getElementById(id)?.textContent.trim()).join(" "))
+        expect.equal(described, "Confirm 2 checks first", "a screen reader hears why after the name")
+        await page.keyboard.press("Enter")
+        await page.keyboard.press("Space")
+        await button.click({ force: true })
+        expect.equal((await scope.locator('[data-slot="example-status"]').textContent()).trim(), "Pressed 0 times.", "no press went through")
+      },
+    },
+    {
+      name: "Disabled and aria-disabled fade alike, to the opacity-disabled token",
+      async run({ page, expect }) {
+        const token = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--opacity-disabled").trim())
+        const faded = await page.locator('[data-example="states"] button:disabled, [data-example="reason"] button[aria-disabled="true"]').evaluateAll((all) => all.map((el) => getComputedStyle(el).opacity))
+        expect.equal(faded.length, 2, "a disabled and an aria-disabled button")
+        for (const o of faded) expect.equal(o, String(Number(token)), "faded to the token")
       },
     },
     {

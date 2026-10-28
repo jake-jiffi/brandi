@@ -36,6 +36,14 @@ export interface ToolbarProps extends Omit<React.ComponentPropsWithoutRef<"div">
 
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+/** The nearest ancestor that scrolls up and down, or the page. */
+function scrollParent(el: HTMLElement): HTMLElement {
+  for (let at = el.parentElement; at; at = at.parentElement) {
+    if (/(auto|scroll)/.test(getComputedStyle(at).overflowY)) return at
+  }
+  return document.scrollingElement as HTMLElement
+}
+
 /** One row of search, filters and view controls above a table or list, wrapping when the space runs out. */
 export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   { label, selectedCount = 0, bulkActions = [], onClearSelection, sticky = true, className, children, ...rest },
@@ -63,6 +71,31 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
     pressedInSelection.current = false
   }, [selecting])
 
+  // While it sticks, what scrolls under it keeps clear of it: the scroller's scroll-padding-top reaches the
+  // toolbar's foot (its height, below the scroller's own top padding, where a sticky box rests), so a control Tab
+  // or Shift+Tab brings into view never comes to rest beneath it (WCAG 2.4.11). On a short screen it stops sticking
+  // (the class below), because it would take most of it: at 200% zoom on a laptop it and the top bar took 225 of
+  // 400px.
+  React.useEffect(() => {
+    const el = own.current
+    if (!sticky || !el) return
+    const scroller = scrollParent(el)
+    const apply = () => {
+      const stuck = getComputedStyle(el).position === "sticky"
+      scroller.style.scrollPaddingTop = stuck ? `${el.offsetHeight + parseFloat(getComputedStyle(scroller).paddingTop)}px` : ""
+    }
+    apply()
+    const observer = new ResizeObserver(apply)
+    observer.observe(el)
+    // A window that grows or shrinks past the short-screen line flips the position without resizing the toolbar.
+    window.addEventListener("resize", apply)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("resize", apply)
+      scroller.style.scrollPaddingTop = ""
+    }
+  }, [sticky])
+
   const press = (fn?: () => void) => () => {
     pressedInSelection.current = true
     fn?.()
@@ -75,7 +108,7 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
       aria-label={label}
       data-slot="toolbar"
       data-selecting={selecting ? "" : undefined}
-      className={cn("py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas", className)}
+      className={cn("py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas [@media(max-height:560px)]:static", className)}
       {...rest}
     >
       {/* The filters stay mounted while rows are selected, so nothing typed into them is lost. */}

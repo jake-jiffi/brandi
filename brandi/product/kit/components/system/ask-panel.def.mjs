@@ -41,11 +41,11 @@ export default {
     { name: "greeting", type: "ReactNode", default: '"No questions yet"', doc: 'The empty thread\'s title: "Morning, [Sam]".' },
     { name: "suggestions", type: "string[]", doc: "Up to three questions for an empty thread, as quiet buttons. A viewer sees none that create anything." },
     { name: "onSuggest", type: "(suggestion: string) => void", doc: "Called with the suggestion the person pressed, to ask it." },
-    { name: "onSend", type: "(question: string) => void", doc: "Called with the question on Enter or Send. Focus then moves to the new answer." },
-    { name: "working", type: "boolean", default: "false", doc: "An answer is running: Send becomes Stop." },
+    { name: "onSend", type: "(question: string) => void", doc: "Called with the question on Enter or Ask. Focus then moves to the new answer." },
+    { name: "working", type: "boolean", default: "false", doc: "An answer is running: Ask becomes Stop." },
     { name: "onStop", type: "() => void", doc: 'Stops the running answer. Focus moves to its "Stopped at step N of M" line. The answers inside show no Stop of their own.' },
     { name: "stopLabel", type: "string", default: '"Stop"', doc: "Stop's label." },
-    { name: "sendLabel", type: "string", default: '"Send"', doc: "Send's label." },
+    { name: "sendLabel", type: "string", default: '"Ask"', doc: "The composer's button. Ask, as AskBar says it: Send is for what a person sends out." },
     { name: "composerLabel", type: "string", default: '"Ask the assistant"', doc: "What the composer is for: its accessible name." },
     { name: "placeholder", type: "string", doc: "An example question, never an instruction." },
     { name: "onClose", type: "() => void", doc: "Shows a close button and lets Escape close the panel. Focus goes back to what opened it." },
@@ -55,13 +55,13 @@ export default {
   notes: {
     Behaviour: [
       "Docked, not modal: a complementary region named by its title, beside the page. It traps nothing and hides nothing, so people keep working in the page behind it, and Tab moves on from it into the page.",
-      "Enter sends and Shift+Enter adds a line. After Send or a suggestion, focus moves to the new answer's question. The thread is not a live region: each answer has its own status line.",
-      'While an answer runs, Send becomes Stop, and Stop moves focus to that answer\'s "Stopped at step N of M" line. While a proposal waits in the thread, Send drops to secondary, so the proposal\'s action is the only primary.',
+      "Enter asks and Shift+Enter adds a line. After Ask or a suggestion, focus moves to the new answer's question. The thread is not a live region: each answer has its own status line.",
+      'While an answer runs, Ask becomes Stop, and Stop moves focus to that answer\'s "Stopped at step N of M" line. While a proposal waits in the thread, Ask drops to secondary, so the proposal\'s action is the only primary.',
       "Close, or Escape inside the panel, closes it at once and returns focus to what opened it, then the page title, then main. It remembers what had focus as it mounts, so mount it when it opens.",
       "The composer comes after the thread in the tab order, so it is the next stop after the newest answer's own controls.",
     ],
     Layout: ["The title bar, the thread (scrolling, newest last) and the composer at the foot. It fills the height it is given and takes its width from the page beside it."],
-    States: ["Empty, with a greeting and up to three suggestions. Replying, with Stop in place of Send. Waiting on a proposal, with Send secondary. Done, stopped and failed come from the answers."],
+    States: ["Empty, with a greeting and up to three suggestions. Replying, with Stop in place of Ask. Waiting on a proposal, with Ask secondary. Done, stopped and failed come from the answers."],
     Copy: ["The greeting is short and in the brand's voice. Suggestions are things the person can do, in their words. The placeholder is an example question, never an instruction."],
     Rules: [
       "No model picker, no tabs of tools, no agent desktop.",
@@ -151,7 +151,7 @@ export default {
         await panel.getByRole("button", { name: "Close the assistant" }).focus()
         await page.keyboard.press("Shift+Tab")
         expect(await scope.getByRole("button", { name: "Ask the assistant" }).evaluate((el) => el === document.activeElement), "Shift+Tab from its first control reaches the page beside it")
-        await panel.getByRole("button", { name: "Send", exact: true }).focus()
+        await panel.getByRole("button", { name: "Ask", exact: true }).focus()
         await page.keyboard.press("Tab")
         const left = await panel.evaluate((el) => !el.contains(document.activeElement) && document.activeElement !== document.body)
         expect(left, "and Tab from its last control moves on past it")
@@ -176,11 +176,11 @@ export default {
       },
     },
     {
-      name: "While an answer runs, Send becomes Stop, and Stop moves focus to that answer's steps line",
+      name: "While an answer runs, Ask becomes Stop, and Stop moves focus to that answer's steps line",
       example: "states",
       async run({ page, scope, expect }) {
         const panel = scope.locator('[data-panel="working"]')
-        expect.equal(await panel.getByRole("button", { name: "Send", exact: true }).count(), 0, "no Send while it runs")
+        expect.equal(await panel.getByRole("button", { name: "Ask", exact: true }).count(), 0, "no Ask while it runs")
         expect.equal(await panel.locator('[data-slot="ai-answer"]').getByRole("button", { name: "Stop" }).count(), 0, "and the answer shows no Stop of its own")
         await panel.getByRole("button", { name: "Stop" }).focus()
         await page.keyboard.press("Enter")
@@ -188,16 +188,16 @@ export default {
         const f = await focused(page)
         expect.equal(f.slot, "ai-steps-summary", "focus lands on the steps line")
         expect.equal(f.text, "Stopped at step 2 of 2", "which says where it stopped")
-        expect.equal(await panel.getByRole("button", { name: "Send", exact: true }).count(), 1, "and Send is back")
+        expect.equal(await panel.getByRole("button", { name: "Ask", exact: true }).count(), 1, "and Ask is back")
       },
     },
     {
-      name: "While a proposal waits in the thread, Send drops to secondary",
+      name: "While a proposal waits in the thread, Ask drops to secondary",
       example: "states",
       async run({ scope, expect }) {
-        expect.equal(await scope.locator('[data-panel="waiting"]').getByRole("button", { name: "Send", exact: true }).getAttribute("data-variant"), "secondary", "Send steps aside for the proposal")
+        expect.equal(await scope.locator('[data-panel="waiting"]').getByRole("button", { name: "Ask", exact: true }).getAttribute("data-variant"), "secondary", "Ask steps aside for the proposal")
         expect.equal(await scope.locator('[data-panel="waiting"] [data-slot="button"][data-variant="default"]').count(), 1, "the proposal's action is the only primary")
-        expect.equal(await scope.locator('[data-panel="empty"]').getByRole("button", { name: "Send", exact: true }).getAttribute("data-variant"), "default", "otherwise Send is the primary")
+        expect.equal(await scope.locator('[data-panel="empty"]').getByRole("button", { name: "Ask", exact: true }).getAttribute("data-variant"), "default", "otherwise Ask is the primary")
       },
     },
     {
@@ -246,7 +246,7 @@ export default {
       },
     },
     {
-      name: "Send, Stop and the suggestions are at least 40px on a touch screen",
+      name: "Ask, Stop and the suggestions are at least 40px on a touch screen",
       example: "states",
       touch: true,
       async run({ scope, expect }) {

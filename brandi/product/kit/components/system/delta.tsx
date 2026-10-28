@@ -63,15 +63,13 @@ export const Delta = React.forwardRef<HTMLSpanElement, DeltaProps>(function Delt
       >
         <Icon name={direction === "up" ? "ArrowUp" : direction === "down" ? "ArrowDown" : "Minus"} size={14} strokeWidth={2.25} />
         {figure}
-        {/* Forced colours take away the colour that says better or worse, so the word stands in for it. */}
-        {judgement ? (
-          <span data-slot="delta-judgement" className="ms-1 hidden forced-colors:inline">
-            {judgement}
-          </span>
-        ) : null}
       </span>
-      {suffix ? (
+      {/* The word says better or worse in every mode: colour alone fails anyone who cannot tell success from danger,
+          and whether up is good depends on goodWhen, which no arrow shows. */}
+      {judgement || suffix ? (
         <span aria-hidden="true" className="type-body text-text-muted">
+          {judgement ? <span data-slot="delta-judgement">{judgement}</span> : null}
+          {judgement && suffix ? " " : null}
           {suffix}
         </span>
       ) : null}

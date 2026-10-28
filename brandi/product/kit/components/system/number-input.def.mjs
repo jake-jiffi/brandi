@@ -28,6 +28,7 @@ export default {
     { name: "min", type: "number", doc: "The lowest it takes. Its step button turns off there." },
     { name: "max", type: "number", doc: "The highest it takes. Its step button turns off there." },
     { name: "step", type: "number", default: "1", doc: "How far a step button or an arrow key moves the value." },
+    { name: "integer", type: "boolean", default: "false", doc: "Whole numbers only, for a count: a typed decimal is refused and the Field says Enter a whole number." },
     { name: "size", type: '"sm" | "md" | "lg"', default: '"md"', doc: "32, 36 or 44px tall; 40, 44 or 48px on a touch screen, with 16px text and 44px step buttons there." },
     { name: "prefix", type: "ReactNode", doc: "Text before the value, such as $. Read with the field." },
     { name: "suffix", type: "ReactNode", doc: "Text after the value, such as kg or %. Read with the field." },
@@ -42,14 +43,15 @@ export default {
       "A spin button: a screen reader hears the label, spin button, and the value, with the prefix and suffix read with the field.",
       "Up and Down step the value, within min and max.",
       "The step buttons are named by what they change (Increase quantity). They sit out of the tab order, because Up and Down do the same from the field, and a press keeps the caret in the field and says the new value politely.",
-      "On a desktop the two step buttons sit together at the end. On touch, Decrease moves to the start, so the two 44px targets sit apart with the value between them.",
-      "A typed value is checked when the person leaves the field or presses Enter, never while they type. Not a number, or out of range, stays as typed, turns the field invalid, and the Field around it says what to enter (Enter a number from 1 to 99).",
+      "Decrease sits at the start and Increase at the end, on every screen, so it reads minus, value, plus, in the source as on screen. On touch the two 44px targets sit apart with the value between them.",
+      "A typed value is checked when the person leaves the field or presses Enter, never while they type. Not a number, or out of range, stays as typed, turns the field invalid, and the Field around it says what to enter (Enter a number from 1 to 99, or Enter a whole number from 1 to 99 for a count).",
       "Numbers show through the system's formatter, and what people type is read with the market's separators, so 1,250.5 and 1250.5 are the same.",
     ],
     States: ["The input's edge: a 2px focus edge, a danger edge that stays danger when focused, dashed with a lock when read-only. A step button turns off at its limit."],
     Copy: ["The hint gives the range (From 1 to 99) so the check never surprises anyone."],
     Rules: [
       "Put it in a Field: the Field names it, names its step buttons and shows its message.",
+      "A count of things (items, seats, guests) is integer: 1.5 meals is refused, not rounded.",
       "For a range of values, use two NumberInputs or a slider; for a year or a code that only looks like a number, use a TextInput.",
     ],
     Open: ["To build, not yet proven: no review round has checked it. Page Up, Page Down, Home and End are left to the text field rather than stepping."],
@@ -61,12 +63,12 @@ export default {
       layout: "block",
       markup: row(
         [
-          field("Quantity", 'min="{{one}}" max="{{ninetyNine}}" default-value="{{three}}"', ' hint="From 1 to 99."'),
+          field("Quantity", 'integer="{{yes}}" min="{{one}}" max="{{ninetyNine}}" default-value="{{three}}"', ' hint="From 1 to 99."'),
           field("Amount", 'prefix="$" min="{{zero}}" step="{{cent}}" default-value="{{amount}}"'),
           field("Discount", 'suffix="%" min="{{zero}}" max="{{hundred}}" step="{{five}}" default-value="{{ten}}"'),
         ].join("\n")
       ),
-      vals: { one: 1, ninetyNine: 99, three: 3, zero: 0, cent: 0.01, amount: 1250.5, hundred: 100, five: 5, ten: 10 },
+      vals: { one: 1, ninetyNine: 99, three: 3, zero: 0, cent: 0.01, amount: 1250.5, hundred: 100, five: 5, ten: 10, yes: true },
     },
     {
       id: "states",
@@ -98,6 +100,34 @@ export default {
   ],
   frame: { width: 960, height: 548 },
   checks: [
+    {
+      name: "A whole-number count refuses a typed decimal and says so",
+      example: "basics",
+      async run({ page, scope, expect }) {
+        const quantity = scope.getByRole("spinbutton", { name: "Quantity" })
+        await quantity.fill("2.5")
+        await page.keyboard.press("Tab")
+        expect.equal(await quantity.getAttribute("aria-invalid"), "true", "a decimal is refused")
+        expect.equal(await quantity.inputValue(), "2.5", "and stays as typed, to be fixed")
+        const message = await quantity.evaluate((el) => (el.getAttribute("aria-describedby") ?? "").split(" ").map((id) => document.getElementById(id)?.textContent.trim()).join(" "))
+        expect(message.includes("Enter a whole number from 1 to 99"), `it says what to enter (${message})`)
+        await quantity.fill("4")
+        await page.keyboard.press("Tab")
+        expect.equal(await quantity.getAttribute("aria-invalid"), null, "a whole number is taken")
+        expect.equal(await quantity.getAttribute("inputmode"), "numeric", "with the digits keypad")
+      },
+    },
+    {
+      name: "It reads minus, value, plus, on a desktop and on touch, in the source as on screen",
+      example: "basics",
+      async run({ scope, expect }) {
+        const box = scope.locator('[data-slot="number-input"]').first()
+        const [minus, input, plus] = await Promise.all([box.getByRole("button", { name: "Decrease quantity" }).boundingBox(), box.getByRole("spinbutton").boundingBox(), box.getByRole("button", { name: "Increase quantity" }).boundingBox()])
+        expect(minus.x + minus.width <= input.x && input.x + input.width <= plus.x, "minus, then the value, then plus")
+        const order = await box.evaluate((el) => [...el.querySelectorAll('button, [role="spinbutton"]')].map((n) => n.getAttribute("aria-label") ?? "value").join(" | "))
+        expect.equal(order, "Decrease quantity | value | Increase quantity", "the same order for a screen reader")
+      },
+    },
     {
       name: "It reads as a spin button with its value and range, and its label focuses it",
       example: "basics",
@@ -154,7 +184,7 @@ export default {
         expect.equal((await region.textContent()).trim(), "", "nothing while they type")
         expect.equal(await quantity.getAttribute("aria-invalid"), null, "not invalid while they type")
         await page.keyboard.press("Tab")
-        expect.equal((await region.textContent()).trim(), "Enter a number from 1 to 99", "checked on leaving, and announced")
+        expect.equal((await region.textContent()).trim(), "Enter a whole number from 1 to 99", "checked on leaving, and announced")
         expect.equal(await quantity.getAttribute("aria-invalid"), "true", "invalid")
         expect.equal(await quantity.inputValue(), "150", "what they typed stays")
         await quantity.fill("12")
@@ -163,7 +193,7 @@ export default {
         expect.equal(await quantity.getAttribute("aria-valuenow"), "12", "and is the new value")
         await quantity.fill("about 12")
         await page.keyboard.press("Enter")
-        expect.equal((await region.textContent()).trim(), "Enter a number from 1 to 99", "Enter checks it too")
+        expect.equal((await region.textContent()).trim(), "Enter a whole number from 1 to 99", "Enter checks it too")
       },
     },
     {

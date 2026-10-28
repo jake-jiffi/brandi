@@ -43,7 +43,7 @@ export interface NavItemProps {
   href: string
   /** 18px on the rail. The icons-only rail shows nothing else, so every top-level item has one. */
   icon?: IconName
-  /** The page people are on: rail-selected with a hairline, and aria-current="page". */
+  /** The page people are on: rail-selected with a hairline, a bar in rail-text-strong, and aria-current="page". */
   current?: boolean
   /** Work waiting there. Zero shows nothing. */
   count?: number
@@ -81,6 +81,9 @@ export const NavItem = React.forwardRef<HTMLAnchorElement, NavItemProps>(functio
         "group/nav-item relative flex min-h-9 w-full min-w-0 items-center gap-2.5 rounded-control px-3 py-1.5 type-label text-rail-text transition-colors duration-(--duration-fast)",
         "hover:bg-rail-hover hover:text-rail-text-strong [--focus:var(--rail-focus)] focus-visible:outline-rail-focus focus-visible:outline-offset-[-2px] pointer-coarse:min-h-11",
         current && "bg-rail-selected text-rail-text-strong shadow-[inset_0_0_0_1px_var(--rail-line)] hover:bg-rail-selected",
+        // The fill is a step off the rail, about 1.3:1, so the bar carries the state at 3:1 or more (WCAG 1.4.11):
+        // rail-text-strong holds 4.5:1 on the rail and on the fill in every brand.
+        current && "before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-rail-text-strong",
         // Lined up under the label of the item above: 12px in, the 18px icon and its 10px gap.
         sub && "pl-10 @max-[160px]/rail:hidden",
         "@max-[160px]/rail:size-10 @max-[160px]/rail:min-h-10 @max-[160px]/rail:justify-center @max-[160px]/rail:p-0 @max-[160px]/rail:pointer-coarse:size-11",

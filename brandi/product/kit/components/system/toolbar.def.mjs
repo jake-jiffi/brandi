@@ -32,7 +32,7 @@ export default {
     { name: "selectedCount", type: "number", default: "0", doc: "How many rows are selected. Above zero, the filters give way to the bulk actions." },
     { name: "bulkActions", type: "Array<{ label: string; icon?: IconName; variant?: \"secondary\" | \"primary\" | \"danger\"; disabled?: boolean; onSelect?: () => void }>", doc: "The actions for the selected rows, as data, so a board can pass them. They act only on rows on screen." },
     { name: "onClearSelection", type: "() => void", doc: "Clears the selection. Focus then goes back to the filters, never to the page body." },
-    { name: "sticky", type: "boolean", default: "true", doc: "Sticks to the top of the scrolling area on the canvas colour while the table scrolls." },
+    { name: "sticky", type: "boolean", default: "true", doc: "Sticks to the top of the scrolling area on the canvas colour while the table scrolls, except on a screen under 560px tall." },
   ],
   notes: {
     Behaviour: [
@@ -45,6 +45,7 @@ export default {
       "Wraps by its own width, never the window. Controls stay 8px apart, and rows 8px apart when they wrap.",
       "12px of padding above and below its controls: it sits 12px above its table, and rows sliding under it while it sticks never touch the controls.",
       "At least 36px tall in both modes, 44px on touch, so selecting rows never moves the table.",
+      "While it sticks, its scroller's scroll-padding-top reaches its foot, so a control Tab or Shift+Tab brings into view never comes to rest beneath it. On a screen under 560px tall (200% zoom on a laptop, a phone on its side) it stops sticking, because it would take most of the screen.",
     ],
     States: ["The filters stay mounted while rows are selected, so a search someone typed or a chip they pressed is still there when the selection clears."],
     Rules: [
@@ -52,7 +53,10 @@ export default {
       "Keep the row to one size of control: chips are 32px, so the switcher and buttons beside them are sm.",
       "Bulk actions act only on rows on screen, and the count says how many.",
     ],
-    Review: ["Focus fell to the page body after clearing a selection (rounds 3 and 4, section 2.6): a scripted check presses Clear selection from the keyboard."],
+    Review: [
+      "Focus fell to the page body after clearing a selection (rounds 3 and 4, section 2.6): a scripted check presses Clear selection from the keyboard.",
+      "At 200% and 400% zoom, Shift+Tab up a list left the focused row under the sticking toolbar (WCAG 2.4.11, a pilot's round 1): checks tab up a list under it, and look on a short screen.",
+    ],
   },
   examples: [
     {
@@ -83,6 +87,17 @@ ${FILTERS}
       vals: { bulk: [{ label: "Send reminders", icon: "Send" }, { label: "Export", icon: "Download" }] },
     },
     {
+      id: "scrolling",
+      title: "Sticking over a list that scrolls",
+      layout: "block",
+      markup: `<div data-scroller="" style="height: 240px; overflow-y: auto; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius-md);">
+<x-import component-from-global-scope="NS.Toolbar" label="[Job] filters, over a list">
+${FILTERS}
+</x-import>
+${Array.from({ length: 12 }, (_, i) => `<p style="margin: 0; padding: 8px 0;"><a href="#job-${1040 + i}">[Job ${1040 + i}]</a></p>`).join("\n")}
+</div>`,
+    },
+    {
       id: "narrow",
       title: "In a narrow space it wraps",
       layout: "block",
@@ -92,7 +107,7 @@ ${FILTERS}
 </x-import>`,
     },
   ],
-  frame: { width: 960, height: 460 },
+  frame: { width: 960, height: 760 },
   state: { selected: 3 },
   logic: "selected: self.state.selected, clearSelection: () => self.setState({ selected: 0 })",
   checks: [
@@ -172,6 +187,38 @@ ${FILTERS}
         expect.equal(s.position, "sticky", "position")
         expect.equal(s.top, "0px", "top")
         expect.equal(s.bg, await colourOf(page, "canvas"), "an opaque canvas behind the controls")
+      },
+    },
+    {
+      name: "While it sticks, Shift+Tab up the list never leaves the focused row under it",
+      example: "scrolling",
+      async run({ page, scope, expect }) {
+        const toolbar = scope.locator('[data-slot="toolbar"]')
+        const scroller = scope.locator("[data-scroller]")
+        const height = Math.round((await toolbar.boundingBox()).height)
+        expect.equal(await scroller.evaluate((el) => el.style.scrollPaddingTop), `${height}px`, "the scroller keeps the toolbar's height clear")
+        await scope.getByRole("link", { name: "[Job 1051]" }).focus()
+        for (let i = 0; i < 11; i++) {
+          await page.keyboard.press("Shift+Tab")
+          const where = await page.evaluate(() => {
+            const el = document.activeElement
+            const bar = el.closest('[data-scroller]')?.querySelector('[data-slot="toolbar"]')
+            if (!bar || bar.contains(el)) return null
+            const r = el.getBoundingClientRect()
+            return { name: el.textContent.trim(), top: Math.round(r.top), under: Math.round(bar.getBoundingClientRect().bottom), hit: el.contains(document.elementFromPoint(r.left + 4, r.top + r.height / 2)) }
+          })
+          if (!where) break
+          expect(where.top >= where.under - 1 && where.hit, `${where.name} came to rest at ${where.top}px, under the toolbar's foot at ${where.under}px`)
+        }
+      },
+    },
+    {
+      name: "On a screen under 560px tall it stops sticking, and keeps nothing clear for itself",
+      example: "scrolling",
+      viewport: { width: 1280, height: 480 },
+      async run({ scope, expect }) {
+        expect.equal(await scope.locator('[data-slot="toolbar"]').evaluate((el) => getComputedStyle(el).position), "static", "it scrolls with the list")
+        expect.equal(await scope.locator("[data-scroller]").evaluate((el) => el.style.scrollPaddingTop), "", "no scroll padding for a toolbar that does not stick")
       },
     },
     {

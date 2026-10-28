@@ -13,6 +13,8 @@ import { ProductLockup } from "./product-lockup"
 export interface PhoneTopBarProps {
   /** The screen's title, for a detail screen. One line, cut with an ellipsis; the page's heading below carries it whole. */
   title?: string
+  /** Makes the title a heading at this level, for a task screen with no page header below it: 1 when it is the page's one h1. */
+  headingLevel?: 1 | 2 | 3 | 4 | 5 | 6
   /** Back to the screen above: `{ href, label }`, where label names it: "[Invoices]". Read as "Back to [Invoices]". */
   back?: { href: string; label: string }
   /** Shows the menu button, which opens the navigation drawer. AppShell passes it. */
@@ -32,7 +34,7 @@ export interface PhoneTopBarProps {
 
 /** The top bar under 1024px of shell: the menu button and the lockup, or Back and the screen's title. */
 export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(function PhoneTopBar(
-  { title, back, onMenu, menuExpanded = false, menuRef, product, home, actions, className },
+  { title, headingLevel, back, onMenu, menuExpanded = false, menuRef, product, home, actions, className },
   ref
 ) {
   const Link = useLink()
@@ -70,9 +72,13 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
       ) : null}
       <div className={cn("flex min-w-0 flex-1 items-center", back || onMenu ? "px-1" : "px-2")}>
         {title ? (
-          <p data-slot="phone-top-bar-title" className="min-w-0 truncate type-heading">
-            {title}
-          </p>
+          // A paragraph by default, because the page header below holds the heading; a heading when nothing does.
+          // As the page's h1 it steps up to heading-lg, so the page keeps a hierarchy above its body text.
+          React.createElement(
+            headingLevel && Number(headingLevel) >= 1 && Number(headingLevel) <= 6 ? `h${Number(headingLevel)}` : "p",
+            { "data-slot": "phone-top-bar-title", className: cn("min-w-0 truncate", Number(headingLevel) === 1 ? "type-heading-lg" : "type-heading") },
+            title
+          )
         ) : (
           <ProductLockup tone="rail" color={PRODUCT.railTone === "dark" ? "on-dark" : "auto"} product={product} href={home} height={20} />
         )}

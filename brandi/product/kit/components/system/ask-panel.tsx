@@ -28,13 +28,14 @@ export interface AskPanelProps extends Omit<React.ComponentPropsWithoutRef<"asid
   /** Up to three questions for an empty thread, as quiet buttons. A viewer sees none that create anything. */
   suggestions?: string[]
   onSuggest?: (suggestion: string) => void
-  /** Called with the question on Enter or Send. Focus then moves to the new answer. */
+  /** Called with the question on Enter or Ask. Focus then moves to the new answer. */
   onSend?: (question: string) => void
-  /** An answer is running: Send becomes Stop. */
+  /** An answer is running: Ask becomes Stop. */
   working?: boolean
   /** Stops the running answer. Focus moves to its "Stopped at step N of M" line. */
   onStop?: () => void
   stopLabel?: string
+  /** The composer's button. Ask, the verb AskBar uses, so asking the assistant reads the same everywhere: Send is what a person does to an email. */
   sendLabel?: string
   /** What the composer is for: its accessible name. */
   composerLabel?: string
@@ -63,7 +64,7 @@ export const AskPanel = React.forwardRef<HTMLElement, AskPanelProps>(function As
     working = false,
     onStop,
     stopLabel = "Stop",
-    sendLabel = "Send",
+    sendLabel = "Ask",
     composerLabel = "Ask the assistant",
     placeholder,
     onClose,

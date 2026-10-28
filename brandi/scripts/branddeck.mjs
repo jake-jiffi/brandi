@@ -242,6 +242,7 @@ table.pairing td { text-align: center; }
 .card { border: 1px solid var(--rule); padding: 24px; display: flex; flex-direction: column; gap: 10px; border-radius: var(--radius); background: var(--paper); }
 .card h3 { font-size: 22px; }
 .card p { font-size: 16px; color: var(--muted); line-height: 1.45; }
+.card .big { color: var(--ink); }
 table { width: 100%; border-collapse: collapse; font-size: 15px; }
 th { text-align: left; font-weight: 400; font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); padding: 0 12px 8px 0; border-bottom: 1px solid var(--ink); }
 td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
@@ -805,6 +806,32 @@ function planMechanics(entries) {
 
 function railText(...paras) {
   return paras.filter(has).map((p) => `<p>${p}</p>`).join('');
+}
+
+/**
+ * Where one page of the register sits in it, and the ids the register skips there.
+ *
+ * Records keep their ids for life, so a register with a withdrawn or moved record runs d70, d75. Counted by
+ * position, the rail said "68 to 71 of 76" above d68 to d75, and a careful reader saw records missing under
+ * a heading that said nothing was. With ids, the rail names the ids it shows and the ones the page skips.
+ */
+export function registerSpan(all, rows, start, noun) {
+  const idOf = (r) => /^([a-z]+)(\d+)$/i.exec(String(r?.id ?? ''));
+  const parsed = all.map(idOf);
+  const sameKind = parsed.length && parsed.every((m) => m && m[1].toLowerCase() === parsed[0][1].toLowerCase());
+  if (!rows.length) return { span: null, gaps: null };
+  if (!sameKind) return { span: `${noun} ${start + 1} to ${start + rows.length} of ${all.length}.`, gaps: null };
+  const prefix = parsed[0][1];
+  const missing = [];
+  for (let i = Math.max(start, 1); i < start + rows.length; i++) {
+    const a = Number(parsed[i - 1][2]);
+    const b = Number(parsed[i][2]);
+    if (b - a > 1) missing.push(b - a === 2 ? `${prefix}${a + 1}` : `${prefix}${a + 1} to ${prefix}${b - 1}`);
+  }
+  return {
+    span: `${noun} ${rows[0].id} to ${rows.at(-1).id}, ${rows.length} of ${all.length}.`,
+    gaps: missing.length ? `Not on these pages: ${missing.join(', ')}. An id is never reused, so a record that was closed, withdrawn or moved leaves a gap.` : null,
+  };
 }
 
 const SAMPLE_KIND = { motion: 'Video', sound: 'Sound', voice: 'Voice', object: '3D model' };
@@ -1801,7 +1828,7 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
         canvas: `<div style="display:flex;flex-direction:column;gap:36px;justify-content:space-between;height:100%">
           <p style="font-family:${stack};font-size:200px;line-height:1;letter-spacing:-0.03em;font-weight:${role === 'display' ? 700 : 400}">${esc(family)}</p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start">
-            <p style="font-family:${stack};font-size:30px;line-height:1.3;word-break:break-all;font-weight:${role === 'display' ? 700 : 400}">AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz 1234567890</p>
+            <p style="font-family:${stack};font-size:30px;line-height:1.3;word-break:break-all;font-weight:${role === 'display' ? 700 : 400}">AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz <span style="white-space:nowrap">1234567890</span></p>
             <p style="font-family:${stack};font-size:18px;line-height:1.5">${specimenText ? esc(specimenText) : todo('a paragraph of real brand copy to set as the specimen (voice.boilerplate)')}</p>
           </div>
         </div>`,
@@ -2314,13 +2341,15 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
     page({
       chapter: 'governance', id: c ? `decisions-${c + 1}` : 'decisions', title: c ? 'Decisions, continued' : 'Decisions',
       render: (n) => {
+        const { span, gaps } = registerSpan(gov.decisions, rows, start, 'Decisions');
         const counts = Object.keys(PROVENANCE).map((k) => [k, (brand.evidence ?? []).filter((e) => e.provenance === k).length]).filter(([, cnt]) => cnt > 0);
         return contentPage(ctx, {
           id: c ? `decisions-${c + 1}` : 'decisions', chapter: 'Rules and decisions', title: c ? 'Decisions, continued' : 'Decisions', n, fill: true,
-          rail: c ? railText(`Decisions ${start + 1} to ${start + rows.length} of ${gov.decisions.length}.`) : railText(
+          rail: c ? railText(span, gaps) : railText(
               'What was decided, why, and what nobody has answered yet. A change nobody wrote down becomes an inconsistency the next person has to guess about.',
               `<strong>Where this came from.</strong> ${counts.length ? counts.map(([k, c]) => `${esc(PROVENANCE[k].label)} ${c}`).join(', ') : 'no evidence recorded'}. Every statement in this deck is traceable to one of those; anything assumed is a working assumption, not a finding.`,
               has(gov.trademark?.notice) ? `<strong>Trademark.</strong> ${esc(gov.trademark.notice)}` : null,
+              gaps,
             ),
           canvas: `<h2>Decision log</h2>
           ${rows.length ? table({
@@ -2339,7 +2368,10 @@ ${list.length > 3 ? `            <p style="font-size:15px;color:var(--muted)">${
       chapter: 'governance', id: c ? `open-questions-${c + 1}` : 'open-questions', title: c ? 'Open questions, continued' : 'Open questions',
       render: (n) => contentPage(ctx, {
         id: c ? `open-questions-${c + 1}` : 'open-questions', chapter: 'Rules and decisions', title: c ? 'Open questions, continued' : 'Open questions', n, fill: true,
-        rail: railText(!rows.length ? 'Nothing is waiting on an answer.' : c ? `Open questions ${start + 1} to ${start + rows.length} of ${openQuestions.length}.` : `What nobody has answered yet, and what is assumed until they do. ${openQuestions.length} open.`),
+        rail: railText(
+          !rows.length ? 'Nothing is waiting on an answer.' : c ? registerSpan(openQuestions, rows, start, 'Open questions').span : `What nobody has answered yet, and what is assumed until they do. ${openQuestions.length} open.`,
+          registerSpan(openQuestions, rows, start, 'Open questions').gaps,
+        ),
         canvas: `<h2>Open questions</h2>
         ${rows.length ? table({
           caption: 'The open questions, what is assumed until each is answered, and who can answer it',

@@ -40,11 +40,14 @@ export default {
     States: [
       "Photo, initials and the assistant. Online is a full dot, away a half dot and offline an empty ring, so status never rides on colour alone.",
       "The same name always gets the same tag tint. Forced colours keep the status dot's drawing.",
+      "The initials take the page's text colour, the ink the tag tints are measured against, wherever the avatar sits: a rail that turns its own text light leaves them alone.",
     ],
     Rules: [
       "Always with the person's name nearby: an avatar alone names nobody to a sighted person.",
       "Initials come from the first and last words of the name, without a sample name's brackets.",
+      "A name's tint is never one on a hue the brand keeps off its grounds: the tokens list those tags (avoidTags, from charts.avoid) and lib/product.ts carries them.",
     ],
+    Review: ["On a dark rail the initials turned white on a pale tint, about 1.2:1, and no gate measured them, because they are drawn content (a pilot's round 1)."],
   },
   examples: [
     {
@@ -65,6 +68,13 @@ export default {
         named(`<x-import component-from-global-scope="NS.Avatar" name="Assistant" assistant="{{yes}}"></x-import>`, "Assistant"),
       ].join("\n"),
       vals: { photo: PHOTO, yes: true },
+    },
+    {
+      id: "rail",
+      title: "On a rail that turns its text light",
+      markup: `<div class="on-rail flex flex-wrap items-center gap-3 rounded-lg bg-rail p-3" style="--rail-text-strong: var(--text-inverse); --rail-text: var(--text-inverse);">
+${["[Tom Okafor]", "[Ada Lovelace]", "[Mia Chen]", "[Sam Patel]", "[Lena Brooks]", "[Priya Raman]", "[Jo Ellis]", "[Kai Moana]"].map((n) => `<x-import component-from-global-scope="NS.Avatar" name="${n}"></x-import>`).join("\n")}
+</div>`,
     },
     {
       id: "status",
@@ -124,13 +134,15 @@ export default {
       },
     },
     {
-      name: "Initials hold 4.5:1 on their tint, in both themes",
-      example: "kinds",
+      name: "Initials hold 4.5:1 on their tint, on a rail that turns its text light too, in both themes",
       themes: ["light", "dark"],
-      async run({ scope, expect }) {
-        const fallback = scope.locator('[data-slot="avatar-fallback"]').first()
-        const { ink, bg } = await fallback.evaluate((el) => ({ ink: getComputedStyle(el).color, bg: getComputedStyle(el).backgroundColor }))
-        expect.atLeast(Math.round(contrast(ink, bg) * 100) / 100, 4.5, "initials contrast")
+      async run({ page, expect, theme }) {
+        // The initials are drawn content, so the colour is read from the drawing itself, where no other gate looks.
+        const drawn = await page.locator('[data-example="kinds"] [data-slot="avatar-fallback"], [data-example="rail"] [data-slot="avatar-fallback"]').evaluateAll((all) =>
+          all.map((el) => ({ ink: getComputedStyle(el.querySelector("[data-initials]"), "::before").color, bg: getComputedStyle(el).backgroundColor, who: el.closest("[data-example]").dataset.example }))
+        )
+        expect.atLeast(drawn.filter((d) => d.who === "rail").length, 6, "the rail's eight avatars")
+        for (const d of drawn) expect.atLeast(Math.round(contrast(d.ink, d.bg) * 100) / 100, 4.5, `${theme} initials on the ${d.who} example`)
       },
     },
     {

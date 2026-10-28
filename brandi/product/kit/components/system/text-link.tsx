@@ -15,12 +15,14 @@ export interface TextLinkProps extends Omit<React.AnchorHTMLAttributes<HTMLAncho
   icon?: IconName
   /** An icon after the text, such as ArrowRight or ExternalLink. */
   iconRight?: IconName
+  /** On its own rather than in a sentence (a card's See all, Forgot your password?): its tap area grows to 40px on touch. */
+  standalone?: boolean
   children: React.ReactNode
 }
 
 /** An underlined inline link in the link colour. Links navigate; buttons act. */
 export const TextLink = React.forwardRef<HTMLAnchorElement, TextLinkProps>(function TextLink(
-  { href, icon, iconRight, target, rel, className, children, ...rest },
+  { href, icon, iconRight, standalone = false, target, rel, className, children, ...rest },
   ref
 ) {
   const Link = useLink() as React.ElementType
@@ -35,8 +37,12 @@ export const TextLink = React.forwardRef<HTMLAnchorElement, TextLinkProps>(funct
       // Vertical padding on an inline box grows its target to 24px without moving the line it sits on.
       // The colour and the underline are important because a canvas board's base styles reset every link
       // outside any layer, which beats a layered utility: without it a board would draw the link as text.
+      // On its own, a link is pressable like any control, so on touch its tap area is 40px, centred on it, with no
+      // change to how it looks. In a sentence it keeps the 24px WCAG target, so it never reaches over the lines
+      // beside it.
       className={cn(
         "py-1 text-link! underline decoration-auto! underline-offset-4! transition-colors hover:text-link-hover!",
+        standalone && "relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:inset-y-[calc(50%-20px)]",
         className
       )}
       {...rest}

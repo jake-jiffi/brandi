@@ -52,7 +52,8 @@ export default {
     ],
     Copy: [
       "Errors say what to enter: Enter a date as dd/mm/yyyy. Choose a date from 02/11/2026 to 27/11/2026.",
-      "The calendar button is named for the field: Choose due date.",
+      "The calendar button is named so it reads with any label, as the label is written: Open calendar, Due date (never Choose starts). The calendar is Calendar, Due date.",
+      "A chosen date shows its day of the week beside it (Thu), and a screen reader hears it after the date (Thursday): a date in numbers alone leaves people counting.",
     ],
     Detector: ["Inside a Card or a FormSection the design detector reads the field box as a nested card. The box carries data-impeccable-ignore=\"nested-cards\", because it is a field. axe and every scripted check still run on it."],
     Rules: [
@@ -99,15 +100,30 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
   frame: { width: 960, height: 830 },
   checks: [
     {
+      name: "A chosen date shows its day of the week and is read with it; the button reads with any label",
+      async run({ page, expect }) {
+        const start = page.getByRole("textbox", { name: "Start date" })
+        expect.equal(await start.inputValue(), "02/11/2026", "the date in the market's numbers")
+        const box = start.locator("xpath=ancestor::*[@data-slot='date-picker'][1]")
+        // 2 November 2026 is a Monday, in the market's own words for it.
+        const short = (await box.locator('[data-slot="date-picker-day"]').textContent()).trim()
+        expect(short.length > 0 && short.length <= 4, `the short weekday beside it (${short})`)
+        const described = await start.evaluate((el) => (el.getAttribute("aria-describedby") ?? "").split(" ").map((id) => document.getElementById(id)?.textContent.trim()).filter(Boolean).join(" "))
+        expect(described.length > short.length && described.toLowerCase().startsWith(short.toLowerCase().replace(/\.$/, "")), `the weekday in full in its description (${described})`)
+        expect.equal(await page.getByRole("textbox", { name: "Due date" }).evaluate((el) => el.closest('[data-slot="date-picker"]').querySelectorAll('[data-slot="date-picker-day"]').length), 0, "no weekday before a date is chosen")
+        expect.equal(await page.getByRole("button", { name: "Open calendar, Due date" }).count(), 1, "the button names the field as it is written")
+      },
+    },
+    {
       name: "The calendar opens on the chosen day; arrows move by day and week, Page Up and Page Down by month, Home and End to the week's ends",
       example: "basics",
       async run({ page, scope, expect }) {
-        await scope.getByRole("button", { name: "Choose start date" }).focus()
+        await scope.getByRole("button", { name: "Open calendar, Start date" }).focus()
         await page.keyboard.press("Enter")
         await dayInHand(page)
         expect.equal(await focusedDay(page), "Monday 2 November 2026", "focus is on the chosen day")
         expect.equal(await page.locator(livePanel).getAttribute("role"), "dialog", "the calendar is a dialog")
-        expect.equal(await page.locator(livePanel).getAttribute("aria-label"), "Choose start date", "named for its field")
+        expect.equal(await page.locator(livePanel).getAttribute("aria-label"), "Calendar, Start date", "named for its field")
         await page.keyboard.press("ArrowRight")
         expect.equal(await focusedDay(page), "Tuesday 3 November 2026", "Right moves a day")
         await page.keyboard.press("ArrowDown")
@@ -144,7 +160,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       name: "Tab from the end of the calendar goes on to the next field, Shift Tab from its start goes back to its button, and either closes it",
       example: "basics",
       async run({ page, scope, expect }) {
-        const button = scope.getByRole("button", { name: "Choose start date" })
+        const button = scope.getByRole("button", { name: "Open calendar, Start date" })
         await button.focus()
         await page.keyboard.press("Enter")
         await dayInHand(page)
@@ -158,7 +174,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
         await page.keyboard.press("Shift+Tab")
         await page.keyboard.press("Shift+Tab")
         // The button's own tooltip opens on focus, so count the calendar itself.
-        expect.equal(await page.evaluate(() => `${document.activeElement?.getAttribute("aria-label")} ${document.querySelectorAll('[data-radix-popper-content-wrapper] [data-slot="date-picker-panel"]').length}`), "Choose start date 0", "Shift Tab past the month buttons went back to the calendar button, and the calendar closed")
+        expect.equal(await page.evaluate(() => `${document.activeElement?.getAttribute("aria-label")} ${document.querySelectorAll('[data-radix-popper-content-wrapper] [data-slot="date-picker-panel"]').length}`), "Open calendar, Start date 0", "Shift Tab past the month buttons went back to the calendar button, and the calendar closed")
       },
     },
     {
@@ -169,7 +185,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
           window.__escapes = []
           window.addEventListener("keydown", (e) => e.key === "Escape" && window.__escapes.push(e.defaultPrevented))
         })
-        await scope.getByRole("button", { name: "Choose start date" }).click()
+        await scope.getByRole("button", { name: "Open calendar, Start date" }).click()
         await dayInHand(page)
         await page.keyboard.press("PageDown")
         await page.keyboard.press("Escape")
@@ -215,7 +231,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       name: "Days outside min and max cannot be chosen, and a typed date outside them says the range",
       example: "basics",
       async run({ page, scope, expect }) {
-        await scope.getByRole("button", { name: "Choose delivery date" }).click()
+        await scope.getByRole("button", { name: "Open calendar, Delivery date" }).click()
         await dayInHand(page)
         const panel = page.locator(livePanel)
         expect.equal((await panel.locator('[role="status"]').first().textContent()).trim(), "November 2026", "it opens on the first month it allows")
@@ -234,7 +250,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       name: "The week starts on Monday in en-AU, with the locale's weekday names",
       example: "basics",
       async run({ page, scope, expect }) {
-        await scope.getByRole("button", { name: "Choose start date" }).click()
+        await scope.getByRole("button", { name: "Open calendar, Start date" }).click()
         await dayInHand(page)
         const head = await page.locator(`${livePanel} th`).evaluateAll((els) => els.map((el) => `${el.textContent.trim()}:${el.getAttribute("aria-label")}`))
         expect.equal(head.join(","), "Mon:Monday,Tue:Tuesday,Wed:Wednesday,Thu:Thursday,Fri:Friday,Sat:Saturday,Sun:Sunday", "Monday first, each named in full")
@@ -249,7 +265,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       example: "basics",
       themes: ["light", "dark"],
       async run({ page, scope, expect }) {
-        await scope.getByRole("button", { name: "Choose start date" }).focus()
+        await scope.getByRole("button", { name: "Open calendar, Start date" }).focus()
         await page.keyboard.press("Enter")
         await dayInHand(page)
         const day = await page.evaluate(() => {
@@ -276,7 +292,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       example: "basics",
       touch: true,
       async run({ page, scope, expect }) {
-        const button = scope.getByRole("button", { name: "Choose start date" })
+        const button = scope.getByRole("button", { name: "Open calendar, Start date" })
         const b = await button.boundingBox()
         expect.atLeast(Math.round(Math.min(b.width, b.height)), 40, "the calendar button is a 40px target")
         await button.click()
@@ -293,7 +309,7 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       example: "basics",
       forcedColors: true,
       async run({ page, scope, expect }) {
-        await scope.getByRole("button", { name: "Choose start date" }).focus()
+        await scope.getByRole("button", { name: "Open calendar, Start date" }).focus()
         await page.keyboard.press("Enter")
         await dayInHand(page)
         const chosen = await page.locator(`${livePanel} td[aria-selected="true"]`).evaluate((el) => getComputedStyle(el).forcedColorAdjust)
@@ -310,13 +326,13 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
       async run({ page, scope, expect }) {
         expect.equal(await page.locator("[data-radix-focus-guard]").count(), 0, "no focus guards")
         const panel = scope.locator('[data-slot="date-picker-panel"]')
-        expect.equal(await panel.getAttribute("aria-label"), "Choose visit date", "the drawn calendar is named for its field")
+        expect.equal(await panel.getAttribute("aria-label"), "Calendar, Visit date", "the drawn calendar is named for its field")
         expect.equal(await panel.locator("button, [tabindex]").count(), 0, "nothing in it can take focus")
         expect.equal(await panel.locator('td[data-selected]').count(), 1, "the chosen day is marked")
         expect.equal((await panel.locator('[data-selected]').textContent()).trim(), "21", "on the 21st")
         await scope.getByRole("textbox", { name: "Visit date" }).focus()
         await page.keyboard.press("Tab")
-        expect.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Choose visit date", "Tab reaches the field's own button")
+        expect.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Open calendar, Visit date", "Tab reaches the field's own button")
         await page.keyboard.press("Tab")
         expect.equal(await page.evaluate(() => (document.activeElement === document.body ? "body" : document.activeElement.tagName)), "body", "and then nothing else")
       },

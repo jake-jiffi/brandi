@@ -39,6 +39,7 @@ export default {
     { name: "onChange", type: "(selected: boolean) => void", doc: "Called with the new state on every press." },
     { name: "count", type: "number", doc: "How many items match if the chip is applied. Missing means unknown, and shows nothing." },
     { name: "attention", type: "boolean", default: "false", doc: "The count is waiting on the reader: it takes the highlight and is read as 12 need you." },
+    { name: "noun", type: "[string, string]", doc: 'What the count counts, one and many: ["job", "jobs"] reads Needs you, 2 jobs.' },
     { name: "icon", type: "IconName", doc: "An icon before the label. The check takes its place while the chip is on." },
     { name: "disabled", type: "boolean", default: "false", doc: "Faded and unpressable. Say why nearby." },
     { name: "children", type: "ReactNode", doc: "The label: what the filter keeps, in a word or two." },
@@ -46,7 +47,7 @@ export default {
   notes: {
     Behaviour: [
       "A toggle button: screen readers hear its label, its count and whether it is pressed. Enter and Space toggle it.",
-      "A count is read in words: 4 items, or with attention 12 need you (1 needs you).",
+      "A count is read in words, once: 4 items, or with attention 12 need you (1 needs you), or with a noun 2 jobs. A label that already says needs you is never followed by need you again.",
     ],
     States: [
       "Pressed takes selected-strong, a selected-line edge and a check. An attention count takes the highlight.",
@@ -58,7 +59,10 @@ export default {
       "The count is how many items match if the chip is applied. Only needs-you counts get attention.",
       "32px tall, 40px on touch, 8px apart.",
     ],
-    Review: ["The starter's controls lost their state in forced colours (round 2, section 2.9): a pressed chip is checked there, and one at rest draws no outline."],
+    Review: [
+      "The starter's controls lost their state in forced colours (round 2, section 2.9): a pressed chip is checked there, and one at rest draws no outline.",
+      'A "Needs you" chip was read "Needs you, 2 need you" (a second brand\'s round 2): a noun says the count once, and a label that says needs you is never followed by it again.',
+    ],
     Accepted: ["Chips are 40px on touch rather than 44px (section 2.5). At 44px they crowd a phone toolbar for no gain in accuracy."],
   },
   examples: [
@@ -70,6 +74,14 @@ export default {
 <x-import component-from-global-scope="NS.FilterChip" count="{{n1284}}">Paid</x-import>
 <x-import component-from-global-scope="NS.FilterChip" icon="User" count="{{n1}}" attention="{{yes}}">Assigned to me</x-import>`,
       vals: { n12: 12, n4: 4, n1284: 1284, n1: 1, yes: true },
+    },
+    {
+      id: "nouns",
+      title: "Saying what it counts, once",
+      markup: `<x-import component-from-global-scope="NS.FilterChip" count="{{n2}}" attention="{{yes}}" noun="{{jobs}}">Needs you</x-import>
+<x-import component-from-global-scope="NS.FilterChip" count="{{n1}}" noun="{{jobs}}">Overdue</x-import>
+<x-import component-from-global-scope="NS.FilterChip" count="{{n3}}" attention="{{yes}}">Needs you</x-import>`,
+      vals: { n2: 2, n1: 1, n3: 3, yes: true, jobs: ["job", "jobs"] },
     },
     {
       id: "states",
@@ -120,6 +132,15 @@ export default {
         const names = []
         for (const c of await scope.locator('[data-slot="filter-chip"]').all()) names.push((await heard(page, c)).name)
         expect.equal(names.join(" | "), "Needs approval, 12 need you | Draft, 4 items | Paid, 1,284 items | Assigned to me, 1 needs you", "what a screen reader hears")
+      },
+    },
+    {
+      name: "A noun says the count once, and a label that says needs you is not followed by it again",
+      example: "nouns",
+      async run({ page, scope, expect }) {
+        const names = []
+        for (const c of await scope.locator('[data-slot="filter-chip"]').all()) names.push((await heard(page, c)).name)
+        expect.equal(names.join(" | "), "Needs you, 2 jobs | Overdue, 1 job | Needs you, 3 items", "what a screen reader hears")
       },
     },
     {

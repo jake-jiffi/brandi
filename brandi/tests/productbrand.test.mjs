@@ -143,7 +143,18 @@ describe('character stills', () => {
     assert.ok(uri.length * 0.75 < 200 * 1024, `inlined at ${Math.round(uri.length * 0.75 / 1024)} KB`);
     const out = brandConstant({ from: 'product.json', name: 'Acme', files: {}, logo: {}, base: dir, character: { name: '[Character]', poses: { welcome: 'pose.png' } } }, { stills: new Map([[file, uri]]) });
     assert.match(out.source, /"welcome": "data:image\/webp;base64,/);
-    assert.deepEqual(out.stills, [], 'nothing left to copy into public/');
+    assert.deepEqual(out.stills, [], 'nothing went in at full size');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a still Chrome could not draw down goes in whole, never as a path from the page root a board cannot reach', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-still-'));
+    const data = Buffer.alloc(4 * 4 * 4, 200);
+    await writeFile(path.join(dir, 'wave.png'), encodePng({ width: 4, height: 4, channels: 4, data }));
+    const out = brandConstant({ from: 'product.json', name: 'Acme', files: {}, logo: {}, base: dir, character: { name: '[Character]', poses: { welcome: 'wave.png' }, flat: { welcome: 'wave.png' } } });
+    assert.match(out.source, /"welcome": "data:image\/png;base64,iVBOR/, 'the file itself, as a data URI');
+    assert.doesNotMatch(out.source, /"\/brand\//, 'no root-absolute path');
+    assert.deepEqual(out.stills, ['wave.png'], 'named once as going in at full size');
     await rm(dir, { recursive: true, force: true });
   });
 });

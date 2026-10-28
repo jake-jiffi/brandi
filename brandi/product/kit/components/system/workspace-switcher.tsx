@@ -38,17 +38,19 @@ export const accountButton = React.forwardRef<HTMLButtonElement, AccountButtonPr
       ref={ref}
       type="button"
       data-slot="account-button"
+      // 48px tall at least, growing when a name wraps: under WCAG 1.4.12 text spacing a long name cut short could
+      // not be read whole anywhere but in the accessible name.
       className={cn(
-        "flex h-12 w-full min-w-0 items-center gap-2.5 rounded-action px-3 text-left text-rail-text transition-colors duration-(--duration-fast) hover:bg-rail-hover aria-expanded:bg-rail-hover focus-visible:outline-rail-focus",
-        "@max-[160px]/rail:size-10 @max-[160px]/rail:justify-center @max-[160px]/rail:p-0 @max-[160px]/rail:pointer-coarse:size-11",
+        "flex min-h-12 w-full min-w-0 items-center gap-2.5 rounded-action px-3 py-1.5 text-left text-rail-text transition-colors duration-(--duration-fast) hover:bg-rail-hover aria-expanded:bg-rail-hover focus-visible:outline-rail-focus",
+        "@max-[160px]/rail:size-10 @max-[160px]/rail:min-h-0 @max-[160px]/rail:justify-center @max-[160px]/rail:p-0 @max-[160px]/rail:pointer-coarse:size-11",
         className
       )}
       {...rest}
     >
       <Avatar name={user.name} src={user.src} size={32} aria-hidden="true" />
       <span className="flex min-w-0 flex-1 flex-col @max-[160px]/rail:hidden">
-        <span className="truncate type-label text-rail-text-strong">{user.name}</span>
-        {detail ? <span className="truncate type-meta text-rail-text">{detail}</span> : null}
+        <span className="type-label wrap-break-word text-rail-text-strong">{user.name}</span>
+        {detail ? <span className="type-meta wrap-break-word text-rail-text">{detail}</span> : null}
       </span>
       <Icon name="ChevronsUpDown" className="text-rail-muted @max-[160px]/rail:hidden" />
     </button>

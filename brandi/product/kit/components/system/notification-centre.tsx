@@ -96,16 +96,20 @@ const Bell = React.forwardRef<HTMLButtonElement, BellProps>(function Bell({ coun
           data-slot="notification-trigger"
           aria-label={count > 0 ? `${label}, ${formatNumber(count)} unread` : label}
         >
-          <Icon name="Bell" />
-          {count > 0 ? (
-            <span
-              aria-hidden="true"
-              data-slot="notification-count"
-              className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-highlight px-1 type-caption tabular-nums text-on-highlight"
-            >
-              {count > 99 ? "99+" : formatNumber(count)}
-            </span>
-          ) : null}
+          {/* The count hangs off the bell's own corner, not the button's: on touch the button grows to 44px round a
+              16px bell, and a count at its corner sat apart from the bell, against the top of the bar. */}
+          <span data-slot="notification-bell" className="relative inline-flex">
+            <Icon name="Bell" />
+            {count > 0 ? (
+              <span
+                aria-hidden="true"
+                data-slot="notification-count"
+                className="absolute -top-2 -right-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-highlight px-1 type-caption tabular-nums text-on-highlight"
+              >
+                {count > 99 ? "99+" : formatNumber(count)}
+              </span>
+            ) : null}
+          </span>
         </ButtonBase>
       </TooltipTrigger>
       <TooltipContent sideOffset={4} collisionPadding={8}>

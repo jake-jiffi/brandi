@@ -62,7 +62,9 @@ export default {
     ],
     Layout: [
       "At the foot of the rail the menu opens above the button, lined up with its left edge; outside a rail, below it. It is at least as wide as the button.",
+      "The name and the workspace wrap rather than cut short, and the button grows past 48px to hold them, so they read whole under WCAG 1.4.12 text spacing.",
     ],
+    Review: ["Under WCAG 1.4.12 text spacing the account button cut the person's name short, readable whole only in its accessible name (a pilot's round 1)."],
     Rules: [
       "(practice) The current workspace shows on every screen where the rail does. Under 1024px of shell it is in the drawer, so name the workspace on the page when it matters there.",
       "Workspaces first, then the account's own actions after a separator, with sign out last.",
@@ -105,6 +107,23 @@ export default {
     };
   })()`,
   checks: [
+    {
+      name: "Under WCAG 1.4.12 text spacing the name and the workspace wrap and read whole, never cut",
+      example: "rail",
+      async run({ page, scope, expect }) {
+        // The spacing the success criterion asks text to survive.
+        await page.addStyleTag({ content: "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }" })
+        const button = scope.getByRole("button", { name: TRIGGER })
+        const lines = await button.locator(":scope > span:not([data-slot]) > span").all()
+        expect.equal(lines.length, 2, "the name and the workspace")
+        for (const line of lines) {
+          const [cut, text] = await line.evaluate((el) => [el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1, el.textContent])
+          expect(!cut, `"${text}" reads whole`)
+        }
+        const [inner, outer] = await button.evaluate((el) => [el.scrollHeight, el.clientHeight])
+        expect(inner <= outer + 1, "the button grows to hold the lines")
+      },
+    },
     {
       name: "The account button is named [name], [workspace], [role], account menu, and shows the current workspace",
       example: "rail",

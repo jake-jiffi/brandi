@@ -1,5 +1,5 @@
 // The jobs pages' state as people share it, in the URL: the list's search, filters, sort and page, and a job's
-// open tab. The server pages read it; the client keeps the address in step with history.replaceState.
+// open tab. The server pages read it; the client keeps the address in step through useAddressState.
 
 import { JOB_FILTERS, JOB_STATUS, type Job, type JobStatus } from "./sample"
 

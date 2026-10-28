@@ -15,7 +15,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { typographyArtboard } from '../scripts/artboards.mjs';
-import { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PLACEHOLDER, PAGE_W, PAGE_H, registerRowHeight, packRegister, REGISTER_HEIGHT } from '../scripts/branddeck.mjs';
+import { renderBrandDeck, pairingMatrix, table, titleise, frameLabel, PLACEHOLDER, PAGE_W, PAGE_H, registerRowHeight, packRegister, REGISTER_HEIGHT, registerSpan } from '../scripts/branddeck.mjs';
 import { renderBrandBook } from '../scripts/brandbook.mjs';
 import { findChrome, runChrome } from '../scripts/preview.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -1238,6 +1238,22 @@ describe('the register and the applications, every one printed', () => {
     for (const pg of packed) assert.ok(pg.height <= REGISTER_HEIGHT || pg.rows.length === 1, `a page of ${pg.height}px`);
     assert.match(html, new RegExp(`Decisions ${packed[1].start + 1} to ${packed[1].start + packed[1].rows.length} of 12\\.`), 'the second page counts its own rows');
     assert.deepEqual(packed.flatMap((pg) => pg.rows), b.governance.decisions, 'every row, in order, once');
+  });
+
+  test('the register names its pages by id, and says which ids it skips, so a moved record is not a silent hole', () => {
+    const long = 'Warm water in every bay, a dryer that actually dries, and somebody on the floor who will show you how it works. ';
+    const b = clone(brand);
+    const nums = Array.from({ length: 20 }, (_, i) => i + 1).filter((n) => n < 5 || n > 7);
+    b.governance.decisions = nums.map((n) => ({ id: `d${n}`, date: '2026-10-28', decision: `d${n}. Decision number ${n}. ${long}`, rationale: long.repeat(2) }));
+    b.governance.openQuestions = [1, 2, 6].map((n) => ({ id: `q${n}`, question: `q${n}. Question ${n}?`, status: 'open', assumedMeanwhile: 'Nothing.' }));
+    const html = renderBrandDeck({ brand: b, system }).html;
+    assert.match(html, /Not on these pages: d5 to d7\./);
+    assert.match(html, /Not on these pages: q3 to q5\./);
+    assert.doesNotMatch(html, /Decisions \d+ to \d+ of 17\./, 'never counted by position when every record has an id');
+    assert.match(html, /Decisions d\d+ to d20, \d+ of 17\./, 'the last page names its ids');
+    // One id skipped reads as one id; records without ids are still counted by position.
+    assert.equal(registerSpan([{ id: 'd1' }, { id: 'd3' }], [{ id: 'd1' }, { id: 'd3' }], 0, 'Decisions').gaps.split('.')[0], 'Not on these pages: d2');
+    assert.deepEqual(registerSpan([{ decision: 'a' }, { decision: 'b' }], [{ decision: 'b' }], 1, 'Decisions'), { span: 'Decisions 2 to 2 of 2.', gaps: null });
   });
 
   test('a row\'s height grows with its longest cell, and a row taller than a page still gets a page', () => {

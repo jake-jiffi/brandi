@@ -24,6 +24,7 @@
  */
 
 import { resolveToken } from './system.mjs';
+import { fontStack } from './type.mjs';
 
 const DTCG_SCHEMA = 'https://tr.designtokens.org/format/';
 const DTCG_STATUS =
@@ -304,7 +305,7 @@ export function toCss(system, {
   L.push('  /* Type */');
   for (const w of system.type.weights) L.push(`  --${p}font-weight-${w.name}: ${w.value};  /* ${w.use} */`);
   for (const [role, family] of Object.entries(system.type.fonts)) {
-    if (family) L.push(`  --${p}font-${role}: ${Array.isArray(family) ? family.join(', ') : family};`);
+    if (family) L.push(`  --${p}font-${role}: ${fontStack(role, family)};`);
   }
   for (const st of system.type.scale.steps) {
     L.push(`  --${p}text-${st.name}: ${st.clamp ?? `${st.rem}rem`};`);
@@ -418,7 +419,7 @@ export function toTailwind(system, { importTokens = './tokens.css' } = {}) {
   L.push('     which is the same namespace Tailwind uses, so these carry the values. */');
   for (const s of system.type.scale.steps) L.push(`  --text-${s.name}: ${s.clamp ?? `${s.rem}rem`};`);
   for (const [role, family] of Object.entries(system.type.fonts)) {
-    if (family) L.push(`  --font-${role}: ${Array.isArray(family) ? family.join(', ') : family};`);
+    if (family) L.push(`  --font-${role}: ${fontStack(role, family)};`);
   }
   L.push('');
   L.push('  /* Space. tokens.css calls these --space-*, Tailwind wants --spacing-*,');

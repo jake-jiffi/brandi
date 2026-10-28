@@ -63,6 +63,17 @@ describe('evidence and decisions', () => {
     assert.match(d.date, /^\d{4}-\d{2}-\d{2}$/);
   });
 
+  test('a new record takes the id past the highest in use, so a removed record never hands its id on', () => {
+    const b = B.emptyBrand();
+    b.governance.decisions = [{ id: 'd1' }, { id: 'd70' }, { id: 'd75' }];
+    b.governance.openQuestions = [{ id: 'q29' }, { id: 'q33' }];
+    b.evidence = [{ id: 'e1' }, { id: 'e160' }];
+    // Counted, these were d4, q3 and e3: each the id of a record a reader may already cite.
+    assert.equal(B.addDecision(b, { decision: 'x', rationale: 'y' }).id, 'd76');
+    assert.equal(B.addOpenQuestion(b, { question: 'x?', whyItMatters: 'y' }).id, 'q34');
+    assert.equal(B.addEvidence(b, { claim: 'x', provenance: 'assumed' }).id, 'e161');
+  });
+
   test('an open question records what was assumed meanwhile', () => {
     const b = B.emptyBrand();
     assert.throws(() => B.addOpenQuestion(b, { question: 'When is peak?' }), TypeError);

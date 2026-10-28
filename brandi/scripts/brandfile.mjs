@@ -177,6 +177,16 @@ export function slugify(s) {
 // ---------------------------------------------------------------------------
 
 /**
+ * The next id for a record list: one past the highest in use, never the count plus one. Ids are kept for
+ * life, so once a record is removed the count trails the highest id, and count-plus-one handed a real brand
+ * a second d77.
+ */
+export function nextId(prefix, records) {
+  const used = (records ?? []).map((r) => new RegExp(`^${prefix}(\\d+)$`).exec(String(r?.id ?? ''))).filter(Boolean).map((m) => Number(m[1]));
+  return `${prefix}${Math.max(0, ...used) + 1}`;
+}
+
+/**
  * Record a statement together with where it came from. Anything that ends up
  * in a deliverable should be traceable to one of these.
  */
@@ -186,7 +196,7 @@ export function addEvidence(brand, { claim, provenance, source = null, confidenc
     throw new TypeError(`unknown provenance "${provenance}". Use one of: ${Object.keys(PROVENANCE).join(', ')}`);
   }
   const entry = {
-    id: `e${brand.evidence.length + 1}`,
+    id: nextId('e', brand.evidence),
     claim,
     provenance,
     source,
@@ -216,7 +226,7 @@ export function localDate(d = new Date()) {
 export function addDecision(brand, { decision, rationale, alternatives = [], owner = null, now = new Date() }) {
   if (!decision || !rationale) throw new TypeError('a decision needs both the decision and the reason for it');
   const entry = {
-    id: `d${brand.governance.decisions.length + 1}`,
+    id: nextId('d', brand.governance.decisions),
     date: localDate(now),
     decision,
     rationale,
@@ -231,7 +241,7 @@ export function addDecision(brand, { decision, rationale, alternatives = [], own
 export function addOpenQuestion(brand, { question, whyItMatters, assumedMeanwhile = null, whoCanAnswer = null, changesIf = null }) {
   if (!question || !whyItMatters) throw new TypeError('an open question needs the question and why it matters');
   const entry = {
-    id: `q${brand.governance.openQuestions.length + 1}`,
+    id: nextId('q', brand.governance.openQuestions),
     question,
     whyItMatters,
     assumedMeanwhile,

@@ -27,6 +27,7 @@ export default {
   status: "to build",
   props: [
     { name: "title", type: "string", doc: "The screen's title, for a detail screen. One line, cut with an ellipsis; the page's heading below carries it whole." },
+    { name: "headingLevel", type: "1 | 2 | 3 | 4 | 5 | 6", doc: "Makes the title a heading at this level, for a task screen with no page header below it: 1 when it is the page's one h1, which takes heading-lg so the page keeps a hierarchy. A paragraph without it." },
     { name: "back", type: "{ href: string, label: string }", doc: "Back to the screen above, where label names it: [Invoices]. Read as Back to [Invoices]." },
     { name: "onMenu", type: "() => void", doc: "Shows the menu button, which opens the navigation drawer. AppShell passes it." },
     { name: "menuExpanded", type: "boolean", default: "false", doc: "Whether the drawer the menu button opens is open." },
@@ -49,7 +50,7 @@ export default {
       "One or two actions at most at the far end, each an IconButton.",
     ],
   },
-  frame: { width: 960, height: 560 },
+  frame: { width: 960, height: 660 },
   examples: [
     {
       id: "menu",
@@ -63,6 +64,13 @@ export default {
       markup: phone(`<x-import component-from-global-scope="NS.PhoneTopBar" title="[Invoice 1042]" back="{{back}}" actions="{{ui.more}}"></x-import>`),
       layout: "block",
       vals: { back: { href: "#invoices", label: "[Invoices]" } },
+    },
+    {
+      id: "task",
+      title: "A task screen: the title is the page's heading",
+      markup: phone(`<x-import component-from-global-scope="NS.PhoneTopBar" title="[Checkout]" heading-level="{{h1}}" back="{{back}}"></x-import>`),
+      layout: "block",
+      vals: { h1: 1 },
     },
     {
       id: "long",
@@ -94,6 +102,15 @@ export default {
       example: "menu",
       async run({ scope, expect, brand }) {
         expect.equal(await scope.getByRole("link", { name: `${brand.name} [Front desk]` }).count(), 1, "the lockup's link")
+      },
+    },
+    {
+      name: "On a task screen the title is a heading at the level asked, and a paragraph otherwise",
+      async run({ page, expect }) {
+        const task = page.locator('[data-example="task"] [data-slot="phone-top-bar-title"]')
+        expect.equal(await task.evaluate((el) => el.tagName), "H1", "the task screen's title is its h1")
+        expect.equal(await page.locator('[data-example="task"]').getByRole("heading", { level: 1, name: "[Checkout]" }).count(), 1, "a screen reader finds it as the page's heading")
+        expect.equal(await page.locator('[data-example="detail"] [data-slot="phone-top-bar-title"]').evaluate((el) => el.tagName), "P", "a detail screen's title stays a paragraph, under its page header")
       },
     },
     {

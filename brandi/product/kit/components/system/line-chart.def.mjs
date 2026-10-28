@@ -60,7 +60,7 @@ export default {
     ],
     Accepted: [
       "The plot is role application with the role description chart, so arrow keys reach it while a screen reader is in browse mode. Its description says which keys to use.",
-      "In forced colours the lines keep their series colours, while text, gridlines and the zero line take the system's colours.",
+      "In forced colours the lines keep their series colours, while text, gridlines and the zero line take the system's colours. The comparison takes the system's text colour, still dashed, so it stands clear of the gridlines.",
     ],
   },
   frame: { width: 960, height: 2950 },
@@ -329,6 +329,9 @@ export default {
         expect.equal(await c.paint(scope.locator('[data-slot="chart-axis-label"]').first(), "fill"), await c.colour(page, "CanvasText"), "axis text is CanvasText")
         expect.equal(await c.paint(scope.locator('[data-slot="chart-direct-label"]').first(), "fill"), await c.colour(page, "CanvasText"), "end names are CanvasText")
         expect.equal(await c.paint(scope.locator('[data-slot="chart-grid"]').first(), "stroke"), await c.colour(page, "GrayText"), "gridlines are GrayText")
+        const compare = scope.locator('[data-series="last"] [data-slot="chart-line"]').first()
+        expect.equal(await c.paint(compare, "stroke"), await c.colour(page, "CanvasText"), "the comparison is CanvasText, so it never sinks among the gridlines")
+        expect.equal(await compare.getAttribute("stroke-dasharray"), "4 6", "and stays dashed")
       },
     },
     {

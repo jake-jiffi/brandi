@@ -7,6 +7,17 @@ const items = [
   { id: "n4", text: "The export to [the bank] failed: [the bank] did not respond", time: "Mon 2 Nov, 11:20 am", tone: "danger" },
   { id: "n5", text: "[Alex Chen] approved your leave for [14 to 18 December]", time: "Mon 2 Nov, 9:03 am", tone: "success" },
 ]
+/** The bell's count, measured against the bell glyph and the button: its centre on the glyph's top right corner, inside the button. */
+async function countOnBell(scope, expect, where) {
+  const bell = scope.getByRole("button", { name: "Notifications, 3 unread" })
+  const [button, glyph, count] = await Promise.all([bell.boundingBox(), bell.locator('[data-slot="icon"]').boundingBox(), bell.locator('[data-slot="notification-count"]').boundingBox()])
+  const dx = Math.round(count.x + count.width / 2 - (glyph.x + glyph.width))
+  const dy = Math.round(count.y + count.height / 2 - glyph.y)
+  expect(Math.abs(dx) <= 4 && Math.abs(dy) <= 4, `${where}: the count's centre is ${dx}, ${dy} from the bell's top right corner`)
+  expect(count.y >= button.y - 0.5 && count.x + count.width <= button.x + button.width + 0.5, `${where}: the count stays inside the button`)
+  return { button, glyph, count }
+}
+
 const arrival = { id: "n6", text: "[Jordan Kaur] swapped her Saturday shift with [Sam Lee]", time: "Just now", icon: "Repeat", unread: true }
 const allRead = items.map((item) => ({ ...item, unread: false }))
 
@@ -148,6 +159,23 @@ export default {
         const quiet = scope.getByRole("button", { name: "Team notifications", exact: true })
         expect.equal(await quiet.count(), 1, "all read: the name has no count")
         expect.equal(await quiet.locator('[data-slot="notification-count"]').count(), 0, "and no figure shows")
+      },
+    },
+    {
+      name: "The count sits on the bell's own corner, inside the button",
+      example: "live",
+      async run({ scope, expect }) {
+        await countOnBell(scope, expect, "desktop")
+      },
+    },
+    {
+      name: "On touch the count still sits on the bell's corner, clear of the top of the larger button",
+      example: "live",
+      touch: true,
+      async run({ scope, expect }) {
+        const { button, count } = await countOnBell(scope, expect, "touch")
+        expect.atLeast(Math.round(button.height), 44, "the bell is 44px on touch")
+        expect.atLeast(Math.round(count.y - button.y), 4, "the count is clear of the button's top, so it never meets the edge of a bar")
       },
     },
     {

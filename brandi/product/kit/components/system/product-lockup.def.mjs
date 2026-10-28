@@ -9,13 +9,15 @@ export default {
     { name: "color", type: '"auto" | "on-light" | "on-dark" | "ink"', default: '"auto"', doc: "As Logo. With ink, the name takes the text colour around it too." },
     { name: "layout", type: '"inline" | "stacked"', default: '"inline"', doc: "Inline, with a hairline between mark and name, or stacked, the name under the mark." },
     { name: "height", type: "number", doc: "The mark's height in px, the logo system's preferred size by default." },
-    { name: "href", type: "string", doc: 'Makes the whole lockup one link, named "[Brand] [product]".' },
+    { name: "href", type: "string", doc: 'Makes the whole lockup one link, named "[Brand] [product]", or the brand alone when the product has its name.' },
     { name: "tone", type: '"default" | "rail"', default: '"default"', doc: "`rail` on the rail and the top bar: the name takes the rail's strong text colour, and the rail asks for the mark drawn for its ground." },
   ],
   notes: {
     Behaviour: [
       'With href the whole lockup is one link named "[Brand] [product]", and the logo inside it is hidden, so nothing is read twice.',
+      "A product that carries the brand's own name is the mark alone, with no hairline and no name beside it, and its link is named for the brand once.",
     ],
+    Review: ['A product named for its brand read "[Brand] / [BRAND]", and its link was named twice (a pilot\'s round 1).'],
     Layout: [
       "A long name is cut with an ellipsis rather than widening the rail. The link's name keeps it whole for screen readers.",
       "Under a 24px mark the name steps down from the heading style to the label style.",
@@ -28,7 +30,8 @@ export default {
       "A name cut short is whole for screen readers but still cut for sighted keyboard and touch users. Keep product names short enough to fit the rail.",
     ],
   },
-  frame: { width: 960, height: 560 },
+  frame: { width: 960, height: 640 },
+  logic: `brandName: NS.BRAND.name`,
   examples: [
     {
       id: "layouts",
@@ -55,6 +58,11 @@ export default {
       markup: `<div class="flex rounded-lg bg-brand px-4 py-5 text-on-brand"><x-import component-from-global-scope="NS.ProductLockup" product="[Rosters]" color="ink"></x-import></div>`,
     },
     {
+      id: "same-name",
+      title: "A product named for the brand: the mark alone",
+      markup: `<x-import component-from-global-scope="NS.ProductLockup" product="{{brandName}}" href="#"></x-import>`,
+    },
+    {
       id: "sizes",
       title: "Sizes",
       markup: `<div class="flex flex-wrap items-center gap-12">
@@ -73,6 +81,16 @@ export default {
         expect.equal(await scope.getByRole("link").count(), 1, "links in the lockup")
         expect.equal(await scope.getByRole("link", { name: `${brand.name} [Rosters]` }).count(), 1, "the link's name")
         expect.equal(await scope.locator('[data-slot="logo"]').getAttribute("aria-hidden"), "true", "the logo inside is hidden")
+      },
+    },
+    {
+      name: "A product named for the brand shows the name once and is named once",
+      example: "same-name",
+      async run({ scope, expect, brand }) {
+        expect.equal(await scope.getByRole("link", { name: brand.name, exact: true }).count(), 1, "one link, named for the brand once")
+        expect.equal(await scope.locator('[data-slot="product-lockup-name"]').count(), 0, "no name beside the mark")
+        expect.equal(await scope.locator('[data-slot="product-lockup-rule"]').count(), 0, "and no hairline before it")
+        expect.equal(await scope.locator('[data-slot="logo"]').count(), 1, "the mark says the name")
       },
     },
     {

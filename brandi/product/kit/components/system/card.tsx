@@ -33,6 +33,8 @@ export interface CardProps extends Omit<React.HTMLAttributes<HTMLElement>, "titl
   icon?: IconName
   /** The title becomes a link that covers the card; buttons inside stay pressable. */
   href?: string
+  /** A chevron at the end of the title's line, the cue that the whole card opens something, as ListRow has. */
+  chevron?: boolean
   /** Inside a pane: no shadow. */
   flat?: boolean
   /** Lifts on hover. */
@@ -58,6 +60,7 @@ export const Card = React.forwardRef<HTMLElement, CardProps>(function Card(
     footer,
     icon,
     href,
+    chevron = false,
     flat = false,
     interactive = false,
     selected = false,
@@ -102,7 +105,7 @@ export const Card = React.forwardRef<HTMLElement, CardProps>(function Card(
             className={cn(box && INSET_X, box && INSET_TOP, box && !hasBody && !footer && INSET_BOTTOM, nested && "px-0")}
           >
             {title != null ? (
-              <CardTitle as={`h${level}`} className={cn(icon && "flex items-center gap-2")}>
+              <CardTitle as={`h${level}`} className={cn((icon || chevron) && "flex items-center gap-2")}>
                 {icon ? <Icon name={icon} size={18} className="text-text-muted" /> : null}
                 {href ? (
                   <Link href={href} data-slot="card-link" className="rounded-xs after:absolute after:inset-0">
@@ -112,6 +115,11 @@ export const Card = React.forwardRef<HTMLElement, CardProps>(function Card(
                 ) : (
                   title
                 )}
+                {chevron ? (
+                  <span aria-hidden="true" data-slot="card-chevron" className="ms-auto flex shrink-0 text-text-subtle">
+                    <Icon name="ChevronRight" />
+                  </span>
+                ) : null}
               </CardTitle>
             ) : null}
             {description != null ? <CardDescription className="max-w-measure">{description}</CardDescription> : null}
