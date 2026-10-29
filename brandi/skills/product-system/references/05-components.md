@@ -387,11 +387,16 @@ caught up, needs a person, nothing found, help.
 - **Behaviour.** Decorative, so hidden from screen readers: the words beside it carry the meaning.
   Its motion stops under reduced motion. A pose in one dark ink is drawn in `currentColor`, so it
   takes the text colour and reads on a dark ground. A pose in a colour or several keeps its colours,
-  and the pack has no dark rendition, so keep it off dark grounds.
+  and the pack has no dark rendition, so keep it off dark grounds. A brand with no character draws
+  none: the starter writes no pack, its card says the brand has no character where the poses would
+  be, and the words carry every moment.
 - **Rules.** One per screen, and only in empty, loading, done, error, welcome and help moments.
   Never in tables, forms or a busy dashboard. Never recoloured, flipped, rotated, cropped or
   squashed, and never two renditions on one screen. A character for mess or trouble stands for the
   system's mess, never the person's own mistake, so it never appears on a form error.
+- **Review.** Its decoration check wanted at least one character on the board, so a brand with no
+  character failed Accessibility unless it kept the kit's placeholder figure, one the brand never
+  had. The check now wants none for such a brand, and still checks that nothing is announced.
 
 ### 3.3 Actions
 

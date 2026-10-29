@@ -34,7 +34,7 @@ Versions live in the kit's `package.json`, pinned exactly and tested together (s
 | --- | --- | --- |
 | Generated | `app/globals.css`, `app/fonts.ts`, `system/tokens.json`, `system/system.json`, `lib/format-locale.js`, `lib/product.ts`, `tools/build-globals.mjs` and `components/system/index.ts` | `$A product starter` rewrites them on every run. A hand edit is undone by the next run |
 | Generated until taken over | `PRODUCT.md` and `DESIGN.md` | Rewritten while they end on the generated marker, kept once it is deleted (section 7) |
-| Generated from the brand's files | `lib/brand.ts` | Its types stay; its `BRAND` comes from the marks product.json's `brand` block names, or from brand.json's logo master. Without either, the kit's placeholder mark stays and the starter says so |
+| Generated from the brand's files | `lib/brand.ts` | Its types and the kit's stand-in mark stay; its `BRAND` comes from the marks product.json's `brand` block names, or from brand.json's logo master. With no logo drawn, `BRAND` carries the stand-in under the brand's name, and the starter says so (below) |
 | Kit | `components/ui/` (shadcn, patched), `components/system/` (the system's components and their definitions), `lib/`, `hooks/`, `canvas/` and `tools/` | Copied on the first run, then the product's. `$A product starter --kit` copies them again |
 | Example | The example product's routes and sample data: the kit's own sample, a trades business's jobs and invoices (`lib/sample.ts`), the same for every brand and outside the product's one sample set (`06-canvas.md`) | A real product replaces it |
 
@@ -75,6 +75,28 @@ an ink. A value the record lacks keeps the kit default, and the file says which.
 narrow places). A pose drawn in one dark ink is turned to `currentColor`, so it reads on a dark ground,
 and the file names those poses. The tight-viewBox wordmark files ship in `public/brand/`, for email and
 Open Graph.
+
+**A brand with no drawn logo.** A brand stage can name a logo before anyone draws it, so a file
+brand.json names that is not there never stops the starter. It is left out and named in
+`lib/brand.ts` and in what the starter prints; a run met one, stopped with "does not exist" and wrote
+nothing. Without the full logo, `BRAND` carries the kit's stand-in mark (`STAND_IN_MARKS`, a rounded
+square and the letters PRODUCT) at the kit's sizes, because the record's minimum and clear space
+belong to the mark nobody has drawn. Its name is the brand's, from the record or product.json's
+`brandName`, so the logo's accessible name, the lockup's link and the email say it, and the file says
+in so many words that the mark is not the brand's logo. The starter never draws, traces or sets a
+mark for it. The brand-system answer for a brand with no logo is a typeset wordmark as the interim
+mark (`<brandi>/skills/brand-system/references/08-logo-system.md` section 7), and that is a person's
+decisions: the starter prints the missing files and the ways to add them (the brand's artwork at that
+path, the logo forge, `$A logo wordmark`, or product.json's `brand.marks`), then a rerun picks them
+up. A file product.json names is the product's own pick, so a missing one there still stops the
+starter. The stand-in's letters read PRODUCT, so until the logo exists, reviews will flag the rail;
+the fix is the brand's logo, not the product.
+
+**A brand with no character.** `BRAND` has a character only when product.json's `brand.character`
+names one, or a drawing in the illustration library carries a moment's own name. Otherwise there is
+none, and the starter says so: a run's product showed the kit's placeholder figure, a character its
+brand never had. Character then draws nothing, and its card says the brand has none
+(`05-components.md`, Brand character or illustration).
 
 **The minimum and the clear space, on route A.** The minimum is the `identity.logo.minSizes` entry for
 the mark the starter draws: the one whose variant names its file in `identity.logo.variants`, or one
@@ -233,8 +255,10 @@ npm run typecheck && npm run build
    rewrites only those, so a product's own work survives. With `--kit` it copies the kit again and
    takes back any file the kit has since dropped, unless someone changed it: a dropped placeholder
    page left behind once shadowed the example's home page. It works out the brand's marks and the
-   texture's file before it writes anything, so when one is missing it stops with "Nothing was
-   written to product/starter" and the reason. A run stopped part way leaves the starter marked
+   texture's file before it writes anything, so when a mark product.json names or the texture's
+   file is missing, it stops with "Nothing was written to product/starter" and the reason. A logo
+   file brand.json names and nobody has drawn does not stop it (section 1, A brand with no drawn
+   logo). A run stopped part way leaves the starter marked
    unfinished (`.brandi/starter-pending`), and the next run copies the kit whole again: a failed
    first run once left half a kit, and the rerun only said "Refreshed".
 2. `npm install` installs the pinned stack. Nothing outside the starter's folder changes.

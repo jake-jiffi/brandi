@@ -1,10 +1,11 @@
 /**
  * Brandi product layer: lib/brand.ts, the brand's marks and character as the product uses them.
  *
- * The kit's file holds the types and a placeholder mark. `brandi product starter` replaces the
- * placeholder with the brand's own files: the ones product.json's `brand` block names (route B, or
- * any override), otherwise brand.json's logo master (route A). Each mark is inlined after a safety
- * pass. A value the record does not hold keeps the kit's default, and the file says which.
+ * The kit's file holds the types, the kit's stand-in mark and its own placeholder brand. `brandi product
+ * starter` replaces the placeholder with the brand's own files: the ones product.json's `brand` block names
+ * (route B, or any override), otherwise brand.json's logo master (route A). Each mark is inlined after a
+ * safety pass. A value the record does not hold keeps the kit's default, and the file says which. With no
+ * logo drawn, the stand-in carries the brand's name, and the file says it is not the brand's logo.
  */
 
 import { execFile } from 'node:child_process';
@@ -299,8 +300,9 @@ const roleWord = (role) => {
 const namesGround = (role) => new RegExp(GROUND.source).test(String(role ?? '').toLowerCase());
 
 /**
- * Where the marks come from: { from, name, files: { rendition: path }, inkFrom, logo, character, base }.
- * Null when nothing names a mark, and the kit's placeholder stays.
+ * Where the marks come from: { from, name, files: { rendition: path }, inkFrom, logo, character, base, record }.
+ * When nothing names a full logo, `files` is empty, and the kit's stand-in mark carries the brand's own name and
+ * character (brandConstant). `record` is true for files brand.json names, which can be ahead of the drawing.
  *
  * brand.json's logo paths are relative to the brand folder (`brandDir`, brand/ under `brandRoot` unless given),
  * and are read from there first, then from the project root, as the brand book reads them. Read from the project
@@ -319,7 +321,9 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
     .filter((c) => c.rank !== null && ok(c.f.path))
     .sort((a, b) => a.rank - b.rank || Number(!/\.svg$/i.test(a.f.path)) - Number(!/\.svg$/i.test(b.f.path)) || a.i - b.i)[0]?.f.path ?? null;
   const full = role('primary');
-  if (!full) return null;
+  if (!full) {
+    return { from: files.length ? "brand/brand.json's logo master" : null, name: block?.name ?? brand?.meta?.name ?? null, files: {}, inkFrom: null, logo: {}, character: characterFrom(block, illustrations, productDir, brand?.meta?.name), base: productDir, notes: [], illustrations, record: files.length > 0 };
+  }
   const rec = brand.identity.logo;
   const logo = {};
   const notes = [];
@@ -348,6 +352,7 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
     base: [brandDir, brandRoot].find((d) => d && existsSync(path.resolve(d, full))) ?? brandDir ?? brandRoot,
     notes,
     illustrations,
+    record: true,
   };
 }
 
@@ -369,7 +374,10 @@ export function rasterMark(bytes, where = 'a mark') {
  * The generated part of lib/brand.ts. A pose still comes from `stills`, drawn down; one that could not be drawn
  * down goes in at full size, as a data URI, and is named in `stills` on the result. Never a path from the page
  * root: the canvas has no public folder, so a board shows that as a broken image. Throws, naming the file, when a
- * mark is missing or unsafe.
+ * mark product.json names is missing, or any mark is unsafe.
+ *
+ * With no full logo drawn, BRAND carries the kit's stand-in mark (STAND_IN_MARKS) at the kit's sizes, under the
+ * brand's own name, and the file says it is not the brand's logo. Nothing is drawn or set in type for it.
  */
 export function brandConstant(src, { stills = new Map() } = {}) {
   const read = (rel, what) => {
@@ -377,8 +385,21 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     if (!existsSync(file)) throw new Error(`${what}: ${rel} does not exist in ${src.base} (from ${src.from}).`);
     return { file, text: readFileSync(file, 'utf8') };
   };
+  // brand.json can name a logo before anyone has drawn it: a brand stage documents the variants it will have. Such a
+  // file is left out and listed, never a stop: a run met one and wrote nothing. A file product.json names is the
+  // product's own pick, so one missing there still stops the starter.
+  const missing = [];
+  const drawn = (rel) => {
+    if (!src.record || !rel || existsSync(path.resolve(src.base, rel))) return true;
+    missing.push(rel);
+    return false;
+  };
+  const files = Object.fromEntries(Object.entries(src.files ?? {}).filter(([, rel]) => drawn(rel)));
+  const inkFrom = src.inkFrom && drawn(src.inkFrom) ? src.inkFrom : null;
+  const standIn = !files.full;
   const marks = {};
-  for (const [rendition, rel] of Object.entries(src.files ?? {})) {
+  // Without the full logo the record's other files go unused: the marks are one set, and the stand-in is all of it.
+  for (const [rendition, rel] of standIn && src.record ? [] : Object.entries(files)) {
     if (!RENDITIONS.includes(rendition)) throw new Error(`${src.from} names a mark "${rendition}"; the renditions are ${RENDITIONS.join(', ')}.`);
     if (rel && /\.png$/i.test(rel)) {
       // A picture cannot take the text colour, so an ink rendition stays an outline drawing.
@@ -389,7 +410,7 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     // An ink rendition is one colour by definition, so whatever its file's ink, it takes the text colour.
     if (rel) marks[rendition] = scopeClasses(tighten((rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel))), `brand-${rendition}-`);
   }
-  if (src.inkFrom && !marks['full-ink']) marks['full-ink'] = scopeClasses(tighten(toInk(cleanSvg(read(src.inkFrom, 'the one-ink mark').text, src.inkFrom))), 'brand-full-ink-');
+  if (!standIn && inkFrom && !marks['full-ink']) marks['full-ink'] = scopeClasses(tighten(toInk(cleanSvg(read(inkFrom, 'the one-ink mark').text, inkFrom))), 'brand-full-ink-');
   // A mark much wider than tall is not a symbol, whatever it is named: without one, the icons rail shows its Home
   // control rather than a mark that overflows its square.
   const refused = [];
@@ -400,8 +421,9 @@ export function brandConstant(src, { stills = new Map() } = {}) {
   }
 
   const kept = [];
-  const logo = {};
-  for (const key of Object.keys(LOGO_DEFAULTS)) {
+  // The stand-in keeps the kit's sizes: the record's minimum and clear space belong to the mark nobody has drawn yet.
+  const logo = standIn ? { ...LOGO_DEFAULTS } : {};
+  for (const key of standIn ? [] : Object.keys(LOGO_DEFAULTS)) {
     if (typeof src.logo?.[key] === 'number') logo[key] = src.logo[key];
   }
   // Brandi records the smallest size along the long side; the product sizes a logo by its height.
@@ -447,18 +469,30 @@ export function brandConstant(src, { stills = new Map() } = {}) {
   }
 
   const json = (v) => JSON.stringify(v);
-  const lines = [
+  const name = src.name ?? 'Product';
+  const said = missing.join(', ');
+  // Written so the stand-in cannot be taken for the brand's own: a run's reviewers saw the kit's mark and name.
+  const head = standIn ? [
+    `${BRAND_MARKER} ${src.from ? `from ${src.from}` : 'with no logo on record'}. Add the logo's files and run it again;`,
+    '// a hand edit here is undone by the next run.',
+    `// Not the brand's logo. ${name} has no drawn mark yet, so BRAND carries the kit's stand-in, STAND_IN_MARKS,`,
+    "// at the kit's sizes, until the brand's own files are there.",
+    said ? `// Named in ${src.from} and not drawn yet: ${said}.` : null,
+    character ? null : `// ${name} has no character, so Character draws nothing.`,
+  ] : [
     `${BRAND_MARKER} from ${src.from}. Change the files there and run it again;`,
     '// a hand edit here is undone by the next run.',
+    said ? `// Not drawn yet, so left out: ${said}.` : null,
     kept.length ? `// The record holds no ${kept.join(', ')}, so ${kept.length === 1 ? 'it keeps the kit default' : 'they keep the kit defaults'} until it does.` : null,
+  ];
+  const lines = [
+    ...head,
     ...refused.map((r) => `// Not a symbol: ${r}`),
     inkPoses.length ? `// Drawn in one dark ink, so they take the text colour on any ground: ${inkPoses.join(', ')}.` : null,
     '',
     'export const BRAND: Brand = {',
-    `  name: ${json(src.name ?? 'Product')},`,
-    '  marks: {',
-    ...Object.entries(marks).map(([k, v]) => `    ${json(k)}: ${json(v)},`),
-    '  },',
+    `  name: ${json(name)},`,
+    ...(standIn ? ['  marks: STAND_IN_MARKS,'] : ['  marks: {', ...Object.entries(marks).map(([k, v]) => `    ${json(k)}: ${json(v)},`), '  },']),
     `  logo: { height: ${logo.height}, minHeight: ${logo.minHeight}, symbolMinHeight: ${logo.symbolMinHeight}, clearSpace: ${Number(logo.clearSpace.toFixed(3))} },`,
   ].filter((l) => l !== null);
   if (character) {
@@ -467,7 +501,7 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     lines.push('  },');
   }
   lines.push('}', '');
-  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character), refused, inkPoses };
+  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character), refused, inkPoses, placeholder: standIn, missing };
 }
 
 /**

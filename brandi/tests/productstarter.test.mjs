@@ -2,6 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 
@@ -113,8 +114,8 @@ describe('the files the system owns in a starter', () => {
   test('a starter that cannot be made is not started: nothing is written, and the message says so', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-'));
     const out = path.join(dir, 'product', 'starter');
-    const brand = { meta: { name: 'Acme' }, identity: { logo: { files: [{ path: 'assets/logos/missing.svg', role: 'primary' }] } } };
-    await assert.rejects(writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') }), /^Error: Nothing was written to .*starter: the full mark: assets\/logos\/missing\.svg does not exist/);
+    // A mark product.json names is the product's own pick, so a missing one is a mistake to fix now.
+    await assert.rejects(writeStarter({ out, tokens, identity, product: { brand: { marks: { full: 'assets/logo/missing.svg' } } }, productDir: path.join(dir, 'product') }), /^Error: Nothing was written to .*starter: the full mark: assets\/logo\/missing\.svg does not exist/);
     assert.equal(existsSync(out), false, 'no half-copied kit');
     // A texture move whose file is not in the product folder stops it the same way.
     const textured = buildProductTokens(buildSystem({ primary: '#1F6F4A' }), { shape: { moves: [{ name: 'The paper ground', source: 'p13', where: ['the sign-in hero'], file: 'textures/paper.jpg', kind: 'texture', strength: 0.3 }] } });
@@ -127,6 +128,45 @@ describe('the files the system owns in a starter', () => {
     assert.ok(made.written.includes('textures/paper.jpg'));
     assert.equal(await readFile(path.join(out, 'textures', 'paper.jpg'), 'utf8'), 'jpeg bytes');
     assert.match(await readFile(path.join(out, 'app', 'globals.css'), 'utf8'), /url\("\.\.\/textures\/paper\.jpg"\)/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("a logo the brand record names that nobody has drawn does not stop the starter: lib/brand.ts carries the kit's stand-in under the brand's name, says it is not the brand's, and draws no character", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-'));
+    const out = path.join(dir, 'product', 'starter');
+    const brand = JSON.parse(await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+    const res = await writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') });
+    assert.equal(res.placeholder, true);
+    assert.deepEqual(res.brand.missing, ['assets/logos/muddy-paws-primary.svg']);
+    assert.equal(res.brand.character, false);
+    const file = await readFile(path.join(out, 'lib', 'brand.ts'), 'utf8');
+    assert.match(file, /export const STAND_IN_MARKS: Brand\["marks"\]/, 'the stand-in is in the file');
+    assert.match(file, /\/\/ Not the brand's logo\. Muddy Paws has no drawn mark yet/);
+    assert.match(file, /name: "Muddy Paws",\n  marks: STAND_IN_MARKS,/);
+    assert.doesNotMatch(file, /name: "Product"|character: \{/, 'neither the kit\'s name nor its character');
+    // A starter made before the stand-in sat with the types takes them from the kit, or BRAND names a constant it lacks.
+    const old = file.replace(/\/\*\*\n \* The kit's stand-in mark[\s\S]*?\n\}\n/, '');
+    assert.doesNotMatch(old, /STAND_IN_MARKS: Brand/);
+    await writeFile(path.join(out, 'lib', 'brand.ts'), old);
+    await writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') });
+    assert.match(await readFile(path.join(out, 'lib', 'brand.ts'), 'utf8'), /export const STAND_IN_MARKS: Brand\["marks"\][\s\S]*marks: STAND_IN_MARKS,/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('the starter command on a brand whose logo is named and never drawn writes the starter, and says which files are missing and how to add them', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-cli-'));
+    await mkdir(path.join(dir, 'brand'), { recursive: true });
+    await mkdir(path.join(dir, 'product'), { recursive: true });
+    await writeFile(path.join(dir, 'brand', 'brand.json'), await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+    await writeFile(path.join(dir, 'product', 'tokens.json'), JSON.stringify(tokens));
+    const run = spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'scripts', 'brandi.mjs'), 'product', 'starter'], { cwd: dir, encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    assert.match(run.stdout, /Wrote the Muddy Paws starter/);
+    assert.match(run.stdout, /Muddy Paws has no drawn logo yet/);
+    assert.match(run.stdout, /assets\/logos\/muddy-paws-primary\.svg/, 'the missing file, by name');
+    assert.match(run.stdout, /brandi logo wordmark/, 'and how to add one');
+    assert.match(run.stdout, /no character, so Character draws nothing/);
+    assert.match(await readFile(path.join(dir, 'product', 'starter', 'lib', 'brand.ts'), 'utf8'), /name: "Muddy Paws",\n  marks: STAND_IN_MARKS,/);
     await rm(dir, { recursive: true, force: true });
   });
 

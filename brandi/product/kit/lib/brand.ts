@@ -1,5 +1,5 @@
 // The brand's marks and character, as the product uses them. `brandi product starter` writes this file
-// for each brand from its logo system and character pack: it keeps the types and replaces BRAND.
+// for each brand from its logo system and character pack: it keeps the types and the stand-in mark, and replaces BRAND.
 // Components read it (Logo, ProductLockup, Character); nothing redraws or recolours what is here.
 
 /**
@@ -56,9 +56,11 @@ export interface Brand {
   character?: BrandCharacter
 }
 
-// PLACEHOLDER. A neutral geometric mark and character for the kit's own previews, not any brand's
-// artwork. Its colours come from the system's roles (brand, on-brand) and currentColor, so one
-// drawing serves both themes. The generator replaces all of it with the brand's real files.
+/**
+ * The kit's stand-in mark: a rounded square and the letters PRODUCT, never any brand's artwork. A brand
+ * with no drawn logo yet carries it until it has one, and the starter says so where it writes it. Its
+ * colours come from the system's roles (brand) and currentColor, so one drawing serves both themes.
+ */
 const SYMBOL_SHAPE =
   "M6 0h12a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H6a6 6 0 0 1-6-6V6a6 6 0 0 1 6-6Zm6 7a5 5 0 1 0 0 10a5 5 0 1 0 0-10Z"
 const WORDMARK =
@@ -75,7 +77,19 @@ const fullMark = (symbolFill: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 116.2 24"><path fill-rule="evenodd" style="fill:${symbolFill}" d="${SYMBOL_SHAPE}"/>${WORDMARK}</svg>`
 const symbolMark = (fill: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" style="fill:${fill}" d="${SYMBOL_SHAPE}"/></svg>`
+export const STAND_IN_MARKS: Brand["marks"] = {
+  full: fullMark("var(--brand)"),
+  "full-on-dark": fullMark("var(--brand)"),
+  "full-ink": fullMark("currentColor"),
+  symbol: symbolMark("var(--brand)"),
+  "symbol-on-dark": symbolMark("var(--brand)"),
+  "symbol-ink": symbolMark("currentColor"),
+}
 
+// PLACEHOLDER. The kit's own brand, for its previews: the stand-in mark and a neutral character. The
+// starter replaces everything from here with the brand's own: its marks, or the stand-in under the
+// brand's name while none is drawn, and a character only when the brand has one.
+//
 // The placeholder character: a rounded figure whose face changes with the moment. Not every moment has a
 // pose, on purpose, so the previews show that a moment the pack has no pose for gets no picture.
 const figure = (face: string) =>
@@ -87,14 +101,7 @@ const lineFigure = (face: string) =>
 
 export const BRAND: Brand = {
   name: "Product",
-  marks: {
-    full: fullMark("var(--brand)"),
-    "full-on-dark": fullMark("var(--brand)"),
-    "full-ink": fullMark("currentColor"),
-    symbol: symbolMark("var(--brand)"),
-    "symbol-on-dark": symbolMark("var(--brand)"),
-    "symbol-ink": symbolMark("currentColor"),
-  },
+  marks: STAND_IN_MARKS,
   logo: { height: 24, minHeight: 16, symbolMinHeight: 16, clearSpace: 0.25 },
   character: {
     name: "Placeholder",
