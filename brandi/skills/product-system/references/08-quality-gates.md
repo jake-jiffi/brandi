@@ -16,6 +16,7 @@ reviewers are briefed, and what goes in the record.
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree (`09-operate.md`) |
 | Canvas runtime | Every board renders without an error under the Design canvas's own runtime, in a cross-origin frame (`06-canvas.md` step 3) |
+| Board sizes | Every board's frame fits its content, a page at its whole height, and nothing on a board hides its own content (Board sizes, below) |
 | Coverage | Every surface `product.json` lists has a board at each of its widths and a states board for each of its modules (Coverage, below) |
 | Record | Every tool's version pinned and written down |
 
@@ -60,6 +61,9 @@ more, and do not lower the bar to finish.
    for it to be visible: a dialog drawn over its page (`06-canvas.md`) has no height of its own, so
    it never counts as visible, and that board went unscanned at every width for two rounds. A page
    axe could not scan fails the Accessibility gate, and its line says how many ("6 not scanned").
+   Every board is also measured once against its frame (Board sizes, below). The summary the
+   command prints ends with a line for every machine gate, the canvas runtime and board sizes
+   included: one run's board failed under the canvas runtime and only a progress line said so.
 2. **Reviewers in parallel, each in its own context and its own folder.** Each reads its own skill's
    instructions and references first, then judges against the system's docs and the bar.
 3. **Evidence only.** A finding is backed by a screenshot, the DOM, a computed style or a keyboard
@@ -77,12 +81,13 @@ more, and do not lower the bar to finish.
 
 Every fix that mattered gets a scripted check, so it cannot quietly regress.
 
-**Plan for the time.** One full `$A product gates --serve` took about 40 minutes for about 500
-renders (204 component, 199 board and 90 route), and the trait loop (`09-operate.md`) about 8
-minutes a trait. Run nothing else that drives Chrome beside either: other browser work beside the
-gates makes checks flaky, and a scripted check that passed the rounds before it failed once on the
-same kit. Start the gates, then do work that needs no browser (the written system, the reviewer
-briefs, the fix plan), and run the traits before the gates or after them.
+**Plan for the time.** Give the first full `$A product gates` of a run up to 90 minutes, and each
+later one about 30: one run's first round took 86 minutes for 539 renders, and its next two 27
+minutes each for the same renders. The trait loop (`09-operate.md`) takes about 8 minutes a trait.
+Run nothing else that drives Chrome beside either: other browser work beside the gates makes checks
+flaky, and a scripted check that passed the rounds before it failed once on the same kit. Start the
+gates, then do work that needs no browser (the written system, the reviewer briefs, the fix plan),
+and run the traits before the gates or after them.
 
 ## Coverage
 
@@ -105,6 +110,32 @@ prefix it starts with, so `AppStaffShift820` counts for `AppStaff`, not for `App
 cannot share a prefix. The Coverage line names what is missing, and the record lists it surface by
 surface. Add each new module to its surface's `modules` when it opens (`09-operate.md`), so the gate
 asks for its states board.
+
+The record's Coverage section also says, surface by surface, which modules drew options A to D and
+which reused a written pattern (`06-canvas.md`, section 4), read from the option boards' names: a
+module with two or more boards ending in a letter before the width (`ConsoleRostersC1440`) drew a
+set. It is a record, not a pass or a fail: a module that reused a pattern needs nothing drawn.
+
+## Board sizes
+
+`$A product gates` draws every board at its declared frame, as the canvas does, then measures it at
+its width in its device's window (900 at 1440, 1180 at 820, 844 at 390), a page in a shell at its
+whole height (`06-canvas.md`, Sizes). The gate fails on:
+
+| Finding | What it means | The fix |
+| --- | --- | --- |
+| A frame clipped | The content runs more than 8px past the frame's height | `$A product boards --heights` |
+| A frame blank | The frame is more than a tenth, and 64px, taller than its content | `$A product boards --heights` |
+| A box hiding content | Inside the board, a box that clips (`overflow` hidden or clip) holds content more than 4px taller than itself | The board's markup (A phone frame, `06-canvas.md`) or the component |
+| Not measured | The board did not render, or gave no height | The board, from the error the record prints |
+
+The box check leaves out text cut short on purpose (an ellipsis or a line clamp), a box that scrolls,
+a visually hidden one, an overlay drawn open (positioned, as a menu's panel is) and a page under a
+dialog's scrim. A run's checkout drew its cards in a phone frame whose main was the flex column: the
+cards shrank, the order's total sat hidden inside one, and every other gate passed it. The round
+folder gets `heights.json`, each board's wanted height, for a script that writes the boards. A
+starter whose `tools/measure-boards.mjs` predates the gate reports it not run, and the round is not
+met until `brandi product starter --kit` refreshes it.
 
 ## Reviewers cannot start reviewers
 
@@ -136,8 +167,9 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
 - **What scripts miss:** real keyboard and touch use, forced colours, screen-reader output, and
   anything the last fixes broke.
 - **Working rules:** fix nothing; never start or stop the servers; work only in your folder; back
-  every finding with evidence; grade on your skill's own scale; return the report as text; aim for
-  20 to 25 minutes.
+  every finding with evidence; grade on your skill's own scale, and for each heuristic under 4 name
+  the board, route or finding that cost the point; return the report as text; aim for 20 to 25
+  minutes.
 
 ## What scripts miss, and the checks that cover it
 
@@ -158,6 +190,14 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
   boards, component previews and routes alike. Limit: it counts every required control, so a form
   whose only required field is disabled, or whose every submit button has `formnovalidate`, fails
   too, though no bubble shows. Give that form `noValidate` as well.
+- **An element drawn as a string.** Two holes in one text node, or a hole beside words, are joined
+  into text, and an element there reads "[object Object]" (`06-canvas.md`, The mount). axe and the
+  detector read it as words. `axe-pages.mjs` reports text or an attribute that reads
+  "[object Object]" as `object-as-text`, naming the element.
+- **A class the bundle never built.** The system's `bundle.css` holds only the Tailwind classes the
+  kit's components use, so a board's own class can select nothing and change nothing on screen.
+  `$A validate` names each class no stylesheet the board loads selects (`06-canvas.md`, Five
+  limits).
 - **A board that works as a page and breaks in a frame.** On the canvas each board runs in a frame
   whose parent is another origin, while Brandi's previews and the gates draw it as the top page. A
   board script that walked `window`'s properties to find the bundle read that parent and threw, so a
@@ -233,14 +273,19 @@ reviewer's report beside it, then turn the two judged reports into the files the
 
 ```json
 { "method": "single-context, isolation by procedure: each gate started from the round's evidence",
-  "heuristics": [{ "name": "Visibility of system status", "score": 4 }],
-  "findings": [{ "severity": "P2", "title": "Title clipped at 390 in dark", "status": "open",
+  "heuristics": [{ "name": "Visibility of system status", "score": 4 },
+                 { "name": "Consistency and standards", "score": 3, "note": "ConsoleHome390Dark: the title clipped at 390 (C2)" }],
+  "findings": [{ "id": "C2", "severity": "P2", "title": "Title clipped at 390 in dark", "status": "open",
                  "where": "ConsoleHome390Dark", "evidence": "shots/home-390-dark.png: the title ends in an ellipsis",
                  "owner": "Sam", "class": "kit" }] }
 ```
 
-`critique.json` holds all ten heuristics; `rules.json` holds `findings` alone, with ui-ux-pro-max's
-severities. Both carry:
+`critique.json` holds all ten heuristics. Each one scored under 4 carries a `note` saying what cost
+the point: the board, route or finding that took it, so the next round knows what to fix. One run
+scored five heuristics 3 of 4 and gave no reason for any, and nobody could tell where the points
+went. The Craft line names every heuristic under 4 with no note, and `record.md` prints each note
+beside its score; a missing note fails nothing, as a finding missing its fields fails nothing.
+`rules.json` holds `findings` alone, with ui-ux-pro-max's severities. Both carry:
 
 - `method`: how the review ran, in a sentence: single-context, or isolation by procedure (Reviewers
   cannot start reviewers, above).
@@ -261,9 +306,12 @@ carries, with a summary row in the quality-gates section:
 
 - Round number, date, and what was in scope.
 - Tools and versions.
-- Scores per gate (critique /40 with each heuristic, audit /20), and whether each ran single-context.
+- Scores per gate (critique /40 with each heuristic and, under 4, what cost the point; audit /20),
+  and whether each ran single-context.
 - Detector findings by target, axe results, behaviour check counts, the token audit line.
-- Coverage: each surface, its prefix, how many boards it has, and what it is missing.
+- Coverage: each surface, its prefix, how many boards it has, what it is missing, and which modules
+  drew options and which reused a written pattern.
+- Board sizes: each frame off its content, each box that hides content, each board not measured.
 - Findings by severity, each with its status and evidence.
 - Accepted deviations, each with its reason.
 - Shape the kit chose: every radius, the shell and any missing shape move the brand did not set, each

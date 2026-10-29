@@ -87,7 +87,20 @@ export function canvasCoverage({ surfaces = [], files = [] }) {
         if (!states) missing.push(`no states board for the ${m} module (a board named ${s.prefix}, a word of ${moduleWords(m).join(' or ')}, then States, as ${s.prefix}${pascal(m)}States${s.widths[0]})`);
       }
     }
-    return { ...s, boards: boards.length, missing };
+    // Which modules drew options and which reused a written pattern (06-canvas.md, section 4), for the record: an
+    // option board ends in its letter before the width, as ConsoleRostersC1440. Two letters or more make a set.
+    const options = [];
+    for (const m of s.modules) {
+      const words = moduleWords(m).map((w) => w.toLowerCase());
+      const letters = new Set();
+      for (const b of boards) {
+        const opt = /^(.+?)([A-D])\d+(?:Dark)?$/.exec(b.slice(s.prefix.length));
+        if (opt && !opt[1].includes('States') && words.some((w) => opt[1].toLowerCase().includes(w))) letters.add(opt[2]);
+      }
+      if (letters.size >= 2) options.push({ module: m, letters: [...letters].sort() });
+    }
+    const reused = s.modules.filter((m) => !options.some((o) => o.module === m));
+    return { ...s, boards: boards.length, missing, options, reused };
   });
   return { covered: result.every((s) => !s.missing.length), surfaces: result };
 }

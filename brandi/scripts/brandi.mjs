@@ -79,7 +79,7 @@ import { fetchFonts } from './productfonts.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
 import { CHARACTER_STATES } from './productbrand.mjs';
-import { runGates, judgeRound, roundMarkdown, publishedSection, serveStarter, starterRoutes, WIDTHS } from './productgates.mjs';
+import { runGates, judgeRound, roundMarkdown, publishedSection, serveStarter, starterRoutes, WIDTHS, MACHINE_GATES } from './productgates.mjs';
 import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
@@ -89,7 +89,7 @@ import { assembleDesignSystem } from './productds.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
-import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES, forDesignCanvas, designIndex, checkSystemRecord } from './canvas.mjs';
+import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES, forDesignCanvas, designIndex, checkSystemRecord, localStylesheets } from './canvas.mjs';
 import { extractColors } from './color.mjs';
 import { renderBrandBook, renderBrandDeck, pdfChromeArgs, splitInlineImages, asPageFragment } from './brandbook.mjs';
 import { toPreviewHtml, screenshot, findChrome, runChrome, declaredFrame } from './preview.mjs';
@@ -1008,7 +1008,14 @@ async function cmdValidate(flags, positional) {
     }
   }
   const near = await brandBesideCanvas(dir, flags);
-  const result = validateCanvas({ artboards, manifest, brandFonts: recordedFonts(near?.brand) });
+  // The stylesheets the boards load from the folder (an installed system's tokens.css and bundle.css), so a class
+  // nothing defines is named. One the folder does not hold is left out, and the boards that load it go unchecked.
+  const stylesheets = {};
+  for (const href of new Set(artboards.flatMap((a) => localStylesheets(a.source)))) {
+    const file = path.resolve(dir, href);
+    if (file.startsWith(dir + path.sep) && existsSync(file)) stylesheets[href] = await readFile(file, 'utf8');
+  }
+  const result = validateCanvas({ artboards, manifest, brandFonts: recordedFonts(near?.brand), stylesheets });
 
   // The artboards can all be correct and the deliverable still contradict the
   // brief: four logo variants documented and one drawn, a photographic
@@ -2995,12 +3002,16 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       definition, and install the system beside the canvas boards. Needs npm
       install in the starter first.
 
-  brandi product boards [--starter product/starter] [--no-measure]
+  brandi product boards [--starter product/starter] [--no-measure] [--heights]
       The canvas boards the system generates for itself into product/canvas:
       colour, type, shape and icons from the tokens, one board per component
       group from the definitions' examples, a dark twin beside each, a
       contents Main, and canvas.json rows under title notes. Heights are
-      measured in a browser. Authored boards are never touched.
+      measured in a browser. Says the y authored rows start at. Authored
+      boards are never touched, except with --heights: each is measured at
+      its width in its device's window (a page at its whole height) and its
+      $preview height and canvas.json entry are written, with the rows under
+      a board that grew moved down.
 
   brandi product ds --title "<name>" [--live <design-system.json>] [--blobs <file>] [--tagline "<line>"] [--all]
       The Design System artifact, assembled under product/.publish/ds: the
@@ -3019,9 +3030,10 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       --serve builds and starts the starter and scans tools/routes.json, or
       --route names a running page (once for each). Holds the canvas to the
       surfaces product.json lists (a board at each width, a states board for
-      each module), and leaves out detector findings product.json "accepted"
-      records with a reason. Writes product/rounds/round-N/gates.json with
-      every tool version.
+      each module), measures every board's frame against its content, and
+      leaves out detector findings product.json "accepted" records with a
+      reason. Writes product/rounds/round-N/gates.json with every tool
+      version, and heights.json with the height each board's frame wants.
 
   brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
       Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
@@ -3311,8 +3323,17 @@ async function cmdProduct(flags, positional) {
     const starter = path.resolve(typeof flags.starter === 'string' ? flags.starter : path.join(productDir, 'starter'));
     if (!existsSync(path.join(starter, 'system', 'system.json'))) return fail('No starter yet. Run `brandi product starter`, then `brandi product bundle`.');
     if (!existsSync(path.join(productDir, 'canvas', 'ds'))) return fail('The system is not installed beside the canvas boards yet. Run `brandi product bundle` first.');
-    const res = await writeProductBoards({ productDir, starter, measure: !flags['no-measure'], log: (l) => process.stderr.write(`${l}\n`) });
-    emit([`Wrote ${plural(res.boards.length, 'generated board')} into ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}${res.measured ? `, ${res.measured} measured in a browser` : ', unmeasured'}.`, res.shifted ? `Authored boards moved down ${res.shifted}px to clear the generated rows.` : '', `Validate with \`brandi validate --dir ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}\`.`].filter(Boolean).join('\n'), { ok: true, ...res, manifest: undefined });
+    if (flags.heights && flags['no-measure']) return fail('--heights measures the authored boards in a browser, so it cannot run with --no-measure.');
+    const res = await writeProductBoards({ productDir, starter, measure: !flags['no-measure'], heights: Boolean(flags.heights), log: (l) => process.stderr.write(`${l}\n`) });
+    emit([
+      `Wrote ${plural(res.boards.length, 'generated board')} into ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}${res.measured ? `, ${res.measured} measured in a browser` : ', unmeasured'}.`,
+      res.ranInto ? `The generated rows now end at y ${res.generatedEnd}, past the first authored row at y ${res.ranInto.top}: the authored boards and their notes moved down ${res.shifted}px.` : '',
+      `Authored rows start at y ${res.authoredFrom} or below, a section's title note first: a script that places its own boards starts there.`,
+      flags.heights && !res.measured ? 'The authored boards were not measured: run npm install in the starter, so Playwright can.' : '',
+      flags.heights && res.heightsSkipped ? `No heights written: ${res.heightsSkipped}.` : '',
+      flags.heights && res.measured && !res.heightsSkipped ? (res.heights.length ? `Wrote ${plural(res.heights.length, 'authored board')} at ${res.heights.length === 1 ? 'its' : 'their'} measured height${res.heights.length === 1 ? '' : 's'}: ${res.heights.map((h) => `${h.file.replace(/\.dc\.html$/, '')} ${h.from ?? 'unplaced'} to ${h.to}`).join(', ')}.` : 'Every authored board is already at its measured height.') : '',
+      `Validate with \`brandi validate --dir ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}\`.`,
+    ].filter(Boolean).join('\n'), { ok: true, ...res, manifest: undefined });
     return;
   }
   if (sub === 'ds') {
@@ -3345,7 +3366,7 @@ async function cmdProduct(flags, positional) {
     const round = flags.round !== undefined ? Number(flags.round) : sub === 'gates' ? (existing.length ? Math.max(...existing) + 1 : 1) : Math.max(0, ...existing);
     if (!Number.isInteger(round) || round < 1) return fail('--round must be a whole number from 1.');
     // Detector findings a person accepted as recorded deviations (08-quality-gates.md), read at judging time, so a
-    // reason written after the gates ran counts without another 40-minute run.
+    // reason written after the gates ran counts without another run of 30 to 90 minutes.
     let accepted = null;
     try { accepted = JSON.parse(await readFile(path.join(productDir, 'product.json'), 'utf8')).accepted ?? null; } catch { /* none recorded */ }
     if (sub === 'gates') {
@@ -3366,9 +3387,14 @@ async function cmdProduct(flags, positional) {
         server?.stop();
       }
       const judged = judgeRound(gates, { accepted });
-      const machine = judged.verdicts.filter((v) => ['Tokens', 'Drift', 'Detector', 'Accessibility', 'Coverage', 'Record'].includes(v.gate));
+      const machine = judged.verdicts.filter((v) => MACHINE_GATES.includes(v.gate));
       const short = (gates.coverage?.surfaces ?? []).flatMap((s) => s.missing.map((m) => `        ${s.name}: ${m}`));
-      emit([`Round ${round} machine gates:`, ...machine.flatMap((v) => [`  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`, ...(v.gate === 'Coverage' ? short : [])]), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
+      const sized = gates.sizes?.off ? [
+        ...gates.sizes.off.map((o) => `        ${o.board}: frame ${o.declared}px, content ${o.want}px (${o.fit})`),
+        ...gates.sizes.clipped.map((c) => `        ${c.board}: ${c.what} shows ${c.shown}px of ${c.content}px`),
+        ...(gates.sizes.off.length ? ['        Write the heights with `brandi product boards --heights`.'] : []),
+      ] : [];
+      emit([`Round ${round} machine gates:`, ...machine.flatMap((v) => [`  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`, ...(v.gate === 'Coverage' ? short : v.gate === 'Board sizes' ? sized : [])]), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
         { ok: machine.every((v) => v.pass), round, gates });
       return;
     }

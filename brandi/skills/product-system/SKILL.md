@@ -55,7 +55,7 @@ $A product audit                      # measure every pair a tokens file declare
 $A product globals                    # the starter's globals.css, from the tokens
 $A product starter                    # the product kit as a Next.js starter, dressed in the tokens
 $A product bundle                     # the canvas bundle from the starter's components, and every card
-$A product boards                     # the boards the system draws for itself: foundations, every component, Main
+$A product boards                     # the boards the system draws for itself: foundations, every component, Main (--heights: authored boards too)
 $A product ds --title <name>          # the Design System artifact, staged for publishing (--live: only what changed)
 $A product gates                      # the machine gates for a round: tokens, detector, axe, checks
 $A product round --round N            # the round held against the whole bar, with the judged gates
@@ -228,17 +228,22 @@ brand's own screens live on the canvas until a product is built in its own repo 
 drift check's by-eye row then compares the canvas with that product, not with the example. If `npm
 install` fails on a cache permission, run it with `--cache <work folder>/notes/tmp/npm-cache`.
 
-**What a run costs.** One `$A product gates --serve` renders about 500 pages and takes about 40
-minutes; the trait loop about 8 minutes a trait. Plan rounds around that, and run nothing else
-Chrome-heavy beside the gates: under load, browser checks time out and read as failures.
+**What a run costs.** One `$A product gates --serve` renders about 500 pages: give the first run up
+to 90 minutes and each later one about 30. The trait loop takes about 8 minutes a trait. Plan rounds
+around that, and run nothing else Chrome-heavy beside the gates: under load, browser checks time out
+and read as failures.
 
 ### 6. Patterns and proof (VISUAL, the stress test)
 
 The core page patterns (home, records, list and detail, record, report, settings, create and edit,
 setup, the assistant, sign in) and the first real product's screens, drawn on the canvas with the
 real components. Every module gets a states board. Every hard screen gets options A to D, each title
-naming its weakness, then the pick on record. Draw at 1440, 820 and 390, in light and dark.
-`references/06-canvas.md` has the board families and the rules.
+naming its weakness, then the pick on record. Hard means no written pattern covers it yet: the first
+module of a surface with modules draws a set, the pick goes into the screen patterns, and later
+modules reuse it, drawing a set of their own only when it does not fit. The round record says which
+modules drew options and which reused a pattern. Draw at 1440, 820 and 390, in light and dark. Once
+the boards are written, `$A product boards --heights` measures each and writes its height, a page at
+its whole height. `references/06-canvas.md` has the board families and the rules.
 
 ### 7. Gates (rounds until the bar is met, then sign-off)
 
@@ -303,6 +308,7 @@ The system is never finished. Five modes, each a round of its own
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree, the docs' written values included |
 | Canvas runtime | Every board renders under the Design canvas's own runtime, in a cross-origin frame |
+| Board sizes | Every board's frame fits its content, and nothing on a board hides its own content |
 | Record | Every tool's version pinned and written down, every round |
 
 Impeccable is the craft gate. ui-ux-pro-max is the rules engine: its accessibility, forms,

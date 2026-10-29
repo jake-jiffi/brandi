@@ -14,7 +14,10 @@ of truth runs, and when it changed.
 ## module: a new product area
 
 1. **Options.** Draw the hard screens four ways (A to D), each title naming its weakness. The person
-   picks, and the pick is recorded on the canvas.
+   picks, and the pick is recorded on the canvas. Hard is a screen no written pattern covers yet:
+   a module whose screens a pattern already covers reuses it, and draws a set only when that
+   pattern does not fit (`06-canvas.md`, section 4). The round record names the modules that drew
+   a set and those that reused a pattern.
 2. **Pages.** Every page of the pick, with the real components.
 3. **States.** A states board for the module, its title listing every state it covers, with the
    edge cases drawn and the outside systems' failure modes among them. Add the module to its

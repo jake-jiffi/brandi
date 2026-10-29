@@ -86,12 +86,20 @@ bottom. A `title1` note heads each section:
 - In a surface's section, each dark row sits directly under its light row, board under board. In a
   module's section, each dark twin sits beside its light board, and the phone version ends the row.
 - When figures and names are samples, the section heading says so.
+- The generated rows (foundations and components) come first and grow when the system does. `$A
+  product boards` prints the y the authored rows start at: a script that places its own boards
+  starts its first title note there, never at a number it worked out once. When the generated rows
+  have grown past the first authored row, title note included, it says so and moves every authored
+  board and note down by as much. A run that placed its rows at a fixed y met an overlap there.
 
 ### Names
 
 `<Surface><Screen>[<Option>]<Width>[Dark].dc.html`, in PascalCase, letters and digits only. That
 passes the canvas's file rule and Brandi's `artboard()`, which refuses anything else. The width is
-the last number in the stem, before `Dark`, so a script can read it. `<Surface>` is the surface's
+the last number in the stem, before `Dark`, so a script can read it. It is the width of the screen
+the board shows, not of the board: a states strip of seven 390 frames is about 3,000px wide and
+still `AppBookingsStates390`, which is how the coverage gate counts it as the app at 390. The
+board's own size is its `$preview` and its `canvas.json` entry. `<Surface>` is the surface's
 `boards` prefix from `product.json` (`Console` for an ops console), its name in PascalCase when it
 sets none; the coverage gate reads boards by it. A states board holds `States` and a word of its
 module: `ConsoleRostersStates1440`.
@@ -186,9 +194,16 @@ What the syntax carries:
 - The value is `<Namespace>.<Export>`, at any depth: `Acme.Dialog.Popup` resolves.
 - Attributes are props. A camelCase prop is written in kebab-case: `heading-level`, `on-row-click`.
   A handler too: `brandi validate` fails `onRowClick` on an `x-import`, and `onclick` or
-  `on-click` on a plain element, where it is JSX camelCase (`onClick`).
+  `on-click` on a plain element, where it is JSX camelCase (`onClick`). Every other attribute on a
+  plain element is its JSX name as well: `<form noValidate>`, never `novalidate`, which validate
+  also fails.
 - A literal attribute is a string. A boolean, number, array, object, handler or element goes
   through a `{{hole}}` bound in `renderVals()`. Holes are dotted lookups only.
+- A text node that is one hole and nothing else draws its value as it is, an element included.
+  Two holes in one text node, or a hole with words beside it, are joined into a string, and an
+  element there reads "[object Object]". Give each element a hole of its own, alone in its element:
+  `<div>{{week}}</div><div>{{saveRow}}</div>`, never `<div>{{week}}{{saveRow}}</div>`. The gates
+  report text or an attribute that reads "[object Object]" as `object-as-text`.
 - Element content is `children`, and a nested `x-import` is a child component.
 - `style` on an `x-import` is for placing and sizing the slot, nothing else.
 - The system's root component wraps the whole board and carries the theme. A component outside it
@@ -198,7 +213,7 @@ What the syntax carries:
 - Icons come from the system, by name. Never emoji.
 - Reuse between boards goes through `<dc-import>`, never through a component defined in script.
 
-### Four limits
+### Five limits
 
 1. **Every mounted component sits inside a wrapper element.** A component that finds its control by
    position breaks: a field wiring its label to the input, a tooltip attaching to its trigger.
@@ -214,6 +229,13 @@ What the syntax carries:
 4. **A board that another board imports must render alone.** Give it the same head lines, list it
    in `canvas.json` at its `$preview` size, keep `name` off its props (that attribute picks the
    board), and set `hint-size` to its root size.
+5. **A class is a rule only if a stylesheet the board loads has it.** The system's `bundle.css`
+   holds the Tailwind classes the kit's own components use, because Tailwind built it from the
+   kit's source and never reads a board. A class nothing in the kit writes does nothing: a board's
+   `@min-[900px]:grid-cols-3` left its three columns as one, and nothing said so. Write the layout
+   as an inline style, or as a rule in the board's helmet `<style>` (limit 3 applies there), or use
+   a class the bundle has. `brandi validate` names every class in a board that no rule in its
+   stylesheets or its own style selects, board by board.
 
 A dark twin is a one-line board that imports its light twin with the prop flipped, so the two
 cannot drift apart:
@@ -287,6 +309,38 @@ dialog's scrim. The page goes in one wrapper, and nothing else does:
 `brandi validate` warns about an inert element with no text-occlusion ignore on it or around it,
 naming the board.
 
+### A phone frame
+
+A phone screen that is not a page in the system's shell (a consumer app's screen, or a frame in a
+states strip) is drawn as a device frame: the top bar, a main that scrolls, an optional foot bar,
+then the tab bar. Its content sits in one plain block inside main, so every card keeps its own
+height and main scrolls past the frame's bottom:
+
+```html
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden; background: var(--canvas);">
+  <x-import component-from-global-scope="Acme.PhoneTopBar" title="Your booking" back="{{back}}"></x-import>
+  <main style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+      <!-- the screen: cards, lists and alerts, each at its own height -->
+    </div>
+  </main>
+  <x-import component-from-global-scope="Acme.PhoneTabBar" items="{{tabs}}" value="Menu" label="App"></x-import>
+</div>
+```
+
+- Never make main itself the flex column or a grid. A flex item that clips its content, as a card
+  does, may shrink below that content when the column has a fixed height, and a grid row does the
+  same. A run's checkout drew its cards that way, they shrank, and the order's total sat hidden
+  inside its card while every gate passed. The block in main is not height-bound, so nothing in it
+  shrinks.
+- A page in the system's shell uses the shell (`AppShell` with its `tabBar`), which does this
+  itself. Inside a fixed frame the shell still takes the height of the board's window, not the
+  frame's: on a strip that is the strip's height, and the shell's foot is cut off. On a strip,
+  draw the frame above.
+- The gates measure every board and name each box that clips content taller than itself (Board
+  sizes, `08-quality-gates.md`), leaving out text cut short on purpose, boxes that scroll, an
+  overlay drawn open and a page under a dialog's scrim.
+
 ### Generated boards
 
 Once a product ships, it becomes the reference build, and its boards are generated from its code
@@ -317,6 +371,32 @@ Each cell carries three things:
 In a strip, a caption above each frame reads `<Screen> · <State>`. A frame showing several states
 of one component captions each one `<State> · <what it does>`, such as "Might be behind · says the
 time".
+
+A strip carries its landmarks on purpose. Each frame's top bar is a `<header>`, and at the top
+level of a page every header is a banner, so a strip of bare frames fails axe on duplicate banners,
+and its title and captions sit outside every landmark (axe's region rule). One run's strip failed on
+65 region nodes and 4 duplicate banners. Put each frame in a `<section aria-label>`, where a header
+is no banner, and the strip's title in a header of its own:
+
+```html
+<div style="width: 1250px; display: flex; flex-direction: column; background: var(--canvas);">
+  <header style="height: 48px;"><h1 class="type-title text-text-strong" style="margin: 0;">App · Bookings, states</h1></header>
+  <div style="display: flex; gap: 40px;">
+    <section aria-label="Bookings · nothing yet" style="width: 390px; display: flex; flex-direction: column; gap: 8px;">
+      <div style="height: 64px;">
+        <h2 class="type-heading text-text-strong" style="margin: 0;">Bookings · nothing yet</h2>
+        <p class="type-meta text-text-muted" style="margin: 0;">Say what to do next</p>
+      </div>
+      <!-- the phone frame (section 2), drawing this state -->
+    </section>
+    <!-- one section per state -->
+  </div>
+</div>
+```
+
+Brandi's own tests run axe on this markup and on the bare frames: the sections and the header pass
+every rule, and the bare frames fail on region and duplicate banners. Fix the markup, never the
+gate. The strip's name ends in its frames' width (Names, above): `AppBookingsStates390`.
 
 **The title lists every state on the board**, in the order drawn:
 
@@ -354,9 +434,16 @@ number before the width: "States2" followed by "1440" reads as 21440.
 
 ## 4. The options board
 
-Draw a hard screen four ways before building it. Hard means the first page of a new module, or a
-screen no pattern in `04-written-system.md` covers. `09-operate.md` puts this step first in every
-module.
+Draw a hard screen four ways before building it. Hard means a screen no written pattern
+(`04-written-system.md`) covers yet. `09-operate.md` puts this step first in every module.
+
+**One set of options per pattern, not per module.** On a surface with modules, the first module
+drawn gets a set: no pattern of the surface's own exists yet. Write the pick into the screen
+patterns, and each later module reuses it. A later module gets a set of its own only when the
+picked pattern does not fit it: say why in its heading (section 5). Five modules drawn four ways
+each made 20 option boards on one run; a reference build drew one set across six console modules.
+The round record says which modules drew options and which reused a pattern: `$A product round`
+reads it from the boards' names, the letter before the width (`08-quality-gates.md`, Coverage).
 
 - **Four boards, A to D, in one row**, at the surface's main width. Each is a complete screen with
   the real components and the same sample data, so they compare like for like.
@@ -463,18 +550,29 @@ number on both.
 
 | Width | Frame | In Brandi's `FRAMES` | Root | For |
 | --- | --- | --- | --- | --- |
-| 1440 | 1440 wide, as tall as the content, from 900 up | `desktop` (1440 x 900), `desktopTall` (1440 x 1600) | Fluid for a page. Fixed for foundations, components and states boards | Console and portal pages, options, specimen boards |
+| 1440 | 1440 wide, as tall as the content; a page from 900 up | `desktop` (1440 x 900), `desktopTall` (1440 x 1600) | Fluid for a page. Fixed for foundations, components and states boards | Console and portal pages, options, specimen boards |
 | 820 | 820 x 1180 | `tablet820`. `tablet` (834 x 1112) is a device frame | Fixed | Tablet tools, and the 820 version of a page |
 | 390 | 390 x 844 | `phone` | Fixed | Phone apps, and the phone version of a page |
 | Strip | Its frames side by side, the gaps between them, and a caption row | None | Fixed | States on a phone or tablet surface |
 
 The family canvas left 40px between phone frames in a strip and 80px between tablet frames.
 
-- `w` and `h` in `canvas.json` equal the board's own `$preview`. Measure the rendered board at its
-  width and write the same numbers in both places. A frame smaller than its content clips, and only
-  a republish fixes it.
-- A page's height is its height at its width. The last system's 1440 boards ran from 900 to 2380
-  tall.
+- `w` and `h` in `canvas.json` equal the board's own `$preview`, and both equal the board's
+  rendered height. A frame shorter than its content clips it, a taller one leaves a stretch blank,
+  and only a republish fixes either. Don't measure by hand: `$A product boards --heights` draws
+  every authored board at its width in its device's window, measures it, and writes its `$preview`
+  height and its `canvas.json` entry, nothing else in the file, moving the rows under a board that
+  grew down by as much. A script that writes the boards itself reads the heights from the last
+  round's `product/rounds/round-N/heights.json`, or runs `--heights` after each write.
+- A page's height is the whole page at its width: the shell's bars plus everything in its main,
+  which scrolls, with the device's window as the floor (900 at 1440, 1180 at 820, 844 at 390). A
+  shell fills its window, so a page measured as it opened was always the window's height whatever
+  it held, and one run's boards were left a third blank. The last system's 1440 boards ran from
+  900 to 2380 tall. A fixed board at 820 or 390 is that device's screen, at least 1180 or 844 tall;
+  a strip, an email, or a states or specimen sheet at 1440 is as tall as what it holds.
+- Every round the gates measure every board the same way, and Board sizes (`08-quality-gates.md`)
+  fails a frame more than 8px short of its content or more than a tenth (and 64px) too tall, and a
+  box that hides content inside a board (A phone frame, section 2).
 - A page gets `"expand": "fill"` and a fluid root. A device frame or specimen board gets a root
   fixed at `w` x `h`. Say which is which in the reviewer brief (`08-quality-gates.md`).
 - A board whose mounted controls work gets `"is_interactive": true`, and `brandi canvas` sets it
@@ -508,7 +606,7 @@ whole check. This is the canvas's share of it.
 | The installed `bundle.js` and `bundle.css` | The source and the Design System's copies | Checksum. A missed copy makes a fix invisible in screenshots |
 | The version in the `designSystems` record | The system's version id in the round record (`12-design-system-artifact.md`) | Equal, or the canvas carries an old system |
 | Screens on the canvas | The screen patterns (`04-written-system.md`) and the starter's routes | The same regions in the same order, the same components, the same primary action |
-| Board sizes | Each board's `$preview` and rendered height | Equal |
+| Board sizes | Each board's `$preview`, and its rendered height | Equal to `canvas.json` (drift), and to the rendered height (the gates' Board sizes) |
 | The publish set | The local-only files (section 8) | None of them in it, and every board listed in `canvas.json` |
 | Raw values in board markup *(proposal)* | `product/tokens.json` | A colour or size typed into a board where a token exists |
 
@@ -644,7 +742,7 @@ Brandi's canvas layer was built for brand rounds. These changes let it carry a p
 
 | Brandi | For a product canvas |
 | --- | --- |
-| `validateArtboard` and `$A validate` | Accept `ds/<namespace>/` stylesheets and scripts when `canvas.json` records the namespace, at any folder depth. Refuse an unrecorded namespace and a path with a `..` folder |
+| `validateArtboard` and `$A validate` | Accept `ds/<namespace>/` stylesheets and scripts when `canvas.json` records the namespace, at any folder depth. Refuse an unrecorded namespace and a path with a `..` folder. Name each class no stylesheet the board loads selects |
 | `$A canvas` | Skips the installed files in its missing-image check. Puts each record's `files` in the first call as server-side copies, beside the index that records them. `--system` and `--system-version` fill the record and its files from the published system. Stages a product canvas under `product/.publish/`, and refuses boards that load a system nothing installs |
 | `designIndex` and `$A canvas --live <file>` | Merge into the live index: Brandi's own boards, notes, pages and records change, and everything else stays. Without `--live` it merges into the last local publish and says what that overwrites |
 | `canvasManifest` | Carries `kind`, `maxW` and `maxH` on a note, so a `title1` heading is one call, and design system records |

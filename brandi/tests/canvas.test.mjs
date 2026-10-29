@@ -588,6 +588,40 @@ describe('a board that walks window', () => {
   });
 });
 
+describe('a class the installed system never built', () => {
+  // The bundle's stylesheet holds only the Tailwind classes the kit's own components use. A board that wrote
+  // @min-[900px]:grid-cols-3 got no rule for it, and its three columns fell to one with nothing said.
+  const sheets = {
+    'ds/acme/tokens.css': ':root{--canvas:#fff}.type-title{font-size:24px}.brand-texture{position:relative}',
+    'ds/acme/components/bundle.css': '.flex{display:flex}.gap-3{gap:.75rem}.md\\:grid-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}.w-1\\/2{width:50%}.\\@container{container-type:inline-size}.group-hover\\:underline:is(:where(.group):hover *){text-decoration:underline}.grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}',
+  };
+  const board = (body, css = '') => K.artboard({ name: 'ConsoleHome1440', system: 'acme', css, body: `<x-import component-from-global-scope="Acme.Root">${body}</x-import>` });
+  const check = (source, stylesheets = sheets) => K.validateArtboard(source, { name: 'ConsoleHome1440.dc.html', systems: ['acme'], stylesheets }).warnings.filter((w) => /match(es)? no rule/.test(w.message));
+
+  test('validate names a class no stylesheet the board loads has a rule for, and the board', () => {
+    const found = check(board('<div class="flex gap-3 @min-[900px]:grid-cols-3 md:grid-cols-3"><p class="type-title">Home</p></div>'));
+    assert.equal(found.length, 1, 'one warning a board');
+    assert.match(found[0].message, /ConsoleHome1440\.dc\.html/);
+    assert.match(found[0].message, /@min-\[900px\]:grid-cols-3, md:grid-cols-3/);
+    assert.match(found[0].fix, /inline style/);
+  });
+
+  test('a class the bundle, the tokens or the board\'s own style defines passes, escaped as Tailwind writes it', () => {
+    const own = board('<div class="flex gap-3 md:grid-cols-2 w-1/2 @container group"><p class="type-title brand-texture group-hover:underline home-grid">Home</p></div>', '.home-grid { display: grid; }');
+    assert.deepEqual(check(own), []);
+    assert.deepEqual(check(board('<div class="{{layout}} flex">x</div>')), [], 'a class from a hole is not read');
+    assert.deepEqual(check(board('<div class="{{ layout.cls }} flex">x</div>')), [], 'nor one from a hole written with spaces');
+    assert.equal(check(board('<div class="gap">x</div>'), { ...sheets, 'ds/acme/components/bundle.css': '.gap-3{gap:1rem}' }).length, 1, 'gap-3 is not gap');
+  });
+
+  test('nothing is said when the board loads no system stylesheet, or one that could not be read', () => {
+    assert.deepEqual(check(K.artboard({ name: 'Cover', body: '<div class="nowhere">Brand</div>' })), [], 'a brand board is its own CSS');
+    const { ['ds/acme/components/bundle.css']: _, ...missing } = sheets;
+    assert.deepEqual(check(board('<div class="nowhere">x</div>'), missing), []);
+    assert.deepEqual(check(board('<div class="nowhere">x</div>'), null), [], 'and the check runs only when the caller read the sheets');
+  });
+});
+
 describe('frames', () => {
   test('print frames are correct at 96 pixels per inch', () => {
     // A4 is 210 x 297 mm. 210mm = 8.268in x 96 = 794px. 297mm = 11.693in x 96 = 1123px.

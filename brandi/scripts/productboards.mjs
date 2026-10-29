@@ -21,7 +21,7 @@ import { pathToFileURL } from 'node:url';
 import { artboard, canvasManifest, FRAME_LIMIT } from './canvas.mjs';
 import { loadDefinitions, resolveNs, resolveLogicNs, GROUPS } from './productdocs.mjs';
 import { auditProductTokens } from './producttokens.mjs';
-import { previewArtboard } from './preview.mjs';
+import { previewArtboard, declaredFrame } from './preview.mjs';
 
 export const MARKER = 'generated from the resolved system by brandi product boards';
 const W = 1440;
@@ -392,12 +392,83 @@ function isGenerated(file) {
   try { return readFileSync(file, 'utf8').slice(0, 2048).includes(MARKER); } catch { return false; }
 }
 
+/** The window each checked width opens in on its device (06-canvas.md, Sizes); any other width, a desktop's. */
+export const DEVICE_HEIGHTS = Object.freeze({ 1440: 900, 820: 1180, 390: 844 });
+export const deviceHeight = (width) => DEVICE_HEIGHTS[width] ?? 900;
+
+// A fixed board at a tablet's or a phone's width is that device's screen; one at 1440 is a sheet (states, specimens).
+const SCREENS = new Set([820, 390]);
+
+/**
+ * The height a board's frame wants for what it holds: a page (expand fill), or a screen at a tablet's or a phone's
+ * width, is never shorter than its device's window; any other board is as tall as its content.
+ */
+export function wantedHeight({ measured, width, fluid }) {
+  return fluid || SCREENS.has(width) ? Math.max(deviceHeight(width), measured) : measured;
+}
+
+// A frame a few pixels short is rounding; one that leaves more than a tenth of itself, or 64px, empty is blank.
+const CLIP_SLACK = 8;
+const BLANK_SLACK = 64;
+
+/** How a frame of `declared` height sits on content that wants `want`: 'fits', 'clipped' or 'blank'. */
+export function frameFit(declared, want) {
+  if (want - declared > CLIP_SLACK) return 'clipped';
+  if (declared - want > Math.max(BLANK_SLACK, want * 0.1)) return 'blank';
+  return 'fits';
+}
+
+/**
+ * A board's source with its `$preview` height set to `height`, raw JSON or entity-encoded, and nothing else
+ * changed; null when it declares no `$preview` height to set.
+ */
+export function withPreviewHeight(source, height) {
+  for (const q of ['"', '&quot;']) {
+    const re = new RegExp(`(${q}\\$preview${q}\\s*:\\s*\\{[^}]*?${q}height${q}\\s*:\\s*)\\d+(?:\\.\\d+)?`);
+    if (re.test(source)) return source.replace(re, `$1${height}`);
+  }
+  return null;
+}
+
+/**
+ * A canvas.json with each board in `heights` (file to height) at that height, and everything under a board that grew
+ * moved down by as much, so it does not run into the row below. A row is the boards on one page that share a y; it
+ * moves the boards and notes on its page that start at or below its old bottom by as far as its bottom moved. Nothing
+ * moves up: a board that shrank leaves a gap. Returns the new manifest and each board whose height changed.
+ */
+export function applyHeights(manifest, heights) {
+  const boards = manifest.artboards ?? [];
+  const rows = new Map();
+  for (const a of boards) {
+    const key = `${a.page ?? ''}\u0000${a.y}`;
+    const row = rows.get(key) ?? { page: a.page ?? '', bottom: a.y, next: a.y };
+    row.bottom = Math.max(row.bottom, a.y + a.h);
+    row.next = Math.max(row.next, a.y + (typeof heights[a.file] === 'number' ? heights[a.file] : a.h));
+    rows.set(key, row);
+  }
+  const shift = ({ y, page }) => [...rows.values()].reduce((n, r) => n + (r.page === (page ?? '') && y >= r.bottom ? Math.max(0, r.next - r.bottom) : 0), 0);
+  const changed = boards.filter((a) => typeof heights[a.file] === 'number' && heights[a.file] !== a.h).map((a) => ({ file: a.file, from: a.h, to: heights[a.file] }));
+  return {
+    manifest: {
+      ...manifest,
+      artboards: boards.map((a) => ({ ...a, y: a.y + shift(a), h: typeof heights[a.file] === 'number' ? heights[a.file] : a.h })),
+      ...(manifest.annotations ? { annotations: manifest.annotations.map((n) => ({ ...n, y: n.y + shift(n) })) } : {}),
+    },
+    changed,
+  };
+}
+
 /**
  * Write every generated board into the canvas folder, measure them, and lay out canvas.json: generated
  * rows on top under title notes, authored boards kept where they are, moved down only if a generated
- * row would cover them.
+ * row would cover them. Returns where the generated rows end and where authored rows start, so a script that
+ * places its own boards starts there.
+ *
+ * With `heights`, the authored boards are measured too, each at its own width in its device's window (06-canvas.md,
+ * Sizes), and each is written at that height: its `$preview` and its canvas.json entry, nothing else in the file,
+ * with the rows under a board that grew moved down by as much.
  */
-export async function writeBoards({ productDir, starter, measure = true, log = () => {} }) {
+export async function writeBoards({ productDir, starter, measure = true, heights: fitAuthored = false, log = () => {} }) {
   const canvas = path.join(productDir, 'canvas');
   mkdirSync(canvas, { recursive: true });
   const tokens = JSON.parse(readFileSync(path.join(productDir, 'tokens.json'), 'utf8'));
@@ -427,17 +498,22 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   // rendered page sets its base to the canvas, so it loads the system from there wherever it sits.
   rmSync(path.join(productDir, 'canvas', '.measure'), { recursive: true, force: true });
   const measuring = measure && existsSync(path.join(starter, 'node_modules', 'playwright'));
+  let measuresPages = true;
+  // Each board at its own width (a generated one at 1440) in the window it opens in (900 unless it says).
   const measureAll = async (list) => {
     const pagesDir = mkdtempSync(path.join(os.tmpdir(), 'brandi-measure-'));
     const pages = [];
     for (const b of list) {
-      const res = await previewArtboard(path.join(canvas, b.file), { outDir: pagesDir, width: W, height: 900, png: false });
-      pages.push({ url: pathToFileURL(res.html).href, width: W, label: b.name });
+      const width = b.width ?? W;
+      const res = await previewArtboard(path.join(canvas, b.file), { outDir: pagesDir, width, height: b.height ?? 900, png: false });
+      pages.push({ url: pathToFileURL(res.html).href, width, label: b.name, ...(b.height ? { height: b.height } : {}) });
     }
     writeFileSync(path.join(pagesDir, 'pages.json'), JSON.stringify(pages));
     const run = spawnSync(process.execPath, [path.join('tools', 'measure-boards.mjs'), '--pages', path.join(pagesDir, 'pages.json')], { cwd: starter, encoding: 'utf8', timeout: 600000 });
     try {
-      const { __sections = {}, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
+      const { __sections = {}, __clipped, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
+      // A tool from before __clipped measures a shell page as its window, whatever it holds.
+      if (__clipped === undefined) measuresPages = false;
       Object.assign(heights, measured);
       Object.assign(sectionsOf, __sections);
     } catch { log(`could not measure the boards: ${(run.stderr || run.stdout).slice(-300)}`); }
@@ -470,6 +546,42 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   if (measuring && parts.length) await measureAll(parts);
   for (const p of parts) if (typeof heights[p.name] === 'number' && heights[p.name] > FRAME_LIMIT.max) tooTall.push({ board: p.name, component: null, height: heights[p.name] });
 
+  // The authored boards at their measured heights: a run that wrote canvas.json by hand left boards clipped or a
+  // third blank, and a shell page, whose main scrolls, measured as the window whatever it held.
+  const written = [];
+  let authoredHeights = {};
+  let heightsSkipped = null;
+  if (fitAuthored && measuring) {
+    const frameOf = (f) => {
+      const entry = existing?.artboards?.find((a) => a.file === f);
+      const declared = declaredFrame(readFileSync(path.join(canvas, f), 'utf8'));
+      const w = entry?.w ?? declared?.w ?? W;
+      return { file: f, name: f.replace(/\.dc\.html$/, ''), width: w, height: deviceHeight(w), fluid: entry?.expand === 'fill' };
+    };
+    const list = authored.filter((f) => !f.startsWith('_')).map(frameOf);
+    await measureAll(list);
+    if (!measuresPages) heightsSkipped = "the starter's tools/measure-boards.mjs measures a shell page as its window, whatever it holds: refresh its kit with brandi product starter --kit, then run this again";
+    const want = {};
+    for (const b of measuresPages ? list : []) {
+      const measured = heights[b.name];
+      if (typeof measured !== 'number') { log(`${b.file} was not measured: ${measured?.error ?? 'no height came back'}`); continue; }
+      // Written as measured, a board past the canvas's limit included: validate then says to split it, where a capped
+      // frame would only clip it.
+      want[b.file] = wantedHeight({ measured, width: b.width, fluid: b.fluid });
+      const source = readFileSync(path.join(canvas, b.file), 'utf8');
+      const next = withPreviewHeight(source, want[b.file]);
+      if (next && next !== source) writeFileSync(path.join(canvas, b.file), next);
+      if (!next) log(`${b.file} declares no $preview height: only its canvas.json entry is written.`);
+    }
+    if (existing?.artboards) {
+      const applied = applyHeights(existing, want);
+      existing = applied.manifest;
+      written.push(...applied.changed);
+    }
+    for (const f of authored) if (want[f] && !existing?.artboards?.some((a) => a.file === f)) written.push({ file: f, from: null, to: want[f] });
+    authoredHeights = want;
+  }
+
   const generated = [main, ...foundations, ...components];
   const heightOf = (b) => (typeof heights[b.name] === 'number' ? Math.max(400, heights[b.name]) : 1600);
   const rewrite = (b) => b.source.replace(/"\$preview":\{"width":1440,"height":\d+\}/, `"$preview":{"width":1440,"height":${heightOf(b)}}`);
@@ -494,18 +606,23 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   row(foundations, `Foundations · ${system.name}, light and dark`, 'foundations');
   row(components, 'Components · every variant and state, mounted live, light and dark', 'components');
 
-  // Authored boards keep their own place; shift them below the generated rows if any would be covered.
+  // Authored rows start where the generated rows end, a row's gap below them: a section's title note there, its
+  // boards under it. The first authored row, its title note included, moves down to that line when the generated
+  // rows have grown past it, and everything authored moves with it.
+  const generatedEnd = y - ROW_GAP_Y;
   const kept = (existing?.artboards ?? []).filter((a) => authored.includes(a.file));
-  const top = kept.length ? Math.min(...kept.map((a) => a.y)) : Infinity;
-  const shift = kept.length && top < y ? y - top + ROW_GAP_Y : 0;
+  const titles = (existing?.annotations ?? []).filter((n) => !GENERATED_NOTES.has(n.id) && /^title/.test(n.kind ?? '') && Number.isFinite(n.y));
+  const top = kept.length ? Math.min(...kept.map((a) => a.y), ...titles.map((n) => n.y)) : Infinity;
+  const shift = kept.length && top < y ? y - top : 0;
   for (const a of kept) entries.push({ ...a, y: a.y + shift });
   let below = Math.max(y, ...kept.map((a) => a.y + shift + a.h + ROW_GAP_Y));
   for (const f of authored) {
     if (kept.some((a) => a.file === f)) continue;
-    entries.push({ file: f, x: 0, y: below, w: W, h: 900 });
-    below += 900 + ROW_GAP_Y;
+    const h = authoredHeights[f] ?? 900;
+    entries.push({ file: f, x: 0, y: below, w: W, h });
+    below += h + ROW_GAP_Y;
   }
-  const keptNotes = (existing?.annotations ?? []).filter((n) => !['foundations', 'components'].includes(n.id)).map((n) => ({ ...n, y: n.y + shift }));
+  const keptNotes = (existing?.annotations ?? []).filter((n) => !GENERATED_NOTES.has(n.id)).map((n) => ({ ...n, y: n.y + shift }));
   const manifest = canvasManifest(entries, {
     annotations: [...annotations, ...keptNotes],
     pages: existing?.pages,
@@ -517,7 +634,7 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
       : [...(existing?.designSystems ?? []), { title: `${system.name} product system`, namespace: system.namespace }],
   });
   writeFileSync(path.join(canvas, 'canvas.json'), `${JSON.stringify(manifest, null, 2)}\n`);
-  return { boards: [...generated, ...twins].map((b) => b.file), measured: Object.keys(heights).length, shifted: shift, tooTall, manifest };
+  return { boards: [...generated, ...twins].map((b) => b.file), measured: Object.keys(heights).length, shifted: shift, generatedEnd, authoredFrom: y, ranInto: shift ? { top } : null, heights: written, heightsSkipped, tooTall, manifest };
 }
 
-export default { writeBoards, colourBoard, typeBoard, shapeBoard, iconBoard, componentBoards, packParts, partBoards, twin, contentsBoard, authoredSections, MARKER };
+export default { writeBoards, colourBoard, typeBoard, shapeBoard, iconBoard, componentBoards, packParts, partBoards, twin, contentsBoard, authoredSections, applyHeights, withPreviewHeight, frameFit, wantedHeight, deviceHeight, DEVICE_HEIGHTS, MARKER };

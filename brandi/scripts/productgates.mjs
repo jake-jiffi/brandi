@@ -9,6 +9,7 @@
  *   axe        axe-core in Chrome, light and dark
  *   reflow     every fluid board and route at 320px wide: nothing scrolls sideways (WCAG 1.4.10)
  *   checks     every definition's scripted checks, real keyboard
+ *   sizes      every board's frame against its content, and no box on a board hiding its own content
  *   coverage   every surface product.json lists: a board at each of its widths, a states board per module
  *
  * The judged gates (the Impeccable craft critique against Nielsen's heuristics, the ui-ux-pro-max
@@ -27,10 +28,13 @@ import { auditProductTokens, auditSummary, shapeKitDefaults } from './producttok
 import { previewArtboard, manifestFrames, declaredFrame, findChrome } from './preview.mjs';
 import { driftCheck } from './productdrift.mjs';
 import { canvasCoverage, canvasBoards } from './productcoverage.mjs';
+import { deviceHeight, wantedHeight, frameFit } from './productboards.mjs';
 
 export const WIDTHS = Object.freeze([1440, 820, 390]);
 /** WCAG 1.4.10's width: 1280 at 400% zoom, and a small phone. Only reflow is measured here. */
 export const REFLOW_WIDTH = 320;
+/** The gates a round runs by machine, in the order `brandi product gates` prints them; the judged ones are Craft and Rules. */
+export const MACHINE_GATES = Object.freeze(['Tokens', 'Drift', 'Detector', 'Accessibility', 'Canvas runtime', 'Board sizes', 'Coverage', 'Record']);
 export const BAR = Object.freeze({
   craftTotal: 34,
   craftMinimum: 3,
@@ -139,7 +143,7 @@ export async function collectPages({ productDir, outDir, widths = WIDTHS, only =
       // A twin that is already dark is scanned as it is; a board with a dark tweak, both ways.
       const themes = /Dark\.dc\.html$/.test(f) ? ['dark'] : /"dark":\{"editor":"boolean"/.test(src) ? ['light', 'dark'] : ['light'];
       for (const width of fluid ? widths : [frame.w]) {
-        for (const theme of themes) pages.push({ kind: 'board', label: f.replace(/\.dc\.html$/, ''), url, width, height: frame.h, theme, fluid });
+        for (const theme of themes) pages.push({ kind: 'board', label: f.replace(/\.dc\.html$/, ''), url, width, height: frame.h, theme, fluid, frame: { w: frame.w, h: frame.h } });
       }
     }
   }
@@ -190,6 +194,38 @@ export async function runDetector(pages, detector, { concurrency = 4, status = h
     while (next < pages.length) await one(pages[next++]);
   }));
   return { findings, errors, unscanned };
+}
+
+/**
+ * The pages the size gate measures: each board once, at its own frame's width, opened in its device's window, and
+ * first drawn at its declared frame, as the canvas draws it.
+ */
+export function sizePages(pages) {
+  const boards = pages.filter((p) => p.kind === 'board' && p.frame);
+  return [...new Map(boards.map((p) => [p.label, { url: p.url, label: p.label, width: p.frame.w, height: deviceHeight(p.frame.w), frame: p.frame, fluid: Boolean(p.fluid) }])).values()];
+}
+
+/**
+ * What a round keeps of the boards' sizes: `measured` is measure-boards.mjs's output, `boards` each board's
+ * { label, width, declared, fluid }. A frame is off when it clips its content or leaves it a stretch blank; a page
+ * (fluid) is held to its device's window at least. `heights` is every height a frame should have, for
+ * `brandi product boards --heights` or a script that writes the boards.
+ */
+export function sizeGate({ measured, boards }) {
+  if (!measured || !('__clipped' in measured)) return { skipped: "the starter's tools/measure-boards.mjs cannot check sizes: refresh its kit with brandi product starter --kit" };
+  const off = [];
+  const errors = [];
+  const heights = {};
+  for (const b of boards) {
+    const m = measured[b.label];
+    if (typeof m !== 'number') { errors.push({ board: b.label, error: m?.error ?? 'no height came back' }); continue; }
+    const want = wantedHeight({ measured: m, width: b.width, fluid: b.fluid });
+    heights[b.label] = want;
+    const fit = frameFit(b.declared, want);
+    if (fit !== 'fits') off.push({ board: b.label, declared: b.declared, want, fit });
+  }
+  const clipped = Object.entries(measured.__clipped ?? {}).flatMap(([board, boxes]) => boxes.map((box) => ({ board, ...box })));
+  return { boards: boards.length, off, clipped, errors, heights };
 }
 
 /** A page's HTTP status, or 0 when it does not answer. */
@@ -328,6 +364,22 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   }
   log(runtime.skipped ? `canvas runtime: not run (${runtime.skipped})` : `canvas runtime: ${runtime.failed.length} of ${runtime.boards} boards with errors`);
 
+  // Every board's frame against what it holds: canvas.json's heights were written by hand or not at all, so boards
+  // were left clipped or a third blank, and a Card squeezed in a phone frame hid a total, with no gate to say so.
+  const sizeList = sizePages(pages);
+  let sizes;
+  if (!sizeList.length) sizes = { boards: 0, off: [], clipped: [], errors: [], heights: {} };
+  else {
+    writeFileSync(path.join(outDir, 'size-pages.json'), JSON.stringify(sizeList, null, 2));
+    const run = nodeScript(starter, 'measure-boards.mjs', ['--pages', path.join(outDir, 'size-pages.json')]);
+    const line = run.out.trim().split('\n').reverse().find((l) => l.startsWith('{'));
+    let measured = null;
+    try { measured = JSON.parse(line); } catch { /* reported below */ }
+    sizes = measured ? sizeGate({ measured, boards: sizeList.map((p) => ({ label: p.label, width: p.width, declared: p.frame.h, fluid: p.fluid })) }) : { skipped: `the size check did not finish: ${run.out.slice(-300)}` };
+    if (sizes.heights) writeFileSync(path.join(outDir, 'heights.json'), `${JSON.stringify(sizes.heights, null, 2)}\n`);
+  }
+  log(sizes.skipped ? `sizes: not run (${sizes.skipped})` : `sizes: ${sizes.off.length} of ${sizes.boards} frames off their content, ${new Set(sizes.clipped.map((c) => c.board)).size} boards hiding content`);
+
   // What the canvas has to cover, from the surfaces product.json lists: every gate above checks what was drawn,
   // and a run that drew one surface in depth passed them all.
   let product = {};
@@ -349,6 +401,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     reflow,
     checks: { passed: checks.passed, failed: checks.failed },
     runtime,
+    sizes,
     coverage,
   };
   writeFileSync(path.join(outDir, 'gates.json'), `${JSON.stringify(gates, null, 2)}\n`);
@@ -403,7 +456,7 @@ export function acceptFindings(findings, accepted = []) {
 
 /**
  * Hold a round's results against the bar. `critique` is the Impeccable craft critique
- * ({ method, heuristics: [{ name, score }], findings: [{ severity: 'P0'..'P3', title, status, where, evidence, owner,
+ * ({ method, heuristics: [{ name, score, note }], findings: [{ severity: 'P0'..'P3', title, status, where, evidence, owner,
  * class, reason }] }); `rules` is the ui-ux-pro-max review ({ method, findings: [{ severity: 'Critical'|'High'|'Medium'
  * |'Low', title, ... }] }); `accepted` is product.json's list of accepted detector findings.
  * Returns each gate with pass or fail and why, whether the bar is met, and the detector findings sorted into open,
@@ -431,6 +484,19 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
     add('Canvas runtime', !gates.runtime.skipped && gates.runtime.failed.length === 0,
       gates.runtime.skipped ? `not run: ${gates.runtime.skipped}` : `${gates.runtime.failed.length} of ${gates.runtime.boards} boards with errors under the Design canvas's own runtime, in a cross-origin frame`);
   }
+  // Likewise for sizes: a round from before the gate has no line for it, and one that could not measure has not passed.
+  if (gates.sizes) {
+    const z = gates.sizes;
+    const hiding = new Set((z.clipped ?? []).map((c) => c.board)).size;
+    const by = (fit) => z.off.filter((o) => o.fit === fit).length;
+    const faults = [
+      z.off.length ? `${z.off.length} of ${z.boards} frames off their content (${by('clipped')} clipped, ${by('blank')} blank)` : '',
+      hiding ? `${count(hiding, 'board')} ${hiding === 1 ? 'hides' : 'hide'} content in a box that clips it` : '',
+      z.errors?.length ? `${z.errors.length} not measured` : '',
+    ].filter(Boolean);
+    add('Board sizes', !z.skipped && !faults.length,
+      z.skipped ? `not run: ${z.skipped}` : faults.length ? faults.join('; ') : `every frame fits its content on ${count(z.boards, 'board')}, and nothing on a board hides its own content`);
+  }
   // Likewise: a round from before coverage has no line for it, and one with no surfaces to hold the canvas to fails.
   if (gates.coverage) {
     const short = (gates.coverage.surfaces ?? []).filter((s) => s.missing.length);
@@ -443,8 +509,11 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
     const low = scores.filter((h) => h.score < BAR.craftMinimum);
     const open = (critique.findings ?? []).filter((f) => BAR.critiqueOpen.includes(f.severity) && !['fixed', 'accepted'].includes(f.status));
     const stray = strayStatuses(critique.findings ?? []);
+    // A score under 4 says what cost the point (08-quality-gates.md): five heuristics at 3 with no reason left nobody
+    // knowing where the points went. Named, not failed, as a finding missing its fields prints with less to say.
+    const unexplained = scores.filter((h) => h.score < 4 && !given(h.note));
     add('Craft', scores.length === 10 && total >= BAR.craftTotal && !low.length && !open.length,
-      `${total}/40 on ${scores.length} heuristics${low.length ? `; under ${BAR.craftMinimum}: ${low.map((h) => h.name).join(', ')}` : ''}${open.length ? `; open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : ''}${stray ? `; ${stray}` : ''}`);
+      `${total}/40 on ${scores.length} heuristics${low.length ? `; under ${BAR.craftMinimum}: ${low.map((h) => h.name).join(', ')}` : ''}${open.length ? `; open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : ''}${stray ? `; ${stray}` : ''}${unexplained.length ? `; under 4 with no note on what cost the point: ${unexplained.map((h) => h.name).join(', ')}` : ''}`);
   } else {
     add('Craft', false, 'no critique recorded for this round');
   }
@@ -508,11 +577,24 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     lines.push('', '## Canvas runtime', '');
     for (const f of gates.runtime.failed) lines.push(`- ${f.board}: ${f.errors.join('; ')}`);
   }
+  if (gates.sizes?.skipped) lines.push('', '## Board sizes', '', `Not run: ${gates.sizes.skipped}`);
+  else if (gates.sizes && (gates.sizes.off.length || gates.sizes.clipped.length || gates.sizes.errors.length)) {
+    lines.push('', '## Board sizes', '', "Each board measured at its width in its device's window, a page at its whole height. Write the heights with `brandi product boards --heights` (06-canvas.md, Sizes); fix a box that hides content in the board or the component.", '');
+    for (const o of gates.sizes.off) lines.push(`- ${o.board}: frame ${o.declared}px, content ${o.want}px (${o.fit})`);
+    for (const c of gates.sizes.clipped) lines.push(`- ${c.board}: ${c.what}${c.text ? ` "${c.text}"` : ''} shows ${c.shown}px of ${c.content}px`);
+    for (const e of gates.sizes.errors) lines.push(`- ${e.board}: not measured (${e.error})`);
+  }
   if (gates.coverage) {
     lines.push('', '## Coverage', '');
     if (gates.coverage.skipped) lines.push(`Not checked: ${gates.coverage.skipped}.`);
+    // Which modules drew options A to D and which reused a written pattern, from the boards' names (06-canvas.md).
+    const letters = (l) => (l.join('') === 'ABCD' ? 'A to D' : l.join(', '));
+    const trail = (s) => [
+      ...(s.options ?? []).map((o) => `options ${letters(o.letters)} for ${o.module}`),
+      ...(s.reused?.length ? [`a written pattern reused for ${s.reused.join(', ')}`] : []),
+    ].map((t) => `; ${t}`).join('');
     for (const s of gates.coverage.surfaces ?? []) {
-      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}`);
+      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}${trail(s)}`);
     }
   }
   if (gates.shape) {
@@ -532,8 +614,11 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   // How each review ran (single-context, or isolation by procedure) goes beside its scores (08-quality-gates.md).
   const method = (review) => (given(review.method) ? [`How it ran: ${String(review.method).trim()}`, ''] : []);
   if (critique) {
-    lines.push('', '## Craft critique', '', ...method(critique), '| Heuristic | Score |', '| --- | --- |');
-    for (const h of critique.heuristics ?? []) lines.push(`| ${h.name} | ${h.score} |`);
+    // Each score with what cost its points beside it; a record from before the notes keeps its two columns.
+    const noted = (critique.heuristics ?? []).some((h) => given(h.note));
+    const cell = (v) => String(v).trim().replace(/\|/g, '\\|');
+    lines.push('', '## Craft critique', '', ...method(critique), ...(noted ? ['| Heuristic | Score | What cost the point |', '| --- | --- | --- |'] : ['| Heuristic | Score |', '| --- | --- |']));
+    for (const h of critique.heuristics ?? []) lines.push(noted ? `| ${h.name} | ${h.score} | ${given(h.note) ? cell(h.note) : ''} |` : `| ${h.name} | ${h.score} |`);
     for (const f of critique.findings ?? []) lines.push(findingLine(f));
   }
   if (rules) {
@@ -556,4 +641,4 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   return lines.join('\n');
 }
 
-export default { runGates, axeGate, acceptFindings, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR };
+export default { runGates, axeGate, acceptFindings, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, sizePages, sizeGate, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR, MACHINE_GATES };

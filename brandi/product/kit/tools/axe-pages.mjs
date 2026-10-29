@@ -10,7 +10,8 @@
  * 1440, 820 and 390, light and dark, a dark render asking for it in the address (?theme=dark), each once the
  * page has settled. Every violation is reported with its impact; the gate counts any violation as a
  * failure, whatever its impact. An image that did not load is reported the same way (image-not-loaded),
- * because axe passes it, and so is a form with a required field and no noValidate (form-without-novalidate).
+ * because axe passes it, and so is a form with a required field and no noValidate (form-without-novalidate), and
+ * text or an attribute that reads [object Object], an element joined into a string (object-as-text).
  */
 
 import { chromium } from "playwright"
@@ -110,6 +111,21 @@ for (const p of pages) {
         })
     )
     if (bubbling.length) r.push({ id: "form-without-novalidate", impact: "moderate", help: "A form with a required field sets noValidate, so the system's errors, not the browser's bubble, say what is missing", nodes: bubbling.slice(0, 5) })
+    // A text node that is one {{hole}} draws its value as it is, an element included; two holes in one text node, or a
+    // hole beside other words, are joined as a string, and an element reads "[object Object]". axe reads it as text.
+    const objects = await page.evaluate(() => {
+      const where = (el) => el.getAttribute("data-slot") ?? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}`
+      const found = []
+      const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT)
+      for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+        if (n.nodeValue.includes("[object Object]") && !n.parentElement.closest("script, style, template")) found.push(`${where(n.parentElement)}: ${n.nodeValue.trim().slice(0, 60)}`)
+      }
+      for (const el of document.body.querySelectorAll("*")) {
+        for (const a of el.attributes) if (a.value.includes("[object Object]")) found.push(`${where(el)} ${a.name}="${a.value.slice(0, 60)}"`)
+      }
+      return found
+    })
+    if (objects.length) r.push({ id: "object-as-text", impact: "serious", help: "A value drawn as text reads [object Object]: give each element its own {{hole}}, alone in its text node (06-canvas.md)", nodes: objects.slice(0, 5) })
     results.push({ ...p, ...(retried && { retried }), violations: r })
   } catch (e) {
     results.push({ ...p, ...(retried && { retried }), violations: [], error: String(e.message ?? e).split("\n")[0] })
