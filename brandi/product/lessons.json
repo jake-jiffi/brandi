@@ -2477,6 +2477,22 @@
     "file": "skills/product-system/references/08-quality-gates.md",
     "heading": "How a round runs"
    }
+  },
+  {
+   "id": "L132",
+   "broke": "Conversation could not take a reply the assistant drafted, so a run drew a second composer and Send for the draft, and the review could not say which one sent it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Conversation",
+     "name": "A drafted reply waits in the one composer, described as drafted, and goes only on Send"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/10-ai-catalogue.md",
+    "heading": "4.3 · AI-drafted marker"
+   }
   }
  ]
 }

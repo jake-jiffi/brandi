@@ -340,6 +340,10 @@ height and main scrolls past the frame's bottom:
       <!-- the screen: cards, lists and alerts, each at its own height -->
     </div>
   </main>
+  <!-- the optional foot bar: a footer, so axe finds it in a landmark; as a plain div it failed the region rule -->
+  <footer style="flex-shrink: 0; padding: 12px 16px; border-top: 1px solid var(--line);">
+    <x-import component-from-global-scope="Acme.Button" variant="primary" block="{{yes}}">Book this time</x-import>
+  </footer>
   <x-import component-from-global-scope="Acme.PhoneTabBar" items="{{tabs}}" value="Menu" label="App"></x-import>
 </div>
 ```

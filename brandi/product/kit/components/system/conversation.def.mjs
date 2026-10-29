@@ -65,6 +65,7 @@ export default {
     { name: "loading", type: "boolean", default: "false", doc: "The thread is loading: skeletons, and one polite status." },
     { name: "empty", type: "ReactNode", default: '"No messages yet"', doc: "What shows when nothing has been said yet." },
     { name: "error", type: "ReactNode", doc: "The thread could not load: say which system failed. Any messages given stay, as the last good copy." },
+    { name: "draft", type: "{ text: string; name?: string; trigger?: ReactNode; check?: \"passed\" | \"issues\" | \"checking\" | \"not-run\" }", doc: "A reply the assistant drafted, in the one composer to check, edit and send, marked as drafted until it is sent. Never a second composer or a second Send: a run drew both, and nobody could tell which sent the draft." },
   ],
   notes: {
     Behaviour: [
@@ -103,8 +104,17 @@ export default {
 </div>`,
       vals: { none: [], yes: true },
     },
+    {
+      id: "drafted",
+      title: "A reply the assistant drafted, waiting in the composer",
+      layout: "block",
+      markup: `<div style="${FRAME} height: 600px; max-width: 640px;">
+<x-import component-from-global-scope="NS.Conversation" style="display: block; height: 100%;" label="Messages with [Northside Dental]" composer-label="Reply to [Jo Ellis]" messages="{{draftThread}}" on-send="{{sendDraft}}" draft="{{reply}}"></x-import>
+</div>`,
+      vals: { reply: { text: "Thanks, [Jo]. Friday suits us, and we'll send the receipt once it's paid.", name: "[Sam Lee]" } },
+    },
   ],
-  state: { thread: THREAD, sent: 0 },
+  state: { thread: THREAD, sent: 0, draftThread: THREAD },
   logic: `thread: self.state.thread,
     send: (text) => {
       const id = "new-" + (self.state.sent + 1)
@@ -112,6 +122,8 @@ export default {
       // The first try fails, so the board shows the way on.
       setTimeout(() => self.setState((s) => ({ thread: s.thread.map((m) => (m.id === id ? Object.assign({}, m, { status: "failed" }) : m)) })), 1200)
     },
+    draftThread: self.state.draftThread,
+    sendDraft: (text) => self.setState((s) => ({ draftThread: s.draftThread.concat({ id: "drafted-" + s.draftThread.length, author: "You", own: true, status: "sent", time: "Today, 9:45 am", dateTime: "2026-10-27T09:45", text }) })),
     retry: (id) => {
       self.setState((s) => ({ thread: s.thread.map((m) => (m.id === id ? Object.assign({}, m, { status: "sending" }) : m)) }))
       setTimeout(() => self.setState((s) => ({ thread: s.thread.map((m) => (m.id === id ? Object.assign({}, m, { status: "sent" }) : m)) })), 1200)
@@ -152,6 +164,25 @@ export default {
         expect.equal(await message.count(), 1, "one from the assistant")
         expect.equal((await message.locator(".type-label").innerText()).trim(), "Assistant", "it says so in words")
         expect.equal(await message.locator('[data-slot="avatar-assistant"]').count(), 1, "with the assistant's own avatar, in its tone")
+      },
+    },
+    {
+      name: "A drafted reply waits in the one composer, described as drafted, and goes only on Send",
+      example: "drafted",
+      async run({ scope, expect }) {
+        const field = scope.getByRole("textbox", { name: "Reply to [Jo Ellis]" })
+        expect.equal(await scope.getByRole("textbox").count(), 1, "one composer")
+        expect.equal(await scope.getByRole("button", { name: "Send", exact: true }).count(), 1, "one Send")
+        expect.equal(await field.inputValue(), "Thanks, [Jo]. Friday suits us, and we'll send the receipt once it's paid.", "the draft is in the composer")
+        const described = await field.evaluate((el) => (el.getAttribute("aria-describedby") ?? "").split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? "").join(" "))
+        expect(/Drafted with AI by \[Sam Lee\]/.test(described), `the composer is described as drafted: got "${described}"`)
+        expect.equal(await scope.locator('[data-slot="conversation-message"]').count(), 4, "nothing is sent before the person sends it")
+        await field.fill("Thanks, [Jo]. Friday suits us.")
+        expect(/edited by you/i.test(await scope.locator("form").innerText()), "an edited draft says so")
+        await scope.getByRole("button", { name: "Send", exact: true }).click()
+        expect.equal(await scope.locator('[data-slot="conversation-message"]').count(), 5, "Send sends it")
+        expect.equal(await field.inputValue(), "", "the composer empties")
+        expect.equal(await field.getAttribute("aria-describedby"), null, "and is no longer described as drafted")
       },
     },
     {

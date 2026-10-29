@@ -1071,6 +1071,10 @@ the person who asked for it.
 An auto-draft (4.5) has no one who asked, so what started it takes the name's place: "Drafted
 with AI when [trigger], brand check passed".
 
+**A draft for a thread.** A reply drafted for a conversation is the composer's text, not a second
+box beside it: `Conversation` takes it as `draft`, and the marker describes the composer until the
+person sends it. One composer, one Send.
+
 **Keyboard.** The issues link is focusable. Nothing else is.
 
 **Screen reader.** Plain text, tied to the item as its description (`aria-describedby`). Not a

@@ -6,6 +6,7 @@ import { textareaBare, textareaBox } from "@/components/ui/textarea"
 import { useMergedRef } from "@/lib/refs"
 import { cn } from "@/lib/utils"
 
+import { AIDraftedMarker, type BrandCheck } from "./ai-drafted-marker"
 import { useGrow } from "./ask-bar"
 import { Avatar } from "./avatar"
 import { Button } from "./button"
@@ -59,6 +60,12 @@ export interface ConversationProps extends Omit<React.ComponentPropsWithoutRef<"
   empty?: React.ReactNode
   /** The thread could not load: say which system failed. Any messages given stay, as the last good copy. */
   error?: React.ReactNode
+  /**
+   * A reply the assistant drafted, put in the composer to check, edit and send: one composer and one Send, never a
+   * second. It is marked as drafted until it is sent, and it goes only when the person sends it. `name` is who asked
+   * for it, or `trigger` what started it; `check` how the brand check went.
+   */
+  draft?: { text: string; name?: string; trigger?: React.ReactNode; check?: BrandCheck }
 }
 
 /**
@@ -78,6 +85,7 @@ export const Conversation = React.forwardRef<HTMLDivElement, ConversationProps>(
     loading = false,
     empty = "No messages yet",
     error,
+    draft,
     className,
     ...rest
   },
@@ -88,7 +96,16 @@ export const Conversation = React.forwardRef<HTMLDivElement, ConversationProps>(
   const log = React.useRef<HTMLDivElement | null>(null)
   const field = React.useRef<HTMLTextAreaElement | null>(null)
   const rows = React.useRef(new Map<string, HTMLLIElement | null>())
-  const [value, setValue] = React.useState("")
+  const [value, setValue] = React.useState(draft?.text ?? "")
+  // A reply drafted for the person stays marked as drafted until it is sent. A new draft takes the composer's place.
+  const [drafted, setDrafted] = React.useState(Boolean(draft?.text))
+  const draftText = draft?.text
+  React.useEffect(() => {
+    if (!draftText) return
+    setValue(draftText)
+    setDrafted(true)
+  }, [draftText])
+  const markerId = `${React.useId()}-drafted`
   const list = Array.isArray(messages) ? messages : []
   // "Messages with [client]" reads on as "Loading messages with [client]".
   const name = String(label ?? "")
@@ -112,6 +129,7 @@ export const Conversation = React.forwardRef<HTMLDivElement, ConversationProps>(
     // The text is handed over before the composer empties, so nothing typed is lost if sending fails.
     onSend?.(text)
     setValue("")
+    setDrafted(false)
   }
   const retry = (id: string) => {
     // The message stays as it sends again, so focus lands on it.
@@ -229,6 +247,7 @@ export const Conversation = React.forwardRef<HTMLDivElement, ConversationProps>(
               value={value}
               placeholder={placeholder}
               aria-keyshortcuts="Meta+Enter Control+Enter"
+              aria-describedby={drafted && draft ? markerId : undefined}
               data-slot="conversation-field"
               onChange={(event) => setValue(event.target.value)}
               onKeyDown={(event) => {
@@ -245,6 +264,16 @@ export const Conversation = React.forwardRef<HTMLDivElement, ConversationProps>(
             </Button>
           </div>
         </Field>
+        {drafted && draft ? (
+          <AIDraftedMarker
+            id={markerId}
+            name={draft.name}
+            trigger={draft.trigger}
+            check={draft.check}
+            editedBy={value !== draft.text ? "you" : undefined}
+            className="mt-2"
+          />
+        ) : null}
       </form>
     </div>
   )

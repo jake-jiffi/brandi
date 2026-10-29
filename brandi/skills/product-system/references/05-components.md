@@ -1598,6 +1598,9 @@ The assistant's own ask panel is in `10-ai-catalogue.md`.
 - From ListRow: an unread message shows a dot and says "(unread)" to screen readers.
 - From TextArea: the composer's label says what the text is for.
 - From section 2.7: a new message is announced politely, once.
+- A reply the assistant drafted goes in the one composer (`draft`), described by the AI-drafted
+  marker (`10-ai-catalogue.md` 4.3) until it is sent, and goes only on Send. A run drew a second
+  composer with its own Send for the draft, and the review could not say which one sent it.
 
 #### Accordion · to build, not yet proven
 
