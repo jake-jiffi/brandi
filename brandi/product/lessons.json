@@ -2663,6 +2663,38 @@
     "file": "skills/product-system/references/04-written-system.md",
     "heading": "Screen patterns"
    }
+  },
+  {
+   "id": "L143",
+   "broke": "Once PageHeader's primary moved to the bar at the foot on a phone, the overflow button sat alone on a row under the title, because any actions dropped to a full row under 640px.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "PageHeader",
+     "name": "On a phone, once the primary has gone to the foot, an overflow left alone stays on the title's row (a proof run)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "PageHeader"
+   }
+  },
+  {
+   "id": "L144",
+   "broke": "A DescriptionList value that wrapped in lines was right-aligned, its lines ragged on the left, at a phone's width.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "DescriptionList",
+     "name": "In lines a value that wraps reads left-aligned, its box still at the end of the line (a proof run)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "DescriptionList"
+   }
   }
  ]
 }
