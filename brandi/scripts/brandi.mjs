@@ -3458,7 +3458,9 @@ async function cmdProduct(flags, positional) {
     // A Published section written after the round (version ids) survives the rewrite.
     const recordFile = path.join(dir, 'record.md');
     const published = existsSync(recordFile) ? publishedSection(await readFile(recordFile, 'utf8')) : '';
-    await writeFile(recordFile, `${roundMarkdown(gates, judged, { system, critique, rules, signOff })}${published ? `\n${published}` : ''}`);
+    const byEyeFile = path.join(dir, 'by-eye.md');
+    const byEye = existsSync(byEyeFile) ? await readFile(byEyeFile, 'utf8') : null;
+    await writeFile(recordFile, `${roundMarkdown(gates, judged, { system, critique, rules, signOff, byEye })}${published ? `\n${published}` : ''}`);
     await writeFile(path.join(dir, 'record.json'), `${JSON.stringify({ round, system, met: judged.met, verdicts: judged.verdicts, critique, rules, accepted: judged.detector.accepted.map((a) => ({ ...a.entry, findings: a.findings.length })), unusedAcceptances: judged.detector.unused, signOff, versions: gates.versions }, null, 2)}\n`);
     emit([`Round ${round}: ${judged.met ? 'the bar is met' : 'the bar is not met yet'}.`, ...judged.verdicts.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Record: ${path.relative(process.cwd(), path.join(dir, 'record.md'))}`].join('\n'), { ok: judged.met, round, verdicts: judged.verdicts });
     if (!judged.met) process.exitCode = 1;

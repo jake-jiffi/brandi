@@ -2525,6 +2525,38 @@
     "file": "skills/product-system/references/02-brand-to-product.md",
     "heading": "Shape, space and marks"
    }
+  },
+  {
+   "id": "L135",
+   "broke": "The Drift verdict said screens checked by eye were noted in the record, and nothing asked for the note or kept it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "the record keeps what was compared by eye, or says plainly it is still to do"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "The round record"
+   }
+  },
+  {
+   "id": "L136",
+   "broke": "The fonts command stamped a licence's fetch date in UTC, so a fetch early on 30 October in Sydney read 29 October.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productfonts.test.mjs",
+     "name": "a fetch is stamped with the day on the local calendar, not the UTC one"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/SKILL.md",
+    "heading": "The command line does the arithmetic"
+   }
   }
  ]
 }

@@ -491,7 +491,7 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
   add('Tokens', gates.tokens.fails === 0, gates.tokens.summary);
   const differences = gates.drift?.differences;
   add('Drift', Array.isArray(differences) && differences.length === 0,
-    !Array.isArray(differences) ? 'no drift check recorded for this round' : differences.length ? `${differences.length} differences between the canvas, the system and the code` : 'canvas, system and code agree; screens checked by eye are noted in the record');
+    !Array.isArray(differences) ? 'no drift check recorded for this round' : differences.length ? `${differences.length} differences between the canvas, the system and the code` : 'canvas, system and code agree; the screens are compared by eye, in by-eye.md beside the record');
   const detector = acceptFindings(gates.detector.findings, accepted);
   const acceptedCount = detector.accepted.reduce((n, e) => n + e.findings.length, 0);
   add('Detector', !gates.detector.skipped && detector.open.length === 0 && gates.detector.errors.length === 0,
@@ -572,7 +572,7 @@ export function publishedSection(record) {
 }
 
 /** The round record as a person reads it. */
-export function roundMarkdown(gates, judged, { system = {}, critique = null, rules = null, signOff = null } = {}) {
+export function roundMarkdown(gates, judged, { system = {}, critique = null, rules = null, signOff = null, byEye = null } = {}) {
   const lines = [`# Round ${gates.round}: ${system.name ?? 'product system'} ${system.version ?? ''}`.trimEnd(), '', `Run ${gates.at}. ${judged.met ? 'The bar is met.' : 'The bar is not met yet.'}`, '', '| Gate | Result | Detail |', '| --- | --- | --- |'];
   for (const v of judged.verdicts) lines.push(`| ${v.gate} | ${v.pass ? 'pass' : 'fail'} | ${String(v.detail).replace(/\|/g, '\\|')} |`);
   if (gates.axe.skipped?.rules?.length) lines.push('', `axe ran every rule on the routes. On ${gates.axe.skipped.kinds.map((k) => `${k} pages`).join(' and ')}, which show a page frame more than once, it skipped ${gates.axe.skipped.rules.join(', ')}.`);
@@ -634,6 +634,9 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     for (const d of gates.drift.differences) lines.push(`- ${d.area}: ${d.where}${d.found ? ` ${d.found}` : ''}, ${d.expected}`);
   }
   for (const u of gates.drift?.unchecked ?? []) lines.push('', `Not checked automatically: ${u}`);
+  // What was compared by eye goes in the record, or the record says it is still to do: a run read "noted in the
+  // record" and found nowhere that asked for the note or kept it.
+  lines.push('', '## Screens checked by eye', '', byEye?.trim() ? byEye.trim() : `Not recorded yet. Compare each screen with its pattern, page by page, and write what you compared and found in by-eye.md beside this record, then run \`brandi product round --round ${gates.round}\` again.`);
   const rerun = gates.checks.retried ?? [];
   if (rerun.length) lines.push('', `${rerun.length === 1 ? '1 scripted check' : `${rerun.length} scripted checks`} failed in the full run and passed run again alone, with ${rerun.length === 1 ? "its component's" : 'their components\''} other checks: ${rerun.map((f) => `${f.check} (first: ${f.reason})`).join('; ')}.`);
   if (gates.checks.failed.length) {

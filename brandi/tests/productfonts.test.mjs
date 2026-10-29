@@ -7,7 +7,7 @@ import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { typeFaces, faceRequest, parseFaceCss, licenceName, fetchFonts } from '../scripts/productfonts.mjs';
+import { localDay, typeFaces, faceRequest, parseFaceCss, licenceName, fetchFonts } from '../scripts/productfonts.mjs';
 
 // Nothing here touches the network: a server on 127.0.0.1 answers as Google Fonts does, for made-up faces.
 const OFL = 'Copyright 2020 The Acme Project Authors\n\nThis Font Software is licensed under the SIL Open Font License, Version 1.1.\n';
@@ -82,6 +82,11 @@ async function productDir() {
   return dir;
 }
 
+test('a fetch is stamped with the day on the local calendar, not the UTC one', () => {
+  assert.equal(localDay(new Date(2026, 9, 30, 4, 2)), '2026-10-30');
+  assert.equal(localDay(new Date(2026, 0, 5, 23, 59)), '2026-01-05');
+});
+
 describe('fetching the faces a product names from Google Fonts', () => {
   test('the faces are each role\'s own face, not a system one, with the weights and italics the type sets in it', () => {
     assert.deepEqual(typeFaces(tokens()), [
@@ -113,7 +118,7 @@ describe('fetching the faces a product names from Google Fonts', () => {
   test('writes the latin woff2 of each face with no file, and its licence, and returns the fonts entries with where the licence came from', async () => {
     const dir = await productDir();
     asked.length = 0;
-    const run = await fetchFonts({ tokens: tokens(), productDir: dir, bases: { css: base, site: base }, date: new Date('2026-10-29T00:00:00Z') });
+    const run = await fetchFonts({ tokens: tokens(), productDir: dir, bases: { css: base, site: base }, date: new Date(2026, 9, 29, 12) });
     assert.deepEqual(run.notHosted, []);
     assert.deepEqual(run.offline, []);
     assert.deepEqual(run.fetched.map((f) => f.family), ['Acme Condensed', 'Acme Grotesk']);

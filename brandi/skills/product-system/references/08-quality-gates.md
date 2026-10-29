@@ -305,7 +305,10 @@ generator's share back into Brandi (`09-operate.md`, After every round).
 ## The round record
 
 One folder per round, `product/rounds/round-N/`. `$A product gates` writes `gates.json`; write each
-reviewer's report beside it, then turn the two judged reports into the files the round reads:
+reviewer's report beside it, then turn the two judged reports into the files the round reads. The
+drift check cannot compare screens with their patterns, so do it by eye, page by page, and write
+what you compared and found in `by-eye.md` in the same folder: `$A product round` carries it into
+the record, and says it is still to do when the file is not there.
 
 ```json
 { "method": "single-context, isolation by procedure: each gate started from the round's evidence",

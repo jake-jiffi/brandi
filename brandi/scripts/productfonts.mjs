@@ -92,6 +92,9 @@ const readJson = async (res) => JSON.parse((await res.text()).replace(/^\)\]\}'\
 /** A failure to reach Google at all (no network, refused, timed out), as against an answer Google gave. */
 const unreachable = (e) => (e.name === 'TypeError' && e.message === 'fetch failed') || e.name === 'TimeoutError' || e.name === 'AbortError';
 
+/** The day as the person's calendar has it. In UTC, a fetch at 4:02 am on 30 October in Sydney was stamped 29 October. */
+export const localDay = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+
 /**
  * Fetch each face the type names that has no file in `productDir`/fonts. A face counts as having one when product.json
  * lists it (`tokens.type.fonts`) with its files there, or a font file there starts with its name. Returns
@@ -104,7 +107,7 @@ export async function fetchFonts({ tokens, productDir, subsets = ['latin'], base
   const fontsDir = path.join(productDir, 'fonts');
   const files = existsSync(fontsDir) ? await readdir(fontsDir) : [];
   const listed = tokens.type?.fonts ?? [];
-  const day = date.toISOString().slice(0, 10);
+  const day = localDay(date);
   const get = (url) => fetch(url, { headers: { 'User-Agent': MODERN_UA }, signal: AbortSignal.timeout(timeout) });
   const rank = (s) => (s === 'latin' ? subsets.length : subsets.indexOf(s));
   const out = { fetched: [], present: [], notHosted: [], offline: [], failed: [] };

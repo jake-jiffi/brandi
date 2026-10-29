@@ -130,6 +130,13 @@ describe('a round held against the bar', () => {
     assert.match(roundMarkdown(g, judged), /1 scripted check failed in the full run and passed run again alone, with its component's other checks: Board: The Move menu/);
   });
 
+  test('the record keeps what was compared by eye, or says plainly it is still to do', () => {
+    const g = clean();
+    assert.match(roundMarkdown(g, judgeRound(g)), /## Screens checked by eye\n\nNot recorded yet\. Compare each screen with its pattern, page by page, and write what you compared and found in by-eye\.md/);
+    assert.match(roundMarkdown(g, judgeRound(g), { byEye: 'Home against the Home pattern: the greeting and ask bar are there.\n' }), /## Screens checked by eye\n\nHome against the Home pattern: the greeting and ask bar are there\./);
+    assert.match(judgeRound(g).verdicts.find((v) => v.gate === 'Drift').detail, /compared by eye, in by-eye\.md beside the record/);
+  });
+
   test('the record names each gate, the tool versions, the findings and the sign-off', () => {
     const g = clean();
     g.detector.findings.push({ page: 'ConsoleRosters1440', width: 820, theme: 'dark', rule: 'side-tab', selector: '.card', snippet: 'border-left' });
