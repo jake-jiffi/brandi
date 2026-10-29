@@ -298,6 +298,21 @@ export function axeGate(axe) {
 }
 
 /**
+ * A scripted check that failed, run once more alone with its component's other checks: on a loaded machine a key
+ * pressed before a menu took focus failed one run's gates, and the same check passed alone. Given only the first run,
+ * the components to run again; given the second too, the merge: a check that passed the second time is counted as
+ * passed and named under `retried`, for the record, as a route axe loaded twice is; one that failed again still fails.
+ */
+export function retryChecks(first, again) {
+  const failed = first.failed.filter((f) => f.check !== 'runner');
+  if (again === undefined) return [...new Set(failed.map((f) => f.check.split(':')[0]))];
+  if (!again) return { ...first, retried: [] };
+  const still = (f) => f.check === 'runner' || again.failed.some((a) => a.check === f.check);
+  const retried = first.failed.filter((f) => !still(f));
+  return { passed: first.passed + retried.length, failed: first.failed.filter(still), retried };
+}
+
+/**
  * Run the machine gates for one round. Writes rounds/round-<n>/gates.json and returns it.
  * `routes` are a running starter's pages ({ url, label }), scanned at every width, light and dark.
  */
@@ -349,8 +364,15 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   const checkRun = existsSync(previews)
     ? nodeScript(starter, 'check-components.mjs', ['--previews', pagesDir, ...(only ? ['--only', only.join(',')] : []), '--json', path.join(outDir, 'checks.json')])
     : { status: 0, out: '' };
-  const checks = existsSync(path.join(outDir, 'checks.json')) ? JSON.parse(readFileSync(path.join(outDir, 'checks.json'), 'utf8')) : { passed: 0, failed: [{ check: 'runner', reason: checkRun.out.slice(-400) }] };
-  log(`checks: ${checks.passed} passed, ${checks.failed.length} failed`);
+  let checks = existsSync(path.join(outDir, 'checks.json')) ? JSON.parse(readFileSync(path.join(outDir, 'checks.json'), 'utf8')) : { passed: 0, failed: [{ check: 'runner', reason: checkRun.out.slice(-400) }] };
+  const again = retryChecks(checks);
+  if (again.length) {
+    log(`checks: ${checks.failed.length} failed; running ${again.join(', ')} again alone`);
+    const retryFile = path.join(outDir, 'checks-retry.json');
+    nodeScript(starter, 'check-components.mjs', ['--previews', pagesDir, '--only', again.join(','), '--json', retryFile]);
+    checks = retryChecks(checks, existsSync(retryFile) ? JSON.parse(readFileSync(retryFile, 'utf8')) : null);
+  }
+  log(`checks: ${checks.passed} passed, ${checks.failed.length} failed${checks.retried?.length ? `, ${checks.retried.length} of them only when run again` : ''}`);
 
   // Every board under the Design canvas's own runtime, in a cross-origin frame as the canvas draws it: the previews
   // use a shim as the top page, and a board that broke only on the canvas passed every other gate.
@@ -400,7 +422,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null, unscanned: detection.unscanned ?? [] },
     axe: axeGate(axe),
     reflow,
-    checks: { passed: checks.passed, failed: checks.failed },
+    checks: { passed: checks.passed, failed: checks.failed, retried: checks.retried ?? [] },
     runtime,
     sizes,
     coverage,
@@ -479,7 +501,7 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
   const unmeasured = gates.reflow?.errors?.length ?? 0;
   // A page axe could not scan is not a clean page: the line says how many, so a board that never loads is not missed.
   add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0 && overflow === 0 && unmeasured === 0,
-    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages${gates.axe.errors ? `, ${gates.axe.errors} not scanned` : ''}; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
+    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages${gates.axe.errors ? `, ${gates.axe.errors} not scanned` : ''}; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.checks.retried?.length ? `, ${gates.checks.retried.length} of them only when run again` : ''}${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
   // A round from before this gate has no line for it; one that could not run it has not passed it.
   if (gates.runtime) {
     add('Canvas runtime', !gates.runtime.skipped && gates.runtime.failed.length === 0,
@@ -612,6 +634,8 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     for (const d of gates.drift.differences) lines.push(`- ${d.area}: ${d.where}${d.found ? ` ${d.found}` : ''}, ${d.expected}`);
   }
   for (const u of gates.drift?.unchecked ?? []) lines.push('', `Not checked automatically: ${u}`);
+  const rerun = gates.checks.retried ?? [];
+  if (rerun.length) lines.push('', `${rerun.length === 1 ? '1 scripted check' : `${rerun.length} scripted checks`} failed in the full run and passed run again alone, with ${rerun.length === 1 ? "its component's" : 'their components\''} other checks: ${rerun.map((f) => `${f.check} (first: ${f.reason})`).join('; ')}.`);
   if (gates.checks.failed.length) {
     lines.push('', '## Failed checks', '');
     for (const f of gates.checks.failed) lines.push(`- ${f.check}: ${f.reason}`);
@@ -646,4 +670,4 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   return lines.join('\n');
 }
 
-export default { runGates, axeGate, acceptFindings, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, sizePages, sizeGate, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR, MACHINE_GATES };
+export default { runGates, retryChecks, axeGate, acceptFindings, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, sizePages, sizeGate, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR, MACHINE_GATES };

@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-import { axeGate, judgeRound, roundMarkdown, publishedSection, findDetector, collectPages, runDetector, reflowPages, sizeGate, BAR, WIDTHS, REFLOW_WIDTH, MACHINE_GATES } from '../scripts/productgates.mjs';
+import { axeGate, retryChecks, judgeRound, roundMarkdown, publishedSection, findDetector, collectPages, runDetector, reflowPages, sizeGate, BAR, WIDTHS, REFLOW_WIDTH, MACHINE_GATES } from '../scripts/productgates.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 
@@ -110,6 +110,24 @@ describe('a round held against the bar', () => {
     assert.equal(judged.met, false);
     assert.match(judged.verdicts.find((v) => v.gate === 'Craft').detail, /no critique recorded/);
     assert.match(judged.verdicts.find((v) => v.gate === 'Rules').detail, /no rules review recorded/);
+  });
+
+  test('a scripted check that fails once and passes run again alone is named, not failed; one that fails twice fails', () => {
+    const first = { passed: 1066, failed: [{ check: 'Board: The Move menu moves a card by keyboard', reason: 'the card is in Booked: got "quoted", wanted "booked"' }, { check: 'Logo: The theme picks the rendition (dark)', reason: 'got "full"' }] };
+    assert.deepEqual(retryChecks(first), ['Board', 'Logo'], 'each failed check\'s component, once');
+    const again = { passed: 20, failed: [{ check: 'Logo: The theme picks the rendition (dark)', reason: 'got "full"' }] };
+    const merged = retryChecks(first, again);
+    assert.equal(merged.passed, 1067);
+    assert.deepEqual(merged.failed.map((f) => f.check), ['Logo: The theme picks the rendition (dark)']);
+    assert.deepEqual(merged.retried, [{ check: 'Board: The Move menu moves a card by keyboard', reason: 'the card is in Booked: got "quoted", wanted "booked"' }]);
+    assert.deepEqual(retryChecks(first, null), { ...first, retried: [] }, 'a rerun that did not run changes nothing');
+    assert.deepEqual(retryChecks({ passed: 0, failed: [{ check: 'runner', reason: 'no Chrome' }] }), [], 'the runner failing is no check to retry');
+
+    const g = clean();
+    g.checks = merged;
+    const judged = judgeRound(g);
+    assert.match(judged.verdicts.find((v) => v.gate === 'Accessibility').detail, /1067 scripted checks passed, 1 failed, 1 of them only when run again/);
+    assert.match(roundMarkdown(g, judged), /1 scripted check failed in the full run and passed run again alone, with its component's other checks: Board: The Move menu/);
   });
 
   test('the record names each gate, the tool versions, the findings and the sign-off', () => {
