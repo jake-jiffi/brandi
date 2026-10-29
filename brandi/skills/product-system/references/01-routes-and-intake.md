@@ -106,10 +106,19 @@ questions with what changes if it is wrong. The CLI reads the keys it needs (`na
 widths it is drawn at (`widths`) and, once they are known, its modules: the coverage gate holds the
 canvas to them (`08-quality-gates.md`, Coverage). A surface with no `widths` is held to the checked
 widths, which suit pages. Messages are read at their own widths, so a messaging surface names them:
-an email at 600, a notification on a 390 phone.
+an email at 600, a text on a 390 phone.
+
+Every surface people use shows its states. A surface with modules does it on each module's states
+board. A surface with no modules (a booking flow, a portal of a few pages) gets a states board of
+its own, as `BookingStates390`, with its empty, loading and could-not-load states and its systems'
+failure modes, or skips them with `"states": { "skip": "why" }` when nothing on it loads, empties or
+fails. A surface that only sends messages (its `platforms` only `email` or `sms`) needs none: what
+goes wrong with a message shows on the surface that sent it. A notification surface listed under
+`ios` or `android` cannot be told from an app, so it draws its states or skips them with a reason
+(`08-quality-gates.md`, Coverage).
 
 A surface with modules (a console, or an app with areas of its own) also gets `pages` once its
-boards are drawn. It names each of the ten core page patterns, as `04-written-system.md` (Screen
+boards are drawn. It names each of the eleven core page patterns, as `04-written-system.md` (Screen
 patterns) names them, with the board that shows it. A pattern the surface does not have is skipped
 with `{ "skip": "why" }`: a product with no queue has no list and detail. A marketing site or
 messages have no modules and need no `pages`. A pattern neither named nor skipped fails the round,
@@ -126,10 +135,10 @@ and so does a surface with modules and no `pages` at all, with every pattern lis
       "pages": { "Home": "ConsoleHome1440", "Records": "ConsoleRosters1440", "List and detail": "ConsoleSync1440",
         "Record": "ConsoleRoster1440", "Report": "ConsoleReport1440", "Settings": "ConsoleSettings1440",
         "Create and edit": "ConsoleRosterEdit1440", "Setup": { "skip": "stores are set up by head office, outside the product" },
-        "The assistant": "ConsoleAsk1440", "Sign in": "ConsoleSignIn1440" } },
+        "The assistant": "ConsoleAsk1440", "Sign in": "ConsoleSignIn1440", "Help": "ConsoleHelp1440" } },
     { "name": "Staff app", "people": "Floor staff", "jobs": "Check in, see the day", "platforms": ["ios", "android"],
       "boards": "Staff", "widths": [390] },
-    { "name": "Messages", "people": "Store managers", "jobs": "Know a roster needs approving", "platforms": ["email", "ios", "android"],
+    { "name": "Messages", "people": "Store managers", "jobs": "Know a roster needs approving", "platforms": ["email", "sms"],
       "boards": "Messaging", "widths": [600, 390] }
   ],
   "systems": [

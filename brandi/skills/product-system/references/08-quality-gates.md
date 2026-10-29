@@ -17,7 +17,7 @@ reviewers are briefed, and what goes in the record.
 | Drift | Canvas, system and code agree (`09-operate.md`) |
 | Canvas runtime | Every board renders without an error under the Design canvas's own runtime, in a cross-origin frame (`06-canvas.md` step 3) |
 | Board sizes | Every board's frame fits its content, a page at its whole height, and nothing on a board hides its own content (Board sizes, below) |
-| Coverage | Every surface `product.json` lists has a board at each of its widths and a states board for each of its modules, and a surface with modules shows each core page on a board or skips it with a reason (Coverage, below) |
+| Coverage | Every surface `product.json` lists has a board at each of its widths and a states board for each of its modules (one for the surface when it has none, unless it only sends messages or skips them with a reason), and a surface with modules shows each core page on a board or skips it with a reason (Coverage, below) |
 | Record | Every tool's version pinned and written down |
 
 The two review scales map onto one another, so "nothing Medium or above" means the same thing in
@@ -115,6 +115,8 @@ depth and almost nothing of the website, the app or the messages, and every gate
 | `widths` | The widths the surface is drawn at: `[1440, 820, 390]` for a console, `[390]` for a phone app | The three checked widths |
 | `modules` | The surface's modules: `["Rosters", "Opening hours"]` | None |
 | `pages` | Each core page pattern (`04-written-system.md`, Screen patterns) and the board that shows it, or `{ "skip": "why" }`: `{ "Home": "ConsoleHome1440", "Setup": { "skip": "stores are set up by head office" } }` | Unchecked, and the Coverage line says so, on a surface with modules. Nothing to check on one without |
+| `states` | For a surface with no modules that has no states to draw, why: `{ "skip": "one fixed page: nothing loads, empties or fails" }` | A surface with no modules needs a states board, unless it only sends messages |
+| `platforms` | Where the surface runs: `["web"]`, `["email", "sms"]` (`01-routes-and-intake.md`) | Read here only to tell a surface that only sends messages |
 
 Each surface needs at least one board at each of its widths (the width is the last number in a
 board's name, before `Dark`), and each module a states board: a board whose name holds the prefix,
@@ -125,9 +127,24 @@ cannot share a prefix. The Coverage line names what is missing, and the record l
 surface. Add each new module to its surface's `modules` when it opens (`09-operate.md`), so the gate
 asks for its states board.
 
-A surface with modules (a console, or an app with areas of its own) is also held to the ten core
+A surface with no modules (a booking flow, a portal of a few pages, a staff app with one job) needs
+a states board of its own: a board whose name holds the prefix and `States`, as `BookingStates390`,
+or one per screen, as `BookingTimesStates390`. It draws the surface's empty, loading and
+could-not-load states and the failure modes of the systems it touches (`06-canvas.md`, section 3).
+A surface with nothing that loads, empties or fails skips them with `"states": { "skip": "why" }`,
+and the record prints the reason. A run's booking pages had no modules, so coverage asked for no
+states, and neither "no times this week" nor "booking failed" was drawn. A `product.json` from
+before this rule is told, surface by surface, which states board each surface now lacks.
+
+A surface that only sends messages, its `platforms` only `email` or `sms`, needs none. An email or a
+text is written once and sent: nothing on it loads, empties or fails to load, and what goes wrong
+with one (a bounce, a text that never arrived) shows on the surface that sent it, so its states are
+drawn there. A messages surface that also has pages of its own (an approval page, an unsubscribe
+page, `web` among its platforms) is held to a states board, and so is one that names no platforms.
+
+A surface with modules (a console, or an app with areas of its own) is also held to the eleven core
 page patterns. They are Home, Records, List and detail, Record, Report, Settings, Create and edit,
-Setup, The assistant and Sign in, the names `04-written-system.md` gives them. A key matches without
+Setup, The assistant, Sign in and Help, the names `04-written-system.md` gives them. A key matches without
 its case or a leading "the". Its `pages` names the board that shows each, one of the surface's own
 boards on the canvas, or skips the pattern with a reason. Coverage fails on a pattern neither named
 nor skipped, a board not on the canvas or of another surface, a skip with no reason, or a name that
@@ -136,7 +153,8 @@ is no pattern. Each is listed by surface.
 A run drew no create and edit screen at all, every gate passed, and its craft review then lost
 points on error prevention and user control, which those screens carry. So a surface with modules
 and no `pages` fails Coverage with every pattern listed, and a `product.json` from before the key
-needs it before its next round. A surface without modules (a marketing site, messages) has none to check unless it names its
+needs it before its next round. Help joined the patterns the same way: every proof run scored Help
+and documentation 3 of 4, because Help sat in the rail and no board showed what it opens. A surface without modules (a marketing site, messages) has none to check unless it names its
 own. The gates read `pages` when they run, so name each page as its board is drawn, before
 `$A product gates`.
 
@@ -353,9 +371,10 @@ carries, with a summary row in the quality-gates section:
 - Scores per gate (critique /40 with each heuristic and, under 4, what cost the point; audit /20),
   and whether each ran single-context.
 - Detector findings by target, axe results, behaviour check counts, the token audit line.
-- Coverage: each surface, its prefix, how many boards it has, what it is missing, which modules
-  drew options and which reused a written pattern, and each core page on its board or skipped with
-  its reason.
+- Coverage: each surface, its prefix, how many boards it has, what it is missing, where a surface
+  with no modules keeps its states (its states boards, its skip and reason, or that it only sends
+  messages), which modules drew options and which reused a written pattern, and each core page on
+  its board or skipped with its reason.
 - Board sizes: each frame off its content, each box that hides content, each board not measured.
 - Findings by severity, each with its status and evidence.
 - Accepted deviations, each with its reason.

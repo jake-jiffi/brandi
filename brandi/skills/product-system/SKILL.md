@@ -241,10 +241,11 @@ and read as failures.
 ### 6. Patterns and proof (VISUAL, the stress test)
 
 The core page patterns (home, records, list and detail, record, report, settings, create and edit,
-setup, the assistant, sign in) and the first real product's screens, drawn on the canvas with the
-real components. Each surface with modules names, under `pages` in `product.json`, the board that
+setup, the assistant, sign in, help) and the first real product's screens, drawn on the canvas with
+the real components. Each surface with modules names, under `pages` in `product.json`, the board that
 shows each pattern, or skips it with a reason: the coverage gate fails a pattern neither named nor
-skipped. Every module gets a states board. Every hard screen gets options A to D, each title
+skipped. Every module gets a states board, and so does every surface with no modules, unless it only
+sends messages or skips its states with a reason. Every hard screen gets options A to D, each title
 naming its weakness, then the pick on record. Hard means no written pattern covers it yet: the first
 module of a surface with modules draws a set, the pick goes into the screen patterns, and later
 modules reuse it, drawing a set of their own only when it does not fit. The round record says which
@@ -316,7 +317,7 @@ The system is never finished. Five modes, each a round of its own
 | Drift | Canvas, system and code agree, the docs' written values included |
 | Canvas runtime | Every board renders under the Design canvas's own runtime, in a cross-origin frame |
 | Board sizes | Every board's frame fits its content, and nothing on a board hides its own content |
-| Coverage | Every surface has a board at each of its widths and a states board for each module, and a surface with modules shows each core page or skips it with a reason |
+| Coverage | Every surface has a board at each of its widths and a states board for each module (one for the surface when it has none, unless it only sends messages or skips them with a reason), and a surface with modules shows each core page or skips it with a reason |
 | Record | Every tool's version pinned and written down, every round |
 
 Impeccable is the craft gate. ui-ux-pro-max is the rules engine: its accessibility, forms,
