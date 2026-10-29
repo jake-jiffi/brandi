@@ -37,6 +37,7 @@
  *                                     the product layer: every role a working screen needs,
  *                                     in both themes, solved for contrast and audited
  *   brandi product measure --url <site> [--follow n]  the brand's live shapes, for where the guidelines are silent
+ *   brandi product fonts [--subset latin]  the brand's faces as files, from Google Fonts where it hosts them
  *   brandi product audit [--tokens product/tokens.json]
  *                                     measure every declared pair in both themes
  *   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
@@ -74,6 +75,7 @@ import {
 import { buildSystem, assertPublishable } from './system.mjs';
 import { buildProductTokens, auditProductTokens, auditSummary, toProductCss, shapeKitDefaults, textureMove } from './producttokens.mjs';
 import { measurePages, summarise as summariseShapes } from './productmeasure.mjs';
+import { fetchFonts } from './productfonts.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
 import { CHARACTER_STATES } from './productbrand.mjs';
@@ -2952,11 +2954,25 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
   brandi product measure --url <the brand's live site> [--url <another page> ...] [--follow <n>]
       Read the site's computed styles in the installed Chrome and suggest the shape
       families (press, control, card, frame) and the shell, each with its source.
-      --url once per page; --follow also measures up to n of the first page's
-      navigation links on the same site. Each family is taken across every page,
-      and its source shows each page's own radius. A form in a frame from another
-      site is named, since it cannot be read. The guidelines come first; these
-      fill only what they leave unsaid.
+      --url once per page; --follow also measures n of the first page's links
+      on the same site: one page likely to hold a form (contact, careers, sign
+      up and the like), then one from each section of the site in turn, and
+      says why it took each. Each page votes once per family with its own most
+      common radius, the family takes what most pages agree on (a tie goes to
+      the page measured first), and its source shows each page's own. A form in
+      a frame from another site is named, since it cannot be read. The
+      guidelines come first; these fill only what they leave unsaid.
+
+  brandi product fonts [--input <file>] [--out product] [--subset latin,latin-ext]
+      The faces the product's type names, as files: for each with no file in
+      product/fonts/, the woff2 Google Fonts serves (the latin subset unless
+      --subset names others; the whole weight range where the face has a
+      weight axis, else the weights the type sets; italics only where it sets
+      them) and the licence file from the family's download. Adds each file to
+      product.json's fonts with its licence and where that came from. A face
+      Google does not host is the brand's to supply, recorded as an open
+      question. With no network, says what is missing and where to get it by
+      hand. Run it before product tokens.
 
   brandi product audit [--tokens product/tokens.json]
       Measure every pair a tokens file declares, in both themes, and list every
@@ -3131,18 +3147,79 @@ async function cmdProduct(flags, positional) {
     if (!run.pages.length) return fail(`Nothing could be measured:\n${run.errors.map((e) => `  ${e.url}: ${e.error}`).join('\n')}`);
     const s = summariseShapes(run.pages);
     const shape = { families: s.families, ...(s.shell ? { shell: s.shell } : {}) };
+    // Which links --follow took and why, so a run that measured only menu pages can see it did.
+    const followed = follow > 0 ? (run.followed.length ? [`Followed ${run.followed.length} of the first page's links:`, ...run.followed.map((f) => `  ${f.url} (${f.why})`)] : ['--follow found no link to another page of the site on the first page.']) : [];
     emit([
       `Measured ${plural(run.pages.length, 'page')} at 1440 wide: ${run.pages.map((p) => p.url).join(', ')}`,
+      ...followed,
       ...run.errors.map((e) => `  not measured: ${e.url} (${e.error})`),
       ...['press', 'control', 'card', 'frame'].map((k) => (s.families[k] ? `  ${k.padEnd(8)}${String(s.families[k].px === 'pill' ? 'pill' : `${s.families[k].px}px`).padEnd(7)}${s.families[k].source}` : `  ${k.padEnd(8)}(none on the ${run.pages.length === 1 ? 'page' : 'pages'} measured)`)),
       // A form embedded from another site is said, not passed over as no form at all.
       ...s.frames.map((f) => `          ${f.page} shows a ${f.w}x${f.h} frame from ${f.origin}, which cannot be read from the page: a form inside it is not measured.`),
       s.shell ? `  shell   ${s.shell.form.padEnd(7)}${s.shell.source}` : '  shell   (no header or navigation found)',
+      ...(s.families.control ? [] : ['', 'No page measured shows a form field. Try --url with a page that holds one: a contact or enquiries page, careers, sign up or log in, catering or franchise.']),
       '',
       'Guidelines first: check each family against the brand\'s own guidelines, keep what they settle, and take these',
-      'only where they say nothing. Then write the ones you keep into product.json under "shape" (02-brand-to-product.md, Shape):',
+      'only where they say nothing. A value the brand pass chose to fill a gap (brand.json provenance "decided" or "assumed",',
+      'or a radius read off its scale) gives way to both. Then write the ones you keep into product.json under "shape"',
+      '(02-brand-to-product.md, Shape):',
       JSON.stringify(shape, null, 2),
-    ].join('\n'), { ok: true, urls: run.pages.map((p) => p.url), shape, frames: s.frames, errors: run.errors, raw: run.pages });
+    ].join('\n'), { ok: true, urls: run.pages.map((p) => p.url), followed: run.followed, shape, frames: s.frames, errors: run.errors, raw: run.pages });
+    return;
+  }
+  if (sub === 'fonts') {
+    // The brand's faces as files (02-brand-to-product.md, Type). It runs before product tokens: the faces and weights
+    // come from the brand and product.json as the tokens will take them, and the entries it adds to product.json's
+    // fonts are what tokens.css then writes an @font-face for.
+    const dir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
+    const configFile = path.join(dir, 'product.json');
+    const config = existsSync(configFile) ? JSON.parse(await readFile(configFile, 'utf8')) : {};
+    const subsets = typeof flags.subset === 'string' ? flags.subset.split(',').map((x) => x.trim()).filter(Boolean) : ['latin'];
+    let tokens;
+    try {
+      const { system } = await productSource(flags);
+      tokens = buildProductTokens(system, { displayForTitles: config.displayForTitles ?? true, displayCase: config.displayCase ?? null, fonts: config.fonts ?? [] });
+    } catch (e) { return fail(e.message); }
+    // BRANDI_GOOGLE_FONTS points both of Google's hosts somewhere else: the tests' fixture server.
+    const google = process.env.BRANDI_GOOGLE_FONTS;
+    const run = await fetchFonts({ tokens, productDir: dir, subsets, ...(google ? { bases: { css: google, site: google } } : {}) });
+    // What arrived goes into product.json's fonts, in place of any stale entry for the same face, and a face the brand
+    // must supply, or one that came with no licence file, becomes an open question, asked once.
+    const got = new Set(run.fetched.map((f) => f.family));
+    const fonts = [...(config.fonts ?? []).filter((f) => !got.has(f.family)), ...run.fetched.flatMap((f) => f.entries)];
+    const asked = config.openQuestions ?? [];
+    let n = Math.max(0, ...asked.map((q) => Number(/^pq(\d+)$/.exec(q.id ?? '')?.[1] ?? 0)));
+    const openQuestions = [
+      ...run.notHosted.map((f) => ({ family: f.family, question: `${f.family}: the font files and their licence. Google Fonts does not host it, so the brand supplies both.`, assumption: `The fallback stands in until they arrive: ${f.fallback}.` })),
+      ...run.fetched.filter((f) => !f.licence).map((f) => ({ family: f.family, question: `${f.family}: its licence. Google's download of the family carries no licence file.`, assumption: 'Open source, as Google hosts it; not yet on record.' })),
+    ].filter((q) => !asked.some((a) => String(a.question ?? '').startsWith(`${q.family}:`)))
+      .map(({ family, ...q }) => ({ id: `pq${++n}`, ...q }));
+    const changed = run.fetched.length > 0 || openQuestions.length > 0;
+    if (changed) {
+      await mkdir(dir, { recursive: true });
+      await writeFile(configFile, `${JSON.stringify({ ...config, ...(asked.length || openQuestions.length ? { openQuestions: [...asked, ...openQuestions] } : {}), fonts }, null, 2)}\n`);
+    }
+    const rel = (f) => path.relative(process.cwd(), path.join(dir, f));
+    const lines = [
+      ...run.fetched.map((f) => [
+        `  ${f.family}: fetched ${f.entries.map((e) => `${rel(e.file)} (${e.weight}${e.style === 'italic' ? ' italic' : ''})`).join(', ')}.`,
+        f.licence ? `    ${f.licence.name}, in ${rel(f.licence.file)}, from ${f.licence.source}.` : '    No licence file in Google\'s download of the family: an open question.',
+        ...(f.missing.length ? [`    The type sets ${f.missing.join(', ')}, which the face does not have: the nearest it has stands in.`] : []),
+        ...(f.absent.length ? [`    Google serves no ${f.absent.join(' or ')} subset of it.`] : []),
+      ].join('\n')),
+      ...run.present.map((f) => `  ${f.family}: ${f.why}.${f.why.startsWith('has a file') ? ' List it under fonts in product.json with its weight, style and licence.' : ''}`),
+      ...run.notHosted.map((f) => `  ${f.family}: Google Fonts does not host it. The brand supplies the files and the licence: put the files in ${rel('fonts')}/, list them under fonts in product.json with the licence, and run this again.`),
+      ...run.offline.map((f) => `  ${f.family}: could not reach Google Fonts (${f.error}). By hand: open ${f.css} in a browser (ask only for the weights the face has), save the file under each /* ${subsets.join(' */ and /* ')} */ block into ${rel('fonts')}/, list them under fonts in product.json, and take the licence file from the family's download at ${f.specimen}.`),
+      ...run.failed.map((f) => `  ${f.family}: not fetched: ${f.error}`),
+    ];
+    const faces = run.fetched.length + run.present.length + run.notHosted.length + run.offline.length + run.failed.length;
+    emit([
+      faces ? `The faces the product's type names, as files (${subsets.join(', ')}):` : "The product's type names no face of the brand's own: nothing to fetch.",
+      ...lines,
+      ...(changed ? ['', `Wrote ${rel('product.json')}: ${[run.fetched.length ? `fonts (${plural(fonts.length, 'file')})` : null, openQuestions.length ? `open questions ${openQuestions.map((q) => q.id).join(', ')}` : null].filter(Boolean).join(' and ')}.`] : []),
+      ...(faces ? ['', 'Then run `brandi product tokens`, so tokens.css carries an @font-face for each file listed under fonts.'] : []),
+    ].join('\n'), { ok: !run.offline.length && !run.failed.length, subsets, ...run, fonts, openQuestions, wrote: changed ? configFile : null });
+    if (run.offline.length || run.failed.length) process.exitCode = 1;
     return;
   }
   if (sub === 'audit') {

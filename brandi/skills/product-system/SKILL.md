@@ -50,6 +50,7 @@ reference writes `<brandi>`, it means the plugin root, `$(dirname "$A")/..`.
 $A product tokens                     # every product role in both themes, solved for contrast, then audited
 $A product tokens --input input.json  # the same, for a brand Brandi has never built
 $A product measure --url <site>       # the brand's live shapes, for where the guidelines are silent
+$A product fonts                      # the brand's faces as files, from Google Fonts where it hosts them
 $A product audit                      # measure every pair a tokens file declares, in both themes
 $A product globals                    # the starter's globals.css, from the tokens
 $A product starter                    # the product kit as a Next.js starter, dressed in the tokens
@@ -170,11 +171,15 @@ different things from it, and every difference is a decision on record.
    into `product/product.json`.
 2. Measure the brand's shapes before the kit's stand in for them: each family's radius (what you
    press, inputs, cards, panes, photos) from the guidelines, then from the brand's live work where
-   they are silent (`$A product measure --url <site>` reads a live site); the rail's form, against the
+   they are silent (`$A product measure --url <site> --follow 4` reads a live site); the rail's form, against the
    window edge unless the brand floats its panels; and
    one shape move of the brand's own to carry. Each goes in `shape` in product.json with its source.
+   A value the brand pass decided to fill a gap (brand.json provenance `decided`, or a radius off its
+   scale) counts only where the guidelines and the live work say nothing.
    Without this, every brand's product comes out looking like the last one.
-3. `$A product tokens`, then read the audit. Fix every fail at its cause; record every warning you
+3. `$A product fonts` when a face has no file in `product/fonts/`: it fetches what Google Fonts hosts,
+   with its licence, and records what the brand must supply. Then `$A product tokens`, and read the
+   audit. Fix every fail at its cause; record every warning you
    accept and why. The audit also lists each shape choice the kit made: measure what you can.
 4. Write the brand-to-product section: every departure from the brand book, with its reason, so
    nobody fixes the product back to the brand.

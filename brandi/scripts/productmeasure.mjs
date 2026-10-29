@@ -56,15 +56,20 @@ export const IN_PAGE = `(() => {
     .map((el) => { const own = radius(el); const wrap = el.parentElement && getComputedStyle(el.parentElement).overflow === 'hidden' ? radius(el.parentElement) : 0; return { ...item(el), radius: own || wrap }; });
   const bar = document.querySelector('header, [role=banner], nav, [role=navigation]');
   const shell = bar && seen(bar) ? (() => { const b = bar.getBoundingClientRect(); return { radius: radius(bar), w: Math.round(b.width), left: Math.round(b.left), top: Math.round(b.top), viewport: vw, tag: bar.tagName.toLowerCase() }; })() : null;
-  // Where --follow goes next: the site's own pages its navigation links to, each once, never a file or the page itself.
+  // Where --follow goes next: the site's own pages its navigation links to, then its footer, where a contact or
+  // careers page often sits. Each with its words, which can say the page holds a form. Never a file or the page itself.
   const here = location.href.split('#')[0];
-  const links = [...new Set([...document.querySelectorAll('header a[href], nav a[href], [role=banner] a[href], [role=navigation] a[href]')]
-    .map((a) => { try { const u = new URL(a.href); u.hash = ''; return u.origin === location.origin ? u.href : null; } catch { return null; } })
-    .filter((u) => u && u !== here && !/\\.(pdf|jpe?g|png|gif|svg|webp|zip|mp4)$/i.test(u)))];
+  const linksIn = (sel) => [...document.querySelectorAll(sel)]
+    .map((a) => { try { const u = new URL(a.href); u.hash = ''; return u.origin === location.origin ? { href: u.href, text: words(a) } : null; } catch { return null; } });
+  const links = [...linksIn('header a[href], nav a[href], [role=banner] a[href], [role=navigation] a[href]'), ...linksIn('footer a[href], [role=contentinfo] a[href]')]
+    .filter((l) => l && l.href !== here && !/\\.(pdf|jpe?g|png|gif|svg|webp|zip|mp4)$/i.test(l.href));
   return { url: location.href, press, control, card, frame, shell, frames, links };
 })()`;
 
-/** The value most of a family's elements share, and how many share it. */
+/**
+ * The value most of a family's elements share, and how many share it. The sort is stable, so a tie goes to the value
+ * met first: on a page, the first element's; across pages, the earliest page's.
+ */
 function mode(items) {
   const counts = new Map();
   for (const i of items) counts.set(i.radius, (counts.get(i.radius) ?? 0) + 1);
@@ -77,10 +82,12 @@ const px = (v) => (v === 'round' ? 'round' : `${v}px`);
 
 /**
  * Raw measurements of one page, or of several, into suggested families, each with the source line product.json wants.
- * Across pages each family takes the radius most of all its elements share, and the source line shows each page's
- * own, since one site's buttons were 6px on its home page, 10px on its contact page and 7px on its locations page.
- * A press whose radius reaches half its height is a pill. Nothing is suggested for a family no page showed. The shell
- * is the first page's. `frames` lists the frames from other sites the pages showed, which nothing here can read.
+ * Across pages each page votes once per family, with its own most common radius, and the family takes the value most
+ * pages agree on: counted by element, one page repeating a 7px link 111 times outvoted every other page's 6px. A tie
+ * goes to the page measured first among the tied (the --url pages in the order given, then the followed ones). The
+ * source line shows each page's own. A press whose radius reaches half its height is a pill. Nothing is suggested for
+ * a family no page showed. The shell is the first page's. `frames` lists the frames from other sites the pages showed,
+ * which nothing here can read.
  */
 export function summarise(input, { date = new Date() } = {}) {
   const raws = (Array.isArray(input) ? input : [input]).filter(Boolean);
@@ -94,14 +101,23 @@ export function summarise(input, { date = new Date() } = {}) {
   for (const family of ['press', 'control', 'card', 'frame']) {
     const pages = raws.map((r) => ({ url: r.url, items: (r[family] ?? []).map((i) => (family === 'press' && (i.radius === 'round' || (typeof i.radius === 'number' && i.radius >= i.h / 2 - 1)) ? { ...i, radius: 'pill' } : i)) }));
     const items = pages.flatMap((p) => p.items);
-    const m = mode(items);
-    if (!m) continue;
-    const rest = m.others.length ? `; the others ${m.others.map((o) => `${name(o.value)} x${o.count}`).join(', ')}` : '';
-    const spread = many ? ` By page: ${pages.filter((p) => p.items.length).map((p) => { const own = mode(p.items); return `${where(p.url)} ${name(own.value)} (${own.count} of ${p.items.length})`; }).join(', ')}.` : '';
-    families[family] = {
-      px: m.value === 'round' ? 'pill' : m.value,
-      source: `${many ? `${raw.url} and ${raws.length - 1} more ${raws.length === 2 ? 'page' : 'pages'}` : raw.url}, computed style on ${day}: ${m.count} of ${items.length} visible ${NOUNS[family]}${many ? ` across ${raws.length} pages` : ''} are ${m.value === 'pill' ? 'pills' : px(m.value)}${rest}.${spread}`,
-    };
+    if (!items.length) continue;
+    let m;
+    let said;
+    if (!many) {
+      m = mode(items);
+      const rest = m.others.length ? `; the others ${m.others.map((o) => `${name(o.value)} x${o.count}`).join(', ')}` : '';
+      said = `${raw.url}, computed style on ${day}: ${m.count} of ${items.length} visible ${NOUNS[family]} are ${m.value === 'pill' ? 'pills' : px(m.value)}${rest}.`;
+    } else {
+      const shown = pages.filter((p) => p.items.length).map((p) => ({ ...p, own: mode(p.items) }));
+      m = mode(shown.map((p) => ({ radius: p.own.value })));
+      const mostly = (v) => (v === 'pill' ? 'pills' : name(v));
+      const rest = m.others.map((o) => `, ${o.count} mostly ${mostly(o.value)}`).join('');
+      const tie = m.others.some((o) => o.count === m.count) ? '; a tie, settled by the page measured first' : '';
+      const spread = shown.map((p) => `${where(p.url)} ${name(p.own.value)} (${p.own.count} of ${p.items.length})`).join(', ');
+      said = `${raw.url} and ${raws.length - 1} more ${raws.length === 2 ? 'page' : 'pages'}, computed style on ${day}: ${m.count} of ${shown.length} ${shown.length === 1 ? 'page' : 'pages'} showing ${NOUNS[family]} ${m.count === 1 ? 'is' : 'are'} mostly ${mostly(m.value)}${rest}${tie}. By page: ${spread}.`;
+    }
+    families[family] = { px: m.value === 'round' ? 'pill' : m.value, source: said };
     if (families[family].px === 'pill' && family !== 'press') delete families[family];
   }
   const frames = raws.flatMap((r) => (r.frames ?? []).map((f) => ({ page: r.url, ...f })));
@@ -117,10 +133,44 @@ export function summarise(input, { date = new Date() } = {}) {
   return { families, shell, frames };
 }
 
+/** Words that say a page likely holds a form, in its link or its path: the brand's own fields are on pages like these. */
+const FORM_PAGE = /\b(contact|enquir\w*|inquir\w*|feedback|careers?|jobs?|sign[\s_-]?up|register|log[\s_-]?in|sign[\s_-]?in|account|cater\w*|franchis\w*|apply|bookings?|reserv\w*|subscribe|newsletter)\b/i;
+
+/**
+ * Which of a page's links --follow takes, each with why. The first n links were once all menu pages, and no field was
+ * measured. So one goes to a page likely to hold a form, then the rest are spread across the site: the links grouped
+ * by the first part of their path, one from each group in turn, in the order the page lists them. `skip` holds the
+ * pages already being measured.
+ */
+export function pickFollow(links, n, { skip = [] } = {}) {
+  const seen = new Set(skip);
+  const pool = links.filter((l) => !seen.has(l.href) && seen.add(l.href));
+  const pathOf = (l) => new URL(l.href).pathname;
+  const picked = [];
+  const form = n > 0 ? pool.find((l) => FORM_PAGE.test(l.text ?? '') || FORM_PAGE.test(pathOf(l))) : null;
+  if (form) picked.push({ url: form.href, why: `likely to hold a form: ${FORM_PAGE.test(form.text ?? '') ? `its link reads "${form.text}"` : `its path says ${pathOf(form)}`}` });
+  const groups = new Map();
+  for (const l of pool) {
+    if (l === form) continue;
+    const key = pathOf(l).split('/').filter(Boolean)[0] ?? '';
+    groups.set(key, [...(groups.get(key) ?? []), l]);
+  }
+  for (let round = 0; picked.length < n; round++) {
+    const row = [...groups].filter(([, g]) => g[round]);
+    if (!row.length) break;
+    for (const [key, g] of row.slice(0, n - picked.length)) {
+      const where = key ? `/${key}/` : 'the top level';
+      picked.push({ url: g[round].href, why: round === 0 ? `one page from ${where}${g.length > 1 ? `, the first of ${g.length} links there` : ''}` : `another page from ${where} (${round + 1} of ${g.length}), every section having given one` });
+    }
+  }
+  return picked;
+}
+
 /**
  * A small DevTools client over the installed Chrome: open each page in its own tab, wait for it to settle, run one
- * expression. One browser for every page. `follow` adds up to that many of the first page's navigation links, its
- * own site only, after the pages given. A page that fails is listed in `errors`, and the rest still run.
+ * expression. One browser for every page. `follow` adds up to that many of the first page's links, its own site only,
+ * after the pages given, as pickFollow chooses them; `followed` says which and why. A page that fails is listed in
+ * `errors`, and the rest still run.
  */
 export async function measurePages(urls, { follow = 0, chrome = findChrome(), settle = 2000, timeout = 45000, width = 1440, height = 1000 } = {}) {
   if (!chrome) throw new Error('No Chrome found. Install Google Chrome (or Chromium) to measure a live site; nothing else is needed.');
@@ -170,17 +220,21 @@ export async function measurePages(urls, { follow = 0, chrome = findChrome(), se
     const queue = [...new Set(urls.map((u) => { try { const x = new URL(u); x.hash = ''; return x.href; } catch { return u; } }))];
     const pages = [];
     const errors = [];
+    let followed = [];
     for (let i = 0; i < queue.length; i++) {
       try {
         const raw = await measure(queue[i]);
         pages.push(raw);
-        if (i === 0 && follow > 0) queue.push(...(raw.links ?? []).filter((l) => !queue.includes(l)).slice(0, follow));
+        if (i === 0 && follow > 0) {
+          followed = pickFollow(raw.links ?? [], follow, { skip: queue });
+          queue.push(...followed.map((f) => f.url));
+        }
       } catch (e) {
         errors.push({ url: queue[i], error: e.message });
       }
     }
     ws.close();
-    return { pages, errors };
+    return { pages, errors, followed };
   } finally {
     await kill();
   }
@@ -193,4 +247,4 @@ export async function measureSite(url, options = {}) {
   return pages[0];
 }
 
-export default { measurePages, measureSite, summarise, IN_PAGE };
+export default { measurePages, measureSite, summarise, pickFollow, IN_PAGE };
