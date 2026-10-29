@@ -227,6 +227,23 @@ export default {
       },
     },
     {
+      name: "Nothing in main escapes it: words for screen readers deep in a long page stay in main's scroll, so the shell never holds more than it shows",
+      async run({ page, expect }) {
+        const over = await page.evaluate(() => {
+          const shell = document.querySelector('[data-slot="app-shell"]')
+          const main = shell.querySelector('[data-slot="app-shell-main"]')
+          const tall = Object.assign(document.createElement("div"), { style: "height: 3000px" })
+          const words = Object.assign(document.createElement("span"), { className: "sr-only", textContent: "Up 21% on last Thursday" })
+          main.append(tall, words)
+          const extra = shell.scrollHeight - shell.clientHeight
+          tall.remove()
+          words.remove()
+          return extra
+        })
+        expect(over <= 4, `the shell holds ${over}px more than it shows`)
+      },
+    },
+    {
       name: "At 1100 every icon on the rail shows its words as a tooltip on keyboard focus, and keeps them in its name",
       example: "icons",
       async run({ page, scope, expect }) {

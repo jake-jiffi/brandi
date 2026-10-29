@@ -1185,6 +1185,10 @@ The frame of every product: a skip link, the canvas, the rail and the main colum
 - **Layout.** By its own width. The full rail from 1280px. Icons with tooltips from 1024 to 1279px.
   Under 1024px, a drawer behind a top bar with the menu button and the lockup. Under 640px, one
   column, touch-size controls, tables as lists, and the PageHeader's primary in a bar at the foot.
+- **Main holds what is in it.** `main` is the positioned box, so words for screen readers deep in a
+  long page (sr-only, which is positioned) scroll inside it. Under the shell's own box they escaped
+  main's scroll, the shell held 4,370px in an 844px phone frame, and Board sizes failed four boards
+  for content nobody could see.
 - **Behaviour.** "Skip to content" comes first and targets `main`. The open drawer holds focus: the
   page behind it is inert, a Close navigation button sits at its top, Escape and the scrim close it,
   and focus returns to the menu button. Scroll padding keeps focus clear of the phone action bar.

@@ -2445,6 +2445,22 @@
     "file": "skills/product-system/references/07-starter.md",
     "heading": "Generated, hand-written and example"
    }
+  },
+  {
+   "id": "L130",
+   "broke": "Words for screen readers deep in a long page were positioned against the shell rather than main, so they escaped main's scroll and Board sizes failed four phone boards for content nobody could see.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "AppShell",
+     "name": "Nothing in main escapes it: words for screen readers deep in a long page stay in main's scroll, so the shell never holds more than it shows"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "AppShell"
+   }
   }
  ]
 }

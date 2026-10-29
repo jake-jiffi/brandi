@@ -178,7 +178,9 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
             id={mainId}
             tabIndex={-1}
             data-slot="app-shell-main"
-            className="min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-10 focus-visible:outline-offset-[-2px] @max-[1280px]/shell:px-6 @max-[640px]/shell:px-4 @max-[640px]/shell:pt-4 @max-[640px]/shell:pb-6"
+            // Positioned, so words for screen readers deep in a long page (sr-only, positioned) scroll inside main: under
+            // the shell's own box they escaped main's scroll and the shell held 4,370px in an 844px phone frame.
+            className="relative min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-10 focus-visible:outline-offset-[-2px] @max-[1280px]/shell:px-6 @max-[640px]/shell:px-4 @max-[640px]/shell:pt-4 @max-[640px]/shell:pb-6"
           >
             {children}
           </main>
