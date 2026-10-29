@@ -1,5 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { copyFileSync, existsSync, symlinkSync } from 'node:fs';
 import { mkdtemp, mkdir, writeFile, readFile, readdir, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,13 @@ import * as B from '../scripts/productboards.mjs';
 import { buildProductTokens } from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
 import { artboard, validateCanvas } from '../scripts/canvas.mjs';
+import { KIT } from '../scripts/productstarter.mjs';
+import { findChrome } from '../scripts/preview.mjs';
+
+// Measuring runs the kit's measure-boards.mjs on its own node_modules (Playwright), which Brandi does not carry. Point
+// BRANDI_KIT_MODULES at an installed starter's node_modules to run it; without one it is skipped out loud.
+const KIT_MODULES = process.env.BRANDI_KIT_MODULES && path.resolve(process.env.BRANDI_KIT_MODULES);
+const needsKit = { skip: !KIT_MODULES || !existsSync(path.join(KIT_MODULES, 'playwright')) ? 'needs the kit\'s node_modules: set BRANDI_KIT_MODULES' : findChrome() ? false : 'no headless browser on this machine' };
 
 const tokens = buildProductTokens(buildSystem({ primary: '#1F6F4A', accents: ['#D9822B'], type: { display: 'Bitter', body: 'Karla' } }), { name: 'Acme product system' });
 const system = { name: 'Acme', namespace: 'acme', global: 'Acme', version: '1.0.0', lang: 'en-AU' };
@@ -220,6 +228,96 @@ describe('the boards a system generates for itself', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('generated rows that grow past the first authored row move it and its note below them, and say where authored rows start', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-rows-'));
+    const starter = path.join(dir, 'starter');
+    await mkdir(path.join(starter, 'system'), { recursive: true });
+    await mkdir(path.join(starter, 'components', 'system'), { recursive: true });
+    await mkdir(path.join(dir, 'canvas'), { recursive: true });
+    await writeFile(path.join(dir, 'tokens.json'), JSON.stringify(tokens));
+    await writeFile(path.join(starter, 'system', 'system.json'), JSON.stringify(system));
+    await writeFile(path.join(starter, 'components', 'system', 'button.def.mjs'), def('Button', 'Actions'));
+    await writeFile(path.join(dir, 'canvas', 'ConsoleHome1440.dc.html'), artboard({ name: 'ConsoleHome1440', system: 'acme', title: 'Home', body: '<x-import component-from-global-scope="Acme.Root"><p style="margin:0">Home</p></x-import>', preview: { width: 1440, height: 900 } }));
+    const place = (y) => writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify({ artboards: [{ file: 'ConsoleHome1440.dc.html', x: 0, y: y + 300, w: 1440, h: 900 }], annotations: [{ id: 'console', x: 0, y, text: 'Console · the working day', kind: 'title1', maxW: 1440 }] }));
+    // The note sits where the generated rows now end: only the board below it is clear of them.
+    await place(3000);
+    const ran = await B.writeBoards({ productDir: dir, starter, measure: false });
+    assert.ok(ran.generatedEnd > 3000, `the generated rows end at ${ran.generatedEnd}`);
+    assert.deepEqual(ran.ranInto, { top: 3000 }, 'the first authored row, its note included');
+    let manifest = JSON.parse(await readFile(path.join(dir, 'canvas', 'canvas.json'), 'utf8'));
+    assert.equal(manifest.annotations.find((n) => n.id === 'console').y, ran.authoredFrom, 'the note starts where authored rows start');
+    assert.equal(manifest.artboards.find((a) => a.file === 'ConsoleHome1440.dc.html').y, ran.authoredFrom + 300, 'and its board keeps its place under it');
+    assert.ok(ran.authoredFrom > ran.generatedEnd, 'with a gap after the generated rows');
+    // Far below the generated rows, authored rows stay where they are, and the start is still said.
+    await place(100000);
+    const clear = await B.writeBoards({ productDir: dir, starter, measure: false });
+    assert.equal(clear.ranInto, null);
+    assert.equal(clear.shifted, 0);
+    manifest = JSON.parse(await readFile(path.join(dir, 'canvas', 'canvas.json'), 'utf8'));
+    assert.equal(manifest.annotations.find((n) => n.id === 'console').y, 100000);
+    assert.equal(clear.authoredFrom, ran.authoredFrom);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("a frame is measured against its content: a page is never shorter than its device's window, and a frame off by more than a little is clipped or blank", () => {
+    assert.equal(B.deviceHeight(1440), 900);
+    assert.equal(B.deviceHeight(820), 1180);
+    assert.equal(B.deviceHeight(390), 844);
+    assert.equal(B.deviceHeight(600), 900, 'any other width opens in a desktop window');
+    assert.equal(B.wantedHeight({ measured: 600, width: 1440, fluid: true }), 900);
+    assert.equal(B.wantedHeight({ measured: 497, width: 600, fluid: false }), 497, 'a fixed board is as tall as what it holds');
+    assert.equal(B.wantedHeight({ measured: 1068, width: 1440, fluid: false }), 1068, 'a states board at 1440 too');
+    assert.equal(B.wantedHeight({ measured: 600, width: 390, fluid: false }), 844, "a fixed board at a phone's width is a phone's screen at least");
+    assert.equal(B.wantedHeight({ measured: 900, width: 820, fluid: false }), 1180, "and at a tablet's, a tablet's");
+    assert.equal(B.frameFit(900, 1460), 'clipped');
+    assert.equal(B.frameFit(900, 905), 'fits', 'a few pixels is rounding');
+    assert.equal(B.frameFit(2400, 1600), 'blank', 'a third blank');
+    assert.equal(B.frameFit(964, 916), 'fits', 'a strip a caption short');
+    assert.equal(B.frameFit(600, 497), 'blank');
+  });
+
+  test("a board's $preview height is rewritten in place, raw or entity-encoded, and a board with none says so", () => {
+    const raw = `<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":false},"$preview":{"width":1440,"height":900}}'>`;
+    assert.equal(B.withPreviewHeight(raw, 1460), raw.replace('"height":900', '"height":1460'));
+    const encoded = artboard({ name: 'ConsoleHome1440', body: '<p>x</p>', props: { note: "it's" }, preview: { width: 1440, height: 900 } });
+    const rewritten = B.withPreviewHeight(encoded, 1234);
+    assert.equal(rewritten.replace('1234', '900'), encoded, 'only the number changes');
+    assert.match(rewritten, /"\$preview":\{"width":1440,"height":1234\}|&quot;\$preview&quot;:\{&quot;width&quot;:1440,&quot;height&quot;:1234\}/);
+    assert.equal(B.withPreviewHeight('<x-dc><p>x</p></x-dc>', 900), null);
+  });
+
+  test('a board written taller moves the rows under it down by as much, once a row; nothing moves up', () => {
+    const manifest = {
+      artboards: [
+        { file: 'A1440.dc.html', x: 0, y: 0, w: 1440, h: 900 },
+        { file: 'A1440Dark.dc.html', x: 1560, y: 0, w: 1440, h: 900 },
+        { file: 'B1440.dc.html', x: 0, y: 1100, w: 1440, h: 900 },
+        { file: 'C390.dc.html', x: 1560, y: 1100, w: 390, h: 844 },
+        { file: 'D1440.dc.html', x: 0, y: 2500, w: 1440, h: 900 },
+      ],
+      annotations: [{ id: 'd', x: 0, y: 2200, text: 'D · its own section', kind: 'title1' }],
+    };
+    const { manifest: out, changed } = B.applyHeights(manifest, { 'A1440.dc.html': 1500, 'A1440Dark.dc.html': 1500, 'C390.dc.html': 700, 'B1440.dc.html': 1300 });
+    const at = (f) => out.artboards.find((a) => a.file === f);
+    assert.deepEqual([at('A1440.dc.html').h, at('B1440.dc.html').y, at('C390.dc.html').y], [1500, 1700, 1700], 'both twins grew 600: the row under moved 600, not 1200');
+    assert.equal(at('C390.dc.html').h, 700, 'a board that shrank keeps its place');
+    assert.equal(at('D1440.dc.html').y, 2500 + 600 + 400, 'and below it, both rows that grew');
+    assert.equal(out.annotations[0].y, 2200 + 600 + 400, 'a note moves with the row under it');
+    assert.deepEqual(changed.map((c) => `${c.file} ${c.from}>${c.to}`), ['A1440.dc.html 900>1500', 'A1440Dark.dc.html 900>1500', 'B1440.dc.html 900>1300', 'C390.dc.html 844>700']);
+    assert.equal(manifest.artboards[0].h, 900, 'the manifest given is left as it was');
+    const beside = B.applyHeights({ artboards: [
+      { file: 'Page1440.dc.html', x: 0, y: 0, w: 1440, h: 900 },
+      { file: 'Page390.dc.html', x: 1560, y: 0, w: 390, h: 844 },
+      { file: 'Next1440.dc.html', x: 0, y: 1100, w: 1440, h: 900 },
+    ] }, { 'Page390.dc.html': 880 });
+    assert.equal(beside.manifest.artboards[2].y, 1100, 'a board that grew and still ends above its taller neighbour moves nothing');
+    const paged = B.applyHeights({ artboards: [
+      { file: 'App390.dc.html', x: 0, y: 0, w: 390, h: 844, page: 'app' },
+      { file: 'Console1440.dc.html', x: 0, y: 1100, w: 1440, h: 900, page: 'console' },
+    ] }, { 'App390.dc.html': 1200 });
+    assert.equal(paged.manifest.artboards[1].y, 1100, 'a board on another page stays where it is');
+  });
+
   test('a dark twin imports its light board with the theme flipped', () => {
     const light = B.colourBoard(tokens, system);
     const t = B.twin(light, system, 2400);
@@ -266,6 +364,60 @@ describe('the boards a system generates for itself', () => {
     assert.equal(after.includes('.measure'), false, 'no measuring pages left in the canvas folder');
     assert.equal(after.includes('ComponentsStatus1440.dc.html'), false, 'a board for a group that no longer exists is removed');
     assert.ok(after.includes('ConsoleRosters1440.dc.html'));
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('with heights, each authored board is measured and written at its height, and the rows under it move down', needsKit, async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-heights-'));
+    const starter = path.join(dir, 'starter');
+    await mkdir(path.join(starter, 'system'), { recursive: true });
+    await mkdir(path.join(starter, 'components', 'system'), { recursive: true });
+    await mkdir(path.join(starter, 'tools'), { recursive: true });
+    copyFileSync(path.join(KIT, 'tools', 'measure-boards.mjs'), path.join(starter, 'tools', 'measure-boards.mjs'));
+    symlinkSync(KIT_MODULES, path.join(starter, 'node_modules'), 'dir');
+    await mkdir(path.join(dir, 'canvas'), { recursive: true });
+    await writeFile(path.join(dir, 'tokens.json'), JSON.stringify(tokens));
+    await writeFile(path.join(starter, 'system', 'system.json'), JSON.stringify(system));
+    await writeFile(path.join(starter, 'components', 'system', 'button.def.mjs'), def('Button', 'Actions'));
+    const board = (name, body, height) => artboard({ name, title: name, body, preview: { width: 1440, height } });
+    await writeFile(path.join(dir, 'canvas', 'ConsoleStates1440.dc.html'), board('ConsoleStates1440', '<div style="width: 1440px; height: 1234px;">Every state</div>', 900));
+    await writeFile(path.join(dir, 'canvas', 'ConsoleHome1440.dc.html'), board('ConsoleHome1440', '<div style="height: 300px;">A short page</div>', 900));
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify({ artboards: [
+      { file: 'ConsoleStates1440.dc.html', x: 0, y: 100000, w: 1440, h: 900 },
+      { file: 'ConsoleHome1440.dc.html', x: 0, y: 101100, w: 1440, h: 900, expand: 'fill' },
+    ] }));
+    const res = await B.writeBoards({ productDir: dir, starter, heights: true });
+    const manifest = JSON.parse(await readFile(path.join(dir, 'canvas', 'canvas.json'), 'utf8'));
+    const at = (f) => manifest.artboards.find((a) => a.file === f);
+    assert.equal(at('ConsoleStates1440.dc.html').h, 1234, 'as tall as what it holds');
+    assert.match(await readFile(path.join(dir, 'canvas', 'ConsoleStates1440.dc.html'), 'utf8'), /"height":1234/, 'its $preview says the same');
+    assert.equal(at('ConsoleHome1440.dc.html').h, 900, "a page is never shorter than its device's window");
+    assert.equal(at('ConsoleHome1440.dc.html').y, 101100 + 334, 'the row under the board that grew moved down by as much');
+    assert.deepEqual(res.heights, [{ file: 'ConsoleStates1440.dc.html', from: 900, to: 1234 }]);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("with heights and a starter whose measuring tool predates them, nothing is written and it says to refresh the kit", needsKit, async () => {
+    // The older tool measured a shell page as its window, whatever it held: writing what it says would set every page to 900.
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-heights-old-'));
+    const starter = path.join(dir, 'starter');
+    await mkdir(path.join(starter, 'system'), { recursive: true });
+    await mkdir(path.join(starter, 'components', 'system'), { recursive: true });
+    await mkdir(path.join(starter, 'tools'), { recursive: true });
+    await mkdir(path.join(starter, 'node_modules', 'playwright'), { recursive: true });
+    await writeFile(path.join(starter, 'tools', 'measure-boards.mjs'), 'import { readFileSync } from "node:fs";\nconst pages = JSON.parse(readFileSync(process.argv[3], "utf8"));\nconsole.log(JSON.stringify(Object.fromEntries([...pages.map((p) => [p.label, 900]), ["__sections", {}]])));\n');
+    await mkdir(path.join(dir, 'canvas'), { recursive: true });
+    await writeFile(path.join(dir, 'tokens.json'), JSON.stringify(tokens));
+    await writeFile(path.join(starter, 'system', 'system.json'), JSON.stringify(system));
+    await writeFile(path.join(starter, 'components', 'system', 'button.def.mjs'), def('Button', 'Actions'));
+    const source = artboard({ name: 'ConsoleStates1440', title: 'States', body: '<div style="height: 1234px;">Every state</div>', preview: { width: 1440, height: 1600 } });
+    await writeFile(path.join(dir, 'canvas', 'ConsoleStates1440.dc.html'), source);
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify({ artboards: [{ file: 'ConsoleStates1440.dc.html', x: 0, y: 100000, w: 1440, h: 1600 }] }));
+    const logged = [];
+    const res = await B.writeBoards({ productDir: dir, starter, heights: true, log: (l) => logged.push(l) });
+    assert.deepEqual(res.heights, []);
+    assert.match(res.heightsSkipped ?? '', /brandi product starter --kit/);
+    assert.equal(await readFile(path.join(dir, 'canvas', 'ConsoleStates1440.dc.html'), 'utf8'), source, 'the board is left as it was');
     await rm(dir, { recursive: true, force: true });
   });
 });

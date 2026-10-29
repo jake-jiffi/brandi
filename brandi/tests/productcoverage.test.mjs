@@ -47,6 +47,14 @@ describe('the canvas covers every surface the product ships on', () => {
     assert.deepEqual(cov.surfaces.map((s) => s.boards), [0, 1], 'AppStaff boards are not App boards, and Apples is not App');
   });
 
+  test('a surface says which modules drew options and which reused a written pattern, read from the option boards\' letters', () => {
+    const drawn = [...files, 'ConsoleRostersA1440.dc.html', 'ConsoleRostersB1440.dc.html', 'ConsoleRostersC1440.dc.html', 'ConsoleRostersD1440.dc.html', 'ConsoleRostersB1440Dark.dc.html', 'ConsoleMenuA1440.dc.html', 'ConsoleRostersStatesA1440.dc.html'];
+    const consoleSurface = canvasCoverage({ surfaces, files: drawn }).surfaces[0];
+    assert.deepEqual(consoleSurface.options, [{ module: 'Rosters', letters: ['A', 'B', 'C', 'D'] }]);
+    assert.deepEqual(consoleSurface.reused, ['Opening hours', 'Menu'], 'one lettered board is not a set of options');
+    assert.deepEqual(canvasCoverage({ surfaces, files: drawn }).surfaces[1].options, [], 'a surface with no modules has none to say');
+  });
+
   test('two surfaces with one prefix are reported, since each would count the other\'s boards', () => {
     const cov = canvasCoverage({ surfaces: [{ name: 'A', boards: 'Console', widths: [1440] }, { name: 'B', boards: 'Console', widths: [1440] }], files: ['ConsoleHome1440.dc.html'] });
     assert.deepEqual(cov.surfaces[1].missing, ['its prefix Console is also A\'s: give each surface its own boards prefix']);
@@ -80,6 +88,13 @@ describe('coverage as a gate', () => {
     const md = roundMarkdown(g, judged);
     assert.match(md, /## Coverage\n\n- Ops console \(Console\*, 7 boards\): no states board for the Menu module/);
     assert.match(md, /- Staff app \(Staff\*, 1 board\): covered at 390\n/);
+  });
+
+  test('the record says, surface by surface, which modules drew options A to D and which reused a written pattern', () => {
+    const g = clean();
+    g.coverage = canvasCoverage({ surfaces: surfaces.slice(0, 1), files: [...files, 'ConsoleMenuStates1440.dc.html', ...['A', 'B', 'C', 'D'].map((l) => `ConsoleOpeningHours${l}1440.dc.html`)] });
+    const md = roundMarkdown(g, judgeRound(g));
+    assert.match(md, /- Ops console \(Console\*, 12 boards\): covered at 1440, 820, 390, with a states board for Rosters, Opening hours, Menu; options A to D for Opening hours; a written pattern reused for Rosters, Menu\n/);
   });
 
   test('a covered canvas passes, and a round from before the gate has no line for it', () => {

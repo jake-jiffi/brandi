@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 
-import { axeGate, judgeRound, roundMarkdown, publishedSection, findDetector, collectPages, runDetector, reflowPages, BAR, WIDTHS, REFLOW_WIDTH } from '../scripts/productgates.mjs';
+import { axeGate, judgeRound, roundMarkdown, publishedSection, findDetector, collectPages, runDetector, reflowPages, sizeGate, BAR, WIDTHS, REFLOW_WIDTH, MACHINE_GATES } from '../scripts/productgates.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 
@@ -141,6 +141,55 @@ describe('a round held against the bar', () => {
     assert.equal(judgeRound(clean()).verdicts.some((v) => v.gate === 'Canvas runtime'), false, 'a round from before the gate has no line for it');
   });
 
+  test("the gates' printed summary carries every machine gate the round judges, the canvas runtime and board sizes included", () => {
+    const g = clean();
+    g.runtime = { boards: 1, failed: [] };
+    g.sizes = { boards: 1, off: [], clipped: [], errors: [] };
+    g.coverage = { covered: true, surfaces: [] };
+    const machine = judgeRound(g).verdicts.map((v) => v.gate).filter((gate) => !['Craft', 'Rules'].includes(gate));
+    assert.deepEqual(machine.filter((gate) => !MACHINE_GATES.includes(gate)), [], 'a verdict the summary would leave out');
+    assert.ok(MACHINE_GATES.includes('Canvas runtime'));
+  });
+
+  test("every board's frame is held to its content, and a box that hides content fails the round, each named in the record", () => {
+    const measured = {
+      ConsoleHome1440: 1460, ConsoleSignIn1440: 700, MessagingReady600: 497, AppCheckout390: 844, ConsoleStates1440: 1878, Broken1440: { error: 'the board did not render: boom' },
+      __sections: {}, __clipped: { AppCheckout390: [{ what: 'card', shown: 327, content: 371, text: '[Northside], pick-up' }] },
+    };
+    const boards = [
+      { label: 'ConsoleHome1440', width: 1440, declared: 900, fluid: true },
+      { label: 'ConsoleSignIn1440', width: 1440, declared: 900, fluid: true },
+      { label: 'MessagingReady600', width: 600, declared: 600, fluid: false },
+      { label: 'AppCheckout390', width: 390, declared: 844, fluid: false },
+      { label: 'ConsoleStates1440', width: 1440, declared: 1878, fluid: false },
+      { label: 'Broken1440', width: 1440, declared: 900, fluid: false },
+    ];
+    const sizes = sizeGate({ measured, boards });
+    assert.deepEqual(sizes.off, [
+      { board: 'ConsoleHome1440', declared: 900, want: 1460, fit: 'clipped' },
+      { board: 'MessagingReady600', declared: 600, want: 497, fit: 'blank' },
+    ], 'a page under its window is held to the window, not to its content');
+    assert.deepEqual(sizes.heights, { ConsoleHome1440: 1460, ConsoleSignIn1440: 900, MessagingReady600: 497, AppCheckout390: 844, ConsoleStates1440: 1878 });
+    assert.deepEqual(sizes.errors, [{ board: 'Broken1440', error: 'the board did not render: boom' }]);
+    const g = clean();
+    g.sizes = sizes;
+    const judged = judgeRound(g);
+    const verdict = judged.verdicts.find((v) => v.gate === 'Board sizes');
+    assert.equal(verdict.pass, false);
+    assert.equal(verdict.detail, '2 of 6 frames off their content (1 clipped, 1 blank); 1 board hides content in a box that clips it; 1 not measured');
+    const md = roundMarkdown(g, judged);
+    assert.match(md, /## Board sizes\n/);
+    assert.match(md, /- ConsoleHome1440: frame 900px, content 1460px \(clipped\)/);
+    assert.match(md, /- AppCheckout390: card "\[Northside\], pick-up" shows 327px of 371px/);
+    assert.match(md, /- Broken1440: not measured \(the board did not render: boom\)/);
+    assert.match(md, /brandi product boards --heights/);
+    g.sizes = sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {} }, boards: boards.filter((b) => b.label === 'ConsoleStates1440') });
+    assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').pass, true);
+    assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').detail, 'every frame fits its content on 1 board, and nothing on a board hides its own content');
+    assert.match(sizeGate({ measured: { ConsoleStates1440: 1878, __sections: {} }, boards }).skipped, /measure-boards\.mjs.*--kit/, "a starter's older tool says to refresh the kit");
+    assert.equal(judgeRound(clean()).verdicts.some((v) => v.gate === 'Board sizes'), false, 'a round from before the gate has no line for it');
+  });
+
   test('the record lists every shape and shell choice the kit made, not the brand, and says so when there are none', () => {
     const g = clean();
     g.shape = { kitDefaults: [{ choice: 'radius-lg', value: '16px', how: "the brand scale's xl step, held to the card radius (16px)" }, { choice: 'moves', value: 'none', how: "no shape move of the brand's own is carried into the product" }] };
@@ -214,12 +263,31 @@ describe('what the round record holds about the reviews', () => {
     assert.match(md, /## Still open\n\n- Craft P3: Title clipped at 390\. Owner: Sam\.\n- Craft P3: Tight gap in the rail\. Owner: none named\.\n- Rules Low: Long label wraps\. Owner: Jo\.\n/);
   });
 
+  test('a heuristic under 4 carries a note naming what cost the point, printed beside its score; the Craft line names any without one', () => {
+    // A run scored five heuristics 3 of 4 with no reason for any: nobody could tell where the points went, or what
+    // the next round should fix.
+    const c = reviewed().critique;
+    c.heuristics[7].note = 'AcmeHome390 | the title clipped at 390 (C1)';
+    c.heuristics[8].note = '  ';
+    const judged = judgeRound(clean(), { critique: c, rules: rules([]) });
+    const craft = judged.verdicts.find((v) => v.gate === 'Craft');
+    assert.equal(craft.pass, true, 'a missing note is reported, as a finding missing its fields is, and fails nothing');
+    assert.match(craft.detail, /; under 4 with no note on what cost the point: H9, H10$/);
+    const md = roundMarkdown(clean(), judged, { critique: c });
+    assert.match(md, /\| Heuristic \| Score \| What cost the point \|\n\| --- \| --- \| --- \|\n\| H1 \| 4 \|  \|\n/);
+    assert.match(md, /\| H8 \| 3 \| AcmeHome390 \\\| the title clipped at 390 \(C1\) \|\n\| H9 \| 3 \|  \|/);
+    for (const h of c.heuristics) h.note ??= 'evidence';
+    c.heuristics[8].note = 'ConsoleRosters1440: the approve button sits below the fold (C3)';
+    assert.doesNotMatch(judgeRound(clean(), { critique: c, rules: rules([]) }).verdicts.find((v) => v.gate === 'Craft').detail, /no note/, 'nothing said when every score under 4 has its note');
+  });
+
   test('a record written before these fields still judges and prints as it did', () => {
     const c = critique(scores, [{ severity: 'P2', title: 'Old finding', status: 'fixed' }]);
     const judged = judgeRound(clean(), { critique: c, rules: rules([]) });
     assert.equal(judged.met, true);
     const md = roundMarkdown(clean(), judged, { critique: c, rules: rules([]) });
     assert.match(md, /\n- P2: Old finding \(fixed\)\n/);
+    assert.match(md, /\| Heuristic \| Score \|\n\| --- \| --- \|\n/, 'the scores table keeps its two columns when no heuristic has a note');
     assert.doesNotMatch(md, /How it ran/);
     assert.match(md, /## Accepted deviations\n\nNone\.\n/);
     assert.match(md, /## Still open\n\nNothing\.\n/);
@@ -538,5 +606,167 @@ describe('axe on a form that leaves a required field to the browser', () => {
     const found = run.result('/elsewhere').violations.find((v) => v.id === 'form-without-novalidate');
     assert.deepEqual(found.nodes, ['form#far (required: Email)'], 'a field tied to the form from outside it counts');
     for (const p of ['/novalidate', '/optional', '/no-form']) assert.equal(run.ids(p).includes('form-without-novalidate'), false, p);
+  });
+});
+
+/** Serves `page(path)`'s HTML on a local port, runs the kit's measure-boards.mjs on the pages `list(base)` gives, and returns what it prints. */
+async function measureOn(page, list) {
+  const server = createServer((req, res) => {
+    const html = page(req.url);
+    if (html === null) return res.writeHead(404).end();
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(html);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-measure-'));
+  await mkdir(path.join(dir, 'tools'));
+  copyFileSync(path.join(KIT, 'tools', 'measure-boards.mjs'), path.join(dir, 'tools', 'measure-boards.mjs'));
+  symlinkSync(KIT_MODULES, path.join(dir, 'node_modules'), 'dir');
+  await writeFile(path.join(dir, 'pages.json'), JSON.stringify(list(`http://127.0.0.1:${server.address().port}`)));
+  const out = await new Promise((resolve) => {
+    const child = spawn(process.execPath, ['tools/measure-boards.mjs', '--pages', 'pages.json'], { cwd: dir });
+    let text = '';
+    child.stdout.on('data', (d) => { text += d; });
+    child.stderr.on('data', (d) => { text += d; });
+    child.on('close', () => resolve(text));
+  });
+  server.close();
+  await rm(dir, { recursive: true, force: true });
+  try { return JSON.parse(out.trim().split('\n').pop()); } catch { throw new Error(`measure-boards printed no result:\n${out}`); }
+}
+
+const boardPage = (body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A board</title><style>body { margin: 0; } p { margin: 0; line-height: 20px; }</style></head><body><div data-dc-root>${body}</div><script>setTimeout(() => document.documentElement.setAttribute("data-dc-ready", ""), 100)</script></body></html>`;
+const lines = (n, word = 'Line') => Array.from({ length: n }, (_, i) => `<p>${word} ${i + 1}</p>`).join('');
+
+describe('a board that hides its own content', () => {
+  // A phone frame drawn as a flex column with main scrolling let two Cards shrink: a flex item that clips may shrink
+  // below its content, so the checkout's total was cut off inside its card and no gate said so.
+  const card = (n, last) => `<section data-slot="card" style="overflow: hidden; border: 1px solid; padding: 12px;">${lines(n)}<p>${last}</p></section>`;
+  const phone = (inner) => `<div style="width: 390px; height: 400px; display: flex; flex-direction: column; overflow: hidden;"><header style="height: 56px;">Your booking</header>${inner}<nav style="height: 56px;">Tabs</nav></div>`;
+  const pages = {
+    '/squeezed': phone(`<main style="flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px;">${card(8, 'Total $42.00')}${card(8, 'Pay with')}</main>`),
+    '/block': phone(`<main style="flex: 1; overflow: auto; padding: 16px;"><div style="display: flex; flex-direction: column; gap: 16px;">${card(8, 'Total $42.00')}${card(8, 'Pay with')}</div></main>`),
+    '/clip': `<div style="height: 60px; overflow: clip;">${lines(6)}</div>`,
+    '/allowed': [
+      `<p style="width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${'A very long name '.repeat(6)}</p>`,
+      `<p style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 120px;">${'A very long description '.repeat(10)}</p>`,
+      `<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">${lines(4)}</span>`,
+      `<div style="height: 80px; overflow: auto;">${lines(10)}</div>`,
+      `<div style="position: relative; height: 200px;"><div data-slot="combobox-panel" style="position: absolute; top: 0; max-height: 80px; overflow: hidden;">${lines(10, 'Option')}</div></div>`,
+      `<div style="position: relative; height: 200px;"><div aria-hidden="true" inert style="position: relative; height: 100px; overflow: hidden;"><div style="height: 100px; overflow: hidden;">${lines(10)}</div></div></div>`,
+    ].join(''),
+  };
+  let out;
+  before(async () => {
+    if (needsKit.skip) return;
+    out = await measureOn((url) => (pages[url] ? boardPage(pages[url]) : null), (base) => Object.keys(pages).map((p) => ({ url: `${base}${p}`, label: p, width: 390, height: 844, frame: { w: 390, h: 844 } })));
+  });
+
+  test('a box that clips content taller than itself is named, with how much of it shows', needsKit, () => {
+    const squeezed = out.__clipped['/squeezed'];
+    assert.equal(squeezed?.length, 2, JSON.stringify(out.__clipped));
+    assert.equal(squeezed[0].what, 'card');
+    assert.ok(squeezed[0].shown < squeezed[0].content, 'it shows less than it holds');
+    assert.match(squeezed[0].text, /^Line 1/);
+    assert.equal(out.__clipped['/clip']?.length, 1, 'overflow: clip clips too');
+  });
+
+  test('the phone frame with a plain block in its main holds its cards at their height, and truncation, scrolling, the visually hidden, an overlay drawn open and a page under a scrim are left alone', needsKit, () => {
+    assert.equal(out.__clipped['/block'], undefined, JSON.stringify(out.__clipped['/block']));
+    assert.equal(out.__clipped['/allowed'], undefined, JSON.stringify(out.__clipped['/allowed']));
+  });
+});
+
+describe('the height a board is measured at', () => {
+  // A shell fills the window and its main scrolls, so a shell page measured the window (900) whatever it held, and
+  // boards were left clipped or a third blank. The whole page is the shell's bars plus main's full scroll height.
+  const shell = (content) => `<div data-slot="app-shell" style="height: 100dvh; display: flex; overflow: hidden;"><div style="flex: 1; min-height: 0; display: flex; flex-direction: column;"><div style="height: 56px; flex-shrink: 0;">Top bar</div><main data-slot="app-shell-main" style="flex: 1; min-height: 0; overflow-y: auto;"><div style="height: ${content}px;">Page</div></main></div></div>`;
+  const pages = {
+    '/long': shell(1500),
+    '/short': shell(300),
+    '/email': '<div style="width: 600px; height: 497px;">An email</div>',
+    '/framed': `<div style="width: 390px; height: 844px; overflow: auto;">${shell(1500)}</div>`,
+    '/dialog': '<div style="position: absolute; inset: 0; overflow: hidden;"><p>A dialog over its page</p></div>',
+    // Main's content keeps a window's height of its own and adds a footer under it, so main always scrolls by the
+    // footer: growing the window does not help, and the page is measured once grown, not four times.
+    '/scaling': shell(0).replace('<div style="height: 0px;">Page</div>', '<div style="min-height: 100%;">Page</div><div style="height: 200px;">Footer</div>'),
+  };
+  let out;
+  before(async () => {
+    if (needsKit.skip) return;
+    out = await measureOn((url) => (pages[url] ? boardPage(pages[url]) : null), (base) => Object.keys(pages).map((p) => ({ url: `${base}${p}`, label: p, width: p === '/email' ? 600 : 1440, height: p === '/framed' ? 844 : 900 })));
+  });
+
+  test("a shell page measures its bars plus main's whole scroll height, and never less than the window", needsKit, () => {
+    assert.equal(out['/long'], 1556);
+    assert.equal(out['/short'], 900);
+    assert.equal(out['/scaling'], 1100, 'a page whose content grows with the window is grown once');
+  });
+
+  test('a board with a height of its own measures that height, a shell framed inside one included, and a board with none is still measured', needsKit, () => {
+    assert.equal(out['/email'], 497);
+    assert.equal(out['/framed'], 844);
+    assert.equal(typeof out['/dialog'], 'number', JSON.stringify(out['/dialog']));
+  });
+});
+
+describe('axe on a value drawn as text', () => {
+  // A text node that is one hole draws its value as it is, an element included. Two holes in one text node, or a
+  // hole with words beside it, are joined as a string, and an element in either reads "[object Object]". A board
+  // showed "[object Object][object Object]" where a week and a save row belonged, and every gate passed it.
+  const pages = {
+    '/joined': '<div>[object Object][object Object]</div>',
+    '/attribute': '<button aria-label="Save [object Object]">Save</button>',
+    '/script': '<p>Fine.</p><script type="text/x-dc">const said = "[object Object]";</script>',
+    '/clean': '<p>Week of 3 November</p><button>Save</button>',
+  };
+  let run;
+  before(async () => {
+    if (needsKit.skip) return;
+    run = await axePagesOn(
+      (url) => (pages[url] ? pageOf(`<h1>A board</h1>${pages[url]}`) : null),
+      (base) => Object.keys(pages).map((p) => ({ kind: 'board', label: p, url: `${base}${p}`, width: 1440, height: 900, theme: 'light' }))
+    );
+  });
+
+  test('a board whose text or an attribute reads [object Object] fails, naming where; a script or a clean page does not', needsKit, () => {
+    const found = (label) => run.result(label).violations.find((v) => v.id === 'object-as-text');
+    assert.deepEqual(found('/joined')?.nodes, ['div: [object Object][object Object]']);
+    assert.deepEqual(found('/attribute')?.nodes, ['button aria-label="Save [object Object]"']);
+    assert.equal(found('/script'), undefined, 'a script is not text on the board');
+    assert.equal(found('/clean'), undefined);
+  });
+});
+
+describe('axe on a states strip of phone frames', () => {
+  // One device frame per state (06-canvas.md, section 3) puts a top bar's header in every frame: at the top level each
+  // is a banner, and the strip's title and captions sit outside every landmark. A run's strip failed axe on 65 region
+  // nodes and 4 duplicate banners. Each frame in a <section aria-label>, and the title in the strip's own header, is
+  // the markup 06 gives: a header inside a section is no banner.
+  const frame = (state, wrap) => {
+    const inner = `<div style="height: 64px;"><h2>${state}</h2><p>Say what to do next.</p></div>
+<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden;">
+<header style="height: 56px;"><a href="#">Back</a> Your booking</header>
+<main style="flex: 1; overflow: auto; padding: 16px;"><div style="display: flex; flex-direction: column; gap: 16px;"><p>${state}.</p></div></main>
+<nav aria-label="App"><a href="#">Home</a> <a href="#">Menu</a></nav>
+</div>`;
+    return wrap ? `<section aria-label="${state}" style="width: 390px;">${inner}</section>` : `<div style="width: 390px;">${inner}</div>`;
+  };
+  const states = ['Bookings, nothing yet', 'Bookings, loading', 'Payment, card declined'];
+  const strip = (wrap) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Booking states</title></head><body style="margin: 0;"><div style="display: flex; flex-direction: column;">
+${wrap ? '<header style="height: 48px;"><h1>App · Bookings, states</h1></header>' : '<h1>App · Bookings, states</h1>'}
+<div style="display: flex; gap: 40px;">${states.map((s) => frame(s, wrap)).join('\n')}</div></div></body></html>`;
+  let run;
+  before(async () => {
+    if (needsKit.skip) return;
+    run = await axePagesOn(
+      (url) => (url === '/strip' ? strip(true) : url === '/bare' ? strip(false) : null),
+      (base) => ['/strip', '/bare'].map((p) => ({ kind: 'board', label: p, url: `${base}${p}`, width: 1310, height: 964, theme: 'light' }))
+    );
+  });
+
+  test('frames in labelled sections under a header pass; bare frames fail on region and duplicate banners', needsKit, () => {
+    assert.deepEqual(run.ids('/strip'), [], JSON.stringify(run.result('/strip').violations));
+    assert.ok(run.ids('/bare').includes('region'), run.ids('/bare').join(', '));
+    assert.ok(run.ids('/bare').includes('landmark-no-duplicate-banner'), run.ids('/bare').join(', '));
   });
 });

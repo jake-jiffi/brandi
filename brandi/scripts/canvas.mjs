@@ -649,7 +649,7 @@ export function findOverlaps(manifest, { chromeTop = 56 } = {}) {
  * Returns `{ok, errors, warnings}`. Errors mean the artboard will not render
  * correctly. Warnings mean it will render, and look generic.
  */
-export function validateArtboard(source, { name = 'artboard', allowFonts = true, brandFonts = [], systems = [] } = {}) {
+export function validateArtboard(source, { name = 'artboard', allowFonts = true, brandFonts = [], systems = [], stylesheets } = {}) {
   const errors = [];
   const warnings = [];
   const err = (m, fix) => errors.push({ message: m, fix });
@@ -905,6 +905,16 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     );
   }
 
+  // A class with no rule in what the board loads does nothing, and nothing says so: the system's bundle holds only
+  // the Tailwind classes the kit's own components use, so a board's @min-[900px]:grid-cols-3 fell to one column.
+  const unbuilt = stylesheets ? classesWithoutRule(source, stylesheets) : null;
+  if (unbuilt?.length) {
+    warn(
+      `${unbuilt.slice(0, 8).join(', ')}${unbuilt.length > 8 ? ` and ${unbuilt.length - 8} more` : ''} in ${name} ${unbuilt.length === 1 ? 'matches' : 'each match'} no rule in the stylesheets it loads or its own style, so ${unbuilt.length === 1 ? 'it does' : 'they do'} nothing: the system's bundle holds only the Tailwind classes its own components use.`,
+      'Write the layout as an inline style or a rule in the board\'s helmet <style> (a media or container query there needs !important to beat an inline style), or use a class the bundle has.',
+    );
+  }
+
   // On the canvas a board runs in a frame whose parent is another origin, and reading a property of that parent
   // throws. A script that walks window's properties reads it, so it breaks there and nowhere a preview runs.
   const scripts = [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n');
@@ -993,11 +1003,47 @@ export function miscasedAttributes(source) {
   return found;
 }
 
+/** The stylesheets a board loads from its own folder, by href, in the order it loads them. Fonts from Google are not its own. */
+export function localStylesheets(source) {
+  return [...String(source).matchAll(/<link\b[^>]*>/gi)]
+    .filter((m) => /\brel\s*=\s*["']?stylesheet/i.test(m[0]))
+    .map((m) => /\bhref\s*=\s*"([^"]*)"/i.exec(m[0])?.[1])
+    .filter((href) => href && !/^[a-z]+:|^\/\//i.test(href));
+}
+
+// CSS.escape, which is what Tailwind escapes a class name with: `md:flex` is written `.md\:flex`.
+const cssEscape = (name) => [...name].map((ch, i) => {
+  const code = ch.codePointAt(0);
+  if ((code >= 1 && code <= 31) || code === 127 || (/\d/.test(ch) && (i === 0 || (i === 1 && name[0] === '-')))) return `\\${code.toString(16)} `;
+  if (i === 0 && ch === '-' && name.length === 1) return '\\-';
+  return code >= 128 || /[\w-]/.test(ch) ? ch : `\\${ch}`;
+}).join('');
+
+/**
+ * The classes in a board's markup that no rule in what it loads selects: its own folder's stylesheets
+ * (`stylesheets`, href to text, as the caller read them) and its own <style> blocks. Null when the board loads no
+ * installed system (`ds/`), or a stylesheet the caller could not read: then nothing can be said. A class from a hole
+ * is left alone, and so are scripts and comments.
+ */
+export function classesWithoutRule(source, stylesheets) {
+  const hrefs = localStylesheets(source);
+  if (!hrefs.some((h) => /(^|\/)ds\//.test(h)) || hrefs.some((h) => typeof stylesheets?.[h] !== 'string')) return null;
+  const css = [...hrefs.map((h) => stylesheets[h]), ...[...String(source).matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)].map((m) => m[1])].join('\n');
+  const markup = String(source).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>|<!--[\s\S]*?-->/gi, '');
+  const classes = new Set();
+  for (const m of markup.matchAll(/\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/gi)) {
+    for (const c of (m[1] ?? m[2]).replace(/\{\{[^}]*\}\}/g, ' ').split(/\s+/)) if (c && !c.includes('{{') && !c.includes('}}')) classes.add(c);
+  }
+  // The selector, followed by anything that cannot carry on the name: `.gap` is not `.gap-3`, and `.md` is not `.md\:flex`.
+  const selects = (c) => new RegExp(`\\.${cssEscape(c).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-]|\\\\)`).test(css);
+  return [...classes].filter((c) => !selects(c));
+}
+
 /** Validate a whole set at once, plus the manifest that lays them out. */
-export function validateCanvas({ artboards, manifest, brandFonts = [], systems = [] }) {
+export function validateCanvas({ artboards, manifest, brandFonts = [], systems = [], stylesheets }) {
   const recorded = [...new Set([...systems, ...(manifest?.designSystems ?? []).map((d) => d.namespace)])];
   const results = artboards.map(({ file, source }) =>
-    validateArtboard(source, { name: file, brandFonts, systems: recorded }),
+    validateArtboard(source, { name: file, brandFonts, systems: recorded, stylesheets }),
   );
   const errors = results.flatMap((r) => r.errors.map((e) => ({ file: r.name, ...e })));
   const warnings = results.flatMap((r) => r.warnings.map((w) => ({ file: r.name, ...w })));
@@ -1052,7 +1098,7 @@ export function validateCanvas({ artboards, manifest, brandFonts = [], systems =
 }
 
 export default {
-  artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding, FRAME_LIMIT, inertWithoutIgnore,
+  artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding, FRAME_LIMIT, inertWithoutIgnore, localStylesheets, classesWithoutRule,
   forDesignCanvas, designIndex, encodeProps, decodeProps, FRAMES, BANNED_FONTS, DEFAULT_FONTS,
   systemHeadLines, checkSystemRecord, NAMESPACE_RE,
 };
