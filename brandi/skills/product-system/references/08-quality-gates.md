@@ -178,7 +178,9 @@ isolation was procedural.
 Set guardrails and the bar, and leave room to think. Every brief carries:
 
 - **The role and its skill.** Read that skill's instructions and references first (for Impeccable:
-  critique, audit, the craft floor and Operate mode; for ui-ux-pro-max: its rules by domain and stack).
+  critique, audit, the craft floor and Operate mode; for ui-ux-pro-max: its rules by domain and stack,
+  searched with the installed skill's own `scripts/search.py` as its instructions say. That script
+  imports from its own folder, so Python's isolated mode (`python3 -I`) stops it).
 - **The bar, and the system's own rules to judge against** (the README and the relevant sections).
 - **Where everything is:** component pages in both themes, the starter's routes and their port, the
   canvas boards and their port, the source folders, and which board widths are fluid and which fixed.
