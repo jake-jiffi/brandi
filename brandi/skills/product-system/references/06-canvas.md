@@ -573,7 +573,12 @@ are solved too. It reports any pair that fails under the direction's name, and w
   `color-mix` passed drift but no longer carried the solved values. The class carries them.
 - **List every direction that moves a role, today's included.** After the pick, its roles go into
   `roles` and `directions` stays. The picked direction's class then holds nothing, and the others
-  still draw as they did, so the concept boards keep their look.
+  still draw as they did, so the concept boards keep their look. Take the picked one's class off its
+  boards: with no rule it does nothing, and `$A validate` warns that it matches none.
+- **A direction that fails is a finding, not a board.** Its pairs count toward the Tokens gate, so a
+  direction whose roles fail the audit cannot stay listed. Show the person the measurement (the
+  brand's own orange as the primary measured 2.92:1 on the surface), drop it from `directions`, and
+  record it under `decisions` with its ratio, so the next run does not try it again.
 - **The values live in `tokens.json`, as `directions` in its `meta`,** which the Design System page
   does not read. Every family it reads stays a `{ "tokens": [...] }` list. The drift check reports a
   `direction-` class on a board that no direction makes.

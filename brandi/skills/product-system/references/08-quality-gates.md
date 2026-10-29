@@ -92,7 +92,7 @@ Every fix that mattered gets a scripted check, so it cannot quietly regress.
 
 **Plan for the time.** Give the first full `$A product gates` of a run up to 90 minutes, and each
 later one about 30: one run's first round took 86 minutes for 539 renders, and its next two 27
-minutes each for the same renders. The trait loop (`09-operate.md`) takes about 8 minutes a trait.
+minutes each for the same renders; a later run's three took 25, 26 and 33 minutes for about 500. The trait loop (`09-operate.md`) takes about 8 minutes a trait.
 Run nothing else that drives Chrome beside either: other browser work beside the gates makes checks
 flaky, and a scripted check that passed the rounds before it failed once on the same kit. Start the
 gates, then do work that needs no browser (the written system, the reviewer briefs, the fix plan),

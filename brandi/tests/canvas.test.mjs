@@ -1115,6 +1115,11 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     assert.match(String(refused.out), /load the design system from ds\/acme\/, and this publish installs no system there/);
     assert.match(String(refused.out), /--system <its url>/);
     assert.equal(existsSync(path.join(dir, 'product', '.publish')), false, 'nothing written');
+    // A Design System is a claude.ai artifact: a path or a typo installs nothing on the canvas.
+    const wrong = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'product/.publish/ds', '--system-version', 'v7']);
+    assert.notEqual(wrong.code, 0);
+    assert.match(String(wrong.out), /artifact must be the system's address cut after its id/);
+    assert.equal(existsSync(path.join(dir, 'product', '.publish')), false, 'still nothing written');
     const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7']);
     assert.equal(code, 0, String(out));
     assert.ok(out.root.endsWith(path.join('product', '.publish', 'acme-product-canvas')), out.root);
