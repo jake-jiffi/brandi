@@ -64,7 +64,7 @@ describe('the Design System artifact, assembled', () => {
     const index = JSON.parse(await readFile(path.join(out, 'project', 'design-system.json'), 'utf8'));
     assert.equal(index.namespace, 'Acme');
     assert.deepEqual(index.libraries, [{ name: 'react', version: '18' }, { name: 'react-dom', version: '18' }]);
-    assert.deepEqual(index.groups, ['Logos']);
+    assert.deepEqual(index.groups, ['Logos', 'Licences'], 'every system carries its Licences group');
 
     const again = assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system', blobs: { 'Logos/mark.svg': { id: 'abc123', size: 42, type: 'image/svg+xml' } } });
     assert.deepEqual(again.uploads, []);
@@ -80,6 +80,32 @@ describe('the Design System artifact, assembled', () => {
     await writeFile(path.join(dir, 'docs', '2-screens.md'), '# Screens\n');
     const res = assembleDesignSystem({ productDir: dir, starter, outDir: path.join(dir, '.publish', 'ds'), title: 'Acme product system' });
     assert.deepEqual(res.files.slice(0, 4), ['README.md', '1-writing.md', '2-screens.md', '10-operating.md']);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('the Licences group lists every face and the icon set with its licence, carries the texts, and names a face with none', async () => {
+    const { dir, starter } = await product();
+    // product fonts records each face's licence in product.json and fetches its text beside the face.
+    await mkdir(path.join(dir, 'fonts'));
+    await writeFile(path.join(dir, 'fonts', 'bitter.woff2'), Buffer.alloc(8));
+    await writeFile(path.join(dir, 'fonts', 'bitter-OFL.txt'), 'SIL Open Font License, Version 1.1\n');
+    await writeFile(path.join(dir, 'product.json'), JSON.stringify({ fonts: [
+      { family: 'Bitter', file: 'fonts/bitter.woff2', licence: { name: 'SIL Open Font License 1.1', file: 'fonts/bitter-OFL.txt', source: 'https://fonts.google.com/download/list?family=Bitter' } },
+      { family: 'Karla', file: 'fonts/karla.woff2' },
+    ] }));
+    await mkdir(path.join(starter, 'node_modules', 'lucide-react'), { recursive: true });
+    await writeFile(path.join(starter, 'node_modules', 'lucide-react', 'package.json'), JSON.stringify({ name: 'lucide-react', version: '1.62.0', license: 'ISC' }));
+    await writeFile(path.join(starter, 'node_modules', 'lucide-react', 'LICENSE'), 'ISC License\n');
+    const out = path.join(dir, '.publish', 'ds');
+    const res = assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system' });
+    const readme = await readFile(path.join(out, 'project', 'assets', 'Licences', 'README.md'), 'utf8');
+    assert.match(readme, /Bitter \| SIL Open Font License 1\.1 \| `bitter-OFL\.txt`/);
+    assert.match(readme, /Lucide icons \(lucide-react 1\.62\.0\) \| ISC \| `lucide-react-LICENSE\.txt`/);
+    assert.match(readme, /Karla \| No licence recorded/);
+    for (const f of ['bitter-OFL.txt', 'lucide-react-LICENSE.txt']) assert.ok(existsSync(path.join(out, 'project', 'assets', 'Licences', f)), f);
+    const index = JSON.parse(await readFile(path.join(out, 'project', 'design-system.json'), 'utf8'));
+    assert.deepEqual(index.groups, ['Logos', 'Licences']);
+    assert.deepEqual(res.licences.missing, ['Karla']);
     await rm(dir, { recursive: true, force: true });
   });
 

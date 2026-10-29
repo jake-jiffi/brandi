@@ -3337,7 +3337,7 @@ async function cmdProduct(flags, positional) {
     const res = await writeProductBoards({ productDir, starter, measure: !flags['no-measure'], heights: Boolean(flags.heights), log: (l) => process.stderr.write(`${l}\n`) });
     emit([
       `Wrote ${plural(res.boards.length, 'generated board')} into ${path.relative(process.cwd(), path.join(productDir, 'canvas'))}${res.measured ? `, ${res.measured} measured in a browser` : ', unmeasured'}.`,
-      res.ranInto ? `The generated rows now end at y ${res.generatedEnd}, past the first authored row at y ${res.ranInto.top}: the authored boards and their notes moved down ${res.shifted}px.` : '',
+      res.ranInto ? `The generated rows now end at y ${res.generatedEnd}, and authored rows keep ${res.authoredFrom - res.generatedEnd}px clear below them, so the first authored row (y ${res.ranInto.top}) and every authored board and note after it moved down ${res.shifted}px, to start at y ${res.authoredFrom}.` : '',
       `Authored rows start at y ${res.authoredFrom} or below, a section's title note first: a script that places its own boards starts there.`,
       flags.heights && !res.measured ? 'The authored boards were not measured: run npm install in the starter, so Playwright can.' : '',
       flags.heights && res.heightsSkipped ? `No heights written: ${res.heightsSkipped}.` : '',
@@ -3360,12 +3360,13 @@ async function cmdProduct(flags, positional) {
     emit([
       `Assembled the ${flags.title} Design System: ${plural(res.files.length, 'file')} in ${plural(res.calls.length, 'publish call')}, the index last.`,
       res.unchanged.length ? `A republish: ${plural(res.unchanged.length, 'file')} unchanged since the last staging are not sent${res.gone.length ? `, and ${plural(res.gone.length, 'file')} that went are sent as null` : ''} (--all sends everything). Publish each staging, or the next comparison is against files the system never got.` : '',
+      res.licences.missing.length ? `No licence recorded for ${res.licences.missing.join(', ')}: the Licences group says so. Record each in product.json's fonts (\`brandi product fonts\` does it for a Google face) and run this again before publishing (12-design-system-artifact.md).` : '',
       res.uploads.length ? `Upload these first, each with asset: true to the system's url, then run this again with --blobs <file> mapping "<Group>/<file>" to { id, size, type }:\n${res.uploads.map((u) => `  ${u.group}/${u.file}  ${rel(u.path)}`).join('\n')}` : '',
       '',
       'A new system: publish with the Design System type\'s type_url, the title, auto_open "after_first_write" and nothing else. Keep the url.',
       ...res.calls.map((c, i) => `  ${i + 1}. url: that url, root: "${c.root}", file_path: "${c.file_path}", files: ${Object.keys(c.files).length} more`),
       'An existing system: read project/design-system.json first and pass it as --live <file>; the calls then carry only what changed.',
-    ].filter(Boolean).join('\n'), { ok: true, calls: res.calls, uploads: res.uploads, files: res.files, unchanged: res.unchanged, gone: res.gone });
+    ].filter(Boolean).join('\n'), { ok: true, calls: res.calls, uploads: res.uploads, files: res.files, unchanged: res.unchanged, gone: res.gone, licences: res.licences });
     return;
   }
   if (sub === 'gates' || sub === 'round') {

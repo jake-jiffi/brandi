@@ -84,7 +84,10 @@ numbered order.
   renders in both themes.
 - The em-dash check and the banned-words check pass on every generated file.
 - The starter's fresh install builds, lints and type-checks clean.
-- The Licences group lists every face and icon set with its licence.
+- The Licences group lists every face and icon set with its licence. `$A product ds` writes it from
+  product.json's fonts (where `$A product fonts` records each licence and fetches its text) and the
+  starter's installed icon set, with each licence's text beside its README, and names any face with
+  no licence recorded. A README you write in `product/assets/Licences/` is kept instead.
 - The person has said yes.
 
 The publish result reports a version id. Write it into the round record: a canvas that installs the

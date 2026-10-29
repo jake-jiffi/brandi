@@ -131,6 +131,38 @@ export function designSystemIndex({ live = null, system, title, by = 'Claude', n
 const assetKey = (name) => name.replace(/[^A-Za-z0-9_./-]/g, (c) => `~${c.charCodeAt(0).toString(16).padStart(2, '0')}`);
 
 /**
+ * The Licences group: every face and the icon set, each with its licence and the licence's own text. The faces come
+ * from product.json's fonts, where `product fonts` records each licence and fetches its text, and from the tokens'
+ * fonts; the icon set from the starter's installed lucide-react. A face with no licence recorded is named, never
+ * passed over: a run published with an empty group, and nothing said the faces were unlicensed on the page.
+ */
+export function licencesGroup({ productDir, tokens, starter }) {
+  let config = {};
+  try { config = JSON.parse(readFileSync(path.join(productDir, 'product.json'), 'utf8')); } catch { /* no product.json */ }
+  const faces = new Map();
+  for (const f of [...(config.fonts ?? []), ...(tokens.type?.fonts ?? [])]) if (f?.family && !faces.get(f.family)?.licence) faces.set(f.family, f);
+  const rows = [];
+  const texts = [];
+  const missing = [];
+  for (const [family, f] of faces) {
+    const text = f.licence?.file && path.join(productDir, f.licence.file);
+    if (!f.licence?.name) { missing.push(family); rows.push(`| ${family} | No licence recorded: add it to product.json's fonts (\`brandi product fonts\` writes it for a Google face) | |`); continue; }
+    const name = text && existsSync(text) ? path.basename(text) : null;
+    if (name) texts.push({ name, from: text });
+    rows.push(`| ${family} | ${f.licence.name} | ${name ? `\`${name}\`` : ''}${f.licence.source ? ` ${f.licence.source}` : ''} |`);
+  }
+  const lucide = path.join(starter, 'node_modules', 'lucide-react');
+  if (existsSync(path.join(lucide, 'package.json'))) {
+    const pkg = JSON.parse(readFileSync(path.join(lucide, 'package.json'), 'utf8'));
+    const file = ['LICENSE', 'LICENSE.md', 'LICENSE.txt'].map((f) => path.join(lucide, f)).find((f) => existsSync(f));
+    if (file) texts.push({ name: 'lucide-react-LICENSE.txt', from: file });
+    rows.push(`| Lucide icons (lucide-react ${pkg.version}) | ${pkg.license ?? 'see the package'} | ${file ? '`lucide-react-LICENSE.txt`' : ''} |`);
+  }
+  const readme = ['# Licences', '', 'Every face and icon set the system uses, with its licence. Each licence\'s own text is beside this file.', '', '| What | Licence | Text and source |', '| --- | --- | --- |', ...rows, ''].join('\n');
+  return { readme, texts, missing };
+}
+
+/**
  * Write the publish folder and return the calls. `blobs` maps an asset path ("Logos/mark.svg") to
  * the upload result ({ id, size, type }), from uploading each listed picture with asset: true.
  */
@@ -199,6 +231,11 @@ export function assembleDesignSystem({ productDir, starter, outDir, title, live 
       assetGroups[group.name] = { name: group.name, tile: 'm', order, files: records };
     }
   }
+  const licences = licencesGroup({ productDir, tokens, starter });
+  // A Licences README written by hand is kept; the texts go beside it either way.
+  if (!existsSync(path.join(assets, 'Licences', 'README.md'))) put('assets/Licences/README.md', licences.readme);
+  for (const t of licences.texts) put(`assets/Licences/${t.name}`, { from: t.from });
+  assetGroups.Licences ??= { name: 'Licences', tile: 'm', order: [], files: {} };
   const index = designSystemIndex({ live, system, title, by, assetGroups });
   writeFileSync(path.join(project, 'design-system.json'), `${JSON.stringify(index, null, 2)}\n`);
 
@@ -239,7 +276,7 @@ export function assembleDesignSystem({ productDir, starter, outDir, title, live 
     if (gone.length && i === Math.max(dataCalls - 1, 0) && (dataCalls > 0 || c.index)) for (const r of gone) map[`project/${r}`] = null;
     return { root: outDir, file_path: path.join(project, first), files: map };
   });
-  return { system, files, calls: publishCalls, uploads, index, unchanged, gone };
+  return { system, files, calls: publishCalls, uploads, index, unchanged, gone, licences: { missing: licences.missing } };
 }
 
 export default { assembleDesignSystem, designSystemIndex, coverPage, starterFiles };
