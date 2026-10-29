@@ -502,11 +502,11 @@ with a class, never with values typed onto the board. Name it in product.json:
 ```
 
 A role is a hex, one of the brand's colours by name (`acme-green` or `brand-acme-green`), or
-`{ "light", "dark" }` of those. A direction moves the roles `roles` decides: primary, brand,
-highlight, canvas, ink, focus and rail. `$A product tokens` solves each as the system with its roles
-over the decided ones, so its rail words, hover and focus are solved too. It reports any pair that
-fails under the direction's name, and writes a class into `tokens.css` holding only the variables
-that move:
+`{ "light", "dark" }` of those, the forms product.json's `roles` takes too. A direction moves the
+roles `roles` decides: primary, brand, highlight, canvas, ink, focus and rail. `$A product tokens`
+solves each as the system with its roles over the decided ones, so its rail words, hover and focus
+are solved too. It reports any pair that fails under the direction's name, and writes a class into
+`tokens.css` holding only the variables that move:
 
 ```html
 <x-import component-from-global-scope="Acme.Root" theme="{{theme}}">

@@ -3072,14 +3072,25 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       copies the shipped tokens in as they are, records the repo, commit and
       method, and audits them. Nothing is deleted: removals are listed.`;
 
+/**
+ * The system the product layer builds on, and the brand's motion signature with where it was read. The signature lives
+ * only in the brand record (identity.motionSignature); the system and the brand's own tokens carry its stance's
+ * durations and Brandi's curves, never the signature. Route B's input file holds it as motionSignature, in the same form.
+ */
 async function productSource(flags) {
+  // Anything but an object goes on as it is, for the tokens to refuse with what it was.
+  const signature = (sig, field, source) => (sig && typeof sig === 'object' && !Array.isArray(sig) ? { ...sig, source: `${field} in ${source}` } : sig ?? null);
   if (typeof flags.input === 'string') {
     const parsed = JSON.parse(await readFile(path.resolve(flags.input), 'utf8'));
-    const input = parsed.brandi ? systemInputFromBrand(migrateBrand(parsed)) : parsed;
-    return { system: buildSystem(input), name: parsed.meta?.name ?? parsed.name ?? null, source: path.relative(process.cwd(), path.resolve(flags.input)) };
+    const brand = parsed.brandi ? migrateBrand(parsed) : null;
+    const input = brand ? systemInputFromBrand(brand) : parsed;
+    const source = path.relative(process.cwd(), path.resolve(flags.input));
+    const motion = brand ? signature(brand.identity?.motionSignature, 'identity.motionSignature', source) : signature(parsed.motionSignature, 'motionSignature', source);
+    return { system: buildSystem(input), name: parsed.meta?.name ?? parsed.name ?? null, source, motion };
   }
   const { file, brand, system } = await resolveSystem(flags, { gate: false });
-  return { system, name: brand.meta?.name ?? null, source: path.relative(process.cwd(), file) };
+  const source = path.relative(process.cwd(), file);
+  return { system, name: brand.meta?.name ?? null, source, motion: signature(brand.identity?.motionSignature, 'identity.motionSignature', source) };
 }
 
 /**
@@ -3118,7 +3129,7 @@ async function cmdProduct(flags, positional) {
     const dir = path.resolve(typeof flags.out === 'string' ? flags.out : 'product');
     const configFile = path.join(dir, 'product.json');
     const config = existsSync(configFile) ? JSON.parse(await readFile(configFile, 'utf8')) : {};
-    const { system, name, source } = await productSource(flags);
+    const { system, name, source, motion } = await productSource(flags);
     // Before directions were part of the system, runs recorded their picks under the same key, as
     // { family: { picked, boards, ... } }. A record like that moves no role: it is left as it is, nothing is solved
     // from it, and the run is told how to draw a direction by class. A single direction not in a list is still refused.
@@ -3135,6 +3146,7 @@ async function cmdProduct(flags, positional) {
       shape: config.shape ?? {},
       directions: picks ? [] : (given ?? []),
       source,
+      motion,
     });
     const audit = auditProductTokens(tokens);
     await mkdir(dir, { recursive: true });
@@ -3152,8 +3164,11 @@ async function cmdProduct(flags, positional) {
       return `  direction ${d.name}: .${d.class}, ${moved.length ? `${plural(moved.length, 'role')} moved (${moved.slice(0, 6).join(', ')}${moved.length > 6 ? ', ...' : ''})` : "nothing moved: it is today's system"}`;
     });
     if (picks) directions.push(`  directions in product.json records picks (${picks.join(', ')}), not roles to solve, so no direction class was written. To draw a direction by class, list it as [{ "name", "roles", "note" }] (06-canvas.md, Directions).`);
-    const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), ...(directions.length ? ['', ...directions] : []), '', ...written.map((w) => `  ${w}`)];
-    emit(lines.join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, files: written });
+    // Whose each duration and curve is, so the kit's motion is never taken for the brand's (02-brand-to-product.md, Motion).
+    const moving = [...tokens.easing.tokens, ...tokens.duration.tokens];
+    const motionLines = ['Motion:', ...moving.map((t) => `  ${t.name}  ${t.value}  ${t.source ? `the brand's: ${t.source}` : `the kit's: ${t.derived}`}`)];
+    const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), ...(directions.length ? ['', ...directions] : []), '', ...motionLines, '', ...written.map((w) => `  ${w}`)];
+    emit(lines.join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, motion: moving.map(({ name: n, value, source: s, derived }) => ({ name: n, value, ...(s ? { source: s } : { derived }) })), files: written });
     if (!audit.ok) process.exitCode = 1;
     return;
   }

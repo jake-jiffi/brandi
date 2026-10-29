@@ -147,9 +147,9 @@ Find out which route you are on, then read everything before asking anything.
 
 Route B and C stand alone: Brandi need never have been run. On route B, write the brand's colours
 and faces into a plain input file (`{ "name", "primary", "accents", "neutralHue", "type": { "display",
-"body", "mono" }, "shape", "motion" }`) with the source of each value noted beside it, and pass it as
-`--input`. On route C, copy the shipped tokens as they are and read the markup from the running
-build. `references/01-routes-and-intake.md` has the recon checklist for each route.
+"body", "mono" }, "shape", "motion", "motionSignature" }`) with the source of each value noted
+beside it, and pass it as `--input`. On route C, copy the shipped tokens as they are and read the
+markup from the running build. `references/01-routes-and-intake.md` has the recon checklist for each route.
 
 ### 2. Intake (ONE batch of questions, then nothing)
 

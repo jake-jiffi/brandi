@@ -167,7 +167,8 @@ README should still get the principles and the hard rules right.
   - *States.* Focus in each theme and in forced colours. Hover and pressed. Disabled, which fades,
     loses its shadow and says why nearby. Loading. Partial outage: the rest of the screen keeps
     working, and it says which source is unavailable and when it was last checked.
-  - *Motion.* One curve and the duration tokens, what moves and how far. What reduced motion keeps
+  - *Motion.* One curve and the duration tokens, whose each is (the brand's motion signature or the
+    kit's, as the tokens record it), what moves and how far. What reduced motion keeps
     (fades) and drops (slides, lifts, loops), and the loading-indicator exception with its reason.
   - *Contrast.* How many pairs were checked in both themes, with translucent washes laid over the
     surface beneath, and how many failed. Then the ratios that carry rules: body, muted and subtle

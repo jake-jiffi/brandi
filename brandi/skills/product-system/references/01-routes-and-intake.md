@@ -16,7 +16,8 @@ Routes B and C stand alone. Brandi need never have been run.
 ## Route A: a Brandi brand
 
 - `$A status` and `$A system`: the resolved system, its audit, the fonts, the shape and motion
-  stances.
+  stances. The brand's motion signature (`identity.motionSignature` in brand.json) moves the
+  product's tokens (`02-brand-to-product.md`, Motion).
 - The brand file's voice (`voice` in brand.json) feeds the writing section; its applications feed
   the product list; its decision log tells you what is settled.
 - The companion brand skill is the guardian: every product repo gets it.
@@ -43,11 +44,14 @@ Routes B and C stand alone. Brandi need never have been run.
   "neutralHue": "#0F2A4A",
   "type": { "display": "Fraunces", "body": "Karla", "mono": "JetBrains Mono" },
   "shape": "rounded",
-  "motion": "fluid"
+  "motion": "fluid",
+  "motionSignature": { "name": "Glide", "durationMs": 200, "easing": "cubic-bezier(0.3, 0, 0, 1)" }
 }
 ```
 
-Keep a note beside it of where each value came from. `$A check` and `$A fonts` read a brand file,
+`motionSignature` is the brand's own move, when its guidelines or its site name one: the product's
+curve and one of its durations come from it (`02-brand-to-product.md`, Motion). Leave it out when
+the brand names none. Keep a note beside the file of where each value came from. `$A check` and `$A fonts` read a brand file,
 which route B does not have: confirm the faces load by rendering a preview, and check work against
 the brand by reading it against the guidelines.
 

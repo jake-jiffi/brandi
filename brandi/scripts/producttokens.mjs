@@ -821,10 +821,11 @@ export function shapeKitDefaults(tokens) {
  * @param {object} opts
  * @param {string} [opts.name]              the system's name
  * @param {{name: string, hex: string}[] | Record<string, string>} [opts.brandColours]  the brand book's named colours, as a list or a name-to-hex map
- * @param {object} [opts.roles]             decided roles: { primary, brand, highlight, canvas, focus, rail } as { light, dark }
+ * @param {object} [opts.roles]             decided roles: { primary, brand, highlight, canvas, ink, focus, rail }, each a colour for both themes or { light, dark }
  * @param {boolean} [opts.displayForTitles] whether the display face sets titles (default true)
  * @param {object} [opts.source]            where the brand came from, recorded in meta
  * @param {object[]} [opts.directions]      roles a concept board moves: [{ name, roles, note }] (checkDirections)
+ * @param {object} [opts.motion]            the brand's motion signature: { name, durationMs, easing, source } (checkMotion)
  */
 /**
  * The faces a system ships as files: { family, file, weight, style }. A hosted face (Google) has no
@@ -843,8 +844,101 @@ export function checkFonts(fonts) {
   });
 }
 
+/** The kit's interface durations, fastest first: each the job it times. A character scene keeps its own length. */
+const DURATIONS = Object.freeze([
+  { name: 'duration-fast', ms: 120, usage: 'Hover, press, focus.' },
+  { name: 'duration-base', ms: 180, usage: 'Menus, tabs and toggles.' },
+  { name: 'duration-slow', ms: 260, usage: 'Sheets and dialogs.' },
+]);
+
+/** The longest a sheet or dialog may take to arrive in a product someone works in all day. */
+export const MOTION_CEILING_MS = 400;
+
+const CSS_CURVES = new Set(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out']);
+// A number as CSS writes one. Number() also reads 0x1 and 0b1, which a browser drops along with the whole declaration.
+const CSS_NUMBER = /^[+-]?(\d+(\.\d+)?|\.\d+)(e[+-]?\d+)?$/i;
+
+/** True for a curve CSS can draw: a keyword, or cubic-bezier with both x values between 0 and 1. */
+function isCurve(s) {
+  if (typeof s !== 'string') return false;
+  if (CSS_CURVES.has(s.trim().toLowerCase())) return true;
+  const m = /^cubic-bezier\(([^,()]*),([^,()]*),([^,()]*),([^,()]*)\)$/i.exec(s.trim());
+  if (!m || !m.slice(1).every((n) => CSS_NUMBER.test(n.trim()))) return false;
+  const [x1, , x2] = m.slice(1).map(Number);
+  return x1 >= 0 && x1 <= 1 && x2 >= 0 && x2 <= 1;
+}
+
+/** What a motion signature holds, as brand.json's identity.motionSignature does, and where it was read. */
+const SIGNATURE_KEYS = Object.freeze(['name', 'description', 'durationMs', 'easing', 'source']);
+
+/**
+ * The brand's motion signature, checked: { name, description, durationMs, easing }, as brand.json's
+ * identity.motionSignature holds it (route B's input file takes the same form), with `source` saying where it was
+ * read. A field it does not hold is refused: a misspelt `duration` would leave the product on the kit's motion.
+ */
+export function checkMotion(motion) {
+  if (motion == null) return null;
+  if (typeof motion !== 'object' || Array.isArray(motion)) throw new TypeError(`the brand's motion signature is { name, description, durationMs, easing }, got ${JSON.stringify(motion)}`);
+  const where = `motion signature${motion.source ? ` (${motion.source})` : ''}`;
+  const other = Object.keys(motion).filter((k) => !SIGNATURE_KEYS.includes(k));
+  if (other.length) throw new TypeError(`${where}: ${other.join(', ')} is not part of a signature: it holds name, description, durationMs and easing`);
+  const { durationMs = null, easing = null } = motion;
+  if (durationMs != null && !(typeof durationMs === 'number' && Number.isFinite(durationMs) && durationMs > 0)) {
+    throw new TypeError(`${where}: durationMs is a number of milliseconds above 0, got ${JSON.stringify(durationMs)}`);
+  }
+  if (easing != null && !isCurve(easing)) {
+    throw new TypeError(`${where}: easing ${JSON.stringify(easing)} is not a curve CSS can draw: write cubic-bezier(x1, y1, x2, y2) or a keyword such as ease-out`);
+  }
+  return { name: motion.name ?? null, durationMs, easing: easing?.trim() ?? null, source: motion.source ?? null };
+}
+
+/**
+ * The product's durations and curves from the brand's signature, the kit's values filling what it leaves out. The
+ * signature's curve is ease-standard. Its duration sets the job nearest it, a tie going to the slower job, so a
+ * duration too slow for a hover or a press sets a menu's or a sheet's instead and feedback stays quick. Past
+ * MOTION_CEILING_MS it is held there. Each token says where it came from, as a radius does: `source` for the brand's,
+ * `derived` for the kit's.
+ */
+function productMotion(motion) {
+  const sig = checkMotion(motion);
+  const called = sig?.name ? `, ${sig.name}` : '';
+  const whose = `the motion signature${called}${sig?.source ? ` (${sig.source})` : ''}`;
+  const absent = (what) => (sig ? `the motion signature${called}${called ? ',' : ''} names no ${what}` : 'no motion signature in the brand');
+  const ms = sig?.durationMs ?? null;
+  const nearest = ms == null ? null : DURATIONS.reduce((best, d) => (Math.abs(d.ms - ms) <= Math.abs(best.ms - ms) ? d : best));
+  const duration = DURATIONS.map((d) => {
+    const t = { name: d.name, value: `${d.ms}ms`, usage: d.usage };
+    if (d !== nearest) return { ...t, derived: ms == null ? absent('duration') : `the brand's ${ms}ms sets ${nearest.name}, the job nearest it` };
+    if (ms > MOTION_CEILING_MS) return { ...t, value: `${MOTION_CEILING_MS}ms`, derived: `the brand's ${ms}ms${sig.name ? ` (${sig.name})` : ''}, held to ${MOTION_CEILING_MS}ms: past that a sheet or dialog keeps someone waiting` };
+    return { ...t, value: `${ms}ms`, source: whose };
+  });
+  duration.push({ name: 'duration-scene', value: '1250ms', usage: 'A character scene, which then stops.', derived: "a signature times the interface, not a character's scene" });
+  const easing = [
+    sig?.easing
+      ? { name: 'ease-standard', value: sig.easing, usage: 'Every transition.', source: whose }
+      : { name: 'ease-standard', value: 'cubic-bezier(0.2, 0.8, 0.2, 1)', usage: 'Every transition.', derived: absent('curve') },
+    { name: 'ease-exit', value: 'cubic-bezier(0.4, 0, 1, 1)', usage: 'Things leaving.', derived: "something leaving accelerates away; a signature's curve sets how things arrive" },
+  ];
+  return { duration, easing };
+}
+
 /** The roles a direction may move: the ones product.json's `roles` decides. */
 export const DIRECTION_ROLES = Object.freeze(['primary', 'brand', 'highlight', 'canvas', 'ink', 'focus', 'rail']);
+
+/**
+ * One decided role as { light, dark }, in the forms product.json's roles and a direction both take: one colour for
+ * both themes, or { light, dark } with either left out. `colour` reads one value and throws with the caller's reason.
+ * Anything else is refused, never dropped: a plain hex at the root was once read as two undecided themes, and the rail
+ * stayed the surface with no word.
+ */
+function bothThemes(v, colour, where) {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return { light: colour(v), dark: colour(v) };
+  const other = Object.keys(v).filter((k) => k !== 'light' && k !== 'dark');
+  if (other.length) throw new TypeError(`${where} is a colour or { light, dark }: ${other.join(', ')} is neither`);
+  const set = ['light', 'dark'].filter((m) => v[m] != null);
+  if (!set.length) throw new TypeError(`${where} is { light, dark } with neither set: give one, or leave the role out`);
+  return Object.fromEntries(set.map((m) => [m, colour(v[m])]));
+}
 
 /**
  * product.json's `directions`, checked: [{ name, roles, note }], each role a hex, one of the brand's colours by name
@@ -873,14 +967,13 @@ export function checkDirections(directions, brandHex) {
     const roles = {};
     for (const [role, v] of Object.entries(d.roles)) {
       if (!DIRECTION_ROLES.includes(role)) throw new TypeError(`direction ${d.name}: ${role} is not a role a direction can move; it moves ${DIRECTION_ROLES.join(', ')}`);
-      const both = v && typeof v === 'object' ? v : { light: v, dark: v };
-      roles[role] = Object.fromEntries(['light', 'dark'].filter((m) => both[m] != null).map((m) => [m, colour(role, both[m]).toLowerCase()]));
+      roles[role] = bothThemes(v, (x) => colour(role, x).toLowerCase(), `direction ${d.name}: ${role}`);
     }
     return { name: d.name.trim(), class: cls, ...(d.note ? { note: String(d.note) } : {}), roles };
   });
 }
 
-export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, displayCase = null, charts = {}, source = null, fonts: fontFiles = [], shape = {}, directions = [] } = {}) {
+export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, displayCase = null, charts = {}, source = null, fonts: fontFiles = [], shape = {}, directions = [], motion = null } = {}) {
   if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved Brandi system');
 
   // Decided values arrive as people write them: "#fff" as often as "#FFFFFF",
@@ -891,8 +984,6 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
     if (typeof hex !== 'string' || !/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) throw new TypeError(`a decided colour must be a hex value like #0F2A4A, not ${JSON.stringify(hex)}`);
     return hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join('')}` : hex;
   };
-  const roles = Object.fromEntries(Object.entries(rolesIn ?? {}).filter(([, val]) => val)
-    .map(([k, val]) => [k, { light: expand(val.light), dark: expand(val.dark) }]));
   // People write the brand's colours as a list or as a name-to-hex map, and the reference showed neither, so both
   // are read. A map once reached `.map` and stopped the whole build with "brandColoursIn.map is not a function".
   const listed = brandColoursIn == null ? null
@@ -903,6 +994,37 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
     throw new TypeError('brandColours is a list of { name, hex } or a { name: hex } map, each with a name and a hex value');
   }
   const brandColours = listed ? listed.map((c) => ({ ...c, hex: expand(c.hex) })) : null;
+
+  const primitives = (brandColours ?? [
+    { name: 'primary', hex: hexOf(system.palettes.brand.seed) ?? hexOf(system.palettes.brand.light.steps[8]) },
+    ...Object.keys(system.palettes).filter((k) => /^accent\d+$/.test(k)).map((k, i) => ({
+      name: `accent-${i + 1}`,
+      hex: hexOf(system.palettes[k].seed) ?? hexOf(system.palettes[k].light.steps[8]),
+    })),
+  ]).map((c) => ({
+    name: `brand-${c.name}`,
+    brand: true,
+    value: { light: c.hex.toLowerCase(), dark: c.hex.toLowerCase() },
+    usage: "The brand book's exact value. Roles alias it; interface code never uses it directly.",
+    contrast: [],
+  }));
+  const brandHex = new Map(primitives.map((p) => [p.name.replace(/^brand-/, '').toLowerCase(), p.value.light]));
+
+  // The decided roles, in the forms a direction's roles take: a hex or one of the brand's colours by name, for both
+  // themes, or { light, dark } of those. A key the engine does not decide is refused by name rather than carried
+  // unread, and so is a value it cannot read.
+  const decidedColour = (role) => (v) => {
+    if (typeof v === 'string' && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) return expand(v);
+    const key = typeof v === 'string' ? v.toLowerCase().replace(/^brand-/, '') : null;
+    if (brandHex.has(key)) return brandHex.get(key);
+    throw new TypeError(`roles.${role}: a decided colour must be a hex value like #0F2A4A or one of the brand's colours (${[...brandHex.keys()].join(', ')}), not ${JSON.stringify(v)}`);
+  };
+  const roles = {};
+  for (const [role, val] of Object.entries(rolesIn ?? {})) {
+    if (!DIRECTION_ROLES.includes(role)) throw new TypeError(`roles.${role} is not a role product.json decides: it decides ${DIRECTION_ROLES.join(', ')}. Every other role is solved from these`);
+    if (val == null) continue;
+    roles[role] = bothThemes(val, decidedColour(role), `roles.${role}`);
+  }
 
   // The assistant's family borrows the brand's saturation, like Brandi's status colours do.
   const base = toOklch(hexOf(system.palettes.brand.light.steps[8]));
@@ -924,20 +1046,6 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   const avoidTags = Array.from({ length: SERIES_COUNT }, (_, i) => i + 1)
     .filter((n) => [light, dark].some((t) => barredHues.some((h) => hueGap(h, safeHue(toOklch(t.values[`series-${n}`]).h)) < 25)))
     .map((n) => `tag-${n}`);
-
-  const primitives = (brandColours ?? [
-    { name: 'primary', hex: hexOf(system.palettes.brand.seed) ?? hexOf(system.palettes.brand.light.steps[8]) },
-    ...Object.keys(system.palettes).filter((k) => /^accent\d+$/.test(k)).map((k, i) => ({
-      name: `accent-${i + 1}`,
-      hex: hexOf(system.palettes[k].seed) ?? hexOf(system.palettes[k].light.steps[8]),
-    })),
-  ]).map((c) => ({
-    name: `brand-${c.name}`,
-    brand: true,
-    value: { light: c.hex.toLowerCase(), dark: c.hex.toLowerCase() },
-    usage: "The brand book's exact value. Roles alias it; interface code never uses it directly.",
-    contrast: [],
-  }));
 
   const usage = { ...USAGE, ...Object.assign({}, ...STATUS_FAMILIES.map(statusUsage)) };
   const roleTokens = PRODUCT_ROLES.map((role) => ({
@@ -974,6 +1082,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   };
 
   const notes = [...light.notes, ...dark.notes];
+  const moving = productMotion(motion);
 
   const tokens = {
     name,
@@ -1036,14 +1145,12 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
         .map(([n, val]) => ({ name: n, value: String(val) })),
     },
     duration: {
-      note: 'Short and calm. Reduced motion keeps fades and drops movement; spinners slow down rather than stop.',
-      tokens: [['duration-fast', '120ms', 'Hover, press, focus.'], ['duration-base', '180ms', 'Menus, tabs and toggles.'], ['duration-slow', '260ms', 'Sheets and dialogs.'], ['duration-scene', '1250ms', 'A character scene, which then stops.']]
-        .map(([n, val, u]) => ({ name: n, value: val, usage: u })),
+      note: 'Short and calm. Reduced motion keeps fades and drops movement; spinners slow down rather than stop. Each token says where it came from: the brand\'s motion signature (source) or the kit (derived).',
+      tokens: moving.duration,
     },
     easing: {
-      note: 'One curve for nearly everything.',
-      tokens: [['ease-standard', 'cubic-bezier(0.2, 0.8, 0.2, 1)', 'Every transition.'], ['ease-exit', 'cubic-bezier(0.4, 0, 1, 1)', 'Things leaving.']]
-        .map(([n, val, u]) => ({ name: n, value: val, usage: u })),
+      note: 'One curve for nearly everything: the brand\'s own where its motion signature names one.',
+      tokens: moving.easing,
     },
     breakpoint: {
       note: 'The shell measures its own width with container queries, so an artboard behaves like a browser window of the same size.',
@@ -1064,7 +1171,6 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   // move. They sit in meta, which the Design System page does not read, and tokens.css draws each as a class. A
   // board that set raw values on its root failed the drift check, and one rewritten through color-mix lost the
   // solved values.
-  const brandHex = new Map(primitives.map((p) => [p.name.replace(/^brand-/, '').toLowerCase(), p.value.light]));
   const checked = checkDirections(directions ?? [], brandHex);
   if (checked.length) {
     tokens.meta.directions = checked.map((d) => {

@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import * as P from '../scripts/producttokens.mjs';
@@ -167,6 +167,40 @@ describe('decided roles', () => {
     assert.throws(() => P.buildProductTokens(system, { brandColours: '#5CBF1B' }), /brandColours is a list of \{ name, hex \} or a \{ name: hex \} map/);
     assert.throws(() => P.buildProductTokens(system, { brandColours: [{ hex: '#5CBF1B' }] }), /brandColours/);
     assert.throws(() => P.buildProductTokens(system, { brandColours: { 'acme-green': null } }), /each with a name and a hex value/);
+  });
+
+  test("a root role given one value takes it in both themes, as a direction's role does, and is measured in both", () => {
+    // A run wrote roles.rail as a plain hex, the form a direction takes, and the rail stayed the surface with no word.
+    const one = P.buildProductTokens(system, { roles: { rail: '#1B5D40' } });
+    assert.deepEqual(one, P.buildProductTokens(system, { roles: { rail: { light: '#1B5D40', dark: '#1B5D40' } } }), 'one value is both themes');
+    for (const theme of ['light', 'dark']) assert.equal(P.resolveColour(one, 'rail', theme), '#1B5D40', theme);
+    assert.deepEqual(one.meta.roles.rail, { light: '#1B5D40', dark: '#1B5D40' });
+    const rows = P.auditProductTokens(one).rows.filter((r) => r.fg === 'rail-text' && r.bg === 'rail');
+    assert.deepEqual(rows.map((r) => r.theme), ['light', 'dark'], "the rail's words are measured on it in both themes");
+    // A brand colour by name, with or without brand-, as a direction takes it.
+    const named = P.buildProductTokens(system, { brandColours: { 'acme-green': '#1B5D40' }, roles: { rail: 'brand-acme-green' } });
+    assert.equal(P.resolveColour(named, 'rail', 'dark'), '#1b5d40');
+  });
+
+  test("a root role's one value fails loudly in the theme it cannot serve", () => {
+    // A mid green as the primary in both themes: right in light, too dark to stand off the dark canvas.
+    const audit = P.auditProductTokens(P.buildProductTokens(system, { roles: { primary: '#1F6E4A' } }));
+    assert.equal(audit.ok, false);
+    assert.ok(audit.fails.some((f) => f.theme === 'dark' && f.fg === 'primary'), JSON.stringify(audit.fails));
+    assert.equal(audit.fails.some((f) => f.theme === 'light' && f.fg === 'primary'), false, 'and passes where it can');
+  });
+
+  test('an unknown role, or a value in a form the engine cannot read, is refused with its reason, never dropped', () => {
+    const build = (roles) => () => P.buildProductTokens(system, { roles });
+    assert.throws(build({ rial: '#123456' }), /roles\.rial is not a role product\.json decides: it decides primary, brand, highlight, canvas, ink, focus, rail/);
+    assert.throws(build({ rial: null }), /roles\.rial is not a role/, 'a misspelt key is named even with nothing in it');
+    assert.throws(build({ 'rail-text': { light: '#ffffff' } }), /roles\.rail-text is not a role product\.json decides/, 'a solved role is not decided here');
+    assert.throws(build({ rail: { day: '#123456' } }), /roles\.rail is a colour or \{ light, dark \}: day is neither/);
+    assert.throws(build({ rail: {} }), /roles\.rail is \{ light, dark \} with neither set/);
+    assert.throws(build({ rail: 'acme-teal' }), /roles\.rail: a decided colour must be a hex value like #0F2A4A or one of the brand's colours \(primary, accent-1\), not "acme-teal"/);
+    assert.throws(build({ rail: 12 }), /roles\.rail: a decided colour must be a hex value/);
+    assert.throws(build({ rail: ['#123456'] }), /roles\.rail: a decided colour must be a hex value/);
+    assert.equal(P.resolveColour(P.buildProductTokens(system, { roles: { rail: null } }), 'rail', 'light'), P.resolveColour(P.buildProductTokens(system), 'surface', 'light'), 'null leaves a role undecided');
   });
 
   test('a signature rail gets its own text, muted and focus colours, and they pass on it', () => {
@@ -460,6 +494,7 @@ describe('directions: a role a concept board moves, solved and carried as a clas
     assert.throws(build([{ name: 'B', roles: { 'rail-text': '#000000' } }]), /B: rail-text is not a role a direction can move; it moves primary, brand, highlight, canvas, ink, focus, rail/);
     assert.throws(build([{ name: 'B', roles: { rail: 'acme-teal' } }]), /B: rail names acme-teal, which is not a hex value or one of the brand's colours \(acme-green, acme-black, acme-emerald\)/);
     assert.throws(build([{ name: 'B', roles: { rail: { dark: '#12345' } } }]), /direction B: rail names #12345, which is not a hex value/, 'a broken hex names its direction');
+    assert.throws(build([{ name: 'B', roles: { rail: {} } }]), /direction B: rail is \{ light, dark \} with neither set/, 'an empty pair moves nothing, and says so');
     assert.throws(build([{ name: 'B', roles: { rail: '#58C21E' } }, { name: 'b', roles: { rail: '#134A36' } }]), /"b" makes direction-b a second time/);
   });
 
@@ -478,6 +513,132 @@ describe('directions: a role a concept board moves, solved and carried as a clas
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("motion: a product built from a brand moves like the brand", () => {
+  const signature = brand.identity.motionSignature;
+  const from = 'identity.motionSignature in muddy-paws.json';
+  const motion = (t) => Object.fromEntries([...t.duration.tokens, ...t.easing.tokens].map((x) => [x.name, x]));
+  const KIT = { 'duration-fast': '120ms', 'duration-base': '180ms', 'duration-slow': '260ms', 'duration-scene': '1250ms', 'ease-standard': 'cubic-bezier(0.2, 0.8, 0.2, 1)', 'ease-exit': 'cubic-bezier(0.4, 0, 1, 1)' };
+
+  test("the brand's curve is ease-standard and its duration sets the job nearest it, each with its source; the kit fills the rest, saying so", () => {
+    // The fixture's signature: Settle, 240ms, a curve that decelerates into place and never overshoots.
+    assert.deepEqual([signature.durationMs, signature.easing], [240, 'cubic-bezier(0.2, 0, 0, 1)']);
+    const tokens = P.buildProductTokens(system, { motion: { ...signature, source: from } });
+    const m = motion(tokens);
+    assert.equal(m['ease-standard'].value, signature.easing);
+    assert.equal(m['duration-slow'].value, '240ms', 'an arrival at 240ms is nearest the sheets and dialogs');
+    for (const n of ['ease-standard', 'duration-slow']) {
+      assert.equal(m[n].source, 'the motion signature, Settle (identity.motionSignature in muddy-paws.json)', n);
+      assert.equal(m[n].derived, undefined, n);
+    }
+    // A hover or a press answers in the kit's 120ms: at 240ms a press would answer late.
+    for (const n of ['duration-fast', 'duration-base', 'duration-scene', 'ease-exit']) {
+      assert.equal(m[n].value, KIT[n], n);
+      assert.equal(m[n].source, undefined, n);
+      assert.ok(m[n].derived, n);
+    }
+    assert.equal(m['duration-fast'].derived, "the brand's 240ms sets duration-slow, the job nearest it");
+    assert.match(m['ease-exit'].derived, /something leaving accelerates away/);
+    const css = P.toProductCss(tokens);
+    assert.match(css, /--ease-standard: cubic-bezier\(0\.2, 0, 0, 1\);/);
+    assert.match(css, /--duration-slow: 240ms;/);
+    assert.match(toStarterGlobals(tokens), /--duration-slow: 240ms;/, 'the starter moves the same way');
+  });
+
+  test('a brand with no signature keeps the kit\'s motion, every value recorded as the kit\'s', () => {
+    for (const tokens of [P.buildProductTokens(system), P.buildProductTokens(system, { motion: null })]) {
+      for (const [n, t] of Object.entries(motion(tokens))) {
+        assert.equal(t.value, KIT[n], n);
+        assert.equal(t.source, undefined, n);
+        assert.ok(t.derived, n);
+      }
+      assert.equal(motion(tokens)['ease-standard'].derived, 'no motion signature in the brand');
+      assert.equal(motion(tokens)['duration-slow'].derived, 'no motion signature in the brand');
+    }
+    // A signature with a name and no values moves nothing, and says which part it left out.
+    const named = motion(P.buildProductTokens(system, { motion: { name: 'Drift', durationMs: null, easing: null, source: from } }));
+    assert.equal(named['ease-standard'].value, KIT['ease-standard']);
+    assert.equal(named['ease-standard'].derived, 'the motion signature, Drift, names no curve');
+    assert.equal(named['duration-slow'].derived, 'the motion signature, Drift, names no duration');
+  });
+
+  test('each duration sets the job nearest it; feedback never takes a slow one, and a duration too slow for any job is held, with why', () => {
+    const at = (ms) => motion(P.buildProductTokens(system, { motion: { name: 'Acme', durationMs: ms, easing: null, source: from } }));
+    assert.equal(at(100)['duration-fast'].value, '100ms', 'a quick brand quickens its feedback');
+    assert.ok(at(100)['duration-fast'].source);
+    assert.equal(at(150)['duration-fast'].value, KIT['duration-fast'], 'a tie goes to the slower job, so feedback is never slowed to the midpoint');
+    assert.equal(at(150)['duration-base'].value, '150ms');
+    assert.equal(at(200)['duration-base'].value, '200ms');
+    assert.equal(at(320)['duration-slow'].value, '320ms');
+    const held = at(600);
+    assert.equal(held['duration-slow'].value, '400ms');
+    assert.equal(held['duration-slow'].source, undefined, 'a held value is not the brand\'s');
+    assert.match(held['duration-slow'].derived, /^the brand's 600ms \(Acme\), held to 400ms: /);
+    for (const n of ['duration-fast', 'duration-base']) assert.equal(held[n].value, KIT[n], n);
+    assert.equal(at(60)['ease-standard'].value, KIT['ease-standard'], 'a duration alone leaves the curve the kit\'s');
+  });
+
+  test('a signature CSS cannot draw is refused with its reason, and a CSS keyword is a curve', () => {
+    const build = (sig) => () => P.buildProductTokens(system, { motion: { name: 'Acme', source: from, ...sig } });
+    assert.throws(build({ easing: 'a gentle settle' }), /motion signature \(identity\.motionSignature in muddy-paws\.json\): easing "a gentle settle" is not a curve CSS can draw: write cubic-bezier\(x1, y1, x2, y2\) or a keyword such as ease-out/);
+    assert.throws(build({ easing: 'cubic-bezier(1.2, 0, 0, 1)' }), /not a curve CSS can draw/, 'x runs from 0 to 1');
+    assert.throws(build({ easing: 'cubic-bezier(0.2, 0, 0)' }), /not a curve CSS can draw/);
+    assert.throws(build({ durationMs: '240ms' }), /durationMs is a number of milliseconds above 0, got "240ms"/);
+    assert.throws(build({ durationMs: 0 }), /durationMs is a number of milliseconds above 0/);
+    // A number CSS cannot read passes Number() all the same.
+    for (const bad of ['cubic-bezier(0x0, 0, 0, 1)', 'cubic-bezier(0.2, 0, 0, 1_0)', 'cubic-bezier(0.2, , 0, 1)']) assert.throws(build({ easing: bad }), /not a curve CSS can draw/, bad);
+    // A misspelt field is the silent drop this guards against: the signature would move nothing and say nothing.
+    assert.throws(build({ duration: 240, curve: 'ease-out' }), /motion signature \(identity\.motionSignature in muddy-paws\.json\): duration, curve is not part of a signature: it holds name, description, durationMs and easing/);
+    assert.throws(() => P.buildProductTokens(system, { motion: 'Settle' }), /the brand's motion signature is \{ name, description, durationMs, easing \}, got "Settle"/);
+    assert.equal(motion(P.buildProductTokens(system, { motion: { easing: 'ease-out', source: from } }))['ease-standard'].value, 'ease-out');
+    assert.equal(motion(P.buildProductTokens(system, { motion: { easing: 'Cubic-Bezier(0.2,0,0,1)', source: from } }))['ease-standard'].value, 'Cubic-Bezier(0.2,0,0,1)', 'CSS reads a curve in any case, unspaced');
+    assert.equal(motion(P.buildProductTokens(system, { motion: { easing: 'cubic-bezier(.2, 0, 0, 1e0)', source: from } }))['ease-standard'].value, 'cubic-bezier(.2, 0, 0, 1e0)');
+  });
+});
+
+describe('brandi product tokens reads the brand and product.json on both routes', () => {
+  const cli = path.join(ROOT, 'scripts', 'brandi.mjs');
+  const run = (cwd, ...args) => spawnSync(process.execPath, [cli, 'product', 'tokens', ...args], { cwd, encoding: 'utf8' });
+  const product = (dir, config) => { mkdirSync(path.join(dir, 'product'), { recursive: true }); writeFileSync(path.join(dir, 'product', 'product.json'), JSON.stringify(config)); };
+  const written = (dir) => JSON.parse(readFileSync(path.join(dir, 'product', 'tokens.json'), 'utf8'));
+  const value = (t, fam, n) => t[fam].tokens.find((x) => x.name === n).value;
+
+  test("route A: brand.json's motion signature moves the product, a plain-hex rail is the rail, and both are said", () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'brandi-tokens-a-'));
+    mkdirSync(path.join(dir, 'brand'));
+    writeFileSync(path.join(dir, 'brand', 'brand.json'), JSON.stringify(brand));
+    product(dir, { name: 'Acme product system', roles: { rail: '#1B5D40' } });
+    const res = run(dir);
+    const tokens = written(dir);
+    assert.equal(P.resolveColour(tokens, 'rail', 'dark'), '#1B5D40');
+    assert.match(readFileSync(path.join(dir, 'product', 'tokens.css'), 'utf8'), /--rail: #1B5D40;/);
+    assert.equal(value(tokens, 'easing', 'ease-standard'), 'cubic-bezier(0.2, 0, 0, 1)');
+    assert.equal(value(tokens, 'duration', 'duration-slow'), '240ms');
+    assert.equal(tokens.easing.tokens[0].source, 'the motion signature, Settle (identity.motionSignature in brand/brand.json)');
+    assert.match(res.stdout, /\nMotion:\n {2}ease-standard {2}cubic-bezier\(0\.2, 0, 0, 1\) {2}the brand's: the motion signature, Settle/);
+    assert.match(res.stdout, /\n {2}duration-fast {2}120ms {2}the kit's: /);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('route B: the input file carries the signature in the same form; without one the kit\'s motion is said to be the kit\'s; an unknown role stops the run', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'brandi-tokens-b-'));
+    const input = { name: 'Acme', primary: '#1F6E4A', type: { display: 'Bitter', body: 'Karla' }, motionSignature: { name: 'Glide', durationMs: 200, easing: 'cubic-bezier(0.3, 0, 0, 1)' } };
+    writeFileSync(path.join(dir, 'input.json'), JSON.stringify(input));
+    product(dir, {});
+    run(dir, '--input', 'input.json');
+    assert.equal(value(written(dir), 'duration', 'duration-base'), '200ms');
+    assert.equal(written(dir).duration.tokens.find((x) => x.name === 'duration-base').source, 'the motion signature, Glide (motionSignature in input.json)');
+    writeFileSync(path.join(dir, 'input.json'), JSON.stringify({ ...input, motionSignature: undefined }));
+    const plain = run(dir, '--input', 'input.json');
+    assert.equal(value(written(dir), 'easing', 'ease-standard'), 'cubic-bezier(0.2, 0.8, 0.2, 1)');
+    assert.match(plain.stdout, /\n {2}ease-standard {2}cubic-bezier\(0\.2, 0\.8, 0\.2, 1\) {2}the kit's: no motion signature in the brand/);
+    product(dir, { roles: { rial: '#1B5D40' } });
+    const bad = run(dir, '--input', 'input.json');
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /roles\.rial is not a role product\.json decides/);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 
