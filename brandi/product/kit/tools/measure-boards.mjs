@@ -19,6 +19,9 @@
  * after a whole line), a box that scrolls, a visually hidden one, an overlay drawn open (a positioned menu, listbox,
  * picker panel, popover, dialog or tooltip) and a page under a dialog's scrim (inert or aria-hidden) are left out.
  * An ellipsis line squeezed below its own height and a positioned box in the page's layout are not.
+ *
+ * Under "__unfilled" are the holes each board names that its script never gives, as the runtime shim found them: a
+ * proposal's on-edit named a noop its renderVals() never returned, and it quietly drew no Edit.
  */
 
 import { chromium } from "playwright"
@@ -78,6 +81,7 @@ try { browser = await chromium.launch({ channel: "chrome", args: ["--allow-file-
 const heights = {}
 const sections = {}
 const clipped = {}
+const unfilled = {}
 for (const p of pages) {
   const window = p.height ?? 900
   const context = await browser.newContext({ viewport: { width: p.width, height: p.frame?.h ?? window } })
@@ -91,6 +95,8 @@ for (const p of pages) {
     await page.waitForSelector("html[data-dc-ready], html[data-dc-error]", { state: "attached", timeout: shimmed ? 20000 : 2000 }).catch((e) => { if (shimmed) throw e })
     const failed = await page.evaluate(() => document.documentElement.getAttribute("data-dc-error"))
     if (failed) throw new Error(`the board did not render: ${failed}`)
+    const holes = await page.evaluate(() => document.documentElement.getAttribute("data-dc-unfilled"))
+    if (holes) unfilled[p.label] = holes.split(" ")
     // Its unmounted tags are no static board: offline, with React not yet fetched, a board renders without the
     // runtime, and measured as it stands its size would be the bare tags'.
     if (!shimmed && await page.$("x-import, dc-import, sc-for, sc-if")) throw new Error("the board mounts components and rendered without its runtime: React could not be fetched, so connect once and run the gates again")
@@ -127,4 +133,4 @@ for (const p of pages) {
   }
 }
 await browser.close()
-process.stdout.write(`${JSON.stringify({ ...heights, __sections: sections, __clipped: clipped })}\n`)
+process.stdout.write(`${JSON.stringify({ ...heights, __sections: sections, __clipped: clipped, __unfilled: unfilled })}\n`)

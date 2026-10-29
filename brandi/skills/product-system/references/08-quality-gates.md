@@ -16,7 +16,7 @@ reviewers are briefed, and what goes in the record.
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree (`09-operate.md`) |
 | Canvas runtime | Every board renders without an error under the Design canvas's own runtime, in a cross-origin frame (`06-canvas.md` step 3) |
-| Board sizes | Every board's frame fits its content, a page at its whole height, and nothing on a board hides its own content (Board sizes, below) |
+| Board sizes | Every board's frame fits its content, a page at its whole height, nothing on a board hides its own content, and every hole names a value the board's script gives (Board sizes, below) |
 | Coverage | Every surface `product.json` lists has a board at each of its widths and a states board for each of its modules (one for the surface when it has none, unless it only sends messages or skips them with a reason), and a surface with modules shows each core page on a board or skips it with a reason (Coverage, below) |
 | Record | Every tool's version pinned and written down |
 
@@ -176,6 +176,7 @@ whole height (`06-canvas.md`, Sizes). The gate fails on:
 | A frame clipped | The content runs more than 8px past the frame's height | `$A product boards --heights` |
 | A frame blank | The frame is more than a tenth, and 64px, taller than its content | `$A product boards --heights` |
 | A box hiding content | Inside the board, a box that clips (`overflow` hidden or clip) holds content more than 4px taller than itself | The board's markup (A phone frame, `06-canvas.md`) or the component |
+| A hole never given | The board names `{{noop}}` and neither its props nor `renderVals()` give `noop` | Return it from `renderVals()` (`06-canvas.md`, The mount) |
 | Not measured | The board did not render, or gave no height | The board, from the error the record prints |
 
 The box check leaves out text cut short on purpose (an ellipsis across, a line clamp after a whole
@@ -188,8 +189,19 @@ and owner lines each kept the top 8px of an 18px line, and an ellipsis line was 
 purpose. An ellipsis only cuts across, so a line squeezed below its own height is listed, and so
 is any positioned box in the page's own layout, such as an event placed on its hours. The round
 folder gets `heights.json`, each board's wanted height, for a script that writes the boards. A
-starter whose `tools/measure-boards.mjs` predates the gate reports it not run, and the round is not
-met until `brandi product starter --kit` refreshes it.
+starter whose `tools/measure-boards.mjs` predates the gate, or its hole check, reports it not run,
+and the round is not met until `brandi product starter --kit` refreshes it.
+
+Holes are checked as the board renders through the runtime shim, which names on the page each hole
+whose first name the board's props and `renderVals()` never give (a loop's own variables count
+inside the loop). The gate's line names the board and each hole: "1 board names a value its script
+never gives (AppProposal390: noop)". A run's proposal bound `on-edit="{{noop}}"` and
+`on-dismiss="{{noop}}"` on a board that never returned `noop`. Both holes drew nothing, the
+component quietly left out Edit and Not now, every gate passed, and the craft review found it a
+round later. A first name given whose later parts are null is data (`{{booking.note}}` before there
+is a booking), not a fault. A hole inside a branch the board does not draw is not checked.
+`$A product boards --heights` says the same as it measures the boards, so a fix is caught before
+the gates run.
 
 ## Reviewers cannot start reviewers
 
@@ -375,7 +387,8 @@ carries, with a summary row in the quality-gates section:
   with no modules keeps its states (its states boards, its skip and reason, or that it only sends
   messages), which modules drew options and which reused a written pattern, and each core page on
   its board or skipped with its reason.
-- Board sizes: each frame off its content, each box that hides content, each board not measured.
+- Board sizes: each frame off its content, each box that hides content, each hole a script never
+  gives, each board not measured.
 - Findings by severity, each with its status and evidence.
 - Accepted deviations, each with its reason.
 - Shape the kit chose: every radius, the shell and any missing shape move the brand did not set, each

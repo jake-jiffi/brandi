@@ -180,7 +180,7 @@ describe('a round held against the bar', () => {
   test("every board's frame is held to its content, and a box that hides content fails the round, each named in the record", () => {
     const measured = {
       ConsoleHome1440: 1460, ConsoleSignIn1440: 700, MessagingReady600: 497, AppCheckout390: 844, ConsoleStates1440: 1878, Broken1440: { error: 'the board did not render: boom' },
-      __sections: {}, __clipped: { AppCheckout390: [{ what: 'card', shown: 327, content: 371, text: '[Northside], pick-up' }] },
+      __sections: {}, __clipped: { AppCheckout390: [{ what: 'card', shown: 327, content: 371, text: '[Northside], pick-up' }] }, __unfilled: {},
     };
     const boards = [
       { label: 'ConsoleHome1440', width: 1440, declared: 900, fluid: true },
@@ -209,11 +209,32 @@ describe('a round held against the bar', () => {
     assert.match(md, /- AppCheckout390: card "\[Northside\], pick-up" shows 327px of 371px/);
     assert.match(md, /- Broken1440: not measured \(the board did not render: boom\)/);
     assert.match(md, /brandi product boards --heights/);
-    g.sizes = sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {} }, boards: boards.filter((b) => b.label === 'ConsoleStates1440') });
+    g.sizes = sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {}, __unfilled: {} }, boards: boards.filter((b) => b.label === 'ConsoleStates1440') });
     assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').pass, true);
-    assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').detail, 'every frame fits its content on 1 board, and nothing on a board hides its own content');
+    assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').detail, 'every frame fits its content on 1 board, nothing on a board hides its own content, and every hole is filled');
     assert.match(sizeGate({ measured: { ConsoleStates1440: 1878, __sections: {} }, boards }).skipped, /measure-boards\.mjs.*--kit/, "a starter's older tool says to refresh the kit");
+    assert.match(sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {} }, boards }).skipped, /measure-boards\.mjs.*--kit/, 'and so does one from before holes were checked');
     assert.equal(judgeRound(clean()).verdicts.some((v) => v.gate === 'Board sizes'), false, 'a round from before the gate has no line for it');
+  });
+
+  // A proposal's on-edit and on-dismiss named a noop its board's renderVals() never returned, so it drew no Edit and
+  // no Not now, every gate passed, and the craft review found it a round later.
+  test('a board that names a value its script never gives fails Board sizes, naming the board and each name', () => {
+    const boards = [
+      { label: 'AppProposal390', width: 390, declared: 844, fluid: false },
+      { label: 'AppHome390', width: 390, declared: 844, fluid: false },
+    ];
+    const sizes = sizeGate({ measured: { AppProposal390: 844, AppHome390: 844, __clipped: {}, __unfilled: { AppProposal390: ['noop', 'row.pick'] } }, boards });
+    assert.deepEqual(sizes.unfilled, [{ board: 'AppProposal390', names: ['noop', 'row.pick'] }]);
+    const g = clean();
+    g.sizes = sizes;
+    const judged = judgeRound(g);
+    const verdict = judged.verdicts.find((v) => v.gate === 'Board sizes');
+    assert.equal(verdict.pass, false);
+    assert.equal(verdict.detail, '1 board names a value its script never gives (AppProposal390: noop, row.pick)');
+    assert.match(roundMarkdown(g, judged), /## Board sizes\n[\s\S]*- AppProposal390: names \{\{noop\}\}, \{\{row\.pick\}\}, which its script never gives\n/);
+    g.sizes = sizeGate({ measured: { AppProposal390: 844, AppHome390: 844, __clipped: {}, __unfilled: { AppProposal390: ['noop'], AppHome390: ['tabs'] } }, boards });
+    assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').detail, '2 boards name values their scripts never give (AppProposal390: noop; AppHome390: tabs)');
   });
 
   test('the record lists every shape and shell choice the kit made, not the brand, and says so when there are none', () => {
@@ -814,6 +835,18 @@ describe('the height a board is measured at', () => {
     assert.equal(out['/email'], 497);
     assert.equal(out['/framed'], 844);
     assert.equal(typeof out['/dialog'], 'number', JSON.stringify(out['/dialog']));
+  });
+});
+
+describe('a board that names a value its script never gives', () => {
+  // The runtime shim names each hole the board never gives on <html> as it says it is ready, as it does a failure.
+  const marked = (unfilled) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A board</title></head><body style="margin:0"><div data-dc-root><p>A proposal</p></div><script>setTimeout(() => { ${unfilled ? `document.documentElement.setAttribute("data-dc-unfilled", "${unfilled}"); ` : ''}document.documentElement.setAttribute("data-dc-ready", ""); }, 100)</script></body></html>`;
+  const pages = { '/unfilled': marked('noop row.pick'), '/filled': marked('') };
+
+  test('measuring it lists each name under the board, and a board with every hole filled is not listed', needsKit, async () => {
+    const out = await measureOn((url) => pages[url] ?? null, (base) => Object.keys(pages).map((p) => ({ url: `${base}${p}`, label: p, width: 390, height: 844, frame: { w: 390, h: 844 } })));
+    assert.deepEqual(out.__unfilled, { '/unfilled': ['noop', 'row.pick'] });
+    assert.equal(typeof out['/unfilled'], 'number', 'it is still measured');
   });
 });
 

@@ -241,10 +241,11 @@ export function sizePages(pages) {
  * What a round keeps of the boards' sizes: `measured` is measure-boards.mjs's output, `boards` each board's
  * { label, width, declared, fluid }. A frame is off when it clips its content or leaves it a stretch blank; a page
  * (fluid) is held to its device's window at least. `heights` is every height a frame should have, for
- * `brandi product boards --heights` or a script that writes the boards.
+ * `brandi product boards --heights` or a script that writes the boards. `unfilled` is each board that names a value its
+ * script never gives, with the names.
  */
 export function sizeGate({ measured, boards }) {
-  if (!measured || !('__clipped' in measured)) return { skipped: "the starter's tools/measure-boards.mjs cannot check sizes: refresh its kit with brandi product starter --kit" };
+  if (!measured || !('__clipped' in measured) || !('__unfilled' in measured)) return { skipped: "the starter's tools/measure-boards.mjs cannot check sizes: refresh its kit with brandi product starter --kit" };
   const off = [];
   const errors = [];
   const heights = {};
@@ -257,7 +258,8 @@ export function sizeGate({ measured, boards }) {
     if (fit !== 'fits') off.push({ board: b.label, declared: b.declared, want, fit });
   }
   const clipped = Object.entries(measured.__clipped ?? {}).flatMap(([board, boxes]) => boxes.map((box) => ({ board, ...box })));
-  return { boards: boards.length, off, clipped, errors, heights };
+  const unfilled = Object.entries(measured.__unfilled).map(([board, names]) => ({ board, names }));
+  return { boards: boards.length, off, clipped, unfilled, errors, heights };
 }
 
 /** A page's HTTP status, or 0 when it does not answer. */
@@ -422,7 +424,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   // were left clipped or a third blank, and a Card squeezed in a phone frame hid a total, with no gate to say so.
   const sizeList = sizePages(pages);
   let sizes;
-  if (!sizeList.length) sizes = { boards: 0, off: [], clipped: [], errors: [], heights: {} };
+  if (!sizeList.length) sizes = { boards: 0, off: [], clipped: [], unfilled: [], errors: [], heights: {} };
   else {
     writeFileSync(path.join(outDir, 'size-pages.json'), JSON.stringify(sizeList, null, 2));
     const run = nodeScript(starter, 'measure-boards.mjs', ['--pages', path.join(outDir, 'size-pages.json')]);
@@ -432,7 +434,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     sizes = measured ? sizeGate({ measured, boards: sizeList.map((p) => ({ label: p.label, width: p.width, declared: p.frame.h, fluid: p.fluid })) }) : { skipped: `the size check did not finish: ${run.out.slice(-300)}` };
     if (sizes.heights) writeFileSync(path.join(outDir, 'heights.json'), `${JSON.stringify(sizes.heights, null, 2)}\n`);
   }
-  log(sizes.skipped ? `sizes: not run (${sizes.skipped})` : `sizes: ${sizes.off.length} of ${sizes.boards} frames off their content, ${new Set(sizes.clipped.map((c) => c.board)).size} boards hiding content`);
+  log(sizes.skipped ? `sizes: not run (${sizes.skipped})` : `sizes: ${sizes.off.length} of ${sizes.boards} frames off their content, ${new Set(sizes.clipped.map((c) => c.board)).size} boards hiding content, ${sizes.unfilled.length} naming values their scripts never give`);
 
   // What the canvas has to cover, from the surfaces product.json lists: every gate above checks what was drawn,
   // and a run that drew one surface in depth passed them all.
@@ -542,14 +544,17 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
   if (gates.sizes) {
     const z = gates.sizes;
     const hiding = new Set((z.clipped ?? []).map((c) => c.board)).size;
+    // A round from before holes were checked has no list of them.
+    const unfilled = z.unfilled ?? [];
     const by = (fit) => z.off.filter((o) => o.fit === fit).length;
     const faults = [
       z.off.length ? `${z.off.length} of ${z.boards} frames off their content (${by('clipped')} clipped, ${by('blank')} blank)` : '',
       hiding ? `${count(hiding, 'board')} ${hiding === 1 ? 'hides' : 'hide'} content in a box that clips it` : '',
+      unfilled.length ? `${count(unfilled.length, 'board')} ${unfilled.length === 1 ? 'names a value its script never gives' : 'name values their scripts never give'} (${unfilled.map((u) => `${u.board}: ${u.names.join(', ')}`).join('; ')})` : '',
       z.errors?.length ? `${z.errors.length} not measured` : '',
     ].filter(Boolean);
     add('Board sizes', !z.skipped && !faults.length,
-      z.skipped ? `not run: ${z.skipped}` : faults.length ? faults.join('; ') : `every frame fits its content on ${count(z.boards, 'board')}, and nothing on a board hides its own content`);
+      z.skipped ? `not run: ${z.skipped}` : faults.length ? faults.join('; ') : `every frame fits its content on ${count(z.boards, 'board')}, nothing on a board hides its own content, and every hole is filled`);
   }
   // Likewise: a round from before coverage has no line for it, and one with no surfaces to hold the canvas to fails.
   if (gates.coverage) {
@@ -635,10 +640,11 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     for (const f of gates.runtime.failed) lines.push(`- ${f.board}: ${f.errors.join('; ')}`);
   }
   if (gates.sizes?.skipped) lines.push('', '## Board sizes', '', `Not run: ${gates.sizes.skipped}`);
-  else if (gates.sizes && (gates.sizes.off.length || gates.sizes.clipped.length || gates.sizes.errors.length)) {
-    lines.push('', '## Board sizes', '', "Each board measured at its width in its device's window, a page at its whole height. Write the heights with `brandi product boards --heights` (06-canvas.md, Sizes); fix a box that hides content in the board or the component.", '');
+  else if (gates.sizes && (gates.sizes.off.length || gates.sizes.clipped.length || gates.sizes.unfilled?.length || gates.sizes.errors.length)) {
+    lines.push('', '## Board sizes', '', "Each board measured at its width in its device's window, a page at its whole height. Write the heights with `brandi product boards --heights` (06-canvas.md, Sizes); fix a box that hides content in the board or the component, and a hole its script never gives in the board's renderVals().", '');
     for (const o of gates.sizes.off) lines.push(`- ${o.board}: frame ${o.declared}px, content ${o.want}px (${o.fit})`);
     for (const c of gates.sizes.clipped) lines.push(`- ${c.board}: ${c.what}${c.text ? ` "${c.text}"` : ''} shows ${c.shown}px of ${c.content}px`);
+    for (const u of gates.sizes.unfilled ?? []) lines.push(`- ${u.board}: names ${u.names.map((n) => `{{${n}}}`).join(', ')}, which its script never gives`);
     for (const e of gates.sizes.errors) lines.push(`- ${e.board}: not measured (${e.error})`);
   }
   if (gates.coverage) {

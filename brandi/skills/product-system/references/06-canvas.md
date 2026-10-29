@@ -219,6 +219,14 @@ What the syntax carries:
   also fails.
 - A literal attribute is a string. A boolean, number, array, object, handler or element goes
   through a `{{hole}}` bound in `renderVals()`. Holes are dotted lookups only.
+- Every hole names a value the board's script returns from `renderVals()` (or a prop the board was
+  given, which the canvas resolves too, or a loop's own variable inside its `sc-for`). A hole whose
+  first name nothing gives draws nothing, and the component quietly drops what it would have drawn:
+  a proposal's `on-edit="{{noop}}"` on a board that never returned `noop` lost its Edit button, and
+  a review found it a round later. Return a value the board does not have yet as `null`:
+  `{{booking.note}}` with `booking: null` is data, not a fault. The gates hold it: Board sizes
+  (`08-quality-gates.md`) fails a board that names a value its script never gives, naming each
+  hole, and `$A product boards --heights` says so as it measures.
 - A text node that is one hole and nothing else draws its value as it is, an element included.
   Two holes in one text node, or a hole with words beside it, are joined into a string, and an
   element there reads "[object Object]". Give each element a hole of its own, alone in its element:
@@ -677,8 +685,9 @@ The family canvas left 40px between phone frames in a strip and 80px between tab
   900 to 2380 tall. A fixed board at 820 or 390 is that device's screen, at least 1180 or 844 tall;
   a strip, an email, or a states or specimen sheet at 1440 is as tall as what it holds.
 - Every round the gates measure every board the same way, and Board sizes (`08-quality-gates.md`)
-  fails a frame more than 8px short of its content or more than a tenth (and 64px) too tall, and a
-  box that hides content inside a board (A phone frame, section 2).
+  fails a frame more than 8px short of its content or more than a tenth (and 64px) too tall, a
+  box that hides content inside a board (A phone frame, section 2), and a hole its script never
+  gives (The mount, section 2).
 - A page gets `"expand": "fill"` and a fluid root. A device frame or specimen board gets a root
   fixed at `w` x `h`. Say which is which in the reviewer brief (`08-quality-gates.md`).
 - A board whose mounted controls work gets `"is_interactive": true`, and `brandi canvas` sets it
