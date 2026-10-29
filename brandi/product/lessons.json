@@ -2461,6 +2461,22 @@
     "file": "skills/product-system/references/05-components.md",
     "heading": "AppShell"
    }
+  },
+  {
+   "id": "L131",
+   "broke": "Axe scanned a booking dialog while it was still fading in and failed a colour contrast that passes once the dialog settles.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "is scanned once its animations have finished, so a fade in is never read as low contrast"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
   }
  ]
 }

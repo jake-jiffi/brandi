@@ -54,7 +54,9 @@ more, and do not lower the bar to finish.
    h1 shows; a route with none after ten seconds is loaded once more and waited for again, its result
    marked `retried`, counted in the summary line and named in the round record, so a slow page stays on
    the record even when its second load passes. One with no h1 on the second load is scanned anyway and
-   fails. A scripted check that fails is run once more, alone with its component's other checks: one
+   fails. Every page is scanned at rest: axe waits for its animations to end (two seconds at most, a
+   spinner excepted), since a dialog read mid-fade failed a contrast that passes once it settles. A
+   scripted check that fails is run once more, alone with its component's other checks: one
    that passes then counts as passed and is named in the record with its first failure, and one that
    fails again fails the gate. A run's Board check, pressing keys before a menu took focus on a loaded
    machine, failed its gates and passed alone. Every fluid board and

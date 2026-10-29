@@ -88,6 +88,13 @@ for (const p of pages) {
       }
       await page.waitForTimeout(800)
     }
+    // Scanned at rest: a dialog fades in, and axe measured its words mid-fade, nearly the ground's colour, failing a
+    // contrast that passes once it settles. Every animation that ends is waited for, two seconds at most; a spinner
+    // that never ends is not.
+    await page.evaluate(() => Promise.race([
+      Promise.all(document.getAnimations().filter((a) => a.effect?.getComputedTiming?.().iterations !== Infinity).map((a) => a.finished.catch(() => {}))),
+      new Promise((done) => setTimeout(done, 2000)),
+    ]))
     await page.addScriptTag({ content: axeSource })
     // Label in name is WCAG 2.5.3, Level A, but axe ships it switched off as experimental.
     const rules = { "label-content-name-mismatch": { enabled: true } }

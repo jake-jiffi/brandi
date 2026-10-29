@@ -847,6 +847,24 @@ ${wrap ? '<header style="height: 48px;"><h1>App · Bookings, states</h1></header
   });
 });
 
+describe('axe on a board whose dialog is still opening', () => {
+  // A dialog fades in. Scanned at load, its words were measured mid-fade, nearly the colour of the ground, and axe
+  // failed a contrast that passes once the dialog settles. The words here fade from the ground's colour to ink.
+  const page = (iterations) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Booking</title><style>@keyframes in { from { color: #f2f3f0; } to { color: #161616; } } p { animation: in 1200ms ease-out ${iterations} both; }</style></head><body style="margin: 0; background: #ffffff;"><main><h1 style="color: #161616;">Booking</h1><p>Saturday 7 November at 9am, a full groom.</p></main></body></html>`;
+  let run;
+  before(async () => {
+    if (needsKit.skip) return;
+    run = await axePagesOn(
+      (url) => ({ '/opening': page('1') })[url] ?? null,
+      (base) => [{ kind: 'board', label: '/opening', url: `${base}/opening`, width: 1440, height: 900, theme: 'light' }]
+    );
+  });
+
+  test('is scanned once its animations have finished, so a fade in is never read as low contrast', needsKit, () => {
+    assert.deepEqual(run.ids('/opening'), [], JSON.stringify(run.result('/opening').violations));
+  });
+});
+
 describe('axe on an authored states grid and a message board', () => {
   // A states board at a desktop width has no device frame, so no frame's main: drawn as the strip is, a run's three
   // states grids had no main landmark at all. Its email boards drew the email bare, with no main and its layout rows
