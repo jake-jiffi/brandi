@@ -279,6 +279,13 @@ second drawing is a second source, and it can drift from the code. Try it on the
 before relying on it. A native app has no 1440 board to import, so its boards are drawn at their
 own width.
 
+A list and its detail side by side is the one page the import cannot narrow: no kit component
+swaps them by width, so at 820 and 390 the two panes stack, which Screen patterns forbids. Draw
+those widths as two screens, the list on its own and the open item on its own with Back in the top
+bar (`AppShell`'s `topBar`, a `PhoneTopBar` with `back`), named for what they show
+(ConsoleMessagesList390, ConsoleMessages390). Two proof runs met this on a messages page; every other
+page imported cleanly.
+
 ### Rules that keep boards honest
 
 - **Mount wherever the system has a component.** A look-alike drawn in markup lets the canvas and

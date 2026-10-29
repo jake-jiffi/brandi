@@ -780,8 +780,9 @@ the starter (`07-starter.md`).
   API remembered from an older version.
 - **Start a product.** Numbered steps, each an exact command (versions pinned, flags written out)
   or an exact file action. The last step runs the build, lint and dev-server checks, which pass
-  with no changes. Run the sequence on a fresh project before writing it, and say on the page that
-  it was run.
+  with no changes. Run the sequence before writing it, on a fresh project where you can make one
+  (`$A product starter` into an empty folder, then its install, build, lint and type check), else
+  on this product's own starter, and say on the page which steps ran and where.
 - **What is in the starter.** A table, File | What it does, for every file.
 - **Tokens in Tailwind.**
   - Colours are roles, with example classes. shadcn's own names point at the same tokens, so copied
@@ -1130,8 +1131,8 @@ somebody undoes.
 - [ ] The approval rule reads the same in the README, Writing for the product, Screen patterns, the
       brief and Definition of done. The assistant sections match the AI stance and
       `10-ai-catalogue.md`.
-- [ ] The Building it steps were run on a fresh project, and the page's versions are the ones that
-      run used.
+- [ ] The Building it steps were run (on a fresh starter, or this product's own, the page says
+      which), and the page's versions are the ones that run used.
 - [ ] Quality gates matches every `reviews/round-N/record.md`, tool versions included. Its pass
       lines match `08-quality-gates.md`, and so do the brief's and Definition of done's.
 - [ ] Every departure in `product/product.json` and the translation phase has a row, with its
