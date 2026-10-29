@@ -2408,6 +2408,22 @@
     "file": "skills/product-system/references/07-starter.md",
     "heading": "Generated, hand-written and example"
    }
+  },
+  {
+   "id": "L128",
+   "broke": "On a mid-tone brand rail the selected item stepped lighter, towards the rail's light words, and held them at 4.06:1, so two runs changed the brand's rail to pass.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a mid-tone rail steps its hovered and selected items away from its words, so the words keep their floor on them"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
+   }
   }
  ]
 }
