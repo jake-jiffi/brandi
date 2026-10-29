@@ -35,11 +35,11 @@ const railIsDark = (el) => {
   }
   return lum("var(--rail)") < lum("var(--rail-text-strong)")
 }
-const onDarkOf = (page) =>
-  page.evaluate(() => {
+const onDarkOf = (page, base = "full") =>
+  page.evaluate((b) => {
     const marks = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {}
-    return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
-  })
+    return marks[`${b}-on-dark`] ? `${b}-on-dark` : marks[`${b}-ink`] ? `${b}-ink` : b
+  }, base)
 const phone = (inner) => `<div style="width: 390px;" class="outline outline-line">${inner}</div>`
 const LONG = "[Invoice 1042 for the March maintenance plan and the late fee]"
 
@@ -113,18 +113,20 @@ export default {
       name: "The bar's lockup draws the logo made for the rail's ground, and a direction's class moves it with the rail, in both themes",
       example: "menu",
       themes: ["light", "dark"],
-      async run({ page, scope, expect }) {
+      async run({ page, scope, expect, brand }) {
         // Chosen when the bundle was built, a green-rail direction drew the mark made for dark grounds on green.
+        // With no drawn logo the lockup draws the stand-in's symbol beside the brand's name, so the symbol's renditions.
+        const base = brand.standIn ? "symbol" : "full"
         const host = scope.locator('[data-slot="phone-top-bar"]').first()
         const logo = host.locator('[data-slot="product-lockup"] [data-slot="logo"]').first()
-        const onDark = await onDarkOf(page)
+        const onDark = await onDarkOf(page, base)
         const dark = await host.evaluate(railIsDark)
-        expect.equal(await shownMark(logo), dark ? onDark : "full", `the rendition on this ${dark ? "dark" : "light"} rail`)
+        expect.equal(await shownMark(logo), dark ? onDark : base, `the rendition on this ${dark ? "dark" : "light"} rail`)
         await host.evaluate((el, d) => {
           el.style.setProperty("--rail-mark-on-light", d ? "flex" : "none")
           el.style.setProperty("--rail-mark-on-dark", d ? "none" : "flex")
         }, dark)
-        expect.equal(await shownMark(logo), dark ? "full" : onDark, "the rendition once a direction turns the rail's tone over")
+        expect.equal(await shownMark(logo), dark ? base : onDark, "the rendition once a direction turns the rail's tone over")
       },
     },
     {

@@ -157,7 +157,12 @@ export default {
         expect(whileOpen, "while open, the menu holds the page, as a modal menu does")
         const actions = await menu.getByRole("menuitem").allInnerTexts()
         expect.equal(actions.map((s) => s.trim()).join(" | "), "Move to Quoted | Move to Booked | Move to Done | Move up", "the menu offers every other column, then up")
+        // Each key waits for focus to land first: on a loaded machine an arrow pressed before the menu took focus was
+        // lost, Enter took the first item, and the card went to Quoted.
+        const focused = (text) => page.waitForFunction((t) => document.activeElement?.getAttribute("role") === "menuitem" && (t === null || document.activeElement.textContent.trim() === t), text, { timeout: 3000 })
+        await focused(null)
         await page.keyboard.press("ArrowDown")
+        await focused("Move to Booked")
         await page.keyboard.press("Enter")
         await menu.waitFor({ state: "hidden" })
         expect.equal(await columnOf(scope, "[Fix leaking tap]"), "booked", "the card is in Booked")

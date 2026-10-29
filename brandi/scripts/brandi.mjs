@@ -3116,7 +3116,7 @@ function starterIllustrationLines(ill) {
  */
 function starterStandInLines(b) {
   return [
-    `lib/brand.ts: ${b.name} has no drawn logo yet, so it carries the kit's stand-in mark (a rounded square and the letters PRODUCT) under the name "${b.name}", and says in the file that it is not the brand's logo. ${b.character ? 'With the character.' : `${b.name} has no character, so Character draws nothing.`}`,
+    `lib/brand.ts: ${b.name} has no drawn logo yet, so it carries the kit's stand-in mark under the name "${b.name}", and says in the file that it is not the brand's logo. The lockups draw the stand-in's rounded square beside "${b.name}" in words, never its letters PRODUCT. ${b.character ? 'With the character.' : `${b.name} has no character, so Character draws nothing.`}`,
     b.missing.length
       ? `  Not drawn yet: ${b.missing.join(', ')}, which ${b.from} names. Looked for in the brand folder and the project root.`
       : '  No logo on record: brand.json names no primary logo file, and product.json names no marks.',

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import { BRAND } from "@/lib/brand"
+import { BRAND, STAND_IN_MARKS } from "@/lib/brand"
 import { useLink } from "@/lib/link"
 import { PRODUCT } from "@/lib/product"
 import { cn } from "@/lib/utils"
@@ -34,6 +34,15 @@ export function lockupLabel(product: string) {
   return sameName(product, BRAND.name) ? BRAND.name : `${BRAND.name} ${product}`
 }
 
+/**
+ * Whether the brand has no drawn logo yet and carries the kit's stand-in, whose full mark spells PRODUCT. A lockup
+ * then shows the stand-in's symbol and the brand's name in words, so no screen names a brand that is not this one: a
+ * run's sign-in and booking pages said PRODUCT and never the brand's name.
+ */
+export function standInMark() {
+  return BRAND.marks === STAND_IN_MARKS
+}
+
 /** The mark with the product's name, for the top of the rail, sign-in and product emails. */
 export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(function ProductLockup(
   { product = PRODUCT.name, color = "auto", layout = "inline", height, href, tone = "default", className, ...rest },
@@ -42,12 +51,13 @@ export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(f
   const Link = useLink()
   const h = Math.max(height ?? BRAND.logo.height, BRAND.logo.minHeight)
   const ink = color === "ink"
-  // A product named for the brand is the mark alone: the mark already says the name.
-  const alone = sameName(product, BRAND.name)
+  const standIn = standInMark()
+  // A product named for the brand is the mark alone: the mark already says the name. The stand-in says none.
+  const alone = !standIn && sameName(product, BRAND.name)
   const content = (
     <>
-      <Logo color={color} height={h} title={href ? "" : undefined} className={tone === "rail" && !ink ? "text-rail-text-strong" : undefined} />
-      {!alone && layout === "inline" ? (
+      <Logo mark={standIn ? "symbol" : "full"} color={color} height={h} title={href || standIn ? "" : undefined} className={tone === "rail" && !ink ? "text-rail-text-strong" : undefined} />
+      {!alone && !standIn && layout === "inline" ? (
         // A border, not a fill, so the hairline survives forced colours.
         <span aria-hidden data-slot="product-lockup-rule" className={cn("my-0.5 w-0 self-stretch border-l", ink ? "border-current/40" : "border-line")} />
       ) : null}
@@ -61,7 +71,7 @@ export const ProductLockup = React.forwardRef<HTMLElement, ProductLockupProps>(f
             ink ? "text-current" : tone === "rail" ? "text-rail-text-strong" : "text-text-strong"
           )}
         >
-          {product}
+          {standIn ? lockupLabel(product) : product}
         </span>
       )}
     </>

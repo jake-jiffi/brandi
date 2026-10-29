@@ -4,7 +4,7 @@
 export * from "@/components/system"
 export { formatNumber, formatTime, formatTimeRange, NUMBER_STYLES } from "@/lib/format"
 // The brand and product names, so a check can expect "[Brand] [product]" for whatever brand it runs on.
-export { BRAND } from "@/lib/brand"
+export { BRAND, STAND_IN_MARKS } from "@/lib/brand"
 export { PRODUCT } from "@/lib/product"
 export { ICON_NAMES } from "@/lib/icons"
 export { Root } from "./root"

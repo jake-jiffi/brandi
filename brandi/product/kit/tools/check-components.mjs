@@ -8,7 +8,8 @@
  *
  * <dir> holds each component's rendered preview (<Name>Preview.preview.html, written by Brandi's
  * preview.mjs). A check receives { page, scope, expect, theme, brand, format }: scope is the example's
- * section, brand is { name, product, symbol }, the names the bundle was built with and whether it has a symbol mark, and format is lib/format.js
+ * section, brand is { name, product, symbol, standIn }, the names the bundle was built with, whether it has a symbol mark and
+ * whether it carries the kit's stand-in for a logo nobody has drawn, and format is lib/format.js
  * with the product's TIME style, so an expected time reads the way the product writes times.
  * Prints {"passed": n, "failed": [...]} and exits 1 when anything failed.
  *
@@ -114,7 +115,7 @@ for (const def of defs) {
         // A starter has the brand's own names, not the kit's placeholders, so checks read them from the bundle.
         const brand = await page.evaluate(() => {
           const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
-          return { name: kit?.BRAND?.name ?? "Product", product: kit?.PRODUCT?.name ?? "Product", symbol: Boolean(kit?.BRAND?.marks?.symbol) }
+          return { name: kit?.BRAND?.name ?? "Product", product: kit?.PRODUCT?.name ?? "Product", symbol: Boolean(kit?.BRAND?.marks?.symbol), standIn: Boolean(kit?.STAND_IN_MARKS) && kit?.BRAND?.marks === kit?.STAND_IN_MARKS }
         })
         await check.run({ page, scope, expect: makeExpect(), theme, brand, format })
         if (errors.length) throw new Error(`the page threw: ${errors.join("; ")}`)

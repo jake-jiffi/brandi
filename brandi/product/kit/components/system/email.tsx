@@ -4,7 +4,7 @@ import { BRAND, type MarkRendition } from "@/lib/brand"
 import { PRODUCT } from "@/lib/product"
 import { cn } from "@/lib/utils"
 
-import { lockupLabel } from "./product-lockup"
+import { lockupLabel, standInMark } from "./product-lockup"
 // A namespace import read by property, so the bundle keeps only the keys the email uses.
 import * as tokens from "@/system/tokens.json"
 
@@ -111,15 +111,18 @@ function scopeIds(svg: string, scope: string) {
 }
 
 /** The mark as inline SVG with its colours written in, in one scheme. */
-function inlineMark(scheme: EmailScheme, height: number, label: string, scope: string) {
-  const name: MarkRendition = scheme === "dark" && BRAND.marks["full-on-dark"] ? "full-on-dark" : "full"
+function inlineMark(scheme: EmailScheme, height: number, label: string, scope: string, symbol = false) {
+  const name: MarkRendition = symbol
+    ? scheme === "dark" && BRAND.marks["symbol-on-dark"] ? "symbol-on-dark" : "symbol"
+    : scheme === "dark" && BRAND.marks["full-on-dark"] ? "full-on-dark" : "full"
   const svg = scopeIds(BRAND.marks[name] ?? BRAND.marks.full, `${scope}-${scheme}`)
   const box = /viewBox="([\d.\s-]+)"/.exec(svg)?.[1].trim().split(/\s+/).map(Number) ?? [0, 0, 4, 1]
   const width = Math.round((height * (box[2] || 4)) / (box[3] || 1))
   return svg
     .replace(/var\(--([a-z0-9-]+)\)/g, (m, r: string) => role(r, scheme) || m)
     .replace(/currentColor/g, role("text-strong", scheme))
-    .replace(/<svg\b/, `<svg width="${width}" height="${height}" role="img" aria-label="${esc(label)}" style="display:block"`)
+    // With no label the words beside it carry the name, so the mark is hidden rather than read twice.
+    .replace(/<svg\b/, `<svg width="${width}" height="${height}" ${label ? `role="img" aria-label="${esc(label)}"` : 'aria-hidden="true"'} style="display:block"`)
 }
 /** The logo's width at a height, from the mark's own proportions, so a hosted image gets both dimensions. */
 function markWidth(height: number) {
@@ -141,14 +144,17 @@ function bodyHtml({ props, scheme, level, bothMarks }: Built) {
   const c = (r: string) => role(r, scheme)
   const product = props.product ?? PRODUCT.name
   const h = Math.max(BRAND.logo.height, BRAND.logo.minHeight)
+  const standIn = standInMark() && !props.logoSrc
   const mark = props.logoSrc && safeSrc(props.logoSrc)
     ? `<img src="${safeSrc(props.logoSrc)}" alt="${esc(BRAND.name)}" width="${markWidth(h)}" height="${h}" style="${css({ display: "block", border: "0", height: `${h}px`, width: `${markWidth(h)}px` })}">`
     : bothMarks
-      ? `<div class="em-mark-light">${inlineMark("light", h, BRAND.name, scope)}</div><div class="em-mark-dark" style="display:none;mso-hide:all">${inlineMark("dark", h, BRAND.name, scope)}</div>`
-      : inlineMark(scheme, h, BRAND.name, scope)
-  // A product named for the brand is the mark alone, as in ProductLockup: "[Brand] / [Brand]" says it twice.
-  const alone = lockupLabel(product) === BRAND.name
-  const named = alone ? "" : `<td style="padding:0 12px;vertical-align:middle">${table()}<tr><td class="em-rule" width="1" height="20" style="${css({ width: "1px", height: "20px", "background-color": c("line"), "font-size": "0", "line-height": "0" })}">&nbsp;</td></tr></table></td><td class="em-strong" style="${css({ ...type("heading"), color: c("text-strong"), "vertical-align": "middle" })}">${esc(product)}</td>`
+      ? `<div class="em-mark-light">${inlineMark("light", h, standIn ? "" : BRAND.name, scope, standIn)}</div><div class="em-mark-dark" style="display:none;mso-hide:all">${inlineMark("dark", h, standIn ? "" : BRAND.name, scope, standIn)}</div>`
+      : inlineMark(scheme, h, standIn ? "" : BRAND.name, scope, standIn)
+  // A product named for the brand is the mark alone, as in ProductLockup: "[Brand] / [Brand]" says it twice. The
+  // kit's stand-in spells PRODUCT, so with it the symbol goes beside the brand's name in words, with no rule.
+  const alone = !standIn && lockupLabel(product) === BRAND.name
+  const strong = `<td class="em-strong" style="${css({ ...type("heading"), color: c("text-strong"), "vertical-align": "middle" })}">${esc(standIn ? lockupLabel(product) : product)}</td>`
+  const named = alone ? "" : standIn ? `<td style="padding:0 0 0 12px"></td>${strong}` : `<td style="padding:0 12px;vertical-align:middle">${table()}<tr><td class="em-rule" width="1" height="20" style="${css({ width: "1px", height: "20px", "background-color": c("line"), "font-size": "0", "line-height": "0" })}">&nbsp;</td></tr></table></td>${strong}`
   const lockup = `${table()}<tr><td style="vertical-align:middle">${mark}</td>${named}</tr></table>`
   const radius = RADII.get("radius-md") ?? "12px"
   const pill = RADII.get("radius-action") ?? "9999px"

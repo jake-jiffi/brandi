@@ -88,9 +88,26 @@ export default {
       example: "same-name",
       async run({ scope, expect, brand }) {
         expect.equal(await scope.getByRole("link", { name: brand.name, exact: true }).count(), 1, "one link, named for the brand once")
-        expect.equal(await scope.locator('[data-slot="product-lockup-name"]').count(), 0, "no name beside the mark")
-        expect.equal(await scope.locator('[data-slot="product-lockup-rule"]').count(), 0, "and no hairline before it")
-        expect.equal(await scope.locator('[data-slot="logo"]').count(), 1, "the mark says the name")
+        expect.equal(await scope.locator('[data-slot="product-lockup-rule"]').count(), 0, "no hairline")
+        expect.equal(await scope.locator('[data-slot="logo"]').count(), 1, "one mark")
+        // The kit's stand-in spells PRODUCT, so with it the name is in words; a drawn logo says the name itself.
+        const named = scope.locator('[data-slot="product-lockup-name"]')
+        if (brand.standIn) expect.equal(await named.innerText(), brand.name, "the brand's name in words, once")
+        else expect.equal(await named.count(), 0, "no name beside the mark: the mark says it")
+      },
+    },
+    {
+      name: "With no drawn logo, the stand-in's symbol stands beside the brand's name in words, never the stand-in's PRODUCT",
+      example: "link",
+      async run({ scope, expect, brand }) {
+        // A brand with its own logo shows it; this holds the lockup a brand with none gets.
+        if (!brand.standIn) return
+        const logo = scope.locator('[data-slot="logo"]')
+        const shown = await logo.evaluate((el) => [...el.querySelectorAll('[data-slot="logo-rendition"]')].find((r) => r.checkVisibility())?.dataset.rendition)
+        expect.equal(shown?.startsWith("symbol"), true, `the symbol, not the full stand-in: got ${shown}`)
+        expect.equal(await logo.getAttribute("aria-hidden"), "true", "hidden: the words carry the name")
+        expect.equal(await scope.locator('[data-slot="product-lockup-name"]').innerText(), `${brand.name} [Rosters]`, "the brand and the product, in words")
+        expect.equal(await scope.locator('[data-slot="product-lockup-rule"]').count(), 0, "no hairline between a symbol and words")
       },
     },
     {

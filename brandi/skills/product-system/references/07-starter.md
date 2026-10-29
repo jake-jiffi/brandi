@@ -89,8 +89,11 @@ mark (`<brandi>/skills/brand-system/references/08-logo-system.md` section 7), an
 decisions: the starter prints the missing files and the ways to add them (the brand's artwork at that
 path, the logo forge, `$A logo wordmark`, or product.json's `brand.marks`), then a rerun picks them
 up. A file product.json names is the product's own pick, so a missing one there still stops the
-starter. The stand-in's letters read PRODUCT, so until the logo exists, reviews will flag the rail;
-the fix is the brand's logo, not the product.
+starter. The stand-in's full mark reads PRODUCT, so no lockup draws it: `ProductLockup` (the rail,
+the phone's top bar, sign-in) and `Email` draw the stand-in's symbol, hidden from screen readers,
+beside the brand's name in words, so every screen names the brand and none names PRODUCT. A run's
+sign-in and booking pages said PRODUCT and never the brand, and its review marked it down. The
+brand's own logo replaces both on the next run.
 
 **A brand with no character.** `BRAND` has a character only when product.json's `brand.character`
 names one, or a drawing in the illustration library carries a moment's own name. Otherwise there is

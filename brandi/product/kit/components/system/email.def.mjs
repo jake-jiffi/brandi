@@ -96,13 +96,14 @@ export default {
       name: "A product named for the brand is the mark alone, in the email and its plain text; another product keeps its name",
       async run({ page, expect, brand }) {
         const lockup = await page.locator('[data-example="same-name"] [data-slot="email"]').evaluate((el) => {
-          const mark = el.querySelector('[role="img"], img')
+          const mark = el.querySelector('[role="img"], img, svg[aria-hidden="true"]')
           const row = mark.closest("table")
           return { words: row.innerText.replace(/\s+/g, " ").trim(), rule: row.querySelectorAll(".em-rule").length, name: mark.getAttribute("aria-label") ?? mark.getAttribute("alt") }
         })
-        expect.equal(lockup.words, "", "no name beside the mark")
+        // The kit's stand-in spells PRODUCT, so with it the symbol is hidden and the brand's name is in words.
+        expect.equal(lockup.words, brand.standIn ? brand.name : "", brand.standIn ? "the brand's name in words, beside the stand-in's symbol" : "no name beside the mark")
         expect.equal(lockup.rule, 0, "and no hairline")
-        expect.equal(lockup.name, brand.name, "the mark names the brand, once")
+        expect.equal(lockup.name, brand.standIn ? null : brand.name, brand.standIn ? "the symbol hidden, so the name is read once" : "the mark names the brand, once")
         const [same, other] = await page.evaluate(([props, find, name]) => {
           const kit = new Function(`return (${find})`)()()
           return [kit.Email.text({ ...props, product: name }).split("\n")[0], kit.Email.text({ ...props, product: "[Rosters]" }).split("\n")[0]]
@@ -197,7 +198,7 @@ export default {
       example: "timesheets",
       async run({ scope, expect, brand }) {
         const order = await scope.locator('[data-slot="email"]').evaluate((el) => {
-          const named = el.querySelector('[role="img"], img')
+          const named = el.querySelector('[role="img"], img, svg[aria-hidden="true"]')
           const parts = [named, el.querySelector(".em-card h3"), el.querySelector(".em-card p"), el.querySelector(".em-card a"), el.querySelector(".em-muted")]
           const sorted = parts.every((p, i) => i === 0 || (parts[i - 1].compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING))
           return { sorted, logo: named.getAttribute("aria-label") ?? named.getAttribute("alt"), lockup: named.closest("table").innerText.replace(/\s+/g, " ").trim() }
