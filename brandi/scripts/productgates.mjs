@@ -10,8 +10,9 @@
  *   reflow     every fluid board and route at 320px wide: nothing scrolls sideways (WCAG 1.4.10)
  *   checks     every definition's scripted checks, real keyboard
  *   sizes      every board's frame against its content, and no box on a board hiding its own content
- *   coverage   every surface product.json lists: a board at each of its widths, a states board per module, and
- *              each core page on a board or skipped with a reason
+ *   coverage   every surface product.json lists: a board at each of its widths, a states board per module (one
+ *              for the surface when it has none, unless it only sends messages), and each core page on a
+ *              board or skipped with a reason
  *
  * The judged gates (the Impeccable craft critique against Nielsen's heuristics, the ui-ux-pro-max
  * rules review) are run by reviewers, not by this file. `brandi product round` folds their results
@@ -617,8 +618,13 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
       ...(s.options ?? []).map((o) => `options ${letters(o.letters)} for ${o.module}`),
       ...(s.reused?.length ? [`a written pattern reused for ${s.reused.join(', ')}`] : []),
     ].map((t) => `; ${t}`).join('');
+    // Where a surface keeps its states: a board per module, or, with no modules, its own states boards.
+    const held = (s) => (s.modules.length ? `, with a states board for ${s.modules.join(', ')}`
+      : s.states?.boards ? `, with its states on ${s.states.boards.join(', ')}`
+        : s.states?.messages ? '; it only sends messages, so it needs no states board' : '');
     for (const s of gates.coverage.surfaces ?? []) {
-      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}${trail(s)}`);
+      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${held(s)}`}${trail(s)}`);
+      if (s.states?.skip) lines.push(`  - States skipped: ${sentence(s.states.skip)}`);
       // Each core page on its board, and each skip with its reason, so a reviewer can open the screen or question the skip.
       if (s.core?.named?.length) lines.push(`  - Core pages: ${s.core.named.map((n) => `${n.pattern} on ${n.board}`).join(', ')}`);
       if (s.core?.skipped?.length) lines.push(`  - Skipped: ${s.core.skipped.map((k) => `${k.pattern} (${sentence(k.reason)})`).join(', ')}`);

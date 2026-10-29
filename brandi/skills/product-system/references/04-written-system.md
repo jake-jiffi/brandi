@@ -433,7 +433,7 @@ change the content. Each pattern is drawn on the canvas with the real components
   Which pages cap their width and which run full width. What scrolls and what sticks. One primary
   action per page.
 - **Pages.** One subheading per pattern. Each gives its job in a line, its structure in order, its
-  limits as numbers, and the components it is built from. The ten core patterns:
+  limits as numbers, and the components it is built from. The eleven core patterns:
   - *Home.* What needs me, and how are we tracking. The only page with a greeting and the ask bar.
     A waiting-on-you list of up to five rows, each with its badge and next step, then See all. Two
     to four metric cards in one row, at most one hero. One chart at most, and recent activity if it
@@ -489,6 +489,30 @@ change the content. Each pattern is drawn on the canvas with the real components
     ("Welcome back"). Single sign-on first, then email. The character beside the panel on wide
     screens, nothing on phones. A footnote saying who to ask ("Trouble signing in? Ask your [Brand]
     admin.").
+  - *Help.* An answer without leaving the work, then a person when there is none. The rail's Help,
+    beside Settings, opens it as a page of its own at the content width, and the palette and the
+    phone menu reach the same page. Help asked for in the middle of a task (a field's Learn more, a
+    link in an error) opens that one answer in a Sheet, 440 wide, with a link to the page, so
+    nothing typed is lost.
+    - What is down now comes first: one Banner under the page header naming each outside system
+      that is not responding, since when, and the pages it holds up, in the words those pages use.
+      No banner when nothing is down. Help never says "All systems normal" about systems it does not
+      watch.
+    - Search across every question and answer, a SearchField that filters as the person types, once
+      there are more than ten questions. No match keeps the words and points to who to ask. With ten
+      or fewer, the list is the search.
+    - The common questions, in the words people ask them, as an Accordion with each question a
+      heading. Ten at most in one list, most asked first; past ten, a heading per job. Each answer
+      names the page and the button ("On Jobs, press Export") in 60 words or fewer.
+    - The keyboard shortcuts: every key that works everywhere, each in a Kbd, on a Card at
+      `#keyboard-shortcuts`, the anchor the palette and onboarding link to. While single-key
+      shortcuts are off, the row says so and links to turn them on, never showing a key that does
+      nothing.
+    - Who to ask, last: the person in the workspace who can help, by name, then the support team's
+      address, its hours if it has a phone line, and how long it takes to answer ("Replies within
+      one working day"). A form with no reply time is not a way to reach a person.
+    - Built from PageHeader, Banner, SearchField, Accordion, Card, DescriptionList, Kbd, TextLink and
+      Sheet. The brand's character may stand in the no-match state, and nowhere else on the page.
 
   A product that needs a page none of these covers gets a new pattern, added here first, so the
   next product gets it too.

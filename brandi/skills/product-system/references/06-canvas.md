@@ -16,7 +16,7 @@ Six decisions are fixed, so they are not re-argued per product:
 2. **One canvas carries the whole family.** The ops console, customer portal, staff tablet tool,
    consumer app, messaging and email share it, so a concept means the same thing on every surface.
 3. **States are the unit of design.** Every module gets a states board whose title lists every
-   state it covers, with the edge cases drawn.
+   state it covers, with the edge cases drawn, and so does every surface with no modules.
 4. **The decision trail stays on the canvas.** Hard screens are drawn as options A to D, each title
    naming its weakness. The pick is recorded, then every page and state of the pick follows.
 5. **Three checked widths:** 1440, 820 and 390, in light and dark.
@@ -41,8 +41,8 @@ Foundations and components appear once. The other families repeat for each surfa
 | Foundations | The visual foundations the system's README covers (`12-design-system-artifact.md`) | 1440 |
 | Components | One board per group (actions and inputs, status and data, charts and feedback, navigation and overlays), every variant and state mounted live. One more for the empty, loading and problem components | 1440 |
 | Shell | The shell at each checked width, the phone menu open, and the shell again for each role whose navigation differs | 1440, 820, 390 |
-| The working day | Per product, the ten core screen patterns (`04-written-system.md`) in the order its main person meets them: Home, Records, List and detail, a Record, Create and edit (the dialog, sheet or page that acts on it), the Report. Then Settings, the assistant, Sign in and Setup | The surface's main width |
-| States | One per module (section 3) | The module's surface width |
+| The working day | Per product, the eleven core screen patterns (`04-written-system.md`) in the order its main person meets them: Home, Records, List and detail, a Record, Create and edit (the dialog, sheet or page that acts on it), the Report. Then Settings, Help, the assistant, Sign in and Setup | The surface's main width |
+| States | One per module, and one per surface with no modules (section 3) | The module's surface width |
 | Options | A to D for each hard screen (section 4) | The surface's main width |
 | Phone | The 390 version of each main page | 390 |
 | Tablet | Every page of a surface people use on a tablet | 820 |
@@ -53,12 +53,14 @@ Foundations and components appear once. The other families repeat for each surfa
 **Every surface, not the first one.** Each surface in `product/product.json` names its board prefix
 (`boards`), the widths it is drawn at (`widths`) and its modules (`modules`), and the coverage gate
 (`08-quality-gates.md`, Coverage) fails the round until each surface has a board at each of its
-widths and a states board for each module. A run that drew the console in depth and almost nothing
-of the website, the app or the messages passed every other gate.
+widths and a states board for each module. A surface with no modules has a states board of its own
+(section 3), or skips its states in product.json with a reason; one that only sends messages needs
+none. A run that drew the console in depth and almost nothing of the website, the app or the
+messages passed every other gate.
 
 **Every core page, not the easy ones.** A surface with modules names, under `pages`, the board that
 shows each core pattern, by its name in `04-written-system.md`, or skips it with a reason
-(`01-routes-and-intake.md`, Recording it). Three of the ten:
+(`01-routes-and-intake.md`, Recording it). Three of the eleven:
 
 ```json
 "pages": { "Home": "ConsoleHome1440", "Create and edit": "ConsoleRosterEdit1440",
@@ -118,7 +120,8 @@ still `AppBookingsStates390`, which is how the coverage gate counts it as the ap
 board's own size is its `$preview` and its `canvas.json` entry. `<Surface>` is the surface's
 `boards` prefix from `product.json` (`Console` for an ops console), its name in PascalCase when it
 sets none; the coverage gate reads boards by it. A states board holds `States` and a word of its
-module: `ConsoleRostersStates1440`.
+module: `ConsoleRostersStates1440`. A surface with no modules names its own after the prefix, or
+after a screen: `BookingStates390`, `BookingTimesStates390`.
 
 | Board | File |
 | --- | --- |
@@ -128,6 +131,7 @@ module: `ConsoleRostersStates1440`.
 | Its phone version | `ConsoleRosters390.dc.html` |
 | Option C of the module's first page | `ConsoleRostersC1440.dc.html` |
 | The module's states | `ConsoleRostersStates1440.dc.html` |
+| A surface's states, when it has no modules | `BookingStates390.dc.html` |
 | A tablet tool's page | `StaffShift820.dc.html` |
 | The console's shell on a phone | `ConsoleShell390.dc.html` |
 
@@ -406,6 +410,14 @@ tokens.json". A hand edit to a generated board is drift until someone carries it
 ## 3. The states board
 
 A module is designed when its states board is, not when its happy path is. Every module gets one.
+
+So does a surface with no modules, a booking flow or a portal of a few pages: one states board for
+the surface, or one per screen when they outgrow it, drawing its empty, loading and could-not-load
+states and the failure modes of the systems it touches. A run's booking pages had no modules, and
+drew neither "no times this week" nor "booking failed": nothing asked for them. A surface with
+nothing that loads, empties or fails skips them in `product.json` with its reason, and a surface
+that only sends messages needs none, since a message's failures show where it was sent from
+(`08-quality-gates.md`, Coverage).
 
 On a desktop surface it is one board at 1440, with the states in a grid. On a phone or tablet
 surface it is a strip of device frames side by side, one state per frame. Container queries are

@@ -6,8 +6,10 @@
  * checks what was not. product.json lists the surfaces (01-routes-and-intake.md); each names the prefix its boards
  * carry (`boards`), the widths it is drawn at (`widths`) and, where it has them, its modules and the board that shows
  * each core page (`pages`). Coverage asks for a board at each width, a states board for each module and each core
- * page named or skipped with a reason, and says what is missing, surface by surface. It reads board names only, as
- * 06-canvas.md writes them: `<Prefix><Screen><Width>`, `<Prefix><Module>States<Width>`, a dark twin ending in `Dark`.
+ * page named or skipped with a reason, and says what is missing, surface by surface. A surface with no modules shows
+ * its states on a board of its own or skips them with a reason (`states`), unless it only sends messages. It reads
+ * board names only, as 06-canvas.md writes them: `<Prefix><Screen><Width>`, `<Prefix><Module>States<Width>`, a dark
+ * twin ending in `Dark`.
  */
 
 import { existsSync, readdirSync } from 'node:fs';
@@ -19,7 +21,16 @@ export const DEFAULT_WIDTHS = Object.freeze([1440, 820, 390]);
  * The core page patterns, as 04-written-system.md (Screen patterns) names them, in its order. A surface with modules (an
  * app or a console) shows each on a board or skips it with a reason; a marketing site or messages have none.
  */
-export const CORE_PAGES = Object.freeze(['Home', 'Records', 'List and detail', 'Record', 'Report', 'Settings', 'Create and edit', 'Setup', 'The assistant', 'Sign in']);
+export const CORE_PAGES = Object.freeze(['Home', 'Records', 'List and detail', 'Record', 'Report', 'Settings', 'Create and edit', 'Setup', 'The assistant', 'Sign in', 'Help']);
+
+/**
+ * The platforms of a surface that only sends messages. An email or a text is written once and sent: nothing on it
+ * loads, empties or fails to load, and what goes wrong with one (a bounce, a text that never arrived) shows on the
+ * surface that sent it, so its states are drawn there.
+ */
+const MESSAGE_PLATFORMS = Object.freeze(['email', 'sms']);
+const sendsOnly = (surface) => Array.isArray(surface?.platforms) && surface.platforms.length > 0
+  && surface.platforms.every((p) => MESSAGE_PLATFORMS.includes(String(p).toLowerCase()));
 
 const pascal = (text) => String(text).split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('');
 const stemOf = (file) => String(file).replace(/\.dc\.html$/, '');
@@ -97,8 +108,9 @@ export function canvasBoards(dir) {
 /**
  * Hold the canvas's boards to the surfaces. A board belongs to the longest prefix it starts with, at a word boundary
  * (the next letter a capital or a digit), so AppStaffShift820 is not an App board and ApplesHome390 is nobody's.
- * Returns each surface with its prefix, widths, modules, how many boards it has, its core pages and what is missing,
- * and `covered`.
+ * Returns each surface with its prefix, widths, modules, how many boards it has, where a surface with no modules keeps
+ * its states (`states`: its states boards, a skip with its reason, or that it only sends messages; null otherwise),
+ * its core pages and what is missing, and `covered`.
  */
 export function canvasCoverage({ surfaces = [], files = [] }) {
   if (!Array.isArray(surfaces) || !surfaces.length) {
@@ -123,6 +135,7 @@ export function canvasCoverage({ surfaces = [], files = [] }) {
     const boards = boardsOf.get(s);
     const missing = [];
     const core = corePages(surfaces[i]?.pages, { ...s, boards, canvas });
+    let states = null;
     const twin = listed.slice(0, i).find((o) => o.prefix === s.prefix);
     if (!s.prefix) missing.push('no boards prefix: give the surface a name or a boards prefix');
     else if (twin) missing.push(`its prefix ${s.prefix} is also ${twin.name}'s: give each surface its own boards prefix`);
@@ -136,6 +149,18 @@ export function canvasCoverage({ surfaces = [], files = [] }) {
           return rest.includes('States') && words.some((w) => rest.toLowerCase().includes(w));
         });
         if (!states) missing.push(`no states board for the ${m} module (a board named ${s.prefix}, a word of ${moduleWords(m).join(' or ')}, then States, as ${s.prefix}${pascal(m)}States${s.widths[0]})`);
+      }
+      // A surface with no modules is held to its states as a whole. A run's booking pages had no modules, so nothing
+      // asked for "no times this week" or "booking failed", and neither was drawn.
+      if (!s.modules.length) {
+        const drawn = boards.filter((b) => b.slice(s.prefix.length).includes('States'));
+        const given = surfaces[i]?.states;
+        const skip = given && typeof given === 'object' && 'skip' in given ? given.skip : undefined;
+        if (drawn.length) states = { boards: drawn };
+        else if (typeof skip === 'string' && skip.trim()) states = { skip: skip.trim() };
+        else if (sendsOnly(surfaces[i])) states = { messages: true };
+        else if (skip !== undefined) missing.push('its states are skipped with no reason: say why the surface has none');
+        else missing.push(`no states board for the surface (a board named ${s.prefix}, then States, as ${s.prefix}States${s.widths[0]}, drawing its empty, loading and could-not-load states; or skip them under the surface in product.json with "states": { "skip": "why it has none" })`);
       }
       missing.push(...(core?.missing ?? []));
     }
@@ -152,7 +177,7 @@ export function canvasCoverage({ surfaces = [], files = [] }) {
       if (letters.size >= 2) options.push({ module: m, letters: [...letters].sort() });
     }
     const reused = s.modules.filter((m) => !options.some((o) => o.module === m));
-    return { ...s, boards: boards.length, missing, options, reused, core };
+    return { ...s, boards: boards.length, missing, options, reused, states, core };
   });
   return { covered: result.every((s) => !s.missing.length), surfaces: result };
 }

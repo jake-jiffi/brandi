@@ -3030,8 +3030,10 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       --serve builds and starts the starter and scans tools/routes.json, or
       --route names a running page (once for each). Holds the canvas to the
       surfaces product.json lists (a board at each width, a states board for
-      each module, and on a surface with modules each core page on the board
-      its "pages" names, or skipped with a reason), measures every board's
+      each module, or one for a surface with none unless it only sends
+      messages or its "states" skips them with a reason, and on a surface
+      with modules each core page on the board its "pages" names, or skipped
+      with a reason), measures every board's
       frame against its content, and leaves out detector findings
       product.json "accepted" records with a reason. Writes product/rounds/round-N/gates.json with every tool
       version, and heights.json with the height each board's frame wants.
