@@ -1036,11 +1036,74 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     await rm(dir, { recursive: true, force: true });
   });
 
+  /** A product folder as `brandi product boards` and `bundle` leave it: product.json, the canvas, the system installed beside the boards. */
+  const productFolder = async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-canvas-product-'));
+    const canvasDir = path.join(dir, 'product', 'canvas');
+    await mkdir(path.join(canvasDir, 'ds', 'acme', 'fonts'), { recursive: true });
+    await writeFile(path.join(dir, 'product', 'product.json'), JSON.stringify({ name: 'Acme product system', namespace: 'acme' }));
+    await writeFile(path.join(canvasDir, 'Main.dc.html'), product('Main'));
+    await writeFile(path.join(canvasDir, 'canvas.json'), JSON.stringify(K.canvasManifest([{ file: 'Main.dc.html', w: 600, h: 400 }], { launch: { view: 'canvas' }, designSystems: [{ title: 'Acme product system', namespace: 'acme' }] })));
+    await writeFile(path.join(canvasDir, 'ds', 'acme', 'tokens.css'), '@font-face { font-family: "Acme Sans"; src: url("fonts/AcmeSans.woff2"); }\n');
+    await writeFile(path.join(canvasDir, 'ds', 'acme', 'tokens.json'), JSON.stringify({ type: { fonts: [{ family: 'Acme Sans', file: 'fonts/AcmeSans.woff2' }, { family: 'Acme Mono', file: 'fonts/AcmeMono.woff2' }] } }));
+    await writeFile(path.join(canvasDir, 'ds', 'acme', 'fonts', 'AcmeSans.woff2'), Buffer.alloc(16));
+    return dir;
+  };
+
+  test('a product canvas stages under product/.publish, and refuses to stage boards that load a system it does not install', async () => {
+    const dir = await productFolder();
+    const refused = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas']);
+    assert.notEqual(refused.code, 0);
+    assert.match(String(refused.out), /load the design system from ds\/acme\/, and this publish installs no system there/);
+    assert.match(String(refused.out), /--system <its url>/);
+    assert.equal(existsSync(path.join(dir, 'product', '.publish')), false, 'nothing written');
+    const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7']);
+    assert.equal(code, 0, String(out));
+    assert.ok(out.root.endsWith(path.join('product', '.publish', 'acme-product-canvas')), out.root);
+    assert.equal(existsSync(path.join(dir, 'brand')), false, 'nothing under brand/');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('--system fills the record and installs everything a board loads: tokens, the bundle and the fonts the system ships', async () => {
+    const dir = await productFolder();
+    const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7']);
+    assert.equal(code, 0, String(out));
+    const files = out.calls[0].files;
+    const from = (f) => ({ artifact: 'https://claude.ai/artifact/Sys1', path: `project/${f}` });
+    assert.deepEqual(files['project/ds/acme/tokens.json'], from('tokens.json'));
+    assert.deepEqual(files['project/ds/acme/tokens.css'], { from: 'project/ds/acme/tokens.css', contentType: 'text/css' });
+    assert.deepEqual(files['project/ds/acme/components/bundle.css'], from('components/bundle.css'));
+    assert.deepEqual(files['project/ds/acme/components/bundle.js'], from('components/bundle.js'));
+    assert.deepEqual(files['project/ds/acme/fonts/AcmeSans.woff2'], from('fonts/AcmeSans.woff2'));
+    assert.equal('project/ds/acme/fonts/AcmeMono.woff2' in files, false, 'a face with no file beside the boards is not in the system either');
+    const index = JSON.parse(await readFile(path.join(out.root, 'project', 'canvas.json'), 'utf8'));
+    assert.deepEqual(index.designSystems.map(({ copiedAt, ...r }) => r), [{ title: 'Acme product system', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v7' }]);
+    const local = JSON.parse(await readFile(path.join(dir, 'product', 'canvas', 'canvas.json'), 'utf8'));
+    assert.equal(local.designSystems[0].artifact, undefined, 'the canvas folder\'s own canvas.json is left as it was');
+    const bad = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://example.com/ds']);
+    assert.notEqual(bad.code, 0);
+    assert.match(String(bad.out), /artifact must be the system's address cut after its id/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a republish to a canvas whose live index records the system needs no --system', async () => {
+    const dir = await productFolder();
+    const livePath = path.join(dir, 'live.json');
+    await writeFile(livePath, JSON.stringify({ v: 3, title: 'Acme product canvas', boards: {}, order: [], notes: {}, designSystems: [{ title: 'Acme product system', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v7', copiedAt: 'z' }] }));
+    const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--live', livePath]);
+    assert.equal(code, 0, String(out));
+    assert.equal(Object.keys(out.calls[0].files).some((k) => k.startsWith('project/ds/')), false, 'nothing installed again');
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('with --live, a republish keeps what a person did on the canvas; without it, it says what it overwrote', async () => {
     const dir = await fresh({ 'Main.dc.html': product('Main') });
     const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 600, h: 400 }], { launch: { view: 'canvas' }, designSystems: [{ title: 'Acme', namespace: 'acme' }] });
     await writeFile(path.join(dir, 'brand', 'canvas', 'canvas.json'), JSON.stringify(manifest));
-    const first = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    await mkdir(path.join(dir, 'brand', 'canvas', 'ds', 'acme'), { recursive: true });
+    await writeFile(path.join(dir, 'brand', 'canvas', 'ds', 'acme', 'tokens.css'), ':root { --text: #222; }\n');
+    const system = ['--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v9'];
+    const first = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', ...system]);
     assert.equal(first.code, 0, String(first.out));
     const liveIndex = {
       v: 3, createdOnFiles: { v: 1, at: '2026-10-01T00:00:00.000Z' }, title: 'Acme', launch: { view: 'canvas' }, pages: [],
@@ -1059,7 +1122,7 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     assert.deepEqual(index.notes.n1, liveIndex.notes.n1);
     assert.deepEqual(index.designSystems, liveIndex.designSystems);
     assert.equal(Object.keys(merged.out.calls[0].files).includes('project/Theirs.dc.html'), false, 'their board is never sent');
-    const again = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    const again = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', ...system]);
     assert.equal(again.out.merged, 'last-publish');
     const bad = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', '--live', path.join(dir, 'missing.json')]);
     assert.notEqual(bad.code, 0);

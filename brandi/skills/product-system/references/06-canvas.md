@@ -50,6 +50,12 @@ Foundations and components appear once. The other families repeat for each surfa
 | Messaging | Messages and the pages they link to, at the width they are read at: emails, notifications, an unsubscribe page, an approval page, posts into a chat tool | As read |
 | Brand in the product | Characters or illustration marking states, when the brand has them (`02-brand-to-product.md`) | 1440 |
 
+**Every surface, not the first one.** Each surface in `product/product.json` names its board prefix
+(`boards`), the widths it is drawn at (`widths`) and its modules (`modules`), and the coverage gate
+(`08-quality-gates.md`, Coverage) fails the round until each surface has a board at each of its
+widths and a states board for each module. A run that drew the console in depth and almost nothing
+of the website, the app or the messages passed every other gate.
+
 `Main.dc.html` is the entry board, and the one name without a width. On the last system's canvas
 it held the foundations. *(proposal)* On a canvas with more than one surface, make Main a contents
 board instead, with a link to the first board of each section. Links between boards work in Play.
@@ -80,7 +86,10 @@ bottom. A `title1` note heads each section:
 
 `<Surface><Screen>[<Option>]<Width>[Dark].dc.html`, in PascalCase, letters and digits only. That
 passes the canvas's file rule and Brandi's `artboard()`, which refuses anything else. The width is
-the last number in the stem, before `Dark`, so a script can read it.
+the last number in the stem, before `Dark`, so a script can read it. `<Surface>` is the surface's
+`boards` prefix from `product.json` (`Console` for an ops console), its name in PascalCase when it
+sets none; the coverage gate reads boards by it. A states board holds `States` and a word of its
+module: `ConsoleRostersStates1440`.
 
 | Board | File |
 | --- | --- |
@@ -476,7 +485,10 @@ drift: 3 differences, gate failed
 Through the Design type, in this order.
 
 1. **Publish the system first.** The canvas installs from the published Design System, so a change
-   reaches the canvas only after the system is published (`12-design-system-artifact.md`).
+   reaches the canvas only after the system is published (`12-design-system-artifact.md`). Keep its
+   url and the version id the publish returns: the canvas is staged with both (step 5). Staged
+   before the system was published, a canvas's first call carried no install, and every board on it
+   would have loaded `ds/<namespace>/` files the canvas did not have.
 2. **Read the type's current instructions.** The canvas serves them: `SKILL.md`,
    `artifact-type/reference/format.md` and `artifact-type/reference/design-system-components.md`,
    read with `Artifact` read and `path`. They set the limits this file leaves out (frame sizes,
@@ -524,11 +536,26 @@ Through the Design type, in this order.
    system changes. Map a file an earlier copy had, and this one does not, to `null`. Compare
    checksums afterwards. If another system's record already holds the namespace, stop and ask.
 
-   `$A canvas` writes both halves. Put the record in the canvas folder's `canvas.json` under
-   `designSystems`, with `files` listing the paths to copy, and the first call it prints carries the
-   copies and the index with the record. A `tokens.css` in `files` goes from the canvas folder, and
-   the command stops if that file is not there. It refuses a namespace another system holds, and never
-   writes `files` into the canvas's index.
+   `$A canvas` writes both halves. `$A product boards` records the system in the canvas folder's
+   `canvas.json` by its title and namespace only, since nothing is published when it runs. Stage the
+   canvas once the system is published, with its address and version:
+
+   ```bash
+   $A canvas --dir product/canvas --title "<the canvas's name>" --system <system url> --system-version <version id>
+   ```
+
+   That fills the record's `artifact` and `version` for this publish (the folder's own `canvas.json`
+   is left as it is) and lists the files an install needs: `tokens.json`, `tokens.css`,
+   `components/bundle.css`, `components/bundle.js`, and each font file the system's tokens name that
+   sits in the canvas folder's `ds/<namespace>/fonts/`. A record that already lists `files` keeps
+   its own list. The first call it prints carries the copies and the index with the record. A
+   `tokens.css` in `files` goes from the canvas folder, and the command stops if that file is not
+   there. A product canvas (one with `product.json` beside its folder) stages under
+   `product/.publish/<title>`, beside the Design System's staging. `$A canvas` refuses to stage
+   boards that load `ds/<namespace>/` when nothing installs that namespace: neither this publish
+   (`--system`, or a record with `artifact` and `files`) nor the live index (`--live`, step 6) of a
+   canvas that already has it. It refuses a namespace another system holds, and never writes
+   `files` into the canvas's index.
 6. **Read the index before you write it.** Re-read the live `project/canvas.json` right before
    writing it, and pass the saved file to `$A canvas` as `--live <file>`. It changes only its own
    keys and keeps every other key and entry: the person's notes and boards, keys the editor set, the
@@ -566,7 +593,7 @@ Brandi's canvas layer was built for brand rounds. These changes let it carry a p
 | Brandi | For a product canvas |
 | --- | --- |
 | `validateArtboard` and `$A validate` | Accept `ds/<namespace>/` stylesheets and scripts when `canvas.json` records the namespace, at any folder depth. Refuse an unrecorded namespace and a path with a `..` folder |
-| `$A canvas` | Skips the installed files in its missing-image check. Puts each record's `files` in the first call as server-side copies, beside the index that records them |
+| `$A canvas` | Skips the installed files in its missing-image check. Puts each record's `files` in the first call as server-side copies, beside the index that records them. `--system` and `--system-version` fill the record and its files from the published system. Stages a product canvas under `product/.publish/`, and refuses boards that load a system nothing installs |
 | `designIndex` and `$A canvas --live <file>` | Merge into the live index: Brandi's own boards, notes, pages and records change, and everything else stays. Without `--live` it merges into the last local publish and says what that overwrites |
 | `canvasManifest` | Carries `kind`, `maxW` and `maxH` on a note, so a `title1` heading is one call, and design system records |
 | `artboard()` | Writes `<title>`, `lang` and the install lines (`title`, `lang`, `system`) |

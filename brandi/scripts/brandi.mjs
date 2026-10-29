@@ -14,7 +14,7 @@
  *   brandi system                     resolve and audit the design system
  *   brandi tokens [--out brand/tokens] [--prefix acme] [--strict-dimensions]
  *   brandi sheets [--out <dir>]       write the specification artboards
- *   brandi canvas --dir <dir> --title "Acme brand" [--live <canvas.json>] [--all] [--json]   the files and calls for a Design canvas (with --live, only what changed)
+ *   brandi canvas --dir <dir> --title "Acme brand" [--live <canvas.json>] [--all] [--system <url> [--system-version <id>]] [--json]   the files and calls for a Design canvas (with --live, only what changed)
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf] [--print] [--publish]  the brand book: a 16:9 deck, or the A4 print book with --print;
  *                                     --publish writes it as a page to publish, its images beside it
@@ -36,7 +36,7 @@
  *   brandi product tokens [--input <file>] [--out product]
  *                                     the product layer: every role a working screen needs,
  *                                     in both themes, solved for contrast and audited
- *   brandi product measure --url <site>          the brand's live shapes, for where the guidelines are silent
+ *   brandi product measure --url <site> [--follow n]  the brand's live shapes, for where the guidelines are silent
  *   brandi product audit [--tokens product/tokens.json]
  *                                     measure every declared pair in both themes
  *   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
@@ -73,7 +73,7 @@ import {
 } from './brandfile.mjs';
 import { buildSystem, assertPublishable } from './system.mjs';
 import { buildProductTokens, auditProductTokens, auditSummary, toProductCss, shapeKitDefaults } from './producttokens.mjs';
-import { measureSite, summarise as summariseShapes } from './productmeasure.mjs';
+import { measurePages, summarise as summariseShapes } from './productmeasure.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
 import { runGates, judgeRound, roundMarkdown, publishedSection, serveStarter, starterRoutes, WIDTHS } from './productgates.mjs';
@@ -86,7 +86,7 @@ import { assembleDesignSystem } from './productds.mjs';
 import { toDtcg, toCss, toTailwind, toTypeScript } from './tokens.mjs';
 import { specificationSheets, CONTENTS_MARKER } from './artboards.mjs';
 import { artboard as artboardOf } from './canvas.mjs';
-import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES, forDesignCanvas, designIndex } from './canvas.mjs';
+import { canvasManifest, validateCanvas, validateArtboard, findOverlaps, FRAMES, forDesignCanvas, designIndex, checkSystemRecord } from './canvas.mjs';
 import { extractColors } from './color.mjs';
 import { renderBrandBook, renderBrandDeck, pdfChromeArgs, splitInlineImages, asPageFragment } from './brandbook.mjs';
 import { toPreviewHtml, screenshot, findChrome, runChrome, declaredFrame } from './preview.mjs';
@@ -119,6 +119,9 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  * whole project instead: the wrong answer, delivered confidently.
  */
 const BOOLEAN_FLAGS = new Set(['json', 'force', 'pdf', 'help', 'strict-dimensions', 'check', 'clear']);
+// Flags that may be given more than once, each time adding a value: `--url a --url b` is both pages. Any other flag
+// given twice keeps its last value, and one given once stays a plain value.
+const REPEATABLE_FLAGS = new Set(['url', 'route']);
 
 function parseArgs(argv) {
   const flags = {};
@@ -127,14 +130,15 @@ function parseArgs(argv) {
   // arguments needs the untouched tail, and reconstructing it from `positional`
   // is impossible because every flag has already been taken out.
   const positionalAt = [];
+  const set = (k, v) => { flags[k] = REPEATABLE_FLAGS.has(k) && flags[k] !== undefined ? [].concat(flags[k], v) : v; };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
       const [k, inline] = a.slice(2).split('=');
-      if (inline !== undefined) flags[k] = inline;
+      if (inline !== undefined) set(k, inline);
       else if (BOOLEAN_FLAGS.has(k)) flags[k] = true;
-      else if (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) flags[k] = argv[++i];
-      else flags[k] = true;
+      else if (argv[i + 1] !== undefined && !argv[i + 1].startsWith('--')) set(k, argv[++i]);
+      else set(k, true);
     } else {
       positional.push(a);
       positionalAt.push(i);
@@ -1165,9 +1169,36 @@ async function cmdCanvas(flags) {
     );
   }
 
-  const root = path.resolve(flags.out ?? path.join(near ? path.dirname(near.file) : 'brand', '.publish', slugify(title)));
+  // A product canvas (product.json beside its folder) stages under product/.publish, beside the Design System's
+  // staging, not under the brand's.
+  const productDir = existsSync(path.join(path.dirname(dir), 'product.json')) ? path.dirname(dir) : null;
+  const root = path.resolve(flags.out ?? path.join(productDir ?? (near ? path.dirname(near.file) : 'brand'), '.publish', slugify(title)));
   const project = path.join(root, 'project');
   const indexPath = path.join(project, 'canvas.json');
+
+  // --system fills the one design system record with the published system's address and version, and the files an
+  // install needs, so the first publish carries the install. `brandi product boards` records only the title and the
+  // namespace, since nothing is published when it runs, and a canvas staged from that record alone held boards that
+  // load ds/<namespace>/ files the canvas did not have.
+  if (flags.system !== undefined) {
+    if (typeof flags.system !== 'string') return fail('--system needs the published Design System\'s address, cut after its id.');
+    const records = manifest.designSystems ?? [];
+    if (records.length !== 1) return fail(`--system fills the canvas's one design system record, and canvas.json records ${records.length}. \`brandi product boards\` records the system; with more than one, fill each record by hand (06-canvas.md, Publishing).`);
+    const rec = records[0];
+    const ds = path.join(dir, 'ds', rec.namespace);
+    // The fonts the system ships: the faces its tokens name that are beside the boards, as `brandi product ds` takes them.
+    let faces = [];
+    try { faces = JSON.parse(await readFile(path.join(ds, 'tokens.json'), 'utf8')).type?.fonts ?? []; } catch { /* no installed tokens, no faces */ }
+    const fonts = [...new Set(faces.map((f) => path.basename(String(f.file ?? ''))))].filter((f) => f && existsSync(path.join(ds, 'fonts', f))).map((f) => `fonts/${f}`);
+    const filled = {
+      ...rec,
+      artifact: flags.system,
+      version: typeof flags['system-version'] === 'string' ? flags['system-version'] : rec.version ?? null,
+      files: rec.files?.length ? rec.files : ['tokens.json', 'tokens.css', 'components/bundle.css', 'components/bundle.js', ...fonts],
+    };
+    try { checkSystemRecord(filled); } catch (e) { return fail(e.message); }
+    manifest = { ...manifest, designSystems: [filled] };
+  }
 
   // What the last run from this folder published: its index keeps the canvas's
   // creation record, and an artboard that has since gone must be removed from
@@ -1182,6 +1213,19 @@ async function cmdCanvas(flags) {
     previous = (await readdir(project)).filter((f) => f !== 'canvas.json');
     for (const f of previous) if ((await stat(path.join(project, f))).isFile()) before.set(f, sha(await readFile(path.join(project, f))));
   } catch { /* a first publish from this folder */ }
+  // Boards that load a system from ds/<namespace>/ need it installed on the canvas: by this publish, or already, as the
+  // live index records. The last local staging does not count, since staged is not published.
+  const loaded = [...new Set(artboards.flatMap((a) => [...a.source.matchAll(/(?:href|src)=["'](?:\.\/)?(?:\.\.\/)*ds\/([^/"']+)\//g)].map((m) => m[1])))];
+  const installs = (ns) => (manifest.designSystems ?? []).some((d) => d.namespace === ns && d.artifact && d.files?.length)
+    || (live?.designSystems ?? []).some((d) => d.namespace === ns && d.artifact);
+  const bare = loaded.filter((ns) => !installs(ns));
+  if (bare.length && !flags.force) {
+    return fail(
+      `These boards load the design system from ${bare.map((ns) => `ds/${ns}/`).join(' and ')}, and this publish installs no system there, so on the canvas they would load files it does not have.\n`
+      + 'Publish the Design System first (`brandi product ds`), then run this again with --system <its url> --system-version <its version id>.\n'
+      + 'A canvas that already has the system installed: read its project/canvas.json and pass it as --live <file>.',
+    );
+  }
   await rm(project, { recursive: true, force: true });
   await mkdir(project, { recursive: true });
 
@@ -1272,6 +1316,7 @@ async function cmdCanvas(flags) {
       unchanged.length ? `  ${plural(unchanged.length, 'file')} unchanged since the last publish from this folder, not sent (--all sends them)` : '',
       check.warnings.length ? `  ${check.warnings.length} craft warnings, see: brandi validate --dir ${rel(dir)}` : '',
       Object.keys(install).length ? `  installs ${plural(Object.keys(install).length, 'file')} of ${(manifest.designSystems ?? []).filter((d) => d.files?.length).map((d) => d.namespace).join(', ')} in the first call, copied server side${Object.values(install).some((v) => v.from) ? ' except tokens.css, sent from the canvas folder because the Design System does not store it' : ''}` : '',
+      (manifest.designSystems ?? []).some((d) => d.files?.length && !d.version) ? '  no version id in the install record, so the drift check cannot hold the canvas to the system: pass --system-version <id>' : '',
       live ? `  merged into the live index: ${plural(theirs.length, 'board')} and ${plural(Object.keys(live.notes ?? {}).length, 'note')} already on the canvas kept` : '',
       !live && lastIndex ? '  merged into the last local publish, not the live index: a change made on the canvas since then is overwritten. Read project/canvas.json from the canvas first and pass it as --live <file>.' : '',
       ...clashes.map((c) => `  warning: ${c.a} overlaps ${c.b}, which is already on the canvas. Move one in canvas.json.`),
@@ -2893,10 +2938,14 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       product/product.json ("roles": { "primary": { "light", "dark" }, ... }).
       Writes tokens.json, tokens.css and contrast-audit.json.
 
-  brandi product measure --url <the brand's live site>
+  brandi product measure --url <the brand's live site> [--url <another page> ...] [--follow <n>]
       Read the site's computed styles in the installed Chrome and suggest the shape
       families (press, control, card, frame) and the shell, each with its source.
-      The guidelines come first; these fill only what they leave unsaid.
+      --url once per page; --follow also measures up to n of the first page's
+      navigation links on the same site. Each family is taken across every page,
+      and its source shows each page's own radius. A form in a frame from another
+      site is named, since it cannot be read. The guidelines come first; these
+      fill only what they leave unsaid.
 
   brandi product audit [--tokens product/tokens.json]
       Measure every pair a tokens file declares, in both themes, and list every
@@ -2941,13 +2990,19 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       1440, 820 and 390 in light and dark, axe, and every scripted check, on
       every component preview and canvas board, and the starter's routes:
       --serve builds and starts the starter and scans tools/routes.json, or
-      --route names a running page. Writes product/rounds/round-N/gates.json
-      with every tool version.
+      --route names a running page (once for each). Holds the canvas to the
+      surfaces product.json lists (a board at each width, a states board for
+      each module), and leaves out detector findings product.json "accepted"
+      records with a reason. Writes product/rounds/round-N/gates.json with
+      every tool version.
 
   brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
       Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
       review (ui-ux-pro-max) into the round, hold every gate against the bar,
-      and write record.md and record.json. Exits 1 until the bar is met.
+      and write record.md and record.json: each review's method, each finding
+      with where, evidence, owner and class, the accepted deviations with
+      their reasons, and what is still open with its owner. Exits 1 until the
+      bar is met.
 
   brandi product specs [--dir product/platform] [--components <list|file>] [--platforms <list>]
       Check every platform spec (the stamp, all thirteen fields, every value
@@ -3028,21 +3083,29 @@ async function cmdProduct(flags, positional) {
     return;
   }
   if (sub === 'measure') {
-    // The brand's own live work, read for its shape families: evidence for where the guidelines are silent.
-    if (typeof flags.url !== 'string' || !/^(https?|file):\/\//.test(flags.url)) return fail('measure needs --url, the brand\'s own live site (https://...).');
-    let raw;
-    try { raw = await measureSite(flags.url); } catch (e) { return fail(e.message); }
-    const s = summariseShapes(raw);
+    // The brand's own live work, read for its shape families: evidence for where the guidelines are silent. One page
+    // can mislead (a site's buttons differed page by page), so --url repeats and --follow takes the navigation's pages.
+    const urls = (Array.isArray(flags.url) ? flags.url : [flags.url]).filter((u) => typeof u === 'string');
+    if (!urls.length || urls.some((u) => !/^(https?|file):\/\//.test(u))) return fail('measure needs --url, the brand\'s own live site (https://...), once for each page.');
+    const follow = flags.follow === undefined ? 0 : Number(flags.follow);
+    if (!Number.isInteger(follow) || follow < 0) return fail('--follow needs a whole number: how many of the first page\'s navigation links to measure too.');
+    let run;
+    try { run = await measurePages(urls, { follow }); } catch (e) { return fail(e.message); }
+    if (!run.pages.length) return fail(`Nothing could be measured:\n${run.errors.map((e) => `  ${e.url}: ${e.error}`).join('\n')}`);
+    const s = summariseShapes(run.pages);
     const shape = { families: s.families, ...(s.shell ? { shell: s.shell } : {}) };
     emit([
-      `Measured ${flags.url} at 1440 wide:`,
-      ...Object.entries(s.families).map(([k, v]) => `  ${k.padEnd(8)}${String(v.px === 'pill' ? 'pill' : `${v.px}px`).padEnd(7)}${v.source}`),
+      `Measured ${plural(run.pages.length, 'page')} at 1440 wide: ${run.pages.map((p) => p.url).join(', ')}`,
+      ...run.errors.map((e) => `  not measured: ${e.url} (${e.error})`),
+      ...['press', 'control', 'card', 'frame'].map((k) => (s.families[k] ? `  ${k.padEnd(8)}${String(s.families[k].px === 'pill' ? 'pill' : `${s.families[k].px}px`).padEnd(7)}${s.families[k].source}` : `  ${k.padEnd(8)}(none on the ${run.pages.length === 1 ? 'page' : 'pages'} measured)`)),
+      // A form embedded from another site is said, not passed over as no form at all.
+      ...s.frames.map((f) => `          ${f.page} shows a ${f.w}x${f.h} frame from ${f.origin}, which cannot be read from the page: a form inside it is not measured.`),
       s.shell ? `  shell   ${s.shell.form.padEnd(7)}${s.shell.source}` : '  shell   (no header or navigation found)',
       '',
       'Guidelines first: check each family against the brand\'s own guidelines, keep what they settle, and take these',
       'only where they say nothing. Then write the ones you keep into product.json under "shape" (02-brand-to-product.md, Shape):',
       JSON.stringify(shape, null, 2),
-    ].join('\n'), { ok: true, url: flags.url, shape, raw });
+    ].join('\n'), { ok: true, urls: run.pages.map((p) => p.url), shape, frames: s.frames, errors: run.errors, raw: run.pages });
     return;
   }
   if (sub === 'audit') {
@@ -3160,6 +3223,10 @@ async function cmdProduct(flags, positional) {
     const existing = existsSync(roundsDir) ? (await readdir(roundsDir)).map((d) => Number(/^round-(\d+)$/.exec(d)?.[1])).filter(Number.isFinite) : [];
     const round = flags.round !== undefined ? Number(flags.round) : sub === 'gates' ? (existing.length ? Math.max(...existing) + 1 : 1) : Math.max(0, ...existing);
     if (!Number.isInteger(round) || round < 1) return fail('--round must be a whole number from 1.');
+    // Detector findings a person accepted as recorded deviations (08-quality-gates.md), read at judging time, so a
+    // reason written after the gates ran counts without another 40-minute run.
+    let accepted = null;
+    try { accepted = JSON.parse(await readFile(path.join(productDir, 'product.json'), 'utf8')).accepted ?? null; } catch { /* none recorded */ }
     if (sub === 'gates') {
       if (!existsSync(path.join(productDir, 'tokens.json'))) return fail('No product/tokens.json. Run `brandi product tokens` first.');
       if (!existsSync(path.join(starter, 'node_modules', 'playwright'))) return fail(`${path.relative(process.cwd(), starter)} has no node_modules with Playwright. Run npm install there first.`);
@@ -3177,9 +3244,10 @@ async function cmdProduct(flags, positional) {
       } finally {
         server?.stop();
       }
-      const judged = judgeRound(gates);
-      const machine = judged.verdicts.filter((v) => ['Tokens', 'Drift', 'Detector', 'Accessibility', 'Record'].includes(v.gate));
-      emit([`Round ${round} machine gates:`, ...machine.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
+      const judged = judgeRound(gates, { accepted });
+      const machine = judged.verdicts.filter((v) => ['Tokens', 'Drift', 'Detector', 'Accessibility', 'Coverage', 'Record'].includes(v.gate));
+      const short = (gates.coverage?.surfaces ?? []).flatMap((s) => s.missing.map((m) => `        ${s.name}: ${m}`));
+      emit([`Round ${round} machine gates:`, ...machine.flatMap((v) => [`  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`, ...(v.gate === 'Coverage' ? short : [])]), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
         { ok: machine.every((v) => v.pass), round, gates });
       return;
     }
@@ -3190,7 +3258,7 @@ async function cmdProduct(flags, positional) {
     const critique = await readJson('critique');
     const rules = await readJson('rules');
     const signOff = typeof flags['sign-off'] === 'string' ? flags['sign-off'] : null;
-    const judged = judgeRound(gates, { critique, rules });
+    const judged = judgeRound(gates, { critique, rules, accepted });
     let system = {};
     try { system = JSON.parse(await readFile(path.join(starter, 'system', 'system.json'), 'utf8')); } catch { /* no starter yet */ }
     const dir = path.dirname(gatesFile);
@@ -3198,7 +3266,7 @@ async function cmdProduct(flags, positional) {
     const recordFile = path.join(dir, 'record.md');
     const published = existsSync(recordFile) ? publishedSection(await readFile(recordFile, 'utf8')) : '';
     await writeFile(recordFile, `${roundMarkdown(gates, judged, { system, critique, rules, signOff })}${published ? `\n${published}` : ''}`);
-    await writeFile(path.join(dir, 'record.json'), `${JSON.stringify({ round, system, met: judged.met, verdicts: judged.verdicts, critique, rules, signOff, versions: gates.versions }, null, 2)}\n`);
+    await writeFile(path.join(dir, 'record.json'), `${JSON.stringify({ round, system, met: judged.met, verdicts: judged.verdicts, critique, rules, accepted: judged.detector.accepted.map((a) => ({ ...a.entry, findings: a.findings.length })), unusedAcceptances: judged.detector.unused, signOff, versions: gates.versions }, null, 2)}\n`);
     emit([`Round ${round}: ${judged.met ? 'the bar is met' : 'the bar is not met yet'}.`, ...judged.verdicts.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Record: ${path.relative(process.cwd(), path.join(dir, 'record.md'))}`].join('\n'), { ok: judged.met, round, verdicts: judged.verdicts });
     if (!judged.met) process.exitCode = 1;
     return;

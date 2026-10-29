@@ -60,7 +60,9 @@ for (const p of pages) {
   let retried
   try {
     await page.goto(p.url, { waitUntil: route ? "networkidle" : "load", timeout: 60000 })
-    if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { timeout: 20000 })
+    // Attached, not visible: a dialog drawn over its page (06-canvas.md) leaves the document no height, so html never
+    // counts as visible, and waiting for that left the board unscanned at every width.
+    if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { state: "attached", timeout: 20000 })
     // A route is scanned as people meet it: hydrated, measured and settled, not as the server's first draft.
     // Every page has one h1, and a streamed page's loading skeleton has none, so wait for it. Under load a
     // record page was still streaming after network idle, and axe reported a page with no heading. A page

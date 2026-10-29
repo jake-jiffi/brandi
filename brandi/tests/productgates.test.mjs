@@ -181,6 +181,97 @@ describe('a round held against the bar', () => {
   });
 });
 
+describe('what the round record holds about the reviews', () => {
+  const scores = [4, 4, 4, 4, 4, 4, 4, 3, 3, 3];
+  const reviewed = () => ({
+    critique: {
+      method: 'single-context, isolation by procedure: each gate started from the evidence',
+      heuristics: scores.map((score, i) => ({ name: `H${i + 1}`, score })),
+      findings: [
+        { id: 'C1', severity: 'P3', title: 'Title clipped at 390', status: 'open', where: 'AcmeHome390', evidence: 'shots/home-390.png, the title ends in an ellipsis.', owner: 'Sam', class: 'kit' },
+        { id: 'C2', severity: 'P2', title: '14px body on phones', status: 'accepted', reason: 'Interface text stays 14px on phones, as the README records', class: 'brand only' },
+        { id: 'C3', severity: 'P1', title: 'Focus lost after approve', status: 'fixed', evidence: 'keyboard path: Approve, then Tab lands on the next row' },
+        { id: 'C4', severity: 'P3', title: 'Tight gap in the rail', status: 'open' },
+      ],
+    },
+    rules: { method: 'ui-ux-pro-max rules by domain and stack, single-context', findings: [{ severity: 'Low', title: 'Long label wraps', status: 'open', where: 'Settings', owner: 'Jo' }] },
+  });
+
+  test('each review says how it ran, and each finding where, its evidence, its owner and its class', () => {
+    const { critique: c, rules: r } = reviewed();
+    const md = roundMarkdown(clean(), judgeRound(clean(), { critique: c, rules: r }), { critique: c, rules: r });
+    assert.match(md, /## Craft critique\n\nHow it ran: single-context, isolation by procedure: each gate started from the evidence\n/);
+    assert.match(md, /## Rules review\n\nHow it ran: ui-ux-pro-max rules by domain and stack, single-context\n/);
+    assert.match(md, /- P3: Title clipped at 390 \(open\)\. Where: AcmeHome390\. Evidence: shots\/home-390\.png, the title ends in an ellipsis\. Owner: Sam\. Class: kit\.\n/);
+    assert.match(md, /- P1: Focus lost after approve \(fixed\)\. Evidence: keyboard path: Approve, then Tab lands on the next row\.\n/);
+    assert.match(md, /- Low: Long label wraps \(open\)\. Where: Settings\. Owner: Jo\.\n/);
+  });
+
+  test('accepted deviations are listed with their reasons, and what is still open with its owner', () => {
+    const { critique: c, rules: r } = reviewed();
+    const md = roundMarkdown(clean(), judgeRound(clean(), { critique: c, rules: r }), { critique: c, rules: r });
+    assert.match(md, /## Accepted deviations\n\n- Craft P2: 14px body on phones\. Interface text stays 14px on phones, as the README records\.\n/);
+    assert.match(md, /## Still open\n\n- Craft P3: Title clipped at 390\. Owner: Sam\.\n- Craft P3: Tight gap in the rail\. Owner: none named\.\n- Rules Low: Long label wraps\. Owner: Jo\.\n/);
+  });
+
+  test('a record written before these fields still judges and prints as it did', () => {
+    const c = critique(scores, [{ severity: 'P2', title: 'Old finding', status: 'fixed' }]);
+    const judged = judgeRound(clean(), { critique: c, rules: rules([]) });
+    assert.equal(judged.met, true);
+    const md = roundMarkdown(clean(), judged, { critique: c, rules: rules([]) });
+    assert.match(md, /\n- P2: Old finding \(fixed\)\n/);
+    assert.doesNotMatch(md, /How it ran/);
+    assert.match(md, /## Accepted deviations\n\nNone\.\n/);
+    assert.match(md, /## Still open\n\nNothing\.\n/);
+  });
+});
+
+describe('a detector finding accepted as a recorded deviation', () => {
+  const found = () => {
+    const g = clean();
+    g.detector.findings.push(
+      { page: 'AcmeRail1440', width: 1440, theme: 'light', rule: 'gray-on-color', selector: 'nav > p.rail-group', snippet: 'Teams' },
+      { page: 'AcmeRail1440Dark', width: 1440, theme: 'dark', rule: 'gray-on-color', selector: 'nav > p.rail-group', snippet: 'Teams' },
+      { page: 'AcmeHome1440', width: 820, theme: 'light', rule: 'nested-cards', selector: '.card .card', snippet: '' },
+    );
+    return g;
+  };
+  const accepted = [
+    { rule: 'gray-on-color', page: 'AcmeRail', selector: 'rail-group', reason: 'The rail labels are the brand rail tint, 4.6:1, decided in pd5' },
+    { rule: 'low-contrast', page: 'AcmeOld', reason: 'A board since removed' },
+    { rule: 'nested-cards', page: 'AcmeHome' },
+  ];
+
+  test('a matching finding leaves the verdict and is listed with its reason; the rest still fail', () => {
+    const judged = judgeRound(found(), { accepted });
+    const det = judged.verdicts.find((v) => v.gate === 'Detector');
+    assert.equal(det.pass, false, 'the nested cards finding is still open: its entry has no reason');
+    assert.match(det.detail, /^1 finding across 120 renders/);
+    assert.match(det.detail, /2 accepted as recorded deviations/);
+    const md = roundMarkdown(found(), judged);
+    assert.match(md, /## Detector findings\n\n- AcmeHome1440 at 820, light: nested-cards on \.card \.card/);
+    assert.doesNotMatch(md.split('## Detector findings')[1].split('\n## ')[0], /gray-on-color/, 'an accepted finding is not listed as open');
+    assert.match(md, /## Accepted deviations\n\n- Detector gray-on-color on AcmeRail \(selector rail-group\), 2 findings: The rail labels are the brand rail tint, 4\.6:1, decided in pd5\.\n/);
+  });
+
+  test('an entry that matches nothing, or has no reason, is reported, so a stale one does not linger', () => {
+    const judged = judgeRound(found(), { accepted });
+    const det = judged.verdicts.find((v) => v.gate === 'Detector');
+    assert.match(det.detail, /2 acceptances unused: low-contrast on AcmeOld matches no finding this round; nested-cards on AcmeHome needs a rule, a page and a reason/);
+    assert.match(roundMarkdown(found(), judged), /Not used from product\.json "accepted":\n\n- low-contrast on AcmeOld: matches no finding this round\n- nested-cards on AcmeHome: needs a rule, a page and a reason\n/);
+  });
+
+  test('every finding accepted passes the gate, and without product.json acceptances nothing changes', () => {
+    const all = judgeRound(found(), { accepted: [...accepted.slice(0, 1), { rule: 'nested-cards', page: 'AcmeHome1440', reason: 'Recorded in the fix plan' }] });
+    assert.equal(all.verdicts.find((v) => v.gate === 'Detector').pass, true);
+    assert.equal(judgeRound(found()).verdicts.find((v) => v.gate === 'Detector').detail.startsWith('3 findings'), true);
+    const notAList = judgeRound(found(), { accepted: { rule: 'nested-cards' } }).verdicts.find((v) => v.gate === 'Detector');
+    assert.match(notAList.detail, /accepted in product\.json is not a list/);
+    const shadowed = judgeRound(found(), { accepted: [accepted[0], { ...accepted[0], page: 'AcmeRail1440Dark', reason: 'The dark twin too' }] }).verdicts.find((v) => v.gate === 'Detector');
+    assert.match(shadowed.detail, /1 acceptance unused: gray-on-color on AcmeRail1440Dark accepts nothing an earlier entry has not/);
+  });
+});
+
 describe('the round record, rewritten', () => {
   test('a rerun of the round keeps the Published section written after it, once, and a record without one gains none', async () => {
     const product = await mkdtemp(path.join(os.tmpdir(), 'brandi-record-'));
@@ -201,6 +292,24 @@ describe('the round record, rewritten', () => {
     assert.ok(again.includes(published), again.slice(-300));
     assert.match(again, /\| Craft \| fail \|/, 'and the rest is rewritten');
     assert.deepEqual(publishedSection('# Round 3\n\n## Published\n\nA\n\n## Later notes\n\nB\n'), '## Published\n\nA\n', 'to its next heading');
+    await rm(product, { recursive: true, force: true });
+  });
+
+  test('product round reads product.json\'s acceptances, so a reason written after the gates counts without running them again', async () => {
+    const product = await mkdtemp(path.join(os.tmpdir(), 'brandi-accepted-'));
+    const round = path.join(product, 'rounds', 'round-2');
+    await mkdir(round, { recursive: true });
+    const g = clean();
+    g.detector.findings.push({ page: 'AcmeRail1440', width: 1440, theme: 'light', rule: 'gray-on-color', selector: 'p.rail-group', snippet: 'Teams' });
+    await writeFile(path.join(round, 'gates.json'), JSON.stringify(g));
+    await writeFile(path.join(product, 'product.json'), JSON.stringify({ name: 'Acme', accepted: [{ rule: 'gray-on-color', page: 'AcmeRail', reason: 'The rail tint is the brand decision pd5' }] }));
+    const cli = path.join(path.dirname(KIT), '..', 'scripts', 'brandi.mjs');
+    spawnSync(process.execPath, [cli, 'product', 'round', '--round', '2', '--out', product], { encoding: 'utf8' });
+    const md = await readFile(path.join(round, 'record.md'), 'utf8');
+    assert.match(md, /\| Detector \| pass \| 0 findings across 120 renders at 1440, 820, 390, light and dark; 1 accepted as recorded deviations \|/);
+    assert.match(md, /- Detector gray-on-color on AcmeRail, 1 finding: The rail tint is the brand decision pd5\./);
+    const json = JSON.parse(await readFile(path.join(round, 'record.json'), 'utf8'));
+    assert.deepEqual(json.accepted, [{ rule: 'gray-on-color', page: 'AcmeRail', reason: 'The rail tint is the brand decision pd5', findings: 1 }]);
     await rm(product, { recursive: true, force: true });
   });
 });
@@ -303,10 +412,10 @@ const KIT_MODULES = process.env.BRANDI_KIT_MODULES && path.resolve(process.env.B
 const needsKit = { skip: !KIT_MODULES || !existsSync(path.join(KIT_MODULES, 'playwright')) ? 'needs the kit\'s node_modules: set BRANDI_KIT_MODULES' : findChrome() ? false : 'no headless browser on this machine' };
 
 /**
- * Serves `page(path, hit)`'s HTML (null is a 404) on a local port, runs the kit's axe-pages.mjs on the pages
- * `list(base)` gives, and returns its summary line and its record.
+ * Serves `page(path, hit)`'s HTML (null is a 404) on a local port, runs the kit's axe-pages.mjs (or `tool`) on the
+ * pages `list(base)` gives, and returns its summary line and its record.
  */
-async function axePagesOn(page, list) {
+async function axePagesOn(page, list, tool = 'axe-pages.mjs') {
   const hits = {};
   const server = createServer((req, res) => {
     hits[req.url] = (hits[req.url] ?? 0) + 1;
@@ -317,23 +426,53 @@ async function axePagesOn(page, list) {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-axe-'));
   await mkdir(path.join(dir, 'tools'));
-  copyFileSync(path.join(KIT, 'tools', 'axe-pages.mjs'), path.join(dir, 'tools', 'axe-pages.mjs'));
+  copyFileSync(path.join(KIT, 'tools', tool), path.join(dir, 'tools', tool));
   symlinkSync(KIT_MODULES, path.join(dir, 'node_modules'), 'dir');
   await writeFile(path.join(dir, 'pages.json'), JSON.stringify(list(`http://127.0.0.1:${server.address().port}`)));
   const out = await new Promise((resolve) => {
-    const child = spawn(process.execPath, ['tools/axe-pages.mjs', '--pages', 'pages.json', '--json', 'axe.json'], { cwd: dir });
+    const child = spawn(process.execPath, [`tools/${tool}`, '--pages', 'pages.json', '--json', 'axe.json'], { cwd: dir });
     let text = '';
     child.stdout.on('data', (d) => { text += d; });
     child.stderr.on('data', (d) => { text += d; });
     child.on('close', () => resolve(text));
   });
   server.close();
-  if (!existsSync(path.join(dir, 'axe.json'))) throw new Error(`axe-pages.mjs wrote no record:\n${out}`);
+  if (!existsSync(path.join(dir, 'axe.json'))) throw new Error(`${tool} wrote no record:\n${out}`);
   const run = { hits, line: JSON.parse(out.trim().split('\n').pop()), record: JSON.parse(await readFile(path.join(dir, 'axe.json'), 'utf8')) };
   await rm(dir, { recursive: true, force: true });
   const result = (label) => run.record.results.find((r) => r.label === label);
   return { ...run, result, ids: (label) => result(label).violations.map((v) => v.id) };
 }
+
+describe('a board with no height of its own', () => {
+  // A dialog drawn over its page (06-canvas.md) puts everything in a wrapper at position: absolute; inset: 0, so the
+  // document has no height and html never counts as visible. Waiting for a visible html[data-dc-ready] left that
+  // board unscanned at every width, by axe and by reflow, for two rounds.
+  const flat = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A dialog</title></head><body style="margin:0"><x-dc><div style="position:absolute;inset:0;overflow:hidden"><main><h1>A dialog over its page</h1><p>Some text.</p></main></div></x-dc><script>setTimeout(() => document.documentElement.setAttribute("data-dc-ready", ""), 200)</script></body></html>';
+  const list = (base) => [{ kind: 'board', label: 'DialogOverPage1440', url: `${base}/flat`, width: 1440, height: 900, theme: 'light' }];
+  const serve = (url) => (url === '/flat' ? flat : null);
+
+  test('axe scans it once it says it is ready', needsKit, async () => {
+    const run = await axePagesOn(serve, list);
+    assert.equal(run.result('DialogOverPage1440').error, undefined, run.result('DialogOverPage1440').error);
+    assert.equal(run.line.errors, 0);
+  });
+
+  test('reflow measures it once it says it is ready', needsKit, async () => {
+    const run = await axePagesOn(serve, (base) => list(base).map((p) => ({ ...p, width: 320, height: 800 })), 'reflow-pages.mjs');
+    assert.equal(run.result('DialogOverPage1440').error, undefined, run.result('DialogOverPage1440').error);
+    assert.equal(run.result('DialogOverPage1440').overflow, false);
+  });
+
+  test('a page axe could not scan fails the Accessibility gate, and its line says how many', () => {
+    const g = clean();
+    g.axe.errors = 6;
+    const verdict = judgeRound(g).verdicts.find((v) => v.gate === 'Accessibility');
+    assert.equal(verdict.pass, false);
+    assert.match(verdict.detail, /^axe 0 violations on 120 pages, 6 not scanned;/);
+    assert.doesNotMatch(judgeRound(clean()).verdicts.find((v) => v.gate === 'Accessibility').detail, /not scanned/, 'nothing said when every page was scanned');
+  });
+});
 
 const pageOf = (main, extra = '') => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A page</title></head><body><main>${main}</main>${extra}</body></html>`;
 
