@@ -59,6 +59,17 @@ describe('a platform spec', () => {
   });
 });
 
+describe('the platforms specs are asked for', () => {
+  test('ios and ipados mean ios-ipados, the surfaces stand in when product.json names none, and a stranger is said, not dropped', () => {
+    assert.deepEqual(S.specPlatforms({ config: { platforms: ['web', 'ios', 'android'] } }), { platforms: ['web', 'ios-ipados', 'android'], ignored: [] });
+    const surfaces = [{ name: 'Desk', platforms: ['web', 'ipados'] }, { name: 'Messages', platforms: ['email', 'ios', 'android'] }];
+    assert.deepEqual(S.specPlatforms({ config: { surfaces } }), { platforms: ['web', 'ios-ipados', 'android'], ignored: ['email'] });
+    assert.deepEqual(S.specPlatforms({ config: { platforms: ['web', 'andriod'], surfaces } }), { platforms: ['web'], ignored: ['andriod'] }, 'product.json\'s own list wins over the surfaces');
+    assert.deepEqual(S.specPlatforms({ listed: ['macos'], config: { platforms: ['web'] } }), { platforms: ['macos'], ignored: [] }, 'a list given on the command line wins');
+    assert.deepEqual(S.specPlatforms({}), { platforms: ['web'], ignored: [] });
+  });
+});
+
 describe('the monthly standards check', () => {
   const spec = { ...S.parseSpec(text, 'ios-ipados/Button.md') };
 

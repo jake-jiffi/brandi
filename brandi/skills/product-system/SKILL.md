@@ -87,8 +87,10 @@ It reads decided roles from `product/product.json`:
 Anything not decided is derived and solved to pass. A decided role is never moved: when it fails,
 the audit says so and you resolve it with the person, then record the outcome. The same file names
 the system: `productName`, `namespace` (the canvas folder), `global` (the bundle's namespace),
-`locale`, `currency`, `lang` and `platforms` (the platforms each component needs a spec for). Left
-out, they come from the brand's name and an Australian market.
+`locale`, `currency`, `lang` and `platforms` (the platforms each component needs a spec for: `web`,
+`ios-ipados`, `macos`, `android`, `windows`). Left out, they come from the brand's name, an
+Australian market and the platforms the surfaces run on, where `ios` and `ipados` both mean
+`ios-ipados`.
 
 The starter is one implementation built twice. Its components are the product's, and `$A product
 bundle` builds the canvas bundle from the same files, so a board shows what production renders.
@@ -213,7 +215,8 @@ it did (`references/06-canvas.md`, Directions).
 
 The fundamentals first (above), then the components, each with a README carrying its behaviour rules
 and a live preview in both themes (`references/05-components.md`); the AI core set
-(`references/10-ai-catalogue.md`); the written system (`references/04-written-system.md`); and a
+(`references/10-ai-catalogue.md`); the written system, in `product/docs/`
+(`references/04-written-system.md`); and a
 spec per platform for every component that can appear there (`references/11-platform-layer.md`).
 Native code is generated on demand, never kept by default.
 

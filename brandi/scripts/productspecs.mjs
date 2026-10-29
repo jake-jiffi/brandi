@@ -19,6 +19,25 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PLATFORMS = Object.freeze(['web', 'ios-ipados', 'macos', 'android', 'windows']);
+// iOS and iPadOS share one spec, so either name, as a surface lists it, means that platform.
+const PLATFORM_NAMES = { ios: 'ios-ipados', ipados: 'ios-ipados' };
+
+/**
+ * The platforms each component needs a spec for: the list given, else product.json's `platforms`, else every
+ * platform its surfaces run on. A name that is no platform with specs ("email", a typo) is returned under `ignored`,
+ * so it is said, not dropped: a run's "ios" was dropped without a word, and its specs were never asked for.
+ */
+export function specPlatforms({ listed = null, config = {} } = {}) {
+  const fromSurfaces = (config.surfaces ?? []).flatMap((s) => s.platforms ?? []);
+  const given = listed ?? config.platforms ?? (fromSurfaces.length ? fromSurfaces : ['web']);
+  const platforms = [];
+  const ignored = [];
+  for (const name of given) {
+    const p = PLATFORM_NAMES[String(name).trim().toLowerCase()] ?? String(name).trim().toLowerCase();
+    if (!PLATFORMS.includes(p)) { if (!ignored.includes(name)) ignored.push(name); } else if (!platforms.includes(p)) platforms.push(p);
+  }
+  return { platforms, ignored };
+}
 export const FIELDS = Object.freeze([
   'Native control', 'Target and spacing', 'Type', 'Colour and theme', 'States', 'Motion', 'Accessibility API',
   'Navigation placement', 'Keyboard, pointer, trackpad', 'Haptics', 'Brand may change', 'Platform owns', 'Not confirmed',
@@ -307,4 +326,4 @@ export function writeStale(specs, changes, date) {
   return written;
 }
 
-export default { PLATFORMS, FIELDS, loadSources, parseStamp, parseSpec, checkSpec, loadSpecs, coverage, compareMarkers, standardsReport, markStale, fetchMarker, writeStale };
+export default { PLATFORMS, specPlatforms, FIELDS, loadSources, parseStamp, parseSpec, checkSpec, loadSpecs, coverage, compareMarkers, standardsReport, markStale, fetchMarker, writeStale };

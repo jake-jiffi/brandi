@@ -1,8 +1,11 @@
 # The written system
 
 Every product system ships a README and nine sections of writing, eight when the brand has no
-characters or illustration. The components make products look alike. The writing makes them say
-and do the same things: one word for each state, the same three beats in every error, the same
+characters or illustration. They live in `product/docs/`: `README.md`, then one file per section,
+numbered in reading order (`1-writing.md`, `2-screen-patterns.md` and on). `$A product ds` publishes
+that folder as it stands, README first, and the drift check holds every token value they quote to
+`tokens.json`. The components make products look alike. The writing makes
+them say and do the same things: one word for each state, the same three beats in every error, the same
 limits on what the assistant may do alone.
 
 The writing is the part of the system people rely on most, and the part a build agent reads before

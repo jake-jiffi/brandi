@@ -80,7 +80,7 @@ import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
 import { CHARACTER_STATES } from './productbrand.mjs';
 import { runGates, judgeRound, roundMarkdown, publishedSection, serveStarter, starterRoutes, WIDTHS, MACHINE_GATES } from './productgates.mjs';
-import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
+import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS, specPlatforms } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
 import { compareProduct, syncReport, applyTokens, provenance } from './productsync.mjs';
@@ -3049,7 +3049,9 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       Check every platform spec (the stamp, all thirteen fields, every value
       citing a key the stamp lists and the reference's registry holds), and
       report which component and platform pairs have no spec. The platforms
-      come from product.json ("platforms": ["web", "ios-ipados", ...]).
+      come from product.json ("platforms": ["web", "ios-ipados", ...]), else
+      from its surfaces' platforms; ios and ipados mean ios-ipados, and any
+      other name (email) is said and left out.
 
   brandi product standards [--dir product/platform] [--markers <file>] [--fetch] [--mark-stale]
       The monthly standards check: compare every stamped marker with a fresh
@@ -3440,7 +3442,7 @@ async function cmdProduct(flags, positional) {
       const listFlag = async (v) => (typeof v !== 'string' ? null : existsSync(path.resolve(v)) ? (await readFile(path.resolve(v), 'utf8')).split(/\s+/).filter(Boolean) : v.split(',').map((x) => x.trim()).filter(Boolean));
       const components = (await listFlag(flags.components))
         ?? (existsSync(path.join(starter, 'components', 'system')) ? (await loadDefinitions(path.join(starter, 'components', 'system'))).map((d) => d.name) : []);
-      const platforms = ((await listFlag(flags.platforms)) ?? config.platforms ?? ['web']).filter((p) => PLATFORMS.includes(p));
+      const { platforms, ignored } = specPlatforms({ listed: await listFlag(flags.platforms), config });
       const problems = specs.flatMap((sp) => checkSpec(sp, { sources, components: components.length ? components : null }));
       const cov = coverage(specs, { components, platforms });
       const stale = specs.filter((sp) => /^stale/.test(sp.stamp?.status ?? ''));
@@ -3448,10 +3450,11 @@ async function cmdProduct(flags, positional) {
         `${plural(specs.length, 'spec')} checked against ${sources.size} registry keys: ${problems.length ? `${plural(problems.length, 'problem')}` : 'all complete'}.`,
         ...problems.map((p) => `  ${p}`),
         `Coverage: ${cov.present} of ${cov.total} component and platform pairs (${platforms.join(', ')}).`,
+        ignored.length ? `Not platforms with specs, so left out: ${ignored.join(', ')}. The platforms are ${PLATFORMS.join(', ')} (ios and ipados mean ios-ipados).` : '',
         ...cov.missing.slice(0, 40).map((m) => `  missing  ${m.component} on ${m.platform}`),
         cov.missing.length > 40 ? `  and ${cov.missing.length - 40} more` : '',
         stale.length ? `Stale, so no native code from these until reviewed: ${stale.map((sp) => sp.file).join(', ')}` : '',
-      ].filter(Boolean).join('\n'), { ok: !problems.length && !cov.missing.length, problems, coverage: cov, stale: stale.map((sp) => sp.file) });
+      ].filter(Boolean).join('\n'), { ok: !problems.length && !cov.missing.length, problems, coverage: cov, stale: stale.map((sp) => sp.file), ignored });
       if (problems.length || cov.missing.length) process.exitCode = 1;
       return;
     }
