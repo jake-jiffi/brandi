@@ -579,6 +579,10 @@ are solved too. It reports any pair that fails under the direction's name, and w
   (a direction names at least one role, and an empty one is refused) and its boards take no class.
   A run that listed today's concept with no roles was refused, because the line below reads as if
   it should be there.
+- **A concept the pick moves away from names the role `null`.** Once the green rail is picked into
+  `roles`, today's quiet-rail concept would draw green too. `{ "name": "Quiet rail", "roles": {
+  "rail": null } }` is the rail as the kit solves it undecided, so that board keeps its look. A run
+  kept it only by typing the surface's hexes into a direction.
 - **List every direction that moves a role, today's pick included.** After the pick, its roles go into
   `roles` and `directions` stays. The picked direction's class then holds nothing, and the others
   still draw as they did, so the concept boards keep their look. Take the picked one's class off its

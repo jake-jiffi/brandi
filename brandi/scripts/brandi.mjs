@@ -3035,6 +3035,7 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       frame against its content, and leaves out detector findings
       product.json "accepted" records with a reason. Writes product/rounds/round-N/gates.json with every tool
       version, and heights.json with the height each board's frame wants.
+      Exits 1 when a machine gate fails.
 
   brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
       Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
@@ -3439,6 +3440,8 @@ async function cmdProduct(flags, positional) {
       ] : [];
       emit([`Round ${round} machine gates:`, ...machine.flatMap((v) => [`  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`, ...(v.gate === 'Coverage' ? short : v.gate === 'Board sizes' ? sized : [])]), '', `Written to ${path.relative(process.cwd(), path.join(roundsDir, `round-${round}`, 'gates.json'))}. Then run the craft critique and the rules review, and \`brandi product round --round ${round}\`.`].join('\n'),
         { ok: machine.every((v) => v.pass), round, gates });
+      // Exits 1 when a machine gate fails, as the other checks do: a run read exit 0 as every gate passing.
+      if (!machine.every((v) => v.pass)) process.exitCode = 1;
       return;
     }
     const gatesFile = path.join(roundsDir, `round-${round}`, 'gates.json');

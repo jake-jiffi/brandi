@@ -2493,6 +2493,22 @@
     "file": "skills/product-system/references/10-ai-catalogue.md",
     "heading": "4.3 · AI-drafted marker"
    }
+  },
+  {
+   "id": "L133",
+   "broke": "After the pick moved the rail, today's quiet-rail concept could keep its look only by typing the surface's hexes into a direction.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a concept that left a role undecided keeps its look after the pick, by naming that role null"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "Directions"
+   }
   }
  ]
 }

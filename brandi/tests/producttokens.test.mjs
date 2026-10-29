@@ -439,6 +439,19 @@ describe('directions: a role a concept board moves, solved and carried as a clas
   const dir = (name, t = tokens) => t.meta.directions.find((d) => d.name === name);
   const blockOf = (css, selector) => css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)) + 1);
 
+  test("a concept that left a role undecided keeps its look after the pick, by naming that role null", () => {
+    // A run picked a green rail over today's quiet one, and today's concept board could only keep its quiet rail by
+    // typing the surface's hexes into a direction. Null is the role as it was before the pick: the kit's own.
+    const picked = P.buildProductTokens(green, { brandColours, roles: { rail: 'acme-green' }, directions: [{ name: 'Quiet rail', roles: { rail: null } }] });
+    const quiet = picked.meta.directions[0];
+    const before = P.buildProductTokens(green, { brandColours });
+    for (const m of ['light', 'dark']) {
+      assert.equal(P.resolveColour({ ...picked, color: { tokens: picked.color.tokens.map((t) => (quiet[m][t.name] !== undefined ? { ...t, value: { ...t.value, [m]: quiet[m][t.name] } } : t)) } }, 'rail', m), P.resolveColour(before, 'rail', m), `${m}: the quiet concept's rail is the rail before the pick`);
+    }
+    assert.match(P.toProductCss(picked), /\.direction-quiet-rail \{[^}]*--rail: var\(--surface\)/, 'drawn by the class, as the surface it was');
+    assert.throws(() => P.buildProductTokens(green, { brandColours, directions: [{ name: 'Q', roles: { rail: undefined } }] }), /names at least one role/, 'an undefined role is no role');
+  });
+
   test('each is the system with its roles over the decided ones, and only what differs is kept, where the page does not read', () => {
     const b = dir('B');
     assert.equal(b.class, 'direction-b');

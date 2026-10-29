@@ -976,8 +976,12 @@ export function checkDirections(directions, brandHex) {
     const roles = {};
     for (const [role, v] of Object.entries(d.roles)) {
       if (!DIRECTION_ROLES.includes(role)) throw new TypeError(`direction ${d.name}: ${role} is not a role a direction can move; it moves ${DIRECTION_ROLES.join(', ')}`);
-      roles[role] = bothThemes(v, (x) => colour(role, x).toLowerCase(), `direction ${d.name}: ${role}`);
+      if (v === undefined) continue;
+      // Null is the role undecided, as the kit solves it: a concept drawn before the pick keeps its look after it. A
+      // run kept today's quiet rail only by typing the surface's hexes into a direction.
+      roles[role] = v === null ? null : bothThemes(v, (x) => colour(role, x).toLowerCase(), `direction ${d.name}: ${role}`);
     }
+    if (!Object.keys(roles).length) throw new TypeError(`direction ${d.name}: roles names at least one role the direction moves. A direction that only changes the layout needs no class`);
     return { name: d.name.trim(), class: cls, ...(d.note ? { note: String(d.note) } : {}), roles };
   });
 }
@@ -1184,7 +1188,10 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   if (checked.length) {
     tokens.meta.directions = checked.map((d) => {
       const merged = { ...roles };
-      for (const [role, v] of Object.entries(d.roles)) merged[role] = { ...roles[role], ...v };
+      for (const [role, v] of Object.entries(d.roles)) {
+        if (v === null) delete merged[role];
+        else merged[role] = { ...roles[role], ...v };
+      }
       const solved = buildProductTokens(system, { name, brandColours: brandColoursIn, roles: merged, displayForTitles, displayCase, charts, source, fonts: fontFiles, shape });
       // Kept in both themes when it moves in either: a value left out of the dark rule would let the light one show at night.
       const seen = (t, m, set) => resolveColour(set, t.name, m).toLowerCase();
