@@ -20,6 +20,64 @@ const roster = [
   shift("s10", "[Priya Nair]", "2026-11-06T15:00", "2026-11-06T19:00", "Kitchen", 2),
   shift("s11", "[Jordan Kaur]", "2026-11-07T09:00", "2026-11-07T13:00", "Front of house", 1),
 ]
+// A tradesperson's jobs, from half an hour to an hour and a half, so an event has room for one line, two or three, and two
+// side by side on the hour.
+const job = (id, title, start, end, meta, color) => ({ id, title, start, end, meta, color, href: `#${id}` })
+const jobs = [
+  job("j1", "[Service the boiler]", "2026-11-04T09:00", "2026-11-04T10:00", "[Lee household]", 1),
+  job("j2", "[Replace a tap]", "2026-11-04T10:30", "2026-11-04T11:00", "[Okafor household]", 2),
+  job("j3", "[Quote a kitchen]", "2026-11-04T11:15", "2026-11-04T12:00", "[Martin household]", 3),
+  job("j4", "[Fix a leak under the sink]", "2026-11-04T13:00", "2026-11-04T14:30", "[Chen household]", 4),
+  job("j5", "[Check smoke alarms]", "2026-11-04T15:00", "2026-11-04T16:00", "[Nair household]", 1),
+  job("j6", "[Hang a door]", "2026-11-04T15:00", "2026-11-04T16:00", "[Kaur household]", 2),
+  job("j7", "[Bleed the radiators]", "2026-11-05T08:00", "2026-11-05T09:00", "[Lee household]", 3),
+]
+
+// Each line of every event drawn on a grid: whether any of it shows inside the event's edge, whether it sits wholly
+// inside the event's padding, and whether it is a whole number of its own lines tall, not squeezed to part of one.
+const eventLines = (scope) =>
+  scope.locator('[data-slot="schedule-event"]').evaluateAll((els) =>
+    els.flatMap((el, n) => {
+      const r = el.getBoundingClientRect()
+      // An event in a grid that is not shown, as under 640px.
+      if (!r.width || !r.height) return []
+      const s = getComputedStyle(el)
+      const px = (v) => parseFloat(v) || 0
+      const edge = { top: r.top + px(s.borderTopWidth), bottom: r.bottom - px(s.borderBottomWidth), left: r.left + px(s.borderLeftWidth), right: r.right - px(s.borderRightWidth) }
+      const box = { top: edge.top + px(s.paddingTop), bottom: edge.bottom - px(s.paddingBottom) }
+      return [...el.querySelectorAll("[data-measure]")].map((line, i) => {
+        const b = line.getBoundingClientRect()
+        const lh = px(getComputedStyle(line).lineHeight)
+        const count = lh ? line.clientHeight / lh : 0
+        return {
+          event: n,
+          name: el.getAttribute("aria-label").replace(/\s+/g, " "),
+          // The tooltip's words wait in a hidden span beside the event, and only an event with something cut or left
+          // out has any.
+          tip: Boolean(el.parentElement?.querySelector(":scope > [hidden]")?.textContent.trim()),
+          i,
+          text: line.textContent.replace(/\s+/g, " ").trim(),
+          shown: b.width > 0 && b.height > 0 && b.left < edge.right && b.right > edge.left && b.top < edge.bottom && b.bottom > edge.top,
+          inside: b.top >= box.top - 0.5 && b.bottom <= box.bottom + 0.5,
+          whole: Math.round(count) >= 1 && Math.abs(count - Math.round(count)) < 0.05,
+        }
+      })
+    })
+  )
+
+async function wholeLines({ page, expect }) {
+  const lines = await eventLines(page.locator("body"))
+  expect(new Set(lines.map((l) => l.event)).size >= 20, `the preview's events are measured (${new Set(lines.map((l) => l.event)).size})`)
+  const cut = lines.filter((l) => l.shown && !(l.inside && l.whole))
+  expect.equal(cut.map((l) => `${l.name}: "${l.text}"`).join("; "), "", "every line that shows is whole and inside its event")
+  const untitled = lines.filter((l) => l.i === 0 && !l.shown)
+  expect.equal(untitled.map((l) => l.name).join("; "), "", "every event shows its title")
+  // In order: a line shows only when the one before it does, so the time goes before the event's line does.
+  const skipped = lines.filter((l) => l.i > 0 && l.shown && !lines.find((m) => m.event === l.event && m.i === l.i - 1).shown)
+  expect.equal(skipped.map((l) => `${l.name}: "${l.text}"`).join("; "), "", "no line shows after one left out")
+  const short = [...new Set(lines.filter((l) => !l.shown && !l.tip).map((l) => l.name))]
+  expect.equal(short.join("; "), "", "an event with a line left out shows in full in its tooltip")
+}
 
 async function tabTo(page, locator, max = 60) {
   for (let i = 0; i < max; i++) {
@@ -92,7 +150,7 @@ export default {
       "Today's column carries aria-current=\"date\" and the word today.",
     ],
     Layout: [
-      "Events sit on the hours they cover, in the category's quiet fill with its series dot. Events that start in the same hour sit side by side; one that starts later while another runs is drawn over it, indented and ringed in the surface, so both names stay readable. Titles wrap to two lines. The grid starts at startHour and ends at endHour, reaching further to fit any event. Hour rows are 48px, and 64px on a touch screen.",
+      "Events sit on the hours they cover, in the category's quiet fill with its series dot. Events that start in the same hour sit side by side; one that starts later while another runs is drawn over it, indented and ringed in the surface, so both names stay readable. An event shows whole lines only: its title always, then its time, then its line, as its height allows. A line with no room is left out, never cut, and the whole event shows in its tooltip. A title wraps to two lines when there is room for a line under it. The grid starts at startHour and ends at endHour, reaching further to fit any event. Hour rows are 48px, and 64px on a touch screen.",
       "Under 640px of its own width the grid becomes a list by day, as a DataTable becomes a list: each day's heading, then its events, and Nothing scheduled on a free day. Tab moves through the events.",
     ],
     States: [
@@ -106,7 +164,7 @@ export default {
     ],
     Open: ["Month, the reference's third view, is not built: it is a grid of dates, not of hours."],
   },
-  frame: { width: 960, height: 3260 },
+  frame: { width: 960, height: 4950 },
   examples: [
     {
       id: "week",
@@ -136,6 +194,16 @@ export default {
 <x-import component-from-global-scope="NS.Schedule" label="Roster, stale" events="{{someShifts}}" default-date="2026-11-04" today="2026-11-04" start-hour="{{nine}}" end-hour="{{one}}" error="{{rosterError}}" heading-level="{{h3}}"></x-import>
 </div>`,
       vals: { none: [], yes: true, nine: 9, one: 13, someShifts: roster.filter((s) => s.id === "s8" || s.id === "s11"), rosterError: "[The rostering system] did not respond, so this may be out of date. Showing the copy from 9:12 am." },
+    },
+    {
+      id: "short",
+      title: "Short jobs show whole lines: the title, then the time and the line as there is room",
+      layout: "block",
+      markup: `<div style="display: flex; flex-direction: column; gap: 40px;">
+<x-import component-from-global-scope="NS.Schedule" label="Jobs, by day" events="{{jobs}}" default-view="day" default-date="2026-11-04" today="2026-11-04" start-hour="{{eight}}" end-hour="{{five}}" heading-level="{{h3}}"></x-import>
+<x-import component-from-global-scope="NS.Schedule" label="Jobs, by week" events="{{jobs}}" default-date="2026-11-04" today="2026-11-04" start-hour="{{eight}}" end-hour="{{five}}" heading-level="{{h3}}"></x-import>
+</div>`,
+      vals: { jobs, eight: 8, five: 17 },
     },
   ],
   checks: [
@@ -261,6 +329,17 @@ export default {
         const shortest = Math.min(...(await scope.locator('[data-slot="schedule-event"]').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))))
         expect.atLeast(Math.round(shortest), 24, "every event is a 24px target at least")
       },
+    },
+    {
+      // A one-hour booking at 48px an hour showed its title, then the top half of its time and a sliver of its owner:
+      // each line shrank to share what was left, and no gate saw it.
+      name: "Every event shows whole lines inside its edge, by day and by week: the title always, then the time and its line as the height allows",
+      run: wholeLines,
+    },
+    {
+      name: "Every event shows whole lines on a touch screen, at 64px an hour, too",
+      touch: true,
+      run: wholeLines,
     },
     {
       name: "Forced colours keep each event's edge, the today marker and the focused slot",

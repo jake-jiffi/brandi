@@ -349,6 +349,11 @@ height and main scrolls past the frame's bottom:
   same. A run's checkout drew its cards that way, they shrank, and the order's total sat hidden
   inside its card while every gate passed. The block in main is not height-bound, so nothing in it
   shrinks.
+- The board has one h1, as a page does: axe runs page-has-heading-one on every board. It is the
+  screen's own heading in main. A screen with none, such as a conversation or a task screen, makes
+  the top bar's title its h1 with `heading-level="{{h1}}"` (`h1: 1` in `renderVals()`). Without
+  it the title is a paragraph, and one run's texts board had no h1 at all. In a strip, the strip's
+  title is the h1 and each frame's top bar stays a paragraph.
 - A page in the system's shell uses the shell (`AppShell` with its `tabBar`), which does this
   itself. Inside a fixed frame the shell still takes the height of the board's window, not the
   frame's: on a strip that is the strip's height, and the shell's foot is cut off. On a strip,
@@ -356,6 +361,24 @@ height and main scrolls past the frame's bottom:
 - The gates measure every board and name each box that clips content taller than itself (Board
   sizes, `08-quality-gates.md`), leaving out text cut short on purpose, boxes that scroll, an
   overlay drawn open and a page under a dialog's scrim.
+
+### A message board
+
+A message is drawn as it is read: an email at its width, a text or a notification on the phone it
+arrives on (Board families, above). The board is the page around the message, so it carries a
+page's landmarks. Put the email in a `<main>`; the kit's `Email` is the board's h1:
+
+```html
+<main style="width: 600px; padding: 24px 0; background: var(--canvas);">
+  <x-import component-from-global-scope="Acme.Email" heading="[Rex] is booked in" body="{{body}}"
+            action="{{action}}" preheader="Saturday at 9am" scheme="{{theme}}"></x-import>
+</main>
+```
+
+An email drawn bare, in a plain `<div>`, has no main, and every row of its layout table sits
+outside a landmark: one run's email boards failed axe on landmark-one-main and region. A text or a
+notification is a phone frame (above) with the thread in its main and the top bar's title as the
+h1.
 
 ### Generated boards
 
@@ -413,6 +436,29 @@ is no banner, and the strip's title in a header of its own:
 Brandi's own tests run axe on this markup and on the bare frames: the sections and the header pass
 every rule, and the bare frames fail on region and duplicate banners. Fix the markup, never the
 gate. The strip's name ends in its frames' width (Names, above): `AppBookingsStates390`.
+
+A desktop surface's states board has no device frames, so no frame brings a main. The board is
+the page: wrap it in a `<main>`, with its title in a header inside it and each state a labelled
+section in the grid:
+
+```html
+<main style="width: 1440px; box-sizing: border-box; padding: 48px; display: flex; flex-direction: column; gap: 32px; background: var(--canvas);">
+  <header><h1 class="type-title text-text-strong" style="margin: 0;">Console · Rosters, states</h1></header>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;">
+    <section aria-label="Nothing yet" style="display: flex; flex-direction: column; gap: 8px; min-width: 0;">
+      <h2 class="type-heading text-text-strong" style="margin: 0;">Nothing yet</h2>
+      <p class="type-meta text-text-muted" style="margin: 0;">Say what to do next</p>
+      <!-- the state, drawn with the real components -->
+    </section>
+    <!-- one section per state -->
+  </div>
+</main>
+```
+
+One run drew its desktop states grids with the strip's markup and no frames: a header and the
+sections, and no main anywhere on the board. axe failed all three on landmark-one-main, at every
+width. Brandi's tests run axe on both: the grid in a main passes, and the same grid without it
+fails.
 
 **The title lists every state on the board**, in the order drawn:
 

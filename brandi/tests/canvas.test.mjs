@@ -547,6 +547,30 @@ describe('a dialog drawn over its page', () => {
   });
 });
 
+describe('a MetricCard with a context and no delta', () => {
+  // context is the delta's comparison and shows only beside one. A run passed context with no delta on four boards, so
+  // "4 of 6 slots" never showed under its figure, and nothing said so. footnote is the line that always shows.
+  const card = (props) => `<x-import component-from-global-scope="Acme.MetricCard" label="Groom room booked" value="{{v}}" ${props}></x-import>`;
+  const said = (body, head = '') => K.validateArtboard(K.artboard({ name: 'ConsoleHome1440', body: `${head}<div style="display: flex; gap: 12px;">${body}</div>` }), { name: 'ConsoleHome1440.dc.html' })
+    .warnings.filter((w) => /context/.test(w.message));
+
+  test('validate warns about each card with a context and no delta, naming the board and the card, and says to use footnote', () => {
+    const w = said(`${card('context="4 of 6 slots"')}${card('context="vs last week" delta="{{d4}}"')}`);
+    assert.equal(w.length, 1, JSON.stringify(w));
+    assert.match(w[0].message, /ConsoleHome1440\.dc\.html/, 'names the board');
+    assert.match(w[0].message, /"Groom room booked"/, 'and the card, by its label');
+    assert.match(w[0].fix, /footnote/, 'and says to use footnote');
+    assert.deepEqual(K.contextWithoutDelta(`${card("context='today'")}<x-import component-from-global-scope="Acme.MetricCard" label="Spent" context="since March"></x-import>`), ['Groom room booked', 'Spent']);
+  });
+
+  test('a delta, even one with no comparison, a footnote alone, a script, a comment and a generated board are quiet', () => {
+    assert.deepEqual(said(`${card('context="vs last week" delta="{{nil}}"')}${card('footnote="4 of 6 slots"')}${card('context="vs last week" delta-format="points" delta="{{d4}}"')}${card('context=""')}`), []);
+    assert.deepEqual(said('<script type="text/x-dc">const t = \'<x-import component-from-global-scope="Acme.MetricCard" context="x">\';</script><!-- <x-import component-from-global-scope="Acme.MetricCard" context="x"> -->'), []);
+    assert.deepEqual(said(card('context="vs yesterday"'), '<!--\n  generated from the resolved system by brandi product boards.\n-->'), [], 'a generated board shows the kit\'s own examples, this one on purpose');
+    assert.deepEqual(K.contextWithoutDelta('<x-import component-from-global-scope="Acme.Delta" context="vs last week"></x-import>'), [], 'only a MetricCard');
+  });
+});
+
 describe('handlers in a case the canvas may not read', () => {
   test('validate fails a lowercase or kebab handler on an element, a camelCase one on an x-import, and novalidate, read from the source', () => {
     const board = (body) => K.validateArtboard(K.artboard({ name: 'BookingForm1440', body }), { name: 'BookingForm1440.dc.html' });

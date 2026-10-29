@@ -685,12 +685,23 @@ describe('a board that hides its own content', () => {
     '/squeezed': phone(`<main style="flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 16px; padding: 16px;">${card(8, 'Total $42.00')}${card(8, 'Pay with')}</main>`),
     '/block': phone(`<main style="flex: 1; overflow: auto; padding: 16px;"><div style="display: flex; flex-direction: column; gap: 16px;">${card(8, 'Total $42.00')}${card(8, 'Pay with')}</div></main>`),
     '/clip': `<div style="height: 60px; overflow: clip;">${lines(6)}</div>`,
+    // An event placed on a schedule's hours is positioned, and in the page's own layout: the clip check left every
+    // positioned box out, as if it were an overlay, so an event that hid its lines passed.
+    '/event': `<div style="position: relative; height: 96px;"><div data-slot="schedule-event" style="position: absolute; top: 0; inset-inline: 0; height: 45px; overflow: hidden;">${lines(3)}</div></div>`,
+    // A one-hour booking's lines, each an ellipsis line in a column too short for them: each shrank to share the
+    // room, and showed part of itself. An ellipsis cuts across on purpose, never down.
+    '/squeezed-lines': `<div style="height: 45px; display: flex; flex-direction: column; overflow: hidden;"><p>[Service the boiler]</p>${['9 to 10am', '[Lee household]'].map((t) => `<p style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t}</p>`).join('')}</div>`,
+    '/squeezed-clamp': `<div style="height: 30px; display: flex; flex-direction: column;"><p style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 120px;">${'A very long description '.repeat(10)}</p></div>`,
     '/allowed': [
       `<p style="width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${'A very long name '.repeat(6)}</p>`,
       `<p style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; width: 120px;">${'A very long description '.repeat(10)}</p>`,
       `<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">${lines(4)}</span>`,
       `<div style="height: 80px; overflow: auto;">${lines(10)}</div>`,
       `<div style="position: relative; height: 200px;"><div data-slot="combobox-panel" style="position: absolute; top: 0; max-height: 80px; overflow: hidden;">${lines(10, 'Option')}</div></div>`,
+      `<div style="position: relative; height: 200px;"><div role="menu" style="position: absolute; top: 0; max-height: 80px; overflow: hidden;">${lines(10, 'Item')}</div></div>`,
+      // A clamp as tall as its two lines, and one stretched taller than its one line: neither hides a part of a line.
+      `<div style="display: flex; flex-direction: column; height: 50px;"><p style="flex: 1; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">Short</p></div>`,
+      `<p style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 0;">An ellipsis line with room around it</p>`,
       `<div style="position: relative; height: 200px;"><div aria-hidden="true" inert style="position: relative; height: 100px; overflow: hidden;"><div style="height: 100px; overflow: hidden;">${lines(10)}</div></div></div>`,
     ].join(''),
   };
@@ -707,6 +718,14 @@ describe('a board that hides its own content', () => {
     assert.ok(squeezed[0].shown < squeezed[0].content, 'it shows less than it holds');
     assert.match(squeezed[0].text, /^Line 1/);
     assert.equal(out.__clipped['/clip']?.length, 1, 'overflow: clip clips too');
+  });
+
+  test('a positioned box in the page, an ellipsis line squeezed below its height and a clamp cut mid-line are named', needsKit, () => {
+    assert.deepEqual(out.__clipped['/event']?.map((c) => c.what), ['schedule-event'], JSON.stringify(out.__clipped));
+    const squeezed = out.__clipped['/squeezed-lines'] ?? [];
+    assert.deepEqual(squeezed.map((c) => c.text), ['9 to 10am', '[Lee household]'], JSON.stringify(squeezed));
+    assert.ok(squeezed.every((c) => c.shown < 20 && c.content === 20), 'each shows part of its one line');
+    assert.equal(out.__clipped['/squeezed-clamp']?.length, 1, JSON.stringify(out.__clipped));
   });
 
   test('the phone frame with a plain block in its main holds its cards at their height, and truncation, scrolling, the visually hidden, an overlay drawn open and a page under a scrim are left alone', needsKit, () => {
@@ -807,5 +826,45 @@ ${wrap ? '<header style="height: 48px;"><h1>App · Bookings, states</h1></header
     assert.deepEqual(run.ids('/strip'), [], JSON.stringify(run.result('/strip').violations));
     assert.ok(run.ids('/bare').includes('region'), run.ids('/bare').join(', '));
     assert.ok(run.ids('/bare').includes('landmark-no-duplicate-banner'), run.ids('/bare').join(', '));
+  });
+});
+
+describe('axe on an authored states grid and a message board', () => {
+  // A states board at a desktop width has no device frame, so no frame's main: drawn as the strip is, a run's three
+  // states grids had no main landmark at all. Its email boards drew the email bare, with no main and its layout rows
+  // outside every landmark, and its texts board left the top bar's title a paragraph, so the board had no h1. Each is
+  // the markup 06 gives, then the shape the run drew.
+  const doc = (title, body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body style="margin: 0;">${body}</body></html>`;
+  const cell = (state) => `<section aria-label="${state}" style="display: flex; flex-direction: column; gap: 8px; min-width: 0;"><h2>${state}</h2><p>Say what to do next.</p><div role="alert"><p>${state}.</p><button>Try again</button></div></section>`;
+  const grid = (outer) => `<${outer} style="width: 1440px; padding: 48px; display: flex; flex-direction: column; gap: 32px;"><header><h1>Console · Rosters, states</h1></header><div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px;">${['Nothing yet', 'Loading', 'The rostering system is not responding'].map(cell).join('')}</div></${outer}>`;
+  const row = (inner) => `<tr><td style="padding: 16px 24px;">${inner}</td></tr>`;
+  const email = (outer) => `<${outer} style="width: 600px; padding: 24px 0;"><table role="presentation" style="width: 100%;"><tbody>${row('<h1 style="margin: 0;">[Rex] is booked in</h1>')}${row('<p>Saturday 7 November at 9am.</p>')}${row('<a href="#">See the booking</a>')}</tbody></table></${outer}>`;
+  const texts = (title) => `<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden;"><header style="height: 56px;">${title}</header><main style="flex: 1; overflow: auto; padding: 16px;"><div style="display: flex; flex-direction: column; gap: 16px;"><ol aria-label="Texts"><li>Your booking is confirmed.</li><li>Thanks!</li></ol></div></main></div>`;
+  const pages = {
+    '/grid': doc('Rosters, states', grid('main')),
+    '/grid-bare': doc('Rosters, states', grid('div')),
+    '/email': doc('Booked', email('main')),
+    '/email-bare': doc('Booked', email('div')),
+    '/texts': doc('Texts', texts('<h1 style="margin: 0;">Texts from Acme</h1>')),
+    '/texts-bare': doc('Texts', texts('<p style="margin: 0;">Texts from Acme</p>')),
+  };
+  let run;
+  before(async () => {
+    if (needsKit.skip) return;
+    run = await axePagesOn(
+      (url) => pages[url] ?? null,
+      (base) => Object.keys(pages).map((p) => ({ kind: 'board', label: p, url: `${base}${p}`, width: p.startsWith('/grid') ? 1440 : p.startsWith('/email') ? 600 : 390, height: 900, theme: 'light' }))
+    );
+  });
+
+  test('a states grid in a main, an email in a main and a texts frame whose top bar is the h1 pass every rule axe runs on boards', needsKit, () => {
+    for (const p of ['/grid', '/email', '/texts']) assert.deepEqual(run.ids(p), [], `${p}: ${JSON.stringify(run.result(p).violations)}`);
+  });
+
+  test('drawn as the run drew them, the grid and the email have no main, the email\'s rows sit outside every landmark, and the texts board has no h1', needsKit, () => {
+    assert.ok(run.ids('/grid-bare').includes('landmark-one-main'), run.ids('/grid-bare').join(', '));
+    assert.ok(run.ids('/email-bare').includes('landmark-one-main'), run.ids('/email-bare').join(', '));
+    assert.ok(run.ids('/email-bare').includes('region'), run.ids('/email-bare').join(', '));
+    assert.ok(run.ids('/texts-bare').includes('page-has-heading-one'), run.ids('/texts-bare').join(', '));
   });
 });

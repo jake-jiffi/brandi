@@ -153,10 +153,15 @@ whole height (`06-canvas.md`, Sizes). The gate fails on:
 | A box hiding content | Inside the board, a box that clips (`overflow` hidden or clip) holds content more than 4px taller than itself | The board's markup (A phone frame, `06-canvas.md`) or the component |
 | Not measured | The board did not render, or gave no height | The board, from the error the record prints |
 
-The box check leaves out text cut short on purpose (an ellipsis or a line clamp), a box that scrolls,
-a visually hidden one, an overlay drawn open (positioned, as a menu's panel is) and a page under a
-dialog's scrim. A run's checkout drew its cards in a phone frame whose main was the flex column: the
-cards shrank, the order's total sat hidden inside one, and every other gate passed it. The round
+The box check leaves out text cut short on purpose (an ellipsis across, a line clamp after a whole
+line), a box that scrolls, a visually hidden one, an overlay drawn open (a positioned menu, listbox,
+picker panel, popover, dialog or tooltip, by its role or the kit's name for its panel) and a page
+under a dialog's scrim. A run's checkout drew its cards in a phone frame whose main was the flex
+column: the cards shrank, the order's total sat hidden inside one, and every other gate passed it.
+The same shrinking hid a schedule's one-hour bookings, and the check passed those too: their time
+and owner lines each kept the top 8px of an 18px line, and an ellipsis line was read as cut on
+purpose. An ellipsis only cuts across, so a line squeezed below its own height is listed, and so
+is any positioned box in the page's own layout, such as an event placed on its hours. The round
 folder gets `heights.json`, each board's wanted height, for a script that writes the boards. A
 starter whose `tools/measure-boards.mjs` predates the gate reports it not run, and the round is not
 met until `brandi product starter --kit` refreshes it.

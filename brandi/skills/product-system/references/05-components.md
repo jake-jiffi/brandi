@@ -272,6 +272,14 @@ fitted and was unwrapped, and was cut again. A cut label's Tooltip (Badge, Tag, 
 as the label's own box does (`cutTrigger`), so wrapping it never changes the width that was
 measured. Anything that measures itself and then changes its own markup must hold this.
 
+A box of fixed height shows whole lines, never part of one. An ellipsis cuts a line across, not
+down: Schedule's one-hour bookings sat their title, time and owner in a flex column too short for
+all three, so the time and owner shrank to share the rest and each showed the top 8px of an 18px
+line (a proof run, round 1). Lay such lines out so a line with no room is left out whole: Schedule
+wraps its column, so a line that does not fit starts a second column out past the event's edge, and
+it is a size container in its title's type, so a query in `lh` picks how many lines the title
+takes. Its check measures every event on its preview, by day and by week, at 48px and 64px an hour.
+
 ### 2.12 On the canvas
 
 Boards mount the real components (`06-canvas.md`), which asks four things of each one.
@@ -775,15 +783,19 @@ footnote.
 - **Behaviour.** `hint` is a toggletip behind an info button. Hover shows it after a short delay. A
   press, a tap or Enter opens it and reads it out. Escape or a press elsewhere closes it. The figure
   shrinks with its card, not the window. `context` is the delta's comparison and shows only beside a
-  delta; `footnote` is the line that always shows. A `value` given as text that is not a number ("7
-  of 8") shows as written; a number given as text goes through the formatter.
+  delta; `footnote` is the line that always shows. `brandi validate` warns about a board that
+  mounts a MetricCard with a `context` and no `delta`, naming the card, since that line shows
+  nothing. A `value` given as text that is not a number ("7 of 8") shows as written; a number given
+  as text goes through the formatter.
 - **Rules.** One `hero` per row at most. Tabular figures. The label says exactly what is counted,
   and the footnote or hint says what is left out. Rounded for reading on cards ($18K), exact in
   tables. When a source is down, show `unavailable` and when it last answered, never a zero nobody
   measured.
 - **Review.** The hint could not be opened on touch (round 4). The reference's toggletip waits
   150ms on hover. A figure in words read No data, and a context given with no delta never showed:
-  both were found only by rendering a board.
+  both were found only by rendering a board. A later run passed `context` with no delta on four
+  boards, meaning it as the line under the figure ("4 of 6 slots"), and the craft review found each
+  one missing; validate now says so before the board is rendered.
 
 #### DataTable
 

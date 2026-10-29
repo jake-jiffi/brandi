@@ -15,9 +15,10 @@
  *
  * `frame` is the board's declared { w, h }. Given one, the board is first drawn at that size, as the canvas draws it,
  * and every box that clips content taller than itself is listed under "__clipped": a Card squeezed inside a phone
- * frame hid a checkout's total, and nothing said so. Text cut short on purpose (an ellipsis, a line clamp), a box
- * that scrolls, a visually hidden one, an overlay drawn open (positioned, as a menu's panel is) and a page under a
- * dialog's scrim (inert or aria-hidden) are left out.
+ * frame hid a checkout's total, and nothing said so. Text cut short on purpose (an ellipsis across, a line clamp
+ * after a whole line), a box that scrolls, a visually hidden one, an overlay drawn open (a positioned menu, listbox,
+ * picker panel, popover, dialog or tooltip) and a page under a dialog's scrim (inert or aria-hidden) are left out.
+ * An ellipsis line squeezed below its own height and a positioned box in the page's layout are not.
  */
 
 import { chromium } from "playwright"
@@ -32,14 +33,28 @@ const CLIP_TOLERANCE = 4
 /** Every box on the page that clips content taller than itself (run in the page). */
 function clippedBoxes(tolerance) {
   const replaced = new Set(["INPUT", "TEXTAREA", "SELECT", "IMG", "VIDEO", "CANVAS", "IFRAME", "OBJECT", "EMBED", "PICTURE"])
+  // An overlay drawn open sits over the page: a menu, a listbox, a picker's panel, a popover, a dialog or sheet, a
+  // tooltip, by its role or the kit's own name for its panel. Only those are left out for being positioned: an event
+  // on a schedule is positioned on its hours and is part of the page.
+  const overlay = [
+    ...["menu", "listbox", "dialog", "alertdialog", "tooltip"].map((r) => `[role='${r}']`),
+    ...["tooltip-content", "chart-tooltip", "popover-content", "hover-card-content", "combobox-panel", "select-content", "dropdown-menu-content", "dropdown-menu-sub-content", "date-picker-panel", "date-range-picker-panel", "dialog-content", "sheet-content"].map((n) => `[data-slot='${n}']`),
+  ].join(", ")
   const found = []
   for (const el of document.querySelectorAll("body *")) {
     if (!(el instanceof HTMLElement) || replaced.has(el.tagName)) continue
     const s = getComputedStyle(el)
     if (s.overflowY !== "hidden" && s.overflowY !== "clip") continue
     if (el.clientHeight <= 1 || el.clientWidth <= 1) continue
-    if (s.textOverflow === "ellipsis" || (s.webkitLineClamp && s.webkitLineClamp !== "none")) continue
-    if (s.position === "absolute" || s.position === "fixed") continue
+    // Text cut short on purpose is cut one way. An ellipsis cuts across, so it is still held to its own line's
+    // height below: squeezed in a column, a one-hour booking's time and owner each showed part of a line and passed
+    // as cut on purpose. A clamp cuts after a whole line, so it is left out when it shows whole lines.
+    if (s.webkitLineClamp && s.webkitLineClamp !== "none") {
+      const lh = parseFloat(s.lineHeight)
+      const rest = lh ? (el.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) % lh : 0
+      if (rest <= tolerance || lh - rest <= tolerance) continue
+    }
+    if ((s.position === "absolute" || s.position === "fixed") && el.closest(overlay)) continue
     if (el.closest("[inert], [aria-hidden='true']")) continue
     if (el.scrollHeight - el.clientHeight <= tolerance) continue
     // The outermost box is enough: whatever it holds is hidden with it.
