@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { toStarterGlobals, SHADCN } from '../scripts/productglobals.mjs';
+import { toStarterGlobals, railMarks, SHADCN } from '../scripts/productglobals.mjs';
 import { buildProductTokens } from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
 import { systemInputFromBrand } from '../scripts/brandfile.mjs';
@@ -25,6 +25,17 @@ describe('toStarterGlobals', () => {
     const dark = section('.dark,\n[data-theme="dark"] {', ':root {');
     assert.match(dark, /--rail: var\(--surface\);/);
     assert.match(dark, /--chart-track: var\(--surface-sunken\);/);
+  });
+
+  test("each theme says which of the logo's renditions the rail shows, from the rail's own tone in that theme", () => {
+    // A quiet rail is the surface: light in light, dark in dark.
+    assert.match(section(':root,\n[data-theme="light"] {', '.dark,'), /--rail-mark-on-light: flex;\n {2}--rail-mark-on-dark: none;/);
+    assert.match(section('.dark,\n[data-theme="dark"] {', ':root {'), /--rail-mark-on-light: none;\n {2}--rail-mark-on-dark: flex;/);
+    // A navy rail is dark in both themes, so both take the rendition drawn for dark grounds.
+    const navy = toStarterGlobals(buildProductTokens(buildSystem(systemInputFromBrand(brand)), { roles: { rail: { light: '#102B4B', dark: '#102B4B' } } }));
+    assert.equal((navy.match(/--rail-mark-on-dark: flex;/g) ?? []).length, 2);
+    assert.equal((navy.match(/--rail-mark-on-light: none;/g) ?? []).length, 2);
+    assert.deepEqual(railMarks({ color: { tokens: [] } }, 'dark'), [['rail-mark-on-light', 'flex'], ['rail-mark-on-dark', 'none']], 'no rail at all: the light-ground rendition');
   });
 
   test("the brand's texture move is a class in the components layer, its file in the starter's textures/", () => {

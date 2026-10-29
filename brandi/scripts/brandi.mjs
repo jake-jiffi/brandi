@@ -76,6 +76,7 @@ import { buildProductTokens, auditProductTokens, auditSummary, toProductCss, sha
 import { measurePages, summarise as summariseShapes } from './productmeasure.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
+import { CHARACTER_STATES } from './productbrand.mjs';
 import { runGates, judgeRound, roundMarkdown, publishedSection, serveStarter, starterRoutes, WIDTHS } from './productgates.mjs';
 import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
@@ -2943,6 +2944,9 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       plain system input ({ "primary": "#...", "accents": [...], "type": {...} })
       for a brand Brandi has never built. Decided roles come from
       product/product.json ("roles": { "primary": { "light", "dark" }, ... }).
+      Directions ("directions": [{ "name", "roles", "note" }]) are solved as
+      the system with their roles over the decided ones, audited under their
+      names, and drawn on a board by a class in tokens.css (.direction-<name>).
       Writes tokens.json, tokens.css and contrast-audit.json.
 
   brandi product measure --url <the brand's live site> [--url <another page> ...] [--follow <n>]
@@ -3046,9 +3050,29 @@ async function productSource(flags) {
   return { system, name: brand.meta?.name ?? null, source: path.relative(process.cwd(), file) };
 }
 
+/**
+ * The illustration library beside the character's moments, as the starter says it: the block to fill, and every
+ * drawing to pick from. Which drawing marks which moment is a person's pick, so the starter never guesses one.
+ */
+function starterIllustrationLines(ill) {
+  if (!ill) return [];
+  const taken = Object.keys(ill.taken);
+  return [
+    '',
+    `The brand's illustration library has ${plural(ill.drawings.length, 'drawing')}, and the character has ${plural(CHARACTER_STATES.length, 'moment')}. Which drawing marks which moment is a pick, so none was guessed${taken.length ? `; taken by their exact names: ${taken.join(', ')}` : ''}.`,
+    'Pick one for each moment that has a drawing (leave the rest out), add this to product/product.json, and run the starter again:',
+    ill.block,
+    'The drawings:',
+    ...ill.drawings.map((d) => `  ${d.file}${d.title ? `  ${d.title}` : ''}${d.set ? ` (${d.set})` : ''}`),
+  ];
+}
+
 function productAuditLines(audit) {
   const lines = [auditSummary(audit)];
-  for (const f of audit.fails) lines.push(f.problem ? `  fail  ${f.theme.padEnd(5)} ${f.fg} on ${f.bg}: ${f.problem}` : `  fail  ${f.theme.padEnd(5)} ${f.fg} on ${f.bg}: ${f.ratio}:1, below ${f.min}:1`);
+  for (const f of audit.fails) {
+    const where = `${f.theme.padEnd(5)} ${f.direction ? `direction ${f.direction}: ` : ''}${f.fg} on ${f.bg}`;
+    lines.push(f.problem ? `  fail  ${where}: ${f.problem}` : `  fail  ${where}: ${f.ratio}:1, below ${f.min}:1`);
+  }
   for (const n of audit.notes) lines.push(`  note  ${n}`);
   if (audit.warnings.length) lines.push('', `${plural(audit.warnings.length, 'warning')}:`);
   for (const w of audit.warnings) lines.push(`  ${w.theme.padEnd(5)} ${w.area.padEnd(13)} ${w.message}`);
@@ -3072,6 +3096,7 @@ async function cmdProduct(flags, positional) {
       brandColours: config.brandColours ?? null,
       fonts: config.fonts ?? [],
       shape: config.shape ?? {},
+      directions: config.directions ?? [],
       source,
     });
     const audit = auditProductTokens(tokens);
@@ -3084,7 +3109,12 @@ async function cmdProduct(flags, positional) {
     await write('tokens.json', JSON.stringify(tokens, null, 2) + '\n');
     await write('tokens.css', toProductCss(tokens));
     await write('contrast-audit.json', JSON.stringify({ summary: auditSummary(audit), ...audit }, null, 2) + '\n');
-    const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), '', ...written.map((w) => `  ${w}`)];
+    // Each direction, with the class a board draws it by and how much it moves.
+    const directions = (tokens.meta.directions ?? []).map((d) => {
+      const moved = Object.keys(d.light).filter((n) => !n.startsWith('rail-mark-'));
+      return `  direction ${d.name}: .${d.class}, ${moved.length ? `${plural(moved.length, 'role')} moved (${moved.slice(0, 6).join(', ')}${moved.length > 6 ? ', ...' : ''})` : "nothing moved: it is today's system"}`;
+    });
+    const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), ...(directions.length ? ['', ...directions] : []), '', ...written.map((w) => `  ${w}`)];
     emit(lines.join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, files: written });
     if (!audit.ok) process.exitCode = 1;
     return;
@@ -3174,6 +3204,8 @@ async function cmdProduct(flags, positional) {
       res.brand ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
       ...(res.brand?.refused ?? []).map((r) => `  Not used: ${r}`),
       ...(res.brand?.inkPoses?.length ? [`  Drawn in one ink, so they take the text colour on dark: ${res.brand.inkPoses.join(', ')}.`] : []),
+      ...(res.brand?.notes ?? []).map((n) => `  Logo: ${n}.`),
+      ...starterIllustrationLines(res.brand?.illustrations),
       res.placeholder ? "lib/brand.ts still holds the kit's placeholder mark. Name the brand's marks in product.json (brand.marks) or record a logo master." : '',
       '',
       res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : flags.kit ? 'Copied the kit\'s components and tools again, and rewrote the generated files. Next: `brandi product bundle`.' : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',

@@ -176,12 +176,73 @@ const aspectOf = (svg) => {
  */
 export const SYMBOL_MAX_ASPECT = 1.5;
 
-/** "Leave clear space on every side equal to half the height of the mark" as 0.5. */
-export function clearSpaceRatio(rule) {
+const AMOUNTS = { half: 0.5, 'a half': 0.5, 'one half': 0.5, 'a third': 1 / 3, 'one third': 1 / 3, 'a quarter': 0.25, 'one quarter': 0.25, 'a fifth': 0.2, 'one fifth': 0.2, 'a tenth': 0.1, 'one tenth': 0.1, twice: 2, double: 2 };
+const WHOLE = String.raw`(?:the\s+)?(?:whole\s+|full\s+|primary\s+)?(?:mark|logo|lockup)`;
+// The whole, and not a part named after it: "the logo's tagline" and "the logo symbol" are parts.
+const NOT_A_PART = String.raw`(?!\s*['’]s\b)(?!\s+(?:symbol|icon|ear|letter|tagline|signature|monogram|wordmark|type)\b)`;
+const CLEAR = new RegExp(String.raw`(?:(${Object.keys(AMOUNTS).join('|')}|\d*\.?\d+\s*(?:%|per\s?cent)|\d*\.?\d+(?:\s*(?:x|times))?)\s+(?:of\s+)?|equal to\s+)(?:the\s+)?(?:(height|width)\s+of\s+${WHOLE}\b${NOT_A_PART}|${WHOLE}(?:'s|s')?\s+(height|width)\b)`, 'i');
+
+/**
+ * A clear-space rule as a share of the logo's height: "equal to half the height of the mark" is 0.5, "25% of the
+ * logo's height" 0.25, "twice the height of the logo" 2. A share of the logo's width needs the mark's shape, its
+ * height over its width (`aspect`). A part of the mark ("one e of the signature", the cap height) is not the mark,
+ * and its size is not known from here, so it is null: the starter prints the words instead.
+ */
+export function clearSpaceRatio(rule, { aspect = null } = {}) {
   if (typeof rule === 'number') return rule;
-  const m = /equal to (half|a third|a quarter|one quarter|(\d*\.?\d+))\b/i.exec(String(rule ?? ''));
+  const m = CLEAR.exec(String(rule ?? ''));
   if (!m) return null;
-  return m[2] ? Number(m[2]) : { half: 0.5, 'a third': 1 / 3, 'a quarter': 0.25, 'one quarter': 0.25 }[m[1].toLowerCase()];
+  const amount = (m[1] ?? '').toLowerCase().trim();
+  const share = !amount ? 1 : AMOUNTS[amount] ?? (/%|cent$/.test(amount) ? Number.parseFloat(amount) / 100 : Number.parseFloat(amount));
+  if (!(share > 0)) return null;
+  if ((m[2] ?? m[3]).toLowerCase() === 'height') return share;
+  return aspect > 0 ? share / aspect : null;
+}
+
+/**
+ * The smallest size on screen of the mark the starter draws, along its long side: the minSizes entry whose variant
+ * names that file (through variants[]), or one named for the primary that names no other file, else the general
+ * minimum. A run's minimum sat only in minSizes, and the starter drew the logo under it at the kit's 16px.
+ */
+export function minimumFor(logo, file) {
+  const base = path.basename(String(file ?? '')).toLowerCase();
+  const key = (v) => String(v ?? '').trim().toLowerCase();
+  const named = new Map((logo?.variants ?? []).filter((v) => v?.name && v?.file).map((v) => [key(v.name), path.basename(v.file).toLowerCase()]));
+  const sizes = (logo?.minSizes ?? []).filter((m) => typeof m?.screenPx === 'number' && m.screenPx > 0 && typeof m.variant === 'string');
+  const entry = sizes.find((m) => named.get(key(m.variant)) === base) ?? sizes.find((m) => !named.has(key(m.variant)) && /\bprimary\b/i.test(m.variant));
+  if (entry) return { px: entry.screenPx, from: `identity.logo.minSizes (${entry.variant})` };
+  const px = logo?.minSize?.screenPx;
+  return typeof px === 'number' && px > 0 ? { px, from: 'identity.logo.minSize' } : null;
+}
+
+const slugOf = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+/**
+ * The brand's illustration library beside the character's moments, to pick from. Which drawing marks which moment
+ * is a person's pick, or the run's, recorded: a run mapped five of seventeen by hand. So nothing is guessed, and only
+ * a drawing whose file name or title is a moment's own name is taken. Paths are relative to product/, as product.json
+ * writes them. Null without a library, or once the character is named.
+ */
+export function illustrationChoices({ brand, brandRoot, productDir, character = null }) {
+  const library = (brand?.identity?.illustration?.library ?? []).filter((d) => typeof d?.file === 'string' && !path.isAbsolute(d.file));
+  if (!library.length || character || !brandRoot || !productDir) return null;
+  // A library file's path is from the project root.
+  const drawings = library.map((d) => ({ file: path.relative(productDir, path.resolve(brandRoot, d.file)), title: d.title ?? null, set: d.set ?? null }));
+  const taken = {};
+  for (const state of CHARACTER_STATES) {
+    const d = drawings.find((x) => [slugOf(path.basename(x.file, path.extname(x.file))), slugOf(x.title)].includes(state));
+    if (d) taken[state] = d.file;
+  }
+  const poses = CHARACTER_STATES.map((st) => `      ${JSON.stringify(st)}: ${JSON.stringify(taken[st] ?? '')}`).join(',\n');
+  return { drawings, taken, block: `"brand": { "character": { "name": "[the drawings' name]", "poses": {\n${poses}\n} } }` };
+}
+
+/** A character product.json names, its pose paths read from product/, or the drawings taken by their exact names. */
+function characterFrom(block, choices, productDir, brandName) {
+  const fromProduct = (map) => Object.fromEntries(Object.entries(map ?? {}).map(([k, v]) => [k, path.resolve(productDir, v)]));
+  if (block?.character) return { ...block.character, ...(block.character.poses ? { poses: fromProduct(block.character.poses) } : {}), ...(block.character.flat ? { flat: fromProduct(block.character.flat) } : {}) };
+  if (choices && Object.keys(choices.taken).length) return { name: brandName ? `${brandName} illustrations` : 'Illustrations', poses: fromProduct(choices.taken) };
+  return null;
 }
 
 /** A still's media type, from its name. */
@@ -247,8 +308,9 @@ const namesGround = (role) => new RegExp(GROUND.source).test(String(role ?? '').
  */
 export function brandSources({ product = {}, brand = null, productDir, brandRoot, brandDir = brandRoot ? path.join(brandRoot, 'brand') : null }) {
   const block = product.brand;
+  const illustrations = illustrationChoices({ brand, brandRoot, productDir, character: block?.character ?? null });
   if (block?.marks?.full) {
-    return { from: 'product/product.json', name: block.name ?? product.productName ?? brand?.meta?.name ?? null, files: block.marks, inkFrom: null, logo: block.logo ?? {}, character: block.character ?? null, base: productDir };
+    return { from: 'product/product.json', name: block.name ?? product.productName ?? brand?.meta?.name ?? null, files: block.marks, inkFrom: null, logo: block.logo ?? {}, character: characterFrom(block, illustrations, productDir, brand?.meta?.name), base: productDir, notes: [], illustrations };
   }
   const files = (brand?.identity?.logo?.files ?? []).map((f) => (typeof f === 'string' ? { path: f } : f)).filter((f) => f?.path);
   const rank = (f, r) => (f.role === r ? 0 : roleWord(f.role) !== r ? null : namesGround(f.role) ? 2 : 1);
@@ -258,10 +320,22 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
     .sort((a, b) => a.rank - b.rank || Number(!/\.svg$/i.test(a.f.path)) - Number(!/\.svg$/i.test(b.f.path)) || a.i - b.i)[0]?.f.path ?? null;
   const full = role('primary');
   if (!full) return null;
+  const rec = brand.identity.logo;
   const logo = {};
-  const ratio = clearSpaceRatio(brand.identity.logo.clearSpace);
+  const notes = [];
+  const ratio = clearSpaceRatio(rec.clearSpace);
   if (ratio) logo.clearSpace = ratio;
-  if (brand.identity.logo.minSize?.screenPx) logo.minLongSide = brand.identity.logo.minSize.screenPx;
+  // A share of the width is read once the mark's shape is known (brandConstant).
+  else if (clearSpaceRatio(rec.clearSpace, { aspect: 1 })) logo.clearSpaceWords = String(rec.clearSpace);
+  const min = minimumFor(rec, full);
+  if (min) logo.minLongSide = min.px;
+  // product.json's brand.logo settles what the record cannot: clear space written in words, a minimum it lacks.
+  const set = Object.fromEntries(Object.entries(block?.logo ?? {}).filter(([k, v]) => k in LOGO_DEFAULTS && typeof v === 'number'));
+  Object.assign(logo, set);
+  if (min && set.minHeight == null) notes.push(`the minimum, ${min.px}px along the long side, from ${min.from}`);
+  if (logo.clearSpace == null && !logo.clearSpaceWords && rec.clearSpace) {
+    notes.push(`clear space is written in words the starter cannot turn into a share of the logo's height: "${rec.clearSpace}". Set product.json "brand": { "logo": { "clearSpace": <a share of the logo's height> } }, 0.25 for a quarter of its height on every side, and run it again`);
+  }
   const onDark = role('mono-white');
   return {
     from: "brand/brand.json's logo master",
@@ -270,8 +344,10 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
     // The one ink takes the text colour, which only an outline drawing can.
     inkFrom: role('mono-black', (p) => /\.svg$/i.test(p)),
     logo,
-    character: null,
+    character: characterFrom(block, illustrations, productDir, brand.meta?.name),
     base: [brandDir, brandRoot].find((d) => d && existsSync(path.resolve(d, full))) ?? brandDir ?? brandRoot,
+    notes,
+    illustrations,
   };
 }
 
@@ -331,6 +407,10 @@ export function brandConstant(src, { stills = new Map() } = {}) {
   // Brandi records the smallest size along the long side; the product sizes a logo by its height.
   const aspect = aspectOf(marks.full);
   if (logo.minHeight == null && src.logo?.minLongSide && aspect) logo.minHeight = Math.max(1, Math.ceil(src.logo.minLongSide * Math.min(aspect, 1)));
+  if (logo.clearSpace == null && src.logo?.clearSpaceWords && aspect) {
+    const share = clearSpaceRatio(src.logo.clearSpaceWords, { aspect });
+    if (share) logo.clearSpace = share;
+  }
   for (const [key, value] of Object.entries(LOGO_DEFAULTS)) {
     if (logo[key] != null) continue;
     // With no symbol of its own on record, the symbol's floor is the logo's, when that came from the record.
@@ -400,4 +480,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, oneDarkInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER, SYMBOL_MAX_ASPECT };
+export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, oneDarkInk, clearSpaceRatio, minimumFor, illustrationChoices, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER, SYMBOL_MAX_ASPECT };

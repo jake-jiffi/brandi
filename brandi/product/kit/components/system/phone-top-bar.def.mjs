@@ -17,6 +17,29 @@ const probe = (el, prop, value) => {
   p.remove()
   return want
 }
+// The rendition a logo has on screen, and whether the rail is darker than its words where `el` sits: the test the
+// tokens use to set the rail's marks (--rail-mark-on-light, --rail-mark-on-dark).
+const shownMark = (logo) =>
+  logo.evaluate((el) => [...el.querySelectorAll('[data-slot="logo-rendition"]')].find((r) => r.checkVisibility())?.dataset.rendition)
+const railIsDark = (el) => {
+  const lum = (value) => {
+    const p = document.createElement("span")
+    p.style.color = value
+    el.appendChild(p)
+    const [r, g, b] = (getComputedStyle(p).color.match(/[\d.]+/g) ?? []).slice(0, 3).map((c) => {
+      const s = Number(c) / 255
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    })
+    p.remove()
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  return lum("var(--rail)") < lum("var(--rail-text-strong)")
+}
+const onDarkOf = (page) =>
+  page.evaluate(() => {
+    const marks = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {}
+    return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
+  })
 const phone = (inner) => `<div style="width: 390px;" class="outline outline-line">${inner}</div>`
 const LONG = "[Invoice 1042 for the March grooming package and the late fee]"
 
@@ -43,6 +66,7 @@ export default {
     ],
     Layout: [
       "56px tall on the rail's own colours, with a hairline under it: under 1024px of shell it does the rail's job. The menu button and Back are 36px, 44px on a touch screen.",
+      "The lockup takes the logo made for the rail's ground, from the rail's tone in each theme, as the rail's does, so a direction whose class recolours the rail moves the mark with it.",
       "A title takes one line and is cut with an ellipsis. It repeats the page's heading, which carries it whole, so nothing is lost; give the screen a PageHeader under it.",
     ],
     Rules: [
@@ -85,6 +109,24 @@ export default {
   openMenu: () => self.setState((s) => ({ menuOpen: !s.menuOpen })),
   ui: { more: React.createElement(NS.Menu, { label: "More actions for [Invoice 1042]", items: [{ label: "Download PDF", icon: "Download" }, { label: "Duplicate", icon: "Copy" }] }) }`,
   checks: [
+    {
+      name: "The bar's lockup draws the logo made for the rail's ground, and a direction's class moves it with the rail, in both themes",
+      example: "menu",
+      themes: ["light", "dark"],
+      async run({ page, scope, expect }) {
+        // Chosen when the bundle was built, a green-rail direction drew the mark made for dark grounds on green.
+        const host = scope.locator('[data-slot="phone-top-bar"]').first()
+        const logo = host.locator('[data-slot="product-lockup"] [data-slot="logo"]').first()
+        const onDark = await onDarkOf(page)
+        const dark = await host.evaluate(railIsDark)
+        expect.equal(await shownMark(logo), dark ? onDark : "full", `the rendition on this ${dark ? "dark" : "light"} rail`)
+        await host.evaluate((el, d) => {
+          el.style.setProperty("--rail-mark-on-light", d ? "flex" : "none")
+          el.style.setProperty("--rail-mark-on-dark", d ? "none" : "flex")
+        }, dark)
+        expect.equal(await shownMark(logo), dark ? "full" : onDark, "the rendition once a direction turns the rail's tone over")
+      },
+    },
     {
       name: "The menu button is named Open navigation, says it opens a dialog, and says whether it is open",
       example: "menu",

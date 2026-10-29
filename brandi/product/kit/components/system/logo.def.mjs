@@ -3,6 +3,27 @@
 // asks the browser what it draws.
 const shown = (logo) =>
   logo.evaluate((el) => [...el.querySelectorAll('[data-slot="logo-rendition"]')].find((r) => r.checkVisibility())?.dataset.rendition)
+// Whether the rail is darker than its words where `el` sits: the test the tokens use to set the rail's marks.
+const railIsDark = (el) => {
+  const lum = (value) => {
+    const p = document.createElement("span")
+    p.style.color = value
+    el.appendChild(p)
+    const [r, g, b] = (getComputedStyle(p).color.match(/[\d.]+/g) ?? []).slice(0, 3).map((c) => {
+      const s = Number(c) / 255
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    })
+    p.remove()
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  return lum("var(--rail)") < lum("var(--rail-text-strong)")
+}
+// The rendition drawn for dark grounds, as Logo picks it: the brand's own, else its single ink, else the full logo.
+const onDarkOf = (page) =>
+  page.evaluate(() => {
+    const marks = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {}
+    return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
+  })
 
 const tile = "flex flex-col items-start gap-3 rounded-md border border-line bg-surface p-5"
 
@@ -13,7 +34,7 @@ export default {
   status: "proven",
   props: [
     { name: "mark", type: '"full" | "symbol"', default: '"full"', doc: "The full logo, or the symbol alone for square and narrow places such as the collapsed rail. A brand without a symbol shows its full logo. A mark much wider than tall (over 1.5 times) is never taken as the symbol: the starter leaves it out, and the icons rail shows its Home control." },
-    { name: "color", type: '"auto" | "on-light" | "on-dark" | "ink"', default: '"auto"', doc: "Which of the brand's approved renditions. See Renditions." },
+    { name: "color", type: '"auto" | "on-light" | "on-dark" | "ink" | "rail"', default: '"auto"', doc: "Which of the brand's approved renditions. See Renditions." },
     { name: "height", type: "number", doc: "Height in px. Defaults to the logo system's preferred size, and the symbol to its own, 24px, never the full logo's. Anything under its minimum (the symbol's, for the symbol) is raised to it." },
     { name: "clearspace", type: "boolean", default: "false", doc: "Adds the logo system's clear space around the mark as padding. Off where layout already keeps it clear." },
     { name: "title", type: "string", default: "the brand's name", doc: 'Its accessible name. Pass "" when a parent link already names it.' },
@@ -27,6 +48,7 @@ export default {
         ["on-light", "The rendition approved on light grounds, whatever the theme"],
         ["on-dark", "The rendition approved on dark grounds, or the single ink"],
         ["ink", "One ink in currentColor: the parent sets it, such as the label colour on a brand-coloured rail"],
+        ["rail", "The rendition made for the rail's ground, from the rail's tone in each theme: the dark-ground one on a rail darker than its words. A direction's class that recolours the rail moves it too"],
       ],
     },
   ],
@@ -34,6 +56,7 @@ export default {
     Behaviour: [
       'An image named by its title, the brand\'s name by default. With title="" it is hidden, for a link that already names it.',
       "The theme picks the rendition in CSS, so the server, the canvas and the product agree. Forced colours show the single ink as CanvasText, because an SVG keeps its own colours there.",
+      "On the rail the rail's tone picks it, through --rail-mark-on-light and --rail-mark-on-dark, which the tokens set in each theme and a direction's class flips with the rail. Chosen when the bundle was built, a green-rail direction drew the mark made for dark grounds on green.",
     ],
     Layout: [
       "The height is set and the width follows the artwork, so it is never stretched. Clear space is padding worked out from the height and the logo system's ratio.",
@@ -77,6 +100,11 @@ export default {
 <span class="max-w-measure type-meta text-text-muted">A quarter of the logo's height on every side, kept by padding rather than inside the file</span>
 </div>`,
       vals: { yes: true },
+    },
+    {
+      id: "rail",
+      title: "On the rail",
+      markup: `<div data-rail-tile="" class="flex flex-col items-start gap-3 rounded-md bg-rail p-5"><x-import component-from-global-scope="NS.Logo" color="rail"></x-import><span class="type-meta text-rail-muted">rail, follows the rail's tone</span></div>`,
     },
     {
       id: "link",
@@ -135,6 +163,24 @@ export default {
         const auto = scope.locator('[data-slot="logo"][data-color="auto"]')
         expect.equal(await shown(auto), theme === "dark" ? "full-on-dark" : "full", "the rendition on screen")
         expect.equal(await shown(scope.locator('[data-slot="logo"][data-color="on-light"]')), "full", "on-light, whatever the theme")
+      },
+    },
+    {
+      name: "On the rail it draws the rendition made for the rail's ground, and a direction's class flips it with the rail, in both themes",
+      example: "rail",
+      themes: ["light", "dark"],
+      async run({ page, scope, expect }) {
+        const tile = scope.locator("[data-rail-tile]")
+        const logo = tile.locator('[data-slot="logo"]')
+        const onDark = await onDarkOf(page)
+        const dark = await tile.evaluate(railIsDark)
+        expect.equal(await shown(logo), dark ? onDark : "full", `the rendition on this ${dark ? "dark" : "light"} rail`)
+        // What a direction's class does when its rail's tone is the other one.
+        await tile.evaluate((el, d) => {
+          el.style.setProperty("--rail-mark-on-light", d ? "flex" : "none")
+          el.style.setProperty("--rail-mark-on-dark", d ? "none" : "flex")
+        }, dark)
+        expect.equal(await shown(logo), dark ? "full" : onDark, "the rendition once a direction turns the rail's tone over")
       },
     },
     {

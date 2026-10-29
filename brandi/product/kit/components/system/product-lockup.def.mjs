@@ -6,7 +6,7 @@ export default {
   status: "proven",
   props: [
     { name: "product", type: "string", default: "the name in lib/product.ts", doc: "The product's name as people say it." },
-    { name: "color", type: '"auto" | "on-light" | "on-dark" | "ink"', default: '"auto"', doc: "As Logo. With ink, the name takes the text colour around it too." },
+    { name: "color", type: '"auto" | "on-light" | "on-dark" | "ink" | "rail"', default: '"auto"', doc: "As Logo. With ink, the name takes the text colour around it too." },
     { name: "layout", type: '"inline" | "stacked"', default: '"inline"', doc: "Inline, with a hairline between mark and name, or stacked, the name under the mark." },
     { name: "height", type: "number", doc: "The mark's height in px, the logo system's preferred size by default." },
     { name: "href", type: "string", doc: 'Makes the whole lockup one link, named "[Brand] [product]", or the brand alone when the product has its name.' },

@@ -86,6 +86,41 @@ const cssVal = (v) => {
   return alias ? `var(--${alias[1]})` : v;
 };
 const block = (pairs) => pairs.map(([n, v]) => `  --${n}: ${cssVal(v)};`).join('\n');
+
+/** A hex colour's relative luminance (WCAG), or null for anything that is not one. */
+function luminance(hex) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(String(hex ?? ''));
+  if (!m) return null;
+  const [r, g, b] = m.slice(1).map((c) => {
+    const s = parseInt(c, 16) / 255;
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Whether the rail is darker than its strong text in one theme, as a navy rail is. Aliases are followed. */
+export function railIsDark(tokens, theme) {
+  const all = new Map((tokens.color?.tokens ?? []).map((t) => [t.name, t]));
+  const value = (name, seen = new Set()) => {
+    const v = all.get(name)?.value;
+    const raw = v && typeof v === 'object' ? (v[theme] ?? v.light) : v;
+    const alias = typeof raw === 'string' && /^\{([a-z0-9-]+)\}$/.exec(raw);
+    return alias && !seen.has(alias[1]) ? value(alias[1], new Set([...seen, name])) : raw;
+  };
+  const rail = luminance(value('rail'));
+  const text = luminance(value('rail-text-strong'));
+  return rail != null && text != null && rail < text;
+}
+
+/**
+ * Which of the logo's renditions the rail shows in one theme, as display values: the one drawn for dark grounds on a
+ * rail darker than its words, the one for light grounds otherwise. Variables rather than a choice made when the
+ * bundle is built, so a direction's class can flip them: a green-rail direction drew the on-dark mark on green.
+ */
+export function railMarks(tokens, theme) {
+  const dark = railIsDark(tokens, theme);
+  return [['rail-mark-on-light', dark ? 'none' : 'flex'], ['rail-mark-on-dark', dark ? 'flex' : 'none']];
+}
 const escapeName = (n) => n.replace(/\./g, '\\.');
 
 function styleUtility(s, fam) {
@@ -204,6 +239,7 @@ export function toStarterGlobals(tokens, { shadcn = SHADCN } = {}) {
   color-scheme: light;
 ${block(light)}
 ${block(shadows.map((t) => [t.name, t.value.light]))}
+${block(railMarks(tokens, 'light'))}
 }
 
 .dark,
@@ -211,6 +247,7 @@ ${block(shadows.map((t) => [t.name, t.value.light]))}
   color-scheme: dark;
 ${block(dark)}
 ${block(shadows.map((t) => [t.name, t.value.dark]))}
+${block(railMarks(tokens, 'dark'))}
 }
 
 :root {
@@ -465,4 +502,4 @@ if (runPath && import.meta.url === pathToFileURL(runPath).href) {
   process.exitCode = runCli(process.argv.slice(2));
 }
 
-export default { toStarterGlobals, runCli, SHADCN };
+export default { toStarterGlobals, railIsDark, railMarks, runCli, SHADCN };

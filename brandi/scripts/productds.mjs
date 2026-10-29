@@ -159,8 +159,10 @@ export function assembleDesignSystem({ productDir, starter, outDir, title, live 
     else cpSync(content.from, file);
     files.push(rel);
   };
-  // The written system: README first, then the sections in reading order.
-  for (const f of readdirSync(docs).filter((x) => x.endsWith('.md')).sort()) put(f, readFileSync(path.join(docs, f), 'utf8'));
+  // The written system: README first, then the sections in reading order. A plain sort put every numbered section
+  // before README.md, and 10 before 2.
+  const reading = (a, b) => (a === 'README.md' ? -1 : b === 'README.md' ? 1 : a.localeCompare(b, 'en', { numeric: true }));
+  for (const f of readdirSync(docs).filter((x) => x.endsWith('.md')).sort(reading)) put(f, readFileSync(path.join(docs, f), 'utf8'));
   put('tokens.json', `${JSON.stringify(tokens, null, 2)}\n`);
   const comps = path.join(productDir, 'components');
   for (const f of ['bundle.js', 'bundle.css', 'index.d.ts']) put(`components/${f}`, readFileSync(path.join(comps, f)));

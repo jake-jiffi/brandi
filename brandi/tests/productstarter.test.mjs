@@ -211,6 +211,17 @@ describe('what lib/product.ts reads off the system', () => {
     assert.equal(railTone({ color: { tokens: [] } }), 'light');
   });
 
+  test("the rail and the top bar take the logo from the rail as it renders, never from a tone fixed when the bundle was built", () => {
+    // railTone in the bundle drew the mark made for dark grounds on a green-rail direction's green rail.
+    const kit = (f) => readFileSync(path.join(KIT, 'components', 'system', f), 'utf8');
+    for (const f of ['sidebar.tsx', 'phone-top-bar.tsx']) {
+      assert.doesNotMatch(kit(f), /railTone/, `${f} reads no tone fixed at build time`);
+      assert.match(kit(f), /<(ProductLockup|Logo)\b[^>]*color="rail"/, `${f} asks for the rail's rendition`);
+    }
+    assert.match(kit('logo.tsx'), /var\(--rail-mark-on-light,flex\)[\s\S]*var\(--rail-mark-on-dark,none\)/, 'Logo shows each rendition by the variables the tokens set');
+    assert.ok(['logo', 'sidebar', 'phone-top-bar'].every((n) => /--rail-mark-on-dark/.test(kit(`${n}.def.mjs`))), 'and each definition checks it in a browser');
+  });
+
   test('the lockup name style is the brand\'s choice, "label" unless product.json says "eyebrow"', () => {
     assert.equal(systemIdentity({}, { brandName: 'Acme' }).lockupName, 'label');
     assert.equal(systemIdentity({ lockup: { name: 'eyebrow' } }, { brandName: 'Acme' }).lockupName, 'eyebrow');

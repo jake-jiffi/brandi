@@ -86,6 +86,21 @@ describe('a mark, made safe to inline', () => {
     assert.equal(clearSpaceRatio('equal to 0.75 the height of the mark'), 0.75);
     assert.equal(clearSpaceRatio('Keep it clear.'), null);
   });
+
+  test("a clear space written as a multiple, a fraction or a percentage of the logo's height or width is read; anything else is not", () => {
+    assert.equal(clearSpaceRatio('Twice the height of the logo on every side.'), 2);
+    assert.equal(clearSpaceRatio('1.5x the logo height'), 1.5);
+    assert.equal(clearSpaceRatio("25% of the mark's height all round"), 0.25);
+    assert.equal(clearSpaceRatio('a third of the height of the lockup'), 1 / 3);
+    assert.equal(clearSpaceRatio('Equal to the height of the logo.'), 1);
+    // A width is a share of the height only once the mark's shape is known: 4 wide by 1 high, a tenth of the width is 0.4.
+    assert.equal(clearSpaceRatio('10 per cent of the logo width', { aspect: 0.25 }), 0.4);
+    assert.equal(clearSpaceRatio('10 per cent of the logo width'), null);
+    // A part of the mark is not the mark: its size is not known from here.
+    for (const words of ['One "e" of the signature on every side.', 'equal to half the height of the letter A', 'the height of the symbol', 'X, the cap height', "equal to the height of the logo's tagline", 'half the height of the logo symbol']) {
+      assert.equal(clearSpaceRatio(words), null, words);
+    }
+  });
 });
 
 describe('where the marks come from', () => {
@@ -181,6 +196,78 @@ describe('where the marks come from', () => {
     assert.match(out.source, /"full-ink": "<svg fill=\\"currentColor\\"/);
     assert.throws(() => brandConstant({ from: 'product.json', files: { full: 'missing.svg' }, base: dir }), /missing\.svg does not exist/);
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("the logo's minimum and clear space, from the brand record", () => {
+  // A route-A brand whose minimum sits only in minSizes, per variant, and whose clear space is written in words.
+  const record = (logo = {}) => ({ meta: { name: 'Acme' }, identity: { logo: {
+    files: [{ path: 'assets/logos/acme-shield.svg', role: 'primary' }, { path: 'assets/logos/acme-signature.svg', role: 'signature, internal' }],
+    variants: [{ name: 'Acme Signature', file: 'acme-signature.svg' }, { name: 'Acme Shield Logo', file: 'acme-shield.svg' }],
+    minSize: { printMm: 20, screenPx: null },
+    minSizes: [{ variant: 'Acme Signature', screenPx: 30 }, { variant: 'Acme Shield Logo', printMm: 20, screenPx: 76 }],
+    clearSpace: 'Shield logos, digital: one "e" of the signature on every side.',
+    ...logo,
+  } } });
+
+  test('the minimum is the minSizes entry for the mark the starter draws, found through its variant', () => {
+    const src = brandSources({ product: {}, brand: record(), productDir: '/p', brandRoot: '/r' });
+    assert.equal(src.logo.minLongSide, 76, "the shield's, not the signature's");
+    assert.match(src.notes.join('\n'), /minimum, 76px along the long side, from identity\.logo\.minSizes \(Acme Shield Logo\)/);
+    // With no variant naming the file, an entry named for the primary stands for it, as the logo forge writes it.
+    const forge = brandSources({ brand: record({ variants: [], minSizes: [{ variant: 'Primary', screenPx: 80 }] }), brandRoot: '/r' });
+    assert.equal(forge.logo.minLongSide, 80);
+    // Only another mark's minimum on record: the general one, and none here.
+    assert.equal(brandSources({ brand: record({ variants: [], minSizes: [{ variant: 'Acme Signature', screenPx: 30 }] }), brandRoot: '/r' }).logo.minLongSide, undefined);
+    assert.equal(brandSources({ brand: record({ minSizes: [], minSize: { screenPx: 64 } }), brandRoot: '/r' }).logo.minLongSide, 64);
+  });
+
+  test("clear space in words it cannot read is printed with the product.json key to set, and that key is read on route A", () => {
+    const src = brandSources({ product: {}, brand: record(), productDir: '/p', brandRoot: '/r' });
+    assert.equal(src.logo.clearSpace, undefined, 'never guessed');
+    const said = src.notes.join('\n');
+    assert.match(said, /one "e" of the signature on every side/, 'the words it found');
+    assert.match(said, /product\.json "brand": \{ "logo": \{ "clearSpace": <a share of the logo's height> \} \}/);
+    const set = brandSources({ product: { brand: { logo: { clearSpace: 0.3, minHeight: 45 } } }, brand: record(), productDir: '/p', brandRoot: '/r' });
+    assert.equal(set.from, "brand/brand.json's logo master", 'the marks still come from the logo master');
+    assert.equal(set.logo.clearSpace, 0.3);
+    assert.equal(set.logo.minHeight, 45);
+    assert.doesNotMatch(set.notes.join('\n'), /clearSpace/, 'nothing left to ask once it is set');
+  });
+
+  test('a clear space given as a share of the width is read against the drawn mark', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-clear-'));
+    await writeFile(path.join(dir, 'full.svg'), WIDE);
+    const out = brandConstant({ from: 'brand.json', name: 'Acme', files: { full: 'full.svg' }, logo: { clearSpaceWords: 'a tenth of the width of the logo' }, base: dir });
+    assert.match(out.source, /clearSpace: 0\.4 \}/, 'a 4:1 mark: a tenth of its width is 0.4 of its height');
+    await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("the illustration library beside the character's moments", () => {
+  const library = [
+    { file: 'brand/illustration/waving.svg', set: 'Core', title: 'Waving hello' },
+    { file: 'brand/illustration/caught-up.svg', set: 'Core', title: 'All done for today' },
+    { file: 'brand/illustration/bowl.svg', set: 'Core', title: 'Help' },
+  ];
+  const brand = { meta: { name: 'Acme' }, identity: { logo: { files: [{ path: 'assets/logos/acme.svg', role: 'primary' }] }, illustration: { library } } };
+
+  test('the drawings are listed with the block to fill, and only an exact name is taken, saying so', () => {
+    const src = brandSources({ product: {}, brand, productDir: '/w/product', brandRoot: '/w' });
+    const ill = src.illustrations;
+    assert.deepEqual(ill.drawings.map((d) => d.file), ['../brand/illustration/waving.svg', '../brand/illustration/caught-up.svg', '../brand/illustration/bowl.svg'], 'relative to product/, as product.json writes paths');
+    assert.deepEqual(ill.taken, { 'caught-up': '../brand/illustration/caught-up.svg', help: '../brand/illustration/bowl.svg' }, 'a file name or a title that is a moment, and nothing else');
+    assert.deepEqual(src.character.poses, { 'caught-up': '/w/brand/illustration/caught-up.svg', help: '/w/brand/illustration/bowl.svg' });
+    assert.match(ill.block, /"brand": \{ "character": \{ "name": "\[the drawings' name\]", "poses": \{/);
+    assert.match(ill.block, /"welcome": "",/, 'a moment nobody picked is left to fill');
+    assert.match(ill.block, /"help": "\.\.\/brand\/illustration\/bowl\.svg"/);
+    assert.equal(Object.keys(JSON.parse(`{${ill.block}}`).brand.character.poses).length, 8, 'the block is JSON, every moment in it');
+  });
+
+  test("a character product.json names is the pick: its paths are read from product/, and nothing is listed", () => {
+    const src = brandSources({ product: { brand: { character: { name: 'Acme drawings', poses: { welcome: '../brand/illustration/waving.svg' } } } }, brand, productDir: '/w/product', brandRoot: '/w' });
+    assert.deepEqual(src.character, { name: 'Acme drawings', poses: { welcome: '/w/brand/illustration/waving.svg' } });
+    assert.equal(src.illustrations, null);
   });
 });
 

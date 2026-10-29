@@ -250,9 +250,11 @@ own width.
   were fixed in the components, not hidden on the board. A board is often the first place
   components meet, so it finds what previews miss.
 - **One sample data set per product.** The same names, dates and figures on every board, in the
-  docs and in the starter. The last system's reviewers still found sample dates that contradicted
-  each other. Sample names and figures go in `[brackets]`, with the system's sample badge on the
-  page.
+  docs and in the product built from the starter. The last system's reviewers still found sample
+  dates that contradicted each other. Sample names and figures go in `[brackets]`, with the system's
+  sample badge on the page. The starter's own example routes keep the kit's sample (a trades
+  business's jobs and invoices, `lib/sample.ts`): they are the kit's worked example, the same for
+  every brand, not this product (`07-starter.md`).
 - **Name the outside system in the copy.** Never "the system" (`01-routes-and-intake.md`).
 - **The installed copy is the only copy.** A canvas that pastes the stylesheet into each board
   carries a copy per board, and a fix has to reach every one.
@@ -383,6 +385,51 @@ A module that reaches another surface draws that surface's boards in the same se
 on the consumer app or the tablet tool is then decided with it, not found later.
 
 A board showing an idea that was not picked, or not yet decided, says "(concept)" in its title.
+
+### Directions
+
+A direction (SKILL.md, step 4) that moves a role colour, a rail in the brand's green, say, is drawn
+with a class, never with values typed onto the board. Name it in product.json:
+
+```json
+"directions": [
+  { "name": "A", "roles": { "rail": "acme-black" }, "note": "The black rail." },
+  { "name": "B", "roles": { "rail": "acme-green" }, "note": "The green rail." }
+]
+```
+
+A role is a hex, one of the brand's colours by name (`acme-green` or `brand-acme-green`), or
+`{ "light", "dark" }` of those. A direction moves the roles `roles` decides: primary, brand,
+highlight, canvas, ink, focus and rail. `$A product tokens` solves each as the system with its roles
+over the decided ones, so its rail words, hover and focus are solved too. It reports any pair that
+fails under the direction's name, and writes a class into `tokens.css` holding only the variables
+that move:
+
+```html
+<x-import component-from-global-scope="Acme.Root" theme="{{theme}}">
+<div class="direction-b">
+  <x-import component-from-global-scope="Acme.AppShell" ...></x-import>
+</div>
+</x-import>
+```
+
+- **The class goes just inside Root.** Root sets the theme on its own element, and a class above it
+  would be overruled there. The dark rule outranks the light one wherever the board is dark.
+- **The logo follows the rail.** The rail and the top bar draw the logo made for the rail's ground
+  from `--rail-mark-on-light` and `--rail-mark-on-dark`, which the tokens set from the rail's tone
+  in each theme and a direction's class flips. Chosen when the bundle was built, a green-rail
+  direction drew the mark made for dark grounds on green.
+- **Typed values fail the drift check, and rewrites lose the solve.** A run that set `--rail: ...` on
+  a board's root failed drift on 18 raw colours. Rewriting them through `var(--brand-*)` and
+  `color-mix` passed drift but no longer carried the solved values. The class carries them.
+- **List every direction that moves a role, today's included.** After the pick, its roles go into
+  `roles` and `directions` stays. The picked direction's class then holds nothing, and the others
+  still draw as they did, so the concept boards keep their look.
+- **The values live in `tokens.json`, as `directions` in its `meta`,** which the Design System page
+  does not read. Every family it reads stays a `{ "tokens": [...] }` list. The drift check reports a
+  `direction-` class on a board that no direction makes.
+- **Overlays open outside it.** A menu, dialog or toast renders in a portal outside the board's
+  element, so it shows the system's own roles, not the direction's.
 
 ---
 

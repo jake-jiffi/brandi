@@ -36,7 +36,7 @@ Versions live in the kit's `package.json`, pinned exactly and tested together (s
 | Generated until taken over | `PRODUCT.md` and `DESIGN.md` | Rewritten while they end on the generated marker, kept once it is deleted (section 7) |
 | Generated from the brand's files | `lib/brand.ts` | Its types stay; its `BRAND` comes from the marks product.json's `brand` block names, or from brand.json's logo master. Without either, the kit's placeholder mark stays and the starter says so |
 | Kit | `components/ui/` (shadcn, patched), `components/system/` (the system's components and their definitions), `lib/`, `hooks/`, `canvas/` and `tools/` | Copied on the first run, then the product's. `$A product starter --kit` copies them again |
-| Example | The example product's routes and sample data | A real product replaces it |
+| Example | The example product's routes and sample data: the kit's own sample, a trades business's jobs and invoices (`lib/sample.ts`), the same for every brand and outside the product's one sample set (`06-canvas.md`) | A real product replaces it |
 
 A few things are the product's own to set: its name and locale in `product/product.json` (which
 `$A product starter` writes into `lib/product.ts` and `lib/format-locale.js`), the font files, and the
@@ -75,6 +75,24 @@ an ink. A value the record lacks keeps the kit default, and the file says which.
 narrow places). A pose drawn in one dark ink is turned to `currentColor`, so it reads on a dark ground,
 and the file names those poses. The tight-viewBox wordmark files ship in `public/brand/`, for email and
 Open Graph.
+
+**The minimum and the clear space, on route A.** The minimum is the `identity.logo.minSizes` entry for
+the mark the starter draws: the one whose variant names its file in `identity.logo.variants`, or one
+named for the primary that names no other file. Without one it is `identity.logo.minSize`. A run's
+minimum sat only in `minSizes`, and the starter drew the logo under it, at the kit's 16px.
+Clear space is read when it is a multiple, a fraction or a percentage of the logo's height or width:
+"half the height of the mark", "25% of the logo's height", "twice the height of the logo". A rule
+measured by a part of the mark ("one e of the signature", the cap height) cannot be, since that
+part's size is not known from the files, so the starter prints the words and the key to set. Route A
+reads product.json's `brand.logo` (`clearSpace`, `minHeight`, `height`, `symbolMinHeight`) and
+`brand.character` over the record, so either is settled there without naming the marks again.
+
+**The illustration library and the character.** When brand.json holds `identity.illustration.library`
+and product.json names no character, the starter lists the drawings beside the character's eight
+moments and prints the `brand.character` block to fill, its paths relative to `product/`. Which
+drawing marks which moment is a person's pick, or the run's, recorded, so the starter never guesses
+one. Only a drawing whose file name or title is a moment's own name (`welcome.svg`, "Caught up") is
+taken, and the starter says so. A run mapped five of seventeen drawings by hand before this.
 
 The example product shows the patterns working end to end. Home has figures and a chart. A records
 page has search and filters in the URL, bulk actions on the rows on screen, and an export. One

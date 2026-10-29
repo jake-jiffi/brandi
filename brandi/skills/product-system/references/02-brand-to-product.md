@@ -22,6 +22,7 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `roles.ink` | The text colour. Quieter text, lines, tags and the chart comparison are mixed from it towards the surface and then solved, so the whole hierarchy carries its hue | The brand's neutral at its darkest (lightest in dark) |
 | `roles.focus` | The focus ring colour | The brand colour, solved to 3:1 on every ground |
 | `roles.rail` | A signature navigation surface | None: the rail is a quiet surface |
+| `directions` | Roles a concept board moves, for the person to pick from: `[{ "name", "roles", "note" }]`, each solved and audited as the system with its roles over these, and drawn by a class (`06-canvas.md`, Directions) | None |
 | `displayForTitles` | Whether the display face sets page titles | `true` |
 | `displayCase` | `"upper"` when the brand only ever sets its display face in capitals: the hero, display and title styles take capitals, tracked open a little | Unset: the face's own case |
 | `time` | How the brand writes a time, `{ "minutes": ":" or ".", "onTheHour": "keep" or "drop", "space": true or false }`. "11am to 10.30pm" is `{ ".", "drop", false }`. Every time the system writes follows it | 9:30 am: minutes kept, a space before am or pm |
@@ -94,7 +95,15 @@ for supporting copy, `text-subtle` for meta and placeholders, and nothing quiete
 navy), `rail-text` and `rail-muted` are solved in the rail's own hue, as tints of it, and still clear
 7:1 and 4.5:1. Mixed towards the brand's hue instead, an emerald rail's group labels lost its chroma.
 The detector reported them as grey on colour 52 times, and the only fix on the product's side was to
-give up the rail. A black or grey rail keeps neutral words.
+give up the rail. A black or grey rail keeps neutral words: the hue and chroma of the page's own text,
+solved to the same 7:1 and 4.5:1. Tinted in the brand's hue instead, a black rail's words came out a
+pale green beside a vivid green brand.
+
+**The rail's logo follows the rail.** The rail and the top bar draw the logo made for the rail's
+ground: the one for dark grounds on a rail darker than its words, the one for light grounds
+otherwise, worked out for each theme. `tokens.css` and `globals.css` set it as two variables,
+`--rail-mark-on-light` and `--rail-mark-on-dark`, so a direction whose class recolours the rail
+moves the mark with it (`06-canvas.md`, Directions).
 
 **Every pair measured.** Each token declares what it sits on, and the audit measures every one of
 those pairs in both themes, including washes laid over their surface. The last system checked 162

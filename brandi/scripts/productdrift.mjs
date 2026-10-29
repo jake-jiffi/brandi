@@ -91,6 +91,7 @@ export async function driftCheck({ productDir, starter }) {
   // a fixed list here once overwrote that and reported Root's own new prop as drift.
   if (!propsOf.has('Root')) propsOf.set('Root', new Set(['theme', 'background', 'shortcuts', 'touch']));
   const boards = existsSync(canvas) ? readdirSync(canvas).filter((f) => f.endsWith('.dc.html')).sort() : [];
+  const directionClasses = new Set((tokens.meta?.directions ?? []).map((d) => d.class));
   let canvasManifest = null;
   try { canvasManifest = JSON.parse(readFileSync(path.join(canvas, 'canvas.json'), 'utf8')); } catch { /* none yet */ }
   for (const f of boards) {
@@ -119,6 +120,13 @@ export async function driftCheck({ productDir, starter }) {
     const markup = src.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<helmet>[\s\S]*?<\/helmet>/g, '');
     for (const m of markup.matchAll(/style="([^"]*)"/g)) {
       for (const raw of m[1].match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/g) ?? []) add('raw', f, raw, 'a colour role through var(--<role>)');
+    }
+    // A direction is drawn by its class from tokens.css. A class no direction makes draws today's system under the
+    // direction's title, and nothing else would say so.
+    for (const m of markup.matchAll(/class="([^"]*)"/g)) {
+      for (const cls of m[1].split(/\s+/).filter((c) => c.startsWith('direction-') && !directionClasses.has(c))) {
+        add('direction', f, `class ${cls}`, `product.json "directions" has no ${cls}${directionClasses.size ? `: it has ${[...directionClasses].join(', ')}` : ''}. Name the direction there and run brandi product tokens`);
+      }
     }
     if (f.startsWith('_probe')) add('publish', f, 'a probe board in the canvas folder', 'probe boards stay out of the canvas folder: every .dc.html there shows on the canvas');
   }
