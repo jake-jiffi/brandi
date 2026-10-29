@@ -906,6 +906,14 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
         'Put the line in footnote, which always shows, or give the card the delta its context compares.',
       );
     }
+    // LoadingState shows nothing for its first second, so a load that is quick never flashes. A board is drawn in
+    // under that second, so one without slow drew a blank frame where a run's loading state should have been.
+    for (const title of loadingWithoutSlow(source)) {
+      warn(
+        `The LoadingState "${title}" in ${name} has no slow, so the board draws nothing where it stands: it shows only after its first second, and a board is drawn before that.`,
+        'Give it slow, which draws the long wait as people see it after ten seconds, with how long it usually takes.',
+      );
+    }
   }
 
   // A handler or noValidate in a case the canvas may not read. Brandi's shim takes any case, because the HTML parser
@@ -980,6 +988,18 @@ export function inertWithoutIgnore(source) {
  * The label of each MetricCard mounted with a context and no delta, read from the source: context shows only beside a
  * delta, so on such a card it shows nothing. Scripts, styles and comments are not markup.
  */
+/** Each LoadingState on a board with no `slow`, by its title: the board draws a blank where it stands. */
+export function loadingWithoutSlow(source) {
+  const markup = String(source).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>|<!--[\s\S]*?-->/gi, '');
+  const found = [];
+  for (const [, attrs] of markup.matchAll(/<(?:x-import|dc-import)\b((?:"[^"]*"|'[^']*'|[^'">])*)>/gi)) {
+    const props = new Map([...attrs.matchAll(/([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)].map(([, n, dq, sq, bare]) => [n.toLowerCase(), dq ?? sq ?? bare ?? '']));
+    if (!/\.LoadingState$/.test(props.get('component-from-global-scope') ?? '')) continue;
+    if (!props.has('slow')) found.push(props.get('title') ?? 'Loading');
+  }
+  return found;
+}
+
 export function contextWithoutDelta(source) {
   const markup = String(source).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>|<!--[\s\S]*?-->/gi, '');
   const found = [];

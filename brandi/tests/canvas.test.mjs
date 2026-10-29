@@ -547,6 +547,19 @@ describe('a dialog drawn over its page', () => {
   });
 });
 
+describe('a LoadingState on a board', () => {
+  // LoadingState shows nothing for its first second, and a board is drawn before that: a run's states strip showed a
+  // blank "loading" frame, and every gate passed it.
+  test('validate warns about one with no slow, naming the board and the state, and says to give it slow', () => {
+    const board = (props) => K.artboard({ name: 'BookingStates390', body: `<x-import component-from-global-scope="Acme.LoadingState" title="Finding times" ${props}></x-import>` });
+    const w = K.validateArtboard(board(''), { name: 'BookingStates390.dc.html' }).warnings.filter((x) => /LoadingState/.test(x.message));
+    assert.equal(w.length, 1, JSON.stringify(w));
+    assert.match(w[0].message, /"Finding times" in BookingStates390\.dc\.html has no slow/);
+    assert.match(w[0].fix, /Give it slow/);
+    assert.deepEqual(K.validateArtboard(board('slow="{{yes}}"'), { name: 'BookingStates390.dc.html' }).warnings.filter((x) => /LoadingState/.test(x.message)), [], 'slow draws it');
+  });
+});
+
 describe('a MetricCard with a context and no delta', () => {
   // context is the delta's comparison and shows only beside one. A run passed context with no delta on four boards, so
   // "4 of 6 slots" never showed under its figure, and nothing said so. footnote is the line that always shows.

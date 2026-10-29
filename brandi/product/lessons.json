@@ -2748,6 +2748,43 @@
     "file": "skills/product-system/references/05-components.md",
     "heading": "2.11 Long text"
    }
+  },
+  {
+   "id": "L148",
+   "broke": "A proposal's on-edit and on-dismiss named a value the board's script never returned, so AIProposal quietly dropped Edit and Not now and every gate passed it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a board that names a value its script never gives fails Board sizes, naming the board and each name"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productpreview.test.mjs",
+     "name": "a hole naming a value the board never gives is named on the page; a filled one, null data, a loop variable and a prop are not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Board sizes"
+   }
+  },
+  {
+   "id": "L149",
+   "broke": "A LoadingState on a board, with no slow, drew a blank frame, because it shows nothing for its first second and a board is drawn before that.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "validate warns about one with no slow, naming the board and the state, and says to give it slow"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "LoadingState"
+   }
   }
  ]
 }

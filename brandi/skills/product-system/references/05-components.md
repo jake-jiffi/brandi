@@ -1095,6 +1095,8 @@ Says what is empty and what to do next.
 An area waiting on another system for more than a second: what is happening, an indeterminate bar,
 and the brand character working, when there is one.
 
+- On a board, give it `slow`. It shows nothing for its first second, and a board is drawn before
+  that, so without `slow` a run's states strip drew a blank frame. `brandi validate` warns.
 - **Contract.** `title` (what is happening, naming the system: "Pulling this week's [records] from
   [source]"; "Loading" is a fallback, not copy). `children` (a second line). `character`.
 - **Behaviour.** A polite live region, so the line is read out.
