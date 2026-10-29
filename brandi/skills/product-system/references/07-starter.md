@@ -97,7 +97,9 @@ path, the logo forge, `$A logo wordmark`, or product.json's `brand.marks`), then
 up. A file product.json names is the product's own pick, so a missing one there still stops the
 starter. The stand-in's full mark reads PRODUCT, so no lockup draws it: `ProductLockup` (the rail,
 the phone's top bar, sign-in) and `Email` draw the stand-in's symbol, hidden from screen readers,
-beside the brand's name in words, so every screen names the brand and none names PRODUCT. A run's
+beside the brand's name in words, so every screen names the brand and none names PRODUCT. The
+stand-in has no rendition for dark grounds, so a dark rail draws its one ink in the rail's text
+colour: drawn in the brand's colour, it vanished on a rail in the brand's colour. A run's
 sign-in and booking pages said PRODUCT and never the brand, and its review marked it down. The
 brand's own logo replaces both on the next run.
 

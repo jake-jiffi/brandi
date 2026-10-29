@@ -35,6 +35,18 @@ const railIsDark = (el) => {
   }
   return lum("var(--rail)") < lum("var(--rail-text-strong)")
 }
+// The most any ink of the mark on screen stands from the ground behind it. A stand-in symbol drawn in the brand's
+// colour sat on a rail in the brand's colour at 1:1, and every check of which rendition showed still passed.
+const markStandsOut = (el) => {
+  const rgb = (c) => (String(c).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+  const lum = ([r, g, b]) => [r, g, b].map((v) => v / 255).map((s) => (s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4)).reduce((t, s, i) => t + s * [0.2126, 0.7152, 0.0722][i], 0)
+  let ground = el
+  while (ground && /rgba\(0, 0, 0, 0\)|transparent/.test(getComputedStyle(ground).backgroundColor)) ground = ground.parentElement
+  const g = lum(rgb(getComputedStyle(ground ?? document.body).backgroundColor))
+  const shown = [...el.querySelectorAll('[data-slot="product-lockup"] [data-slot="logo-rendition"]')].find((r) => r.checkVisibility())
+  const inks = [...(shown?.querySelectorAll("path, rect, circle, ellipse, polygon, polyline, line, text") ?? [])].map((s) => getComputedStyle(s).fill).filter((f) => f && f !== "none" && !f.startsWith("url"))
+  return Math.max(0, ...inks.map((f) => { const l = lum(rgb(f)); return (Math.max(l, g) + 0.05) / (Math.min(l, g) + 0.05) }))
+}
 const onDarkOf = (page, base = "full") =>
   page.evaluate((b) => {
     const marks = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {}
@@ -127,6 +139,15 @@ export default {
           el.style.setProperty("--rail-mark-on-dark", d ? "none" : "flex")
         }, dark)
         expect.equal(await shownMark(logo), dark ? base : onDark, "the rendition once a direction turns the rail's tone over")
+      },
+    },
+    {
+      name: "The lockup's mark shows on the rail: some ink of it stands 3:1 from the rail, in both themes",
+      example: "menu",
+      themes: ["light", "dark"],
+      async run({ scope, expect }) {
+        const ratio = await scope.locator('[data-slot="phone-top-bar"]').first().evaluate(markStandsOut)
+        expect(ratio >= 3, `the mark's best ink against the rail: ${ratio.toFixed(2)}:1, wanted at least 3`)
       },
     },
     {

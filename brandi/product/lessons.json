@@ -2424,6 +2424,27 @@
     "file": "skills/product-system/references/02-brand-to-product.md",
     "heading": "Colour"
    }
+  },
+  {
+   "id": "L129",
+   "broke": "The stand-in's rendition for dark grounds was drawn in the brand's colour, so on a rail in the brand's colour the lockup's symbol vanished, and every check of which rendition showed still passed.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Sidebar",
+     "name": "The lockup's mark shows on the rail: some ink of it stands 3:1 from the rail, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "PhoneTopBar",
+     "name": "The lockup's mark shows on the rail: some ink of it stands 3:1 from the rail, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
   }
  ]
 }

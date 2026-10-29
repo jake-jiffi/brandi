@@ -77,12 +77,12 @@ const fullMark = (symbolFill: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 116.2 24"><path fill-rule="evenodd" style="fill:${symbolFill}" d="${SYMBOL_SHAPE}"/>${WORDMARK}</svg>`
 const symbolMark = (fill: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" style="fill:${fill}" d="${SYMBOL_SHAPE}"/></svg>`
+// No rendition for dark grounds: a dark ground takes the one ink, in the text colour around it. Drawn in the brand's
+// colour there too, the stand-in vanished on a rail in the brand's colour (1:1).
 export const STAND_IN_MARKS: Brand["marks"] = {
   full: fullMark("var(--brand)"),
-  "full-on-dark": fullMark("var(--brand)"),
   "full-ink": fullMark("currentColor"),
   symbol: symbolMark("var(--brand)"),
-  "symbol-on-dark": symbolMark("var(--brand)"),
   "symbol-ink": symbolMark("currentColor"),
 }
 
