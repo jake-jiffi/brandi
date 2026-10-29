@@ -571,7 +571,11 @@ are solved too. It reports any pair that fails under the direction's name, and w
 - **Typed values fail the drift check, and rewrites lose the solve.** A run that set `--rail: ...` on
   a board's root failed drift on 18 raw colours. Rewriting them through `var(--brand-*)` and
   `color-mix` passed drift but no longer carried the solved values. The class carries them.
-- **List every direction that moves a role, today's included.** After the pick, its roles go into
+- **A concept that is today's system needs no direction.** It moves no role, so it is not listed
+  (a direction names at least one role, and an empty one is refused) and its boards take no class.
+  A run that listed today's concept with no roles was refused, because the line below reads as if
+  it should be there.
+- **List every direction that moves a role, today's pick included.** After the pick, its roles go into
   `roles` and `directions` stays. The picked direction's class then holds nothing, and the others
   still draw as they did, so the concept boards keep their look. Take the picked one's class off its
   boards: with no rule it does nothing, and `$A validate` warns that it matches none.
