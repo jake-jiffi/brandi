@@ -100,7 +100,9 @@ questions with what changes if it is wrong. The CLI reads the keys it needs (`na
 `displayForTitles`, `displayCase`, `charts`, `time`, `brandColours`, `shape`, `lockup`, `brand`,
 `surfaces`, `accepted`) and ignores the rest. Give each surface its board prefix (`boards`), the
 widths it is drawn at (`widths`) and, once they are known, its modules: the coverage gate holds the
-canvas to them (`08-quality-gates.md`, Coverage).
+canvas to them (`08-quality-gates.md`, Coverage). A surface with no `widths` is held to the checked
+widths, which suit pages. Messages are read at their own widths, so a messaging surface names them:
+an email at 600, a notification on a 390 phone.
 
 ```json
 {
@@ -110,7 +112,9 @@ canvas to them (`08-quality-gates.md`, Coverage).
     { "name": "Ops console", "people": "Store managers", "jobs": "Approve rosters, fix sync failures", "platforms": ["web"],
       "boards": "Console", "widths": [1440, 820, 390], "modules": ["Rosters", "Sync"] },
     { "name": "Staff app", "people": "Floor staff", "jobs": "Check in, see the day", "platforms": ["ios", "android"],
-      "boards": "Staff", "widths": [390] }
+      "boards": "Staff", "widths": [390] },
+    { "name": "Messages", "people": "Store managers", "jobs": "Know a roster needs approving", "platforms": ["email", "ios", "android"],
+      "boards": "Messaging", "widths": [600, 390] }
   ],
   "systems": [
     { "name": "[Rostering system]", "fails": ["not responding", "shift keyed outside store hours"] }

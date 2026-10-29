@@ -1176,6 +1176,353 @@
     "file": "skills/product-system/references/02-brand-to-product.md",
     "heading": "Shape, space and marks"
    }
+  },
+  {
+   "id": "L66",
+   "broke": "A dialog board drawn over its page went unscanned at every width for two rounds: axe and the reflow check waited for a visible ready mark, and a page whose content is all absolutely placed has no height, so it never counted as visible.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "axe scans it once it says it is ready"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "reflow measures it once it says it is ready"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a page axe could not scan fails the Accessibility gate, and its line says how many"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L67",
+   "broke": "The round record had no place for how a review ran or for each finding's evidence, where, owner and class, which the gates reference says a record must hold.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "each review says how it ran, and each finding where, its evidence, its owner and its class"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "accepted deviations are listed with their reasons, and what is still open with its owner"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "The round record"
+   }
+  },
+  {
+   "id": "L68",
+   "broke": "A detector finding a generator caused could not be accepted as a recorded deviation, so the only way past the bar was to change a brand decision.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a matching finding leaves the verdict and is listed with its reason; the rest still fail"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "an entry that matches nothing, or has no reason, is reported, so a stale one does not linger"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Accepted deviations"
+   }
+  },
+  {
+   "id": "L69",
+   "broke": "A run drew the console in depth and almost nothing of the website, the app or the messages, and passed every gate: coverage was not one.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "a surface wants a board at each of its widths and a states board for each module, and says what is missing"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "a surface missing a width or a states board fails the round, and the record lists what is missing by surface"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Coverage"
+   }
+  },
+  {
+   "id": "L70",
+   "broke": "A product canvas staged under brand/.publish, and its first publish carried no system install, so every board loaded ds/ files the canvas did not have. A texture the boards name was not installed either.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "a product canvas stages under product/.publish, and refuses to stage boards that load a system it does not install"
+    },
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "--system fills the record and installs everything a board loads: tokens, the bundle and the fonts the system ships"
+    },
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "--system installs the brand's texture when tokens.css names one, so a board's .brand-texture finds its file"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productds.test.mjs",
+     "name": "the brand's texture goes beside the fonts, at the path tokens.css names it by"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "8. Publishing"
+   }
+  },
+  {
+   "id": "L71",
+   "broke": "Measuring a brand's site read one page and no form fields, even on a contact page with a form.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "across pages each family takes the radius most of all its elements share, and the source shows each page's own"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "follows the first page's navigation to more pages in one browser, reads fields in a frame of its own site, and names a frame from another"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L72",
+   "broke": "The Tabs check that the last tab is in view failed once while other Chrome-heavy work ran beside the gates.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Tabs",
+     "name": "When the tabs do not fit, the row scrolls sideways and the tab in hand scrolls into view"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L73",
+   "broke": "The brand's named colours written as a name-to-hex map stopped `product tokens` with a type error, because the reference never said what shape they take.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "the brand's named colours may be a list of { name, hex } or a { name: hex } map, and nothing else"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Where the decisions live"
+   }
+  },
+  {
+   "id": "L74",
+   "broke": "On a brand built from guidelines, the starter read brand.json's logo paths from the project root rather than the brand folder, and knew only the logo forge's role names, so it found no logo.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "brand.json's paths are read from the brand folder, and free-text roles find the master, the dark-ground file and the one ink"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L75",
+   "broke": "A starter that failed on its inputs left half a kit behind, and the rerun said only \"Refreshed\".",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "a starter that cannot be made is not started: nothing is written, and the message says so"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "a fresh starter stopped part way is fresh again next run, so the kit is copied whole rather than \"Refreshed\""
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "2. Starting a product"
+   }
+  },
+  {
+   "id": "L76",
+   "broke": "The rail's symbol took the full logo's raised height, and a wide mark named as the symbol was drawn about 107px wide in the icons rail's 40px home square.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Logo",
+     "name": "The symbol is drawn at its own size, held to the symbol's minimum, never the full logo's height"
+    },
+    {
+     "kind": "check",
+     "component": "Sidebar",
+     "name": "Icons only, it is 72px wide: the symbol, a search icon, 40px items and the avatar"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a mark much wider than tall is refused as the symbol, so the icons rail shows its Home control"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L77",
+   "broke": "On a rail in the brand's colour, the quiet words were mixed towards a grey tint, and the detector reported 52 grey-on-colour findings; the only product-side fix was giving up the brand's rail.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "on a chromatic rail, rail-text and rail-muted are tints of its own hue, never grey, and keep their floors"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
+   }
+  },
+  {
+   "id": "L78",
+   "broke": "A brand's black line drawings disappeared on dark grounds: the character had no dark rendition.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Character",
+     "name": "A pose drawn in one ink takes the colour of the text around it, in both themes"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a pose drawn in one dark ink takes the text colour; a pose in a colour, or in several, keeps its own"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L79",
+   "broke": "Nothing carried a brand's shape move: a run copied a texture by hand and wrote its own layer for it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a texture move carries its file: tokens.css lays it on a layer multiplied over the element's own colour"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "the system installs beside the boards with the files tokens.css names: its faces and its texture"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productglobals.test.mjs",
+     "name": "the brand's texture move is a class in the components layer, its file in the starter's textures/"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L80",
+   "broke": "Generated boards asked Google Fonts for weights and italics the display face does not have, while the reference says a system's fonts ship as files.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "boards ask Google only for the weights each hosted face's styles set, no italics, and nothing when every face ships as a file"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Type"
+   }
+  },
+  {
+   "id": "L81",
+   "broke": "Rerunning the boards rewrote Main with only Foundations and Components, so no authored section (directions, screens, states) could be linked from the contents board.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "the contents board lists every section the canvas has, the title notes a person wrote included, in canvas order"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "1. Board families and layout"
+   }
+  },
+  {
+   "id": "L82",
+   "broke": "MetricCard showed \"No data\" for a figure written in words, such as \"7 of 8\".",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "MetricCard",
+     "name": "A figure in words shows as written, a number given as text is formatted, and context shows only beside a delta"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "MetricCard"
+   }
   }
  ]
 }

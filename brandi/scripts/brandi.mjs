@@ -72,7 +72,7 @@ import {
   systemInputFromBrand, addDecision, addEvidence, addOpenQuestion, slugify, PHASES, PROVENANCE,
 } from './brandfile.mjs';
 import { buildSystem, assertPublishable } from './system.mjs';
-import { buildProductTokens, auditProductTokens, auditSummary, toProductCss, shapeKitDefaults } from './producttokens.mjs';
+import { buildProductTokens, auditProductTokens, auditSummary, toProductCss, shapeKitDefaults, textureMove } from './producttokens.mjs';
 import { measurePages, summarise as summariseShapes } from './productmeasure.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
@@ -1187,14 +1187,21 @@ async function cmdCanvas(flags) {
     const rec = records[0];
     const ds = path.join(dir, 'ds', rec.namespace);
     // The fonts the system ships: the faces its tokens name that are beside the boards, as `brandi product ds` takes them.
+    // And the texture move's file, which tokens.css and bundle.css name.
     let faces = [];
-    try { faces = JSON.parse(await readFile(path.join(ds, 'tokens.json'), 'utf8')).type?.fonts ?? []; } catch { /* no installed tokens, no faces */ }
+    let texture = null;
+    try {
+      const installed = JSON.parse(await readFile(path.join(ds, 'tokens.json'), 'utf8'));
+      faces = installed.type?.fonts ?? [];
+      texture = textureMove(installed)?.file ?? null;
+    } catch { /* no installed tokens, no faces */ }
     const fonts = [...new Set(faces.map((f) => path.basename(String(f.file ?? ''))))].filter((f) => f && existsSync(path.join(ds, 'fonts', f))).map((f) => `fonts/${f}`);
+    const textures = texture && existsSync(path.join(ds, texture)) ? [texture] : [];
     const filled = {
       ...rec,
       artifact: flags.system,
       version: typeof flags['system-version'] === 'string' ? flags['system-version'] : rec.version ?? null,
-      files: rec.files?.length ? rec.files : ['tokens.json', 'tokens.css', 'components/bundle.css', 'components/bundle.js', ...fonts],
+      files: rec.files?.length ? rec.files : ['tokens.json', 'tokens.css', 'components/bundle.css', 'components/bundle.js', ...fonts, ...textures],
     };
     try { checkSystemRecord(filled); } catch (e) { return fail(e.message); }
     manifest = { ...manifest, designSystems: [filled] };
@@ -3141,10 +3148,13 @@ async function cmdProduct(flags, positional) {
     let brandName = config.brandName ?? null;
     let brandRecord = null;
     let brandRoot = null;
+    let brandDir;
     try {
       const resolved = await resolveSystem(flags, { gate: false });
       brandRecord = resolved.brand;
       brandRoot = path.dirname(path.dirname(resolved.file));
+      // brand.json's paths are relative to its own folder, whatever --dir called it.
+      brandDir = path.dirname(resolved.file);
       brandName ??= resolved.brand.meta?.name ?? null;
     } catch { /* route B: there is no brand file */ }
     let identity;
@@ -3152,7 +3162,7 @@ async function cmdProduct(flags, positional) {
     const out = path.resolve(typeof flags.out === 'string' ? flags.out : path.join('product', 'starter'));
     let res;
     try {
-      res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform'), product: config, brandName, brand: brandRecord, brandRoot, productDir: path.dirname(file) });
+      res = await writeStarter({ out, tokens, identity, refreshKit: Boolean(flags.kit), fontsDir: path.join(path.dirname(file), 'fonts'), platformOut: path.join(path.dirname(file), 'platform'), product: config, brandName, brand: brandRecord, brandRoot, brandDir, productDir: path.dirname(file) });
     } catch (e) { return fail(e.message); }
     const rel = path.relative(process.cwd(), out);
     emit([
@@ -3162,6 +3172,8 @@ async function cmdProduct(flags, positional) {
       ...(res.retired?.removed ?? []).map((r) => `  removed ${r}: the kit no longer has it, and nobody had changed it`),
       ...(res.retired?.kept ?? []).map((r) => `  kept ${r}: the kit dropped it, but it has changed since the kit wrote it. Remove it if it is only the kit's old copy`),
       res.brand ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
+      ...(res.brand?.refused ?? []).map((r) => `  Not used: ${r}`),
+      ...(res.brand?.inkPoses?.length ? [`  Drawn in one ink, so they take the text colour on dark: ${res.brand.inkPoses.join(', ')}.`] : []),
       res.placeholder ? "lib/brand.ts still holds the kit's placeholder mark. Name the brand's marks in product.json (brand.marks) or record a logo master." : '',
       '',
       res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : flags.kit ? 'Copied the kit\'s components and tools again, and rewrote the generated files. Next: `brandi product bundle`.' : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',

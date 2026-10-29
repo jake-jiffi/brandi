@@ -1064,6 +1064,19 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     await rm(dir, { recursive: true, force: true });
   });
 
+  test("--system installs the brand's texture when tokens.css names one, so a board's .brand-texture finds its file", async () => {
+    const dir = await productFolder();
+    const ds = path.join(dir, 'product', 'canvas', 'ds', 'acme');
+    const tokens = JSON.parse(await readFile(path.join(ds, 'tokens.json'), 'utf8'));
+    await writeFile(path.join(ds, 'tokens.json'), JSON.stringify({ ...tokens, radius: { moves: [{ name: 'Paper grain', kind: 'texture', file: 'textures/grain.jpg', strength: 0.5 }] } }));
+    await mkdir(path.join(ds, 'textures'));
+    await writeFile(path.join(ds, 'textures', 'grain.jpg'), Buffer.alloc(16));
+    const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7']);
+    assert.equal(code, 0, String(out));
+    assert.deepEqual(out.calls[0].files['project/ds/acme/textures/grain.jpg'], { artifact: 'https://claude.ai/artifact/Sys1', path: 'project/textures/grain.jpg' });
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('--system fills the record and installs everything a board loads: tokens, the bundle and the fonts the system ships', async () => {
     const dir = await productFolder();
     const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7']);

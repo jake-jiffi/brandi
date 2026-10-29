@@ -13,6 +13,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { textureMove } from './producttokens.mjs';
 
 const REFUSED = /(^|\/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|bunfig\.toml|tsconfig\.json|deno\.json|CLAUDE\.md|AGENTS\.md)$/;
 const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', '.turbo', '.git']);
@@ -171,6 +172,9 @@ export function assembleDesignSystem({ productDir, starter, outDir, title, live 
     const from = path.join(productDir, 'fonts', path.basename(font.file));
     if (existsSync(from)) put(`fonts/${path.basename(font.file)}`, { from });
   }
+  // The texture move's file, beside the fonts at the path tokens.css names it by, so a canvas can install it.
+  const texture = textureMove(tokens);
+  if (texture && existsSync(path.join(productDir, texture.file))) put(texture.file, { from: path.join(productDir, texture.file) });
   for (const f of starterFiles(starter)) put(`starter/${f.to}`, { from: f.from });
 
   // Pictures go to the asset store; their group READMEs are files.

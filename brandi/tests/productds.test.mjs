@@ -73,6 +73,20 @@ describe('the Design System artifact, assembled', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test("the brand's texture goes beside the fonts, at the path tokens.css names it by", async () => {
+    const { dir, starter } = await product();
+    const withMove = { ...tokens, radius: { ...tokens.radius, moves: [{ name: 'Paper grain', source: 'the guidelines', where: 'hero bands', kind: 'texture', file: 'textures/grain.jpg', strength: 0.5 }] } };
+    await writeFile(path.join(dir, 'tokens.json'), JSON.stringify(withMove));
+    await mkdir(path.join(dir, 'textures'));
+    await writeFile(path.join(dir, 'textures', 'grain.jpg'), Buffer.alloc(32));
+    await writeFile(path.join(dir, 'textures', 'unused.jpg'), Buffer.alloc(32));
+    const out = path.join(dir, '.publish', 'ds');
+    assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system' });
+    assert.ok(existsSync(path.join(out, 'project', 'textures', 'grain.jpg')));
+    assert.equal(existsSync(path.join(out, 'project', 'textures', 'unused.jpg')), false, 'only the file the move names');
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('a republish against the live index sends what changed since the last staging, drops what went, and the index last', async () => {
     const { dir, starter } = await product();
     const out = path.join(dir, '.publish', 'ds');

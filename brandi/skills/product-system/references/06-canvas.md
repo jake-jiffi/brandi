@@ -56,9 +56,12 @@ Foundations and components appear once. The other families repeat for each surfa
 widths and a states board for each module. A run that drew the console in depth and almost nothing
 of the website, the app or the messages passed every other gate.
 
-`Main.dc.html` is the entry board, and the one name without a width. On the last system's canvas
-it held the foundations. *(proposal)* On a canvas with more than one surface, make Main a contents
-board instead, with a link to the first board of each section. Links between boards work in Play.
+`Main.dc.html` is the entry board, and the one name without a width. `brandi product boards` writes
+it as the contents board and rewrites it on every run: Foundations, Components, then every section
+the canvas has, in canvas order, each linked to its first board with what it holds. A section is a
+title note (below) and the boards under it, so write the note as "Label · what it holds" and Main
+reads it. Boards under no note are grouped by their name's first word. Links between boards work in
+Play. Don't edit Main by hand: the next run replaces it.
 
 ### Rows and title notes
 
