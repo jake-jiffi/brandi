@@ -2727,6 +2727,27 @@
     "file": "skills/product-system/references/05-components.md",
     "heading": "AIAnswer"
    }
+  },
+  {
+   "id": "L147",
+   "broke": "An earlier Schedule event laid its lines out for its own full height, so its time and owner were drawn under the later event that starts part-way down it, and no clip check saw text that was covered rather than cut.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Schedule",
+     "name": "An event drawn over by a later one shows only the lines that fit above where the later one starts, and no line lies under another event"
+    },
+    {
+     "kind": "check",
+     "component": "Schedule",
+     "name": "No line an event shows lies under another event on a touch screen, at 64px an hour, too"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.11 Long text"
+   }
   }
  ]
 }
