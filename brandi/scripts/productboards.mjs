@@ -331,7 +331,9 @@ export function twin(light, system, height) {
 
 /** The contents board: the system's sections, each linking to its first board. */
 export function contentsBoard(system, sections) {
-  const body = sections.map((s) => `<li style="display: flex; flex-direction: column; gap: 4px; padding-block: 16px; border-top: 1px solid var(--line);"><a href="${esc(s.first)}" style="font-size: 20px; line-height: 28px; font-weight: 600; color: var(--link);">${esc(s.label)}</a><span style="font-size: 14px; line-height: 20px; color: var(--text-muted);">${esc(s.note)}</span></li>`).join('\n');
+  // The link and its note pair by their line heights, with no gap of their own: one gap per entry was most of the
+  // board's spacing on a canvas of 13 sections, and the detector read the board as monotonous.
+  const body = sections.map((s) => `<li style="padding-block: 16px; border-top: 1px solid var(--line);"><a href="${esc(s.first)}" style="display: block; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--link);">${esc(s.label)}</a><span style="display: block; font-size: 14px; line-height: 20px; color: var(--text-muted);">${esc(s.note)}</span></li>`).join('\n');
   return board(system, 'Main', 'Contents', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: var(--measure, 30em);">The ${esc(system.name)} product system on one canvas: the foundations, every component mounted live, then each product's screens, states and options. Light boards with their dark twins beside them.</p>\n<ol style="margin: 0; padding: 0; list-style: none;">\n${body}\n</ol>`);
 }
 
@@ -367,11 +369,23 @@ export function authoredSections(existing, authored) {
   for (const [n, files] of under) {
     if (!files.length) continue;
     const [label, ...rest] = n.text.split(' · ');
-    const holds = rest.join(' · ').trim().replace(/[.\s]+$/, '');
-    sections.push({ at: at(n), label: label.trim(), first: files[0], note: `${holds ? `${holds}. ` : ''}${plural(files.length, 'board')}.` });
+    // A note opening on a plain lower-case word starts with a capital in the list; a domain or a name like iOS is
+    // left as written.
+    const written = rest.join(' · ').trim().replace(/[.\s]+$/, '');
+    const holds = written.replace(/^[a-z]+(?=[\s,:;]|$)/, (w) => w[0].toUpperCase() + w.slice(1));
+    sections.push({ at: at(n), label: label.trim(), written, first: files[0], note: `${holds ? `${holds}. ` : ''}${plural(files.length, 'board')}.` });
+  }
+  // Notes written "Console · Orders (...)" share a label: each is named by the name its note opens with, a run of
+  // capitalised words before any bracket or stop, so the contents does not read "Console" six times. One that opens
+  // in lower case is the surface's own note and keeps the bare label.
+  const count = new Map();
+  for (const s of sections) count.set(s.label, (count.get(s.label) ?? 0) + 1);
+  for (const s of sections) {
+    const name = count.get(s.label) > 1 ? /^[A-Z][^(:,.;]*?(?=\s*[(:,.;]|$)/.exec(s.written)?.[0].trim() : null;
+    if (name) s.label = `${s.label}: ${name}`;
   }
   for (const [label, g] of loose) sections.push({ at: g.at, label, first: g.files[0], note: `${plural(g.files.length, 'board')}.` });
-  return sections.sort((a, b) => before(a.at, b.at)).map(({ at: _, ...s }) => s);
+  return sections.sort((a, b) => before(a.at, b.at)).map(({ at: _, written: __, ...s }) => s);
 }
 
 function isGenerated(file) {
@@ -396,7 +410,7 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   let components = componentBoards(defs, system);
   const sections = [
     { label: 'Foundations', first: foundations[0].file, note: 'Colour, type, space, corners, depth and icons, from the tokens.' },
-    { label: 'Components', first: components[0]?.file ?? foundations[0].file, note: `${defs.length} components in ${components.length} groups, mounted from the bundle.` },
+    { label: 'Components', first: components[0]?.file ?? foundations[0].file, note: `${plural(defs.length, 'component')} in ${plural(components.length, 'group')}, mounted from the bundle.` },
   ];
   const authored = readdirSync(canvas).filter((f) => f.endsWith('.dc.html') && f !== 'Main.dc.html').sort();
   let existing = null;

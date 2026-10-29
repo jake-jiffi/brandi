@@ -150,6 +150,29 @@ describe('the boards a system generates for itself', () => {
     assert.match(main.source, /max-width: var\(--measure, 30em\)/, 'the contents paragraph takes the measure');
   });
 
+  test('sections that share a label are named by what their note opens with, and a note in lower case starts with a capital', () => {
+    const note = (id, y, text) => ({ id, x: 0, y, text, kind: 'title1' });
+    const board = (file, y) => ({ file, x: 0, y, w: 1440, h: 900 });
+    const sections = B.authoredSections({
+      annotations: [note('site', 0, 'Website · acme.example for customers'), note('console', 2000, 'Console · operations for store managers'), note('rosters', 4000, 'Console · Rosters (store managers, first in the rail): who works when'), note('sync', 6000, 'Console · Sync, then its states')],
+      artboards: [board('WebHome1440.dc.html', 200), board('ConsoleHome1440.dc.html', 2200), board('ConsoleRosters1440.dc.html', 4200), board('ConsoleSync1440.dc.html', 6200)],
+    }, ['WebHome1440.dc.html', 'ConsoleHome1440.dc.html', 'ConsoleRosters1440.dc.html', 'ConsoleSync1440.dc.html']);
+    assert.deepEqual(sections.map((s) => s.label), ['Website', 'Console', 'Console: Rosters', 'Console: Sync']);
+    assert.deepEqual(sections.map((s) => s.note), [
+      'acme.example for customers. 1 board.',
+      'Operations for store managers. 1 board.',
+      'Rosters (store managers, first in the rail): who works when. 1 board.',
+      'Sync, then its states. 1 board.',
+    ]);
+  });
+
+  test('a contents board of many sections repeats no gap or margin per entry, which the detector reads as monotonous spacing', () => {
+    const sections = (n) => Array.from({ length: n }, (_, i) => ({ label: `Section ${i}`, first: `Section${i}1440.dc.html`, note: 'Two boards.' }));
+    const spacing = (b) => (b.source.match(/(?:^|[;"\s])(?:row-|column-)?(?:gap|margin(?:-[a-z]+)?):\s*[^;"]+/g) ?? []).length;
+    // 13 sections tripped it on a real canvas: one 4px gap between each link and its note, 13 of the board's 15 spacings.
+    assert.equal(spacing(B.contentsBoard(system, sections(13))), spacing(B.contentsBoard(system, sections(2))));
+  });
+
   test("the contents board lists every section the canvas has, the title notes a person wrote included, in canvas order", async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-main-'));
     const starter = path.join(dir, 'starter');
@@ -184,7 +207,7 @@ describe('the boards a system generates for itself', () => {
       ['Console', 'ConsoleHome1440.dc.html'],
       ['Trading hours', 'ConsoleHoursA1440.dc.html'],
     ]);
-    assert.match(await readFile(path.join(dir, 'canvas', 'Main.dc.html'), 'utf8'), /the working day, light and dark\. 2 boards\./, "the rest of a note's text says what the section holds");
+    assert.match(await readFile(path.join(dir, 'canvas', 'Main.dc.html'), 'utf8'), /The working day, light and dark\. 2 boards\./, "the rest of a note's text says what the section holds");
     // A note added since is listed on the next run.
     const manifest = JSON.parse(await readFile(path.join(dir, 'canvas', 'canvas.json'), 'utf8'));
     const home = manifest.artboards.find((a) => a.file === 'ConsoleHome1440.dc.html');

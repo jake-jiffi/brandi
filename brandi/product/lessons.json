@@ -1523,6 +1523,27 @@
     "file": "skills/product-system/references/05-components.md",
     "heading": "MetricCard"
    }
+  },
+  {
+   "id": "L83",
+   "broke": "Once Main listed every section, a canvas of 13 sections failed the detector: one 4px gap between each link and its note was 13 of the board's 15 spacings. The same board read \"Console\" six times, because module notes were written \"Console · Orders (...)\", and \"1 components in 1 groups\" on a small kit.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "a contents board of many sections repeats no gap or margin per entry, which the detector reads as monotonous spacing"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "sections that share a label are named by what their note opens with, and a note in lower case starts with a capital"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "1. Board families and layout"
+   }
   }
  ]
 }

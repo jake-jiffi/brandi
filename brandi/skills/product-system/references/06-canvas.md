@@ -60,7 +60,9 @@ of the website, the app or the messages passed every other gate.
 it as the contents board and rewrites it on every run: Foundations, Components, then every section
 the canvas has, in canvas order, each linked to its first board with what it holds. A section is a
 title note (below) and the boards under it, so write the note as "Label · what it holds" and Main
-reads it. Boards under no note are grouped by their name's first word. Links between boards work in
+reads it. Notes that share a label ("Console · Orders (...)", "Console · Deals (...)") are listed
+by the name each opens with, as "Console: Orders". Boards under no note are grouped by their name's
+first word. Links between boards work in
 Play. Don't edit Main by hand: the next run replaces it.
 
 ### Rows and title notes
