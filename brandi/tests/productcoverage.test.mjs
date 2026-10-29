@@ -83,7 +83,7 @@ describe('the core pages a surface with modules shows', () => {
     Setup: { skip: 'stores are set up by head office, outside the product' }, 'the assistant': { skip: 'the console has no assistant yet' }, 'Sign in': 'ConsoleSignIn1440', Help: 'ConsoleHelp1440',
   };
 
-  test('the patterns are the ten 04-written-system.md teaches, in its order, so the gate and the written system say the same thing', async () => {
+  test('the patterns are the ones 04-written-system.md teaches, in its order, so the gate and the written system say the same thing', async () => {
     const text = await readFile(new URL('../skills/product-system/references/04-written-system.md', import.meta.url), 'utf8');
     const block = text.slice(text.indexOf('The eleven core patterns:'), text.indexOf('A product that needs a page none of these covers'));
     assert.deepEqual([...block.matchAll(/^ {2}- \*([^*]+?)\.?\*/gm)].map((m) => m[1]), [...CORE_PAGES]);

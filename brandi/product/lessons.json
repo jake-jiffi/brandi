@@ -2026,7 +2026,7 @@
     {
      "kind": "test",
      "file": "tests/productcoverage.test.mjs",
-     "name": "the patterns are the ten 04-written-system.md teaches, in its order, so the gate and the written system say the same thing"
+     "name": "the patterns are the ones 04-written-system.md teaches, in its order, so the gate and the written system say the same thing"
     },
     {
      "kind": "test",
@@ -2620,6 +2620,48 @@
    "teaches": {
     "file": "skills/product-system/references/02-brand-to-product.md",
     "heading": "Colour"
+   }
+  },
+  {
+   "id": "L141",
+   "broke": "A surface with no modules was never asked for its states, so a run's booking pages drew neither no times this week nor booking failed.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "a surface with no modules and no states board is told what is missing and how to name it"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "a surface that only sends messages, by email or text, needs none; one that also has pages of its own does"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Coverage"
+   }
+  },
+  {
+   "id": "L142",
+   "broke": "Every proof run scored Help and documentation 3 of 4, because Help sat in the rail and no board showed what it opens.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "Help is a core page: a surface with modules that neither shows nor skips it is told the board to name"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "the patterns are the ones 04-written-system.md teaches, in its order, so the gate and the written system say the same thing"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/04-written-system.md",
+    "heading": "Screen patterns"
    }
   }
  ]
