@@ -84,6 +84,7 @@ export default {
       "Badge and Tag looked alike (round 1). A badge is tinted in its tone; a tag is outlined, on the surface, with a category dot.",
       'The highlight and the warning shared a colour, so "needs you" blurred with "heads up" (round 1). Highlight is solid; warning is a tint.',
       "One state had five names at two severities (round 3). Each word belongs to one tone.",
+      "A badge cut by a narrow grid column hung its board (React error 185, a proof run): the tooltip wrapped round it widened the column, so it fitted, unwrapped and was cut again. The wrapper now sizes as the badge does.",
     ],
   },
   examples: [
@@ -130,6 +131,19 @@ export default {
       markup: `<x-import component-from-global-scope="NS.Badge" tone="neutral">Waiting on [Northside Plumbing and Gas]</x-import>`,
     },
     {
+      // Two TimePickers and a badge in a row with a fixed label column, in a Card 200px wide: the badge's auto
+      // column has about 10px. Wrapping the cut badge in its tooltip once made that column wide enough to uncut it,
+      // which unwrapped it, which cut it again: React stopped the loop with error 185 and the board never drew.
+      id: "squeezed",
+      title: "A row too narrow for what it holds: the badge is cut and the board still draws",
+      markup: `<div style="width: 200px;"><x-import component-from-global-scope="NS.Card" title="Regular week">
+<div class="flex flex-col gap-3">
+<div data-row style="display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center;"><span class="type-label text-text-strong">Monday</span><x-import component-from-global-scope="NS.TimePicker" default-value="10:00" aria-label="Monday opens"></x-import><x-import component-from-global-scope="NS.TimePicker" default-value="23:00" aria-label="Monday closes"></x-import><span aria-hidden="true"></span></div>
+<div data-row style="display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center;"><span class="type-label text-text-strong">Thursday</span><x-import component-from-global-scope="NS.TimePicker" default-value="10:00" aria-label="Thursday opens"></x-import><x-import component-from-global-scope="NS.TimePicker" default-value="22:00" aria-label="Thursday closes"></x-import><x-import component-from-global-scope="NS.Badge" tone="info">Syncing</x-import></div>
+</div>
+</x-import></div>`,
+    },
+    {
       id: "badge-or-tag",
       title: "A badge is a state; a tag is a category",
       markup: `<x-import component-from-global-scope="NS.Badge" tone="success">Paid</x-import>
@@ -137,6 +151,7 @@ export default {
       vals: { one: 1 },
     },
   ],
+  frame: { width: 960, height: 860 },
   checks: [
     {
       name: "Every badge carries a word, so status never rides on colour alone",
@@ -238,6 +253,31 @@ export default {
         expect.equal(await trigger.getAttribute("aria-describedby"), null, "the full text is not read a second time as a description")
         await page.keyboard.press("Escape")
         await tip.waitFor({ state: "hidden", timeout: 2000 })
+      },
+    },
+    {
+      name: "A badge squeezed by its row is cut and settles, wrapped in its tooltip",
+      example: "squeezed",
+      async run({ page, scope, expect }) {
+        // A board that loops never draws, and the preview fails before any check runs. Past that, the badge
+        // must also hold still: a ResizeObserver can keep a loop going a frame at a time without an error.
+        const row = scope.locator("[data-row]").nth(1)
+        const badge = row.locator('[data-slot="badge"]')
+        expect(await badge.locator('[data-slot="badge-label"]').evaluate((el) => el.scrollWidth > el.clientWidth), "the label is cut short")
+        const frames = await badge.evaluate(
+          (el) =>
+            new Promise((resolve) => {
+              const seen = []
+              const tick = () => {
+                seen.push(`${Boolean(el.isConnected && el.closest('[data-slot="tooltip-trigger"]'))} ${Math.round(el.getBoundingClientRect().width)}`)
+                if (seen.length < 20) requestAnimationFrame(tick)
+                else resolve(seen)
+              }
+              requestAnimationFrame(tick)
+            })
+        )
+        expect.equal(new Set(frames).size, 1, `the same over 20 frames (${[...new Set(frames)].join(", ")})`)
+        expect(frames[0].startsWith("true"), "wrapped in its tooltip, so the full label is there on hover and focus")
       },
     },
     {

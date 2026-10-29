@@ -141,13 +141,21 @@ a split view and a browser tab of the same width then render alike.
 | AppShell | 1280, 1024 and 640px | Rail to icons, then a drawer, then one column |
 | DataTable | 640px | Shows its rows as a list |
 | ListRow | 480px of list | Wraps to two lines; a badge or action moves under the text, whole |
-| DescriptionList | 420px | Stacks |
+| DescriptionList | 420px | `columns` stacks; `lines` never does |
 | FormRow | 180px a field | Drops to one column |
 | FormSection | Its own width | The split layout stacks the title above the fields |
 | MetricCard | Its card | The figure shrinks with the card |
 
 **Open.** The reference never scripted 820px. Tablet portrait is unproven until a round checks every
 component there, which the bar now asks for.
+
+**A column that scrolls.** A phone screen is usually a column whose main fills what is left and
+scrolls. Its flex or grid items shrink to fit unless something stops them, and an `overflow:
+hidden` box is a scroll container, whose automatic minimum size is 0. Cards shrank to fit a phone's
+main and clipped their own content, the checkout's total included (a proof run, round 2). A
+container that rounds its corners clips with `overflow: clip`, which is not a scroll container, and
+a floor on a container's height goes on its content, never as the container's `min-height`, which
+replaces the automatic minimum: a two-line Banner was squashed to its 48px floor the same way.
 
 ### 2.5 Touch
 
@@ -258,6 +266,11 @@ chart end labels under 300px) showed in full only in a `title` tooltip, which ne
 
 **Review.** Long names overflowed the phone title (round 3). Text was truncated with no touch access
 (round 4). A name cut by a single pixel got an ellipsis and no tooltip: any overflow counts as cut.
+A badge cut by a narrow grid column hung the board in a render loop (React error 185, a proof run):
+the Tooltip wrapped round the cut badge would not shrink, so it widened the column, the badge
+fitted and was unwrapped, and was cut again. A cut label's Tooltip (Badge, Tag, Source) now sizes
+as the label's own box does (`cutTrigger`), so wrapping it never changes the width that was
+measured. Anything that measures itself and then changes its own markup must hold this.
 
 ### 2.12 On the canvas
 
@@ -553,6 +566,10 @@ One choice from two to five options that people should see side by side.
 - **Behaviour.** *(practice)* A native radio group: arrows move the choice. The reference left this
   to the platform and did not document it.
 - **Rules.** Preselect the safest or most common option. More than five options: a Select.
+- **Review.** A rules review measured the radios at 18px (a proof run, rounds 1 to 3). The circle
+  is 18px; its hit area, drawn round it, is 24px, and 44px on touch, which the definition checks.
+  Measure a target by what a press reaches (`elementFromPoint` round its centre), never by the
+  element's box.
 
 #### Switch
 
@@ -672,7 +689,7 @@ pressable shape.
   so "needs you" blurred with "heads up" (round 1). They are told apart by 2:1 in lightness or a
   plain difference in colour: a highlighter yellow beside a pale warning tint is close in lightness
   and still reads as different. One state had five names at two severities
-  (round 3).
+  (round 3). A badge cut by a narrow column looped (React error 185, section 2.11).
 
 #### SampleBadge
 
@@ -725,7 +742,8 @@ A short label on hover or keyboard focus.
 - **Behaviour.** Stays while the pointer is over it. Escape closes it. It shifts to stay on screen.
 - **Rules.** Never the only home for essential information, and never interactive. One short
   sentence at most. The child must be focusable, so keyboard users get it too. A definition people
-  need on touch is a toggletip, as MetricCard's hint is.
+  need on touch is a toggletip, as MetricCard's hint is. Wrapped round a cut label, it takes
+  `cutTrigger`, so it sizes as the label does (section 2.11).
 - **Review.** An invisible tooltip swallowed Escape in the phone drawer (round 3).
 
 ### 3.7 Data
@@ -739,9 +757,12 @@ The container on the canvas: a title, an optional description and actions, a bod
   `interactive` (lifts on hover). `selected`. `flush` (no body padding, for tables and lists).
   `headingLevel` (2 by default). `as`. `chevron` (with `href`: a chevron at the end of the title's
   line, the cue that the whole card opens something, as ListRow has).
+- **Layout.** In a column that scrolls, as a flex or a grid item, a card keeps its content's height
+  and the column scrolls. It clips its corners with `overflow: clip`, never `hidden` (section 2.4).
 - **Rules.** Never a card inside a card. The title says what the card shows, in sentence case, with
   no small uppercase label above it. One idea per card: a card that needs tabs is a page.
-- **Review.** An uppercase kicker sat above card titles, which the craft gate bans (round 1).
+- **Review.** An uppercase kicker sat above card titles, which the craft gate bans (round 1). Cards
+  shrank inside a phone's scrolling main and hid the checkout's total (a proof run, round 2).
 
 #### MetricCard
 
@@ -805,7 +826,10 @@ definition.
   crashed it (round 1). Bulk approve acted on rows that were not on screen (round 3). Tables kept
   their desktop layout at phone width (round 4). On a touch tablet the sort buttons and the row's
   link were 16 and 20px; each now takes its whole cell. A search that emptied the table said
-  nothing, because the count in the footer unmounted; the footer stays mounted, out of sight.
+  nothing, because the count in the footer unmounted; the footer stays mounted, out of sight. A
+  selectable table with bulk actions and no filters had a blank band above it at 390 (a proof run,
+  rounds 1 to 3): with no filters the toolbar takes no room until rows are selected. Order lines
+  went label over price at 358px: a receipt is a DescriptionList in `lines`, never a table.
 - **Open.** No shift-click range selection. Up and Down between a list and its detail, which
   `03-fundamentals-first.md` §5 requires, was left to each product.
 
@@ -840,13 +864,22 @@ badge, value or chevron.
 #### DescriptionList
 
 Label and value pairs for a record's details, in two columns, or stacked for side panes. It stacks
-by itself under 420px.
+by itself under 420px. As lines it holds a receipt: order lines, fees and a total.
 
 - **Contract.** `items` (`{ label, value }`, `{ label, badge }`, `{ label, value, badge }`, or
-  `{ label, value, empty }`). `layout` (`columns`, `stacked`).
-- **Rules.** Labels in `text-subtle`, values in `text`. A missing value says so ("Not set"), never
-  blank. An item with a value and a badge shows both, the value first.
-- **Review.** An item with both dropped its value.
+  `{ label, value, empty }`, any of them with `total`). `layout` (`columns`, `stacked`, `lines`).
+- **Layout.** `lines` keeps each label and its value on one line at any width, a phone's included:
+  the value at the end, in tabular figures, on the label's first line, and a long label wraps
+  beside it. A value takes up to two thirds of the line; a longer one wraps there. No hairlines
+  between lines. An item with `total` sits under a rule in `line-strong`, label and value in
+  `text-strong`.
+- **Rules.** Labels in `text-subtle`, values in `text`; in `lines` the label is the line itself, so
+  it takes `text`. A missing value says so ("Not set"), never blank. An item with a value and a
+  badge shows both, the value first. Order lines, a receipt or a price breakdown are `lines`: List,
+  DataTable and `columns` all put the value under its label on a phone.
+- **Review.** An item with both dropped its value. A checkout's order lines read as a form at
+  358px, each price under its label and left-aligned, so a run drew its receipt by hand (a proof
+  run, round 2).
 
 #### Timeline
 
@@ -1227,7 +1260,10 @@ One row of search, filters and view controls above a table or list, wrapping on 
 `label` names the group ("[Record] filters"). Search first, then filter chips, a Spacer, then the
 view switcher and secondary actions. Selecting rows swaps the filters for bulk actions. It sits 12px
 above its table, as one block, and sticks while the table scrolls. On a screen under 560px tall, a
-laptop at 200% zoom, it stops sticking: there a sticky bar hid the focused row under it.
+laptop at 200% zoom, it stops sticking: there a sticky bar hid the focused row under it. It keeps
+its height when rows are selected, so the table never moves; with no filters it takes no room until
+rows are selected, because the row kept for them read as a blank band (a proof run, rounds 1 to 3),
+and clearing the selection then puts focus on the next control, the table's select-all.
 
 #### Spacer
 

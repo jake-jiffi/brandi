@@ -7,7 +7,7 @@ import { formatNumber } from "@/lib/format"
 import type { IconName } from "@/lib/icons"
 
 import { Icon } from "./icon"
-import { Tooltip, useTruncated } from "./tooltip"
+import { Tooltip, cutTrigger, useTruncated } from "./tooltip"
 
 export type BadgeTone = "success" | "warning" | "danger" | "info" | "ai" | "highlight" | "neutral"
 export type BadgeSize = "sm" | "md"
@@ -72,5 +72,5 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(function Badg
     </BadgeBase>
   )
   // A label cut short shows in full on hover, on keyboard focus and on a long press.
-  return cut ? <Tooltip content={children}>{badge}</Tooltip> : badge
+  return cut ? <Tooltip content={children} className={cutTrigger}>{badge}</Tooltip> : badge
 })

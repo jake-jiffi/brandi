@@ -40,6 +40,7 @@ export default {
     Layout: [
       "One line from 640px of its own width: the title in the label style, the consequence after it, the action at the end. Below 640px the action moves under the text.",
       "48px tall with an action, and the dismiss button centred on the line.",
+      "In a column that scrolls it keeps its height: the 48px floor is on its content, so it never replaces the banner's automatic minimum.",
     ],
     States: ["Sample data, read only, a source that is down, offline, and a source that is back (dismissible)."],
     Copy: [
@@ -53,7 +54,10 @@ export default {
       "A source behind the page that is down is warning, never danger: nothing the person did failed, its last good data still shows and the rest of the page works.",
       "Offline is a neutral banner that says changes will save when the connection is back.",
     ],
-    Review: ["A starter showed its down source as a danger banner, against the pattern (a pilot's round 1). A down source is warning."],
+    Review: [
+      "A starter showed its down source as a danger banner, against the pattern (a pilot's round 1). A down source is warning.",
+      "A min-height on the banner let a short column that scrolls squash a two-line banner to 48px, its words over what came next (found beside a proof run's round 2).",
+    ],
   },
   frame: { width: 960, height: 720 },
   examples: [
@@ -119,6 +123,38 @@ export default {
         for (const banner of await scope.locator('[data-slot="banner"]').all()) {
           const { height } = await banner.boundingBox()
           expect(height <= 48, `a banner is ${height}px tall`)
+        }
+      },
+    },
+    {
+      name: "In a short column that scrolls, a banner keeps its height and its words, and a one-line banner is still 48px",
+      example: "narrow",
+      async run({ page, scope, expect }) {
+        // A copy of the narrow banner, as a flex item and as a grid item of a column too short for what it holds. A
+        // min-height on the banner replaced its automatic minimum, so the column squashed it to 48px and its words
+        // ran over whatever came next.
+        const banner = scope.locator('[data-slot="banner"]')
+        const natural = Math.round((await banner.boundingBox()).height)
+        expect(natural > 48, `the narrow banner runs to more than one line (${natural}px)`)
+        for (const kind of ["flex", "grid"]) {
+          const { height, spill } = await banner.evaluate((el, kind) => {
+            const column = document.createElement("div")
+            column.style.cssText = `display: ${kind}; flex-direction: column; width: ${el.getBoundingClientRect().width}px; height: 40px; overflow: auto`
+            const after = document.createElement("p")
+            after.style.cssText = "height: 120px; margin: 0; flex-shrink: 0"
+            const copy = el.cloneNode(true)
+            column.append(copy, after)
+            el.parentElement.append(column)
+            const box = copy.getBoundingClientRect()
+            const out = { height: Math.round(box.height), spill: Math.round(Math.max(...[...copy.querySelectorAll("*")].map((d) => d.getBoundingClientRect().bottom)) - box.bottom) }
+            column.remove()
+            return out
+          }, kind)
+          expect.equal(height, natural, `${kind}: the banner's height in the short column`)
+          expect(spill <= 0, `${kind}: its words run ${spill}px past its foot`)
+        }
+        for (const one of await page.locator('[data-example="uses"] [data-slot="banner"]').all()) {
+          expect.equal(Math.round((await one.boundingBox()).height), 48, "a one-line banner is 48px tall")
         }
       },
     },
