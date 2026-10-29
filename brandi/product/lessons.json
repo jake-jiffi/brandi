@@ -2091,6 +2091,265 @@
     "file": "skills/product-system/references/06-canvas.md",
     "heading": "Directions"
    }
+  },
+  {
+   "id": "L111",
+   "broke": "A surface's platforms written as ios were dropped by the specs check without a word, so no iOS spec was ever asked for.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productspecs.test.mjs",
+     "name": "ios and ipados mean ios-ipados, the surfaces stand in when product.json names none, and a stranger is said, not dropped"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/SKILL.md",
+    "heading": "The command line does the arithmetic"
+   }
+  },
+  {
+   "id": "L112",
+   "broke": "A staged Design System carried an empty Licences group, though product fonts had recorded each face's licence and fetched its text.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productds.test.mjs",
+     "name": "the Licences group lists every face and the icon set with its licence, carries the texts, and names a face with none"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/12-design-system-artifact.md",
+    "heading": "Before publishing"
+   }
+  },
+  {
+   "id": "L113",
+   "broke": "A root role given one colour, the form a direction's role takes, was ignored with no word, so the rail stayed the surface colour.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a root role given one value takes it in both themes, as a direction's role does, and is measured in both"
+    },
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "an unknown role, or a value in a form the engine cannot read, is refused with its reason, never dropped"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Where the decisions live"
+   }
+  },
+  {
+   "id": "L114",
+   "broke": "The product carried the kit's motion and never read the brand's motion signature.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "the brand's curve is ease-standard and its duration sets the job nearest it, each with its source; the kit fills the rest, saying so"
+    },
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a brand with no signature keeps the kit's motion, every value recorded as the kit's"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Motion"
+   }
+  },
+  {
+   "id": "L115",
+   "broke": "The kit's sample business carried the test fixture brand's own name and trade, so a proof run on that brand found itself on the kit's screens.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productdocs.test.mjs",
+     "name": "no kit source or definition names a fixture brand, so a test brand never ships as sample copy"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "How to read an entry"
+   }
+  },
+  {
+   "id": "L116",
+   "broke": "A logo file the brand record named but nobody had drawn stopped the starter, which wrote nothing.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "the starter command on a brand whose logo is named and never drawn writes the starter, and says which files are missing and how to add them"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a logo the record names before anyone has drawn it never stops the starter: a missing file is listed, and with no full logo the kit's stand-in carries the brand's name"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L117",
+   "broke": "With no logo, the starter's brand file kept the kit's name, Product, and its placeholder character for a brand that has none.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "a logo the brand record names that nobody has drawn does not stop the starter: lib/brand.ts carries the kit's stand-in under the brand's name, says it is not the brand's, and draws no character"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "with no logo on record anywhere, lib/brand.ts still carries the brand's name, and a character only when the brand names one"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L118",
+   "broke": "The Character check wanted at least one character on its card, so a brand with none failed Accessibility.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Character",
+     "name": "It is decoration, hidden from screen readers"
+    },
+    {
+     "kind": "check",
+     "component": "Character",
+     "name": "A brand with no character says so on its card, in place of the poses"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Brand character or illustration"
+   }
+  },
+  {
+   "id": "L119",
+   "broke": "With no drawn logo, the lockups drew the kit's stand-in, whose letters read PRODUCT, so sign-in and booking pages never named the brand.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "ProductLockup",
+     "name": "With no drawn logo, the stand-in's symbol stands beside the brand's name in words, never the stand-in's PRODUCT"
+    },
+    {
+     "kind": "check",
+     "component": "Email",
+     "name": "A product named for the brand is the mark alone, in the email and its plain text; another product keeps its name"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L120",
+   "broke": "A short Schedule event shrank its time and owner lines to share a fixed height, so each showed half a line.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Schedule",
+     "name": "Every event shows whole lines inside its edge, by day and by week: the title always, then the time and its line as the height allows"
+    },
+    {
+     "kind": "check",
+     "component": "Schedule",
+     "name": "Every event shows whole lines on a touch screen, at 64px an hour, too"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.11 Long text"
+   }
+  },
+  {
+   "id": "L121",
+   "broke": "The board clip check passed squeezed ellipsis lines and every positioned box, so a schedule hiding half its lines passed Board sizes.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a positioned box in the page, an ellipsis line squeezed below its height and a clamp cut mid-line are named"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Board sizes"
+   }
+  },
+  {
+   "id": "L122",
+   "broke": "A desktop states grid, an email and a texts board drawn from the reference's markup failed axe on the main landmark and the h1.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a states grid in a main, an email in a main and a texts frame whose top bar is the h1 pass every rule axe runs on boards"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "A message board"
+   }
+  },
+  {
+   "id": "L123",
+   "broke": "A MetricCard given a context and no delta dropped the context with no word.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "validate warns about each card with a context and no delta, naming the board and the card, and says to use footnote"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "MetricCard"
+   }
+  },
+  {
+   "id": "L124",
+   "broke": "A scripted check that flaked on a loaded machine failed the round's Accessibility gate, though it passed run alone.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a scripted check that fails once and passes run again alone is named, not failed; one that fails twice fails"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
   }
  ]
 }
