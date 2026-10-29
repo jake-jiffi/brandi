@@ -186,7 +186,8 @@ function useCut(box: React.RefObject<HTMLElement | null>) {
     const measure = () => {
       if (!el.isConnected) return
       const lines = Array.from(el.querySelectorAll<HTMLElement>("[data-measure]"))
-      setCut(lines.some((s) => s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1) || el.scrollHeight > el.clientHeight + 1)
+      // A line with no room wraps out to the side (GridEvent), so a box wider inside than out has left one out.
+      setCut(lines.some((s) => s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1) || el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)
     }
     measure()
     const observer = new ResizeObserver(measure)
@@ -214,14 +215,17 @@ interface GridEventProps {
 }
 
 /**
- * One event on the grid, placed over the hours it covers. Narrow, its lines end in an ellipsis; with room,
- * the title takes two lines. Anything cut short shows in full in a tooltip, on hover, focus and a long press.
+ * One event on the grid, placed over the hours it covers. It shows whole lines only: the title always, then the
+ * time, then its line, as its height allows. Narrow, its lines end in an ellipsis; with room, the title takes two
+ * lines. Anything cut short or left out shows in full in a tooltip, on hover, focus and a long press.
  */
 function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClick }: GridEventProps) {
   const box = React.useRef<HTMLElement | null>(null)
   const cut = useCut(box)
-  // Container widths here are the event's own, inside its padding.
-  const fits = "truncate @min-[64px]/event:line-clamp-2 @min-[64px]/event:whitespace-normal"
+  // The lines are a column that wraps: one with no room below starts a second column, a gap's width out past the
+  // edge, where it is hidden whole. Squeezed instead, a one-hour booking showed half its time and a sliver of its
+  // line. The event is a size container in its title's type, so 1lh in a query is a title line: the title takes
+  // two lines only with room for a line under them, and the time two with room for two of the title's.
   const props: Record<string, unknown> = {
     ref: box,
     "data-slot": "schedule-event",
@@ -231,7 +235,10 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
     onFocus,
     "aria-label": p.name,
     className: cn(
-      "@container/event flex size-full min-h-6 flex-col overflow-hidden rounded-sm border border-transparent px-2 py-1 text-left",
+      "@container-size/event flex size-full flex-col flex-wrap gap-x-[100%] overflow-hidden rounded-sm border border-transparent px-2 py-0.5 text-left",
+      // Never shorter than one title line, so a short event still shows its title, and a 24px target at least.
+      "min-h-[max(1.5rem,calc(1lh+6px))]",
+      view === "day" ? "type-label" : "type-caption",
       "transition-shadow duration-(--duration-fast) hover:shadow-sm focus-visible:outline-offset-[-2px]",
       // An event drawn over another is ringed in the surface, so the two read apart.
       p.depth > 0 && "ring-2 ring-surface",
@@ -240,22 +247,29 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
   }
   const content = (
     <>
-      <span className="flex min-w-0 items-start gap-1.5">
+      <span className="flex w-full min-w-0 shrink-0 items-start gap-1.5">
         <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full forced-color-adjust-none @max-[48px]/event:hidden", view === "day" ? "mt-1.5" : "mt-1", DOT[p.slot])} />
-        <span data-measure="" className={cn("min-w-0 text-text-strong", view === "day" ? "type-label" : "type-caption", p.span >= 1 ? fits : "truncate")}>
+        <span
+          data-measure=""
+          className="min-w-0 truncate text-text-strong [@container_event_(min-width:64px)_and_(min-height:3lh)]:line-clamp-2 [@container_event_(min-width:64px)_and_(min-height:3lh)]:whitespace-normal"
+        >
           {p.event.title}
         </span>
       </span>
       {/* Spaces between the lines, so the visible text reads as the name does: "Annual service 9:00 to 10:00" (WCAG 2.5.3). */}
-      {p.span >= 0.75 ? " " : null}
-      {p.span >= 0.75 ? (
-        <span data-measure="" className={cn("min-w-0 text-text", view === "day" ? "type-meta" : "type-caption", p.span >= 1.5 ? fits : "truncate")}>
-          {p.time}
-        </span>
-      ) : null}
-      {view === "day" && p.event.meta && p.span >= 1 ? " " : null}
-      {view === "day" && p.event.meta && p.span >= 1 ? (
-        <span data-measure="" className="truncate type-meta text-text">
+      {" "}
+      <span
+        data-measure=""
+        className={cn(
+          "w-full min-w-0 shrink-0 truncate text-text [@container_event_(min-width:64px)_and_(min-height:4lh)]:line-clamp-2 [@container_event_(min-width:64px)_and_(min-height:4lh)]:whitespace-normal",
+          view === "day" ? "type-meta" : "type-caption"
+        )}
+      >
+        {p.time}
+      </span>
+      {view === "day" && p.event.meta ? " " : null}
+      {view === "day" && p.event.meta ? (
+        <span data-measure="" className="w-full min-w-0 shrink-0 truncate type-meta text-text">
           {p.event.meta}
         </span>
       ) : null}

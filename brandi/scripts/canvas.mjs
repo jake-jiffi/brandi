@@ -896,6 +896,18 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     );
   }
 
+  // A MetricCard's context is its delta's comparison and shows only beside one: a run passed context with no delta on
+  // four boards, and the line under each figure showed nothing. A generated board shows the kit's own examples, one
+  // of which draws exactly that on purpose, to show the context going.
+  if (!source.slice(0, 4096).includes(GENERATED_MARKER)) {
+    for (const label of contextWithoutDelta(source)) {
+      warn(
+        `The MetricCard "${label}" in ${name} has a context and no delta, so its context shows nothing: context is the comparison a delta is against.`,
+        'Put the line in footnote, which always shows, or give the card the delta its context compares.',
+      );
+    }
+  }
+
   // A handler or noValidate in a case the canvas may not read. Brandi's shim takes any case, because the HTML parser
   // lowercases names before it sees them, so no preview shows this; only the source does.
   for (const m of miscasedAttributes(source)) {
@@ -960,6 +972,21 @@ export function inertWithoutIgnore(source) {
     const inert = /(^|\s)inert(\s|=|\/?$)/.test(attrs.replace(/"[^"]*"|'[^']*'/g, '""'));
     if (inert && !ignores && !open.some((o) => o.ignores)) found.push(`<${t}${attrs.trim() ? ` ${attrs.trim().slice(0, 60)}` : ''}>`);
     if (!VOID_TAGS.has(t) && !/\/\s*$/.test(attrs)) open.push({ tag: t, ignores });
+  }
+  return found;
+}
+
+/**
+ * The label of each MetricCard mounted with a context and no delta, read from the source: context shows only beside a
+ * delta, so on such a card it shows nothing. Scripts, styles and comments are not markup.
+ */
+export function contextWithoutDelta(source) {
+  const markup = String(source).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>|<!--[\s\S]*?-->/gi, '');
+  const found = [];
+  for (const [, attrs] of markup.matchAll(/<(?:x-import|dc-import)\b((?:"[^"]*"|'[^']*'|[^'">])*)>/gi)) {
+    const props = new Map([...attrs.matchAll(/([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)].map(([, n, dq, sq, bare]) => [n.toLowerCase(), dq ?? sq ?? bare ?? '']));
+    if (!/\.MetricCard$/.test(props.get('component-from-global-scope') ?? '')) continue;
+    if (props.get('context')?.trim() && !props.has('delta')) found.push(props.get('label') ?? 'with no label');
   }
   return found;
 }
