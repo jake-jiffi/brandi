@@ -126,8 +126,13 @@ shapes come from the brand. Measure each family from the brand's own work and re
 guidelines first, then its live work (website, app, signage) where the guidelines say nothing. Measure a
 drawn shape in a PDF from its path, and a live site from its computed style: `$A product measure --url
 <site>` reads the site in the installed Chrome and suggests each family and the shell with its source,
-counting only the brand's own text buttons (not app-store badges or icons). Keep what the guidelines
-settle and take the rest. Never take a shape from another brand, however good it looks.
+counting only the brand's own text buttons (not app-store badges or icons). One page can mislead: one
+site's buttons were 6px on its home page, 10px on its contact page and 7px on its locations page. Give
+`--url` once for each page, or `--follow <n>` to take n pages from the first page's navigation; each
+family is then taken across every page, and its source shows each page's own radius. A form embedded
+from another site sits in a frame the page cannot read, and the command names that frame rather than
+reporting no fields. Keep what the guidelines settle and take the rest. Never take a shape from another
+brand, however good it looks.
 
 | Family | Sets | Measure |
 | --- | --- | --- |

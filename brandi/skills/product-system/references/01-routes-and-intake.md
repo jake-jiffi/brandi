@@ -97,16 +97,20 @@ the skill, not asked.
 
 Write the answers into `product/product.json` beside the roles, and every assumption into the open
 questions with what changes if it is wrong. The CLI reads the keys it needs (`name`, `roles`,
-`displayForTitles`, `displayCase`, `charts`, `time`, `brandColours`, `shape`, `lockup`, `brand`) and
-ignores the rest.
+`displayForTitles`, `displayCase`, `charts`, `time`, `brandColours`, `shape`, `lockup`, `brand`,
+`surfaces`, `accepted`) and ignores the rest. Give each surface its board prefix (`boards`), the
+widths it is drawn at (`widths`) and, once they are known, its modules: the coverage gate holds the
+canvas to them (`08-quality-gates.md`, Coverage).
 
 ```json
 {
   "name": "Acme product system",
   "route": "B",
   "surfaces": [
-    { "name": "Ops console", "people": "Store managers", "jobs": "Approve rosters, fix sync failures", "platforms": ["web"] },
-    { "name": "Staff app", "people": "Floor staff", "jobs": "Check in, see the day", "platforms": ["ios", "android"] }
+    { "name": "Ops console", "people": "Store managers", "jobs": "Approve rosters, fix sync failures", "platforms": ["web"],
+      "boards": "Console", "widths": [1440, 820, 390], "modules": ["Rosters", "Sync"] },
+    { "name": "Staff app", "people": "Floor staff", "jobs": "Check in, see the day", "platforms": ["ios", "android"],
+      "boards": "Staff", "widths": [390] }
   ],
   "systems": [
     { "name": "[Rostering system]", "fails": ["not responding", "shift keyed outside store hours"] }

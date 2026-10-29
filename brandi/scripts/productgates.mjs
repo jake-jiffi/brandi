@@ -9,6 +9,7 @@
  *   axe        axe-core in Chrome, light and dark
  *   reflow     every fluid board and route at 320px wide: nothing scrolls sideways (WCAG 1.4.10)
  *   checks     every definition's scripted checks, real keyboard
+ *   coverage   every surface product.json lists: a board at each of its widths, a states board per module
  *
  * The judged gates (the Impeccable craft critique against Nielsen's heuristics, the ui-ux-pro-max
  * rules review) are run by reviewers, not by this file. `brandi product round` folds their results
@@ -25,6 +26,7 @@ import { pathToFileURL } from 'node:url';
 import { auditProductTokens, auditSummary, shapeKitDefaults } from './producttokens.mjs';
 import { previewArtboard, manifestFrames, declaredFrame, findChrome } from './preview.mjs';
 import { driftCheck } from './productdrift.mjs';
+import { canvasCoverage, canvasBoards } from './productcoverage.mjs';
 
 export const WIDTHS = Object.freeze([1440, 820, 390]);
 /** WCAG 1.4.10's width: 1280 at 400% zoom, and a small phone. Only reflow is measured here. */
@@ -326,6 +328,13 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   }
   log(runtime.skipped ? `canvas runtime: not run (${runtime.skipped})` : `canvas runtime: ${runtime.failed.length} of ${runtime.boards} boards with errors`);
 
+  // What the canvas has to cover, from the surfaces product.json lists: every gate above checks what was drawn,
+  // and a run that drew one surface in depth passed them all.
+  let product = {};
+  try { product = JSON.parse(readFileSync(path.join(productDir, 'product.json'), 'utf8')); } catch { /* no surfaces to hold the canvas to */ }
+  const coverage = canvasCoverage({ surfaces: product.surfaces, files: canvasBoards(path.join(productDir, 'canvas')) });
+  log(coverage.skipped ? `coverage: not checked (${coverage.skipped})` : `coverage: ${coverage.surfaces.filter((s) => !s.missing.length).length} of ${coverage.surfaces.length} surfaces covered`);
+
   const gates = {
     round,
     at: new Date().toISOString(),
@@ -340,6 +349,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     reflow,
     checks: { passed: checks.passed, failed: checks.failed },
     runtime,
+    coverage,
   };
   writeFileSync(path.join(outDir, 'gates.json'), `${JSON.stringify(gates, null, 2)}\n`);
   return gates;
@@ -360,30 +370,72 @@ function strayStatuses(findings) {
   return `${stray.length} finding${stray.length === 1 ? ' has' : 's have'} a status outside open, fixed or accepted: ${[...by].map(([status, names]) => `${status} (${names.join(', ')})`).join(', ')}, counted as open`;
 }
 
+const count = (n, word, many = `${word}s`) => `${n} ${n === 1 ? word : many}`;
+const acceptanceName = (a) => `${a?.rule ?? '(no rule)'} on ${a?.page ?? '(no page)'}`;
+
+/**
+ * Detector findings a person has accepted as recorded deviations: product.json "accepted", each entry
+ * { rule, page, selector?, reason }. A finding matches an entry with its rule, a page whose name starts with the
+ * entry's page (a board or route name, or the start of one), and a selector holding the entry's, when it gives one.
+ * A generator's finding once blocked the bar with no fix on the product's side but changing a brand decision.
+ * Returns the findings still open, the accepted ones by entry, and every entry not used: one with no rule, page or
+ * reason accepts nothing, and one matching nothing is named so a stale acceptance does not linger.
+ */
+export function acceptFindings(findings, accepted = []) {
+  if (accepted != null && !Array.isArray(accepted)) return { open: [...findings], accepted: [], unused: [{ name: 'accepted in product.json', why: 'is not a list' }] };
+  const text = (v) => typeof v === 'string' && v.trim() !== '';
+  const valid = (a) => text(a?.rule) && text(a?.page) && text(a?.reason) && (a.selector == null || typeof a.selector === 'string');
+  const entries = (accepted ?? []).filter(valid).map((entry) => ({ entry, findings: [] }));
+  const matches = (a, f) => f.rule === a.rule && String(f.page ?? '').startsWith(a.page) && (!a.selector || String(f.selector ?? '').includes(a.selector));
+  const open = [];
+  for (const f of findings) {
+    const hit = entries.find((e) => matches(e.entry, f));
+    if (hit) hit.findings.push(f);
+    else open.push(f);
+  }
+  // A finding goes to the first entry that matches it, so an entry whose every match an earlier one took is said so.
+  const why = (a) => (!valid(a) ? 'needs a rule, a page and a reason'
+    : entries.find((e) => e.entry === a).findings.length ? null
+      : findings.some((f) => matches(a, f)) ? 'accepts nothing an earlier entry has not' : 'matches no finding this round');
+  const unused = (accepted ?? []).filter(why).map((a) => ({ name: acceptanceName(a), why: why(a) }));
+  return { open, accepted: entries.filter((e) => e.findings.length), unused };
+}
+
 /**
  * Hold a round's results against the bar. `critique` is the Impeccable craft critique
- * ({ heuristics: [{ name, score }], findings: [{ severity: 'P0'..'P3', title }] }); `rules` is the
- * ui-ux-pro-max review ({ findings: [{ severity: 'Critical'|'High'|'Medium'|'Low', title }] }).
- * Returns each gate with pass or fail and why, and whether the bar is met.
+ * ({ method, heuristics: [{ name, score }], findings: [{ severity: 'P0'..'P3', title, status, where, evidence, owner,
+ * class, reason }] }); `rules` is the ui-ux-pro-max review ({ method, findings: [{ severity: 'Critical'|'High'|'Medium'
+ * |'Low', title, ... }] }); `accepted` is product.json's list of accepted detector findings.
+ * Returns each gate with pass or fail and why, whether the bar is met, and the detector findings sorted into open,
+ * accepted and acceptances not used.
  */
-export function judgeRound(gates, { critique = null, rules = null } = {}) {
+export function judgeRound(gates, { critique = null, rules = null, accepted = null } = {}) {
   const verdicts = [];
   const add = (gate, pass, detail) => verdicts.push({ gate, pass, detail });
   add('Tokens', gates.tokens.fails === 0, gates.tokens.summary);
   const differences = gates.drift?.differences;
   add('Drift', Array.isArray(differences) && differences.length === 0,
     !Array.isArray(differences) ? 'no drift check recorded for this round' : differences.length ? `${differences.length} differences between the canvas, the system and the code` : 'canvas, system and code agree; screens checked by eye are noted in the record');
-  add('Detector', !gates.detector.skipped && gates.detector.findings.length === 0 && gates.detector.errors.length === 0,
-    gates.detector.skipped ?? `${gates.detector.findings.length} findings across ${gates.detector.pages} renders at ${gates.widths.join(', ')}, light and dark`);
+  const detector = acceptFindings(gates.detector.findings, accepted);
+  const acceptedCount = detector.accepted.reduce((n, e) => n + e.findings.length, 0);
+  add('Detector', !gates.detector.skipped && detector.open.length === 0 && gates.detector.errors.length === 0,
+    `${gates.detector.skipped ?? `${count(detector.open.length, 'finding')} across ${gates.detector.pages} renders at ${gates.widths.join(', ')}, light and dark`}${acceptedCount ? `; ${acceptedCount} accepted as recorded deviations` : ''}${detector.unused.length ? `; ${count(detector.unused.length, 'acceptance')} unused: ${detector.unused.map((u) => `${u.name} ${u.why}`).join('; ')}` : ''}`);
   // A round from before the reflow measure has none to count; one that measured fails on any page that overflowed.
   const overflow = gates.reflow?.overflow?.length ?? 0;
   const unmeasured = gates.reflow?.errors?.length ?? 0;
+  // A page axe could not scan is not a clean page: the line says how many, so a board that never loads is not missed.
   add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0 && overflow === 0 && unmeasured === 0,
-    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
+    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages${gates.axe.errors ? `, ${gates.axe.errors} not scanned` : ''}; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
   // A round from before this gate has no line for it; one that could not run it has not passed it.
   if (gates.runtime) {
     add('Canvas runtime', !gates.runtime.skipped && gates.runtime.failed.length === 0,
       gates.runtime.skipped ? `not run: ${gates.runtime.skipped}` : `${gates.runtime.failed.length} of ${gates.runtime.boards} boards with errors under the Design canvas's own runtime, in a cross-origin frame`);
+  }
+  // Likewise: a round from before coverage has no line for it, and one with no surfaces to hold the canvas to fails.
+  if (gates.coverage) {
+    const short = (gates.coverage.surfaces ?? []).filter((s) => s.missing.length);
+    add('Coverage', !gates.coverage.skipped && !short.length,
+      gates.coverage.skipped ?? `${gates.coverage.surfaces.length - short.length} of ${gates.coverage.surfaces.length} surfaces covered${short.length ? `; missing: ${short.map((s) => `${s.name} (${s.missing.length})`).join(', ')}` : ''}`);
   }
   if (critique) {
     const scores = critique.heuristics ?? [];
@@ -404,7 +456,17 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
     add('Rules', false, 'no rules review recorded for this round');
   }
   add('Record', Boolean(gates.versions?.detector?.version && gates.versions?.['axe-core'] && gates.versions?.playwright), 'every tool version pinned and written down');
-  return { met: verdicts.every((v) => v.pass), verdicts };
+  return { met: verdicts.every((v) => v.pass), verdicts, detector };
+}
+
+const sentence = (s) => String(s).trim().replace(/\.+$/, '');
+const given = (v) => v != null && String(v).trim() !== '';
+
+/** One reviewed finding as the record prints it: severity, title and status, then where, evidence, owner and class when given. */
+function findingLine(f) {
+  const head = `- ${f.severity}: ${f.title}${f.status ? ` (${f.status})` : ''}`;
+  const details = [['Where', f.where], ['Evidence', f.evidence], ['Owner', f.owner], ['Class', f.class]].filter(([, v]) => given(v));
+  return details.length ? `${head}. ${details.map(([k, v]) => `${k}: ${sentence(v)}.`).join(' ')}` : head;
 }
 
 /**
@@ -427,9 +489,10 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   for (const [k, v] of Object.entries(gates.versions)) lines.push(`- ${k}: ${typeof v === 'object' && v ? `${v.version ?? ''} (${v.path ?? ''})` : v ?? 'not found'}`);
   const unscanned = [...new Set((gates.detector.unscanned ?? []).map((u) => `${u.page} (${u.reason})`))];
   if (unscanned.length) lines.push('', `The detector did not scan ${unscanned.join(', ')}, at any width; axe covered ${unscanned.length === 1 ? 'it' : 'them'}.`);
-  if (gates.detector.findings.length) {
+  const detector = judged.detector ?? { open: gates.detector.findings, accepted: [], unused: [] };
+  if (detector.open.length) {
     lines.push('', '## Detector findings', '');
-    for (const f of gates.detector.findings) lines.push(`- ${f.page} at ${f.width}, ${f.theme}: ${f.rule} on ${f.selector ?? '?'} (${f.snippet ?? ''})`);
+    for (const f of detector.open) lines.push(`- ${f.page} at ${f.width}, ${f.theme}: ${f.rule} on ${f.selector ?? '?'} (${f.snippet ?? ''})`);
   }
   if (gates.axe.results.length) {
     lines.push('', '## axe', '');
@@ -445,6 +508,13 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     lines.push('', '## Canvas runtime', '');
     for (const f of gates.runtime.failed) lines.push(`- ${f.board}: ${f.errors.join('; ')}`);
   }
+  if (gates.coverage) {
+    lines.push('', '## Coverage', '');
+    if (gates.coverage.skipped) lines.push(`Not checked: ${gates.coverage.skipped}.`);
+    for (const s of gates.coverage.surfaces ?? []) {
+      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}`);
+    }
+  }
   if (gates.shape) {
     lines.push('', '## Shape the kit chose', '');
     if (!gates.shape.kitDefaults.length) lines.push("Every shape and shell choice is the brand's, each with its source.");
@@ -459,17 +529,31 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     lines.push('', '## Failed checks', '');
     for (const f of gates.checks.failed) lines.push(`- ${f.check}: ${f.reason}`);
   }
+  // How each review ran (single-context, or isolation by procedure) goes beside its scores (08-quality-gates.md).
+  const method = (review) => (given(review.method) ? [`How it ran: ${String(review.method).trim()}`, ''] : []);
   if (critique) {
-    lines.push('', '## Craft critique', '', '| Heuristic | Score |', '| --- | --- |');
+    lines.push('', '## Craft critique', '', ...method(critique), '| Heuristic | Score |', '| --- | --- |');
     for (const h of critique.heuristics ?? []) lines.push(`| ${h.name} | ${h.score} |`);
-    for (const f of critique.findings ?? []) lines.push(`- ${f.severity}: ${f.title}${f.status ? ` (${f.status})` : ''}`);
+    for (const f of critique.findings ?? []) lines.push(findingLine(f));
   }
   if (rules) {
-    lines.push('', '## Rules review', '');
-    for (const f of rules.findings ?? []) lines.push(`- ${f.severity}: ${f.title}${f.status ? ` (${f.status})` : ''}`);
+    lines.push('', '## Rules review', '', ...method(rules));
+    for (const f of rules.findings ?? []) lines.push(findingLine(f));
+  }
+  const reviewed = [...(critique?.findings ?? []).map((f) => ['Craft', f]), ...(rules?.findings ?? []).map((f) => ['Rules', f])];
+  const deviations = [
+    ...detector.accepted.map(({ entry, findings }) => `- Detector ${entry.rule} on ${entry.page}${entry.selector ? ` (selector ${entry.selector})` : ''}, ${count(findings.length, 'finding')}: ${sentence(entry.reason)}.`),
+    ...reviewed.filter(([, f]) => f.status === 'accepted').map(([gate, f]) => `- ${gate} ${f.severity}: ${sentence(f.title)}. ${given(f.reason) ? `${sentence(f.reason)}.` : 'No reason recorded.'}`),
+  ];
+  lines.push('', '## Accepted deviations', '', ...(deviations.length ? deviations : ['None.']));
+  if (detector.unused.length) lines.push('', 'Not used from product.json "accepted":', '', ...detector.unused.map((u) => `- ${u.name}: ${u.why}`));
+  if (critique || rules) {
+    // Every finding not fixed or accepted, at any severity: a P3 or a Low may stay open, but only with an owner.
+    const open = reviewed.filter(([, f]) => !['fixed', 'accepted'].includes(f.status));
+    lines.push('', '## Still open', '', ...(open.length ? open.map(([gate, f]) => `- ${gate} ${f.severity}: ${sentence(f.title)}. Owner: ${given(f.owner) ? sentence(f.owner) : 'none named'}.`) : ['Nothing.']));
   }
   lines.push('', '## Sign-off', '', signOff ? `Signed off by ${signOff}.` : 'Not signed off.', '');
   return lines.join('\n');
 }
 
-export default { runGates, axeGate, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR };
+export default { runGates, axeGate, acceptFindings, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR };

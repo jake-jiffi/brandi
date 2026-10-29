@@ -17,7 +17,9 @@ of truth runs, and when it changed.
    picks, and the pick is recorded on the canvas.
 2. **Pages.** Every page of the pick, with the real components.
 3. **States.** A states board for the module, its title listing every state it covers, with the
-   edge cases drawn and the outside systems' failure modes among them.
+   edge cases drawn and the outside systems' failure modes among them. Add the module to its
+   surface's `modules` in `product/product.json` when it opens, so the coverage gate asks for that
+   board (`08-quality-gates.md`, Coverage); a module nobody listed can go without one unnoticed.
 4. **Gates.** A round, to the full bar.
 5. **Promote.** Anything new the module needed that another product could use goes into the system:
    a component with its README, its preview in both themes, its platform specs and its pairs. Then a

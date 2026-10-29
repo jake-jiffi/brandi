@@ -25,9 +25,9 @@ export default {
     "type TabOption = { value?: string; label: string; count?: number; countLabel?: string; attention?: boolean; icon?: IconName; id?: string }",
   ],
   props: [
-    { name: "tabs", type: "Array<string | TabOption>", doc: "Strings, or { value, label, count, countLabel, attention, icon, id, panelId }. Two to seven." },
-    { name: "value", type: "string", doc: "The open tab, read from the URL." },
-    { name: "defaultValue", type: "string", doc: "The tab open at first when nothing controls it. The first tab by default." },
+    { name: "tabs", type: "Array<string | TabOption>", doc: "Strings, or { value, label, count, countLabel, attention, icon, id, panelId }. Two to seven. A plain string takes its label as a slug for its value: Opening hours is opening-hours." },
+    { name: "value", type: "string", doc: "The open tab, read from the URL. A tab's value, so the slug for a plain string (opening-hours), never its label: a label matches nothing and the first tab opens." },
+    { name: "defaultValue", type: "string", doc: "The tab open at first when nothing controls it. The first tab by default. Like value, the slug, never the label." },
     { name: "onChange", type: "(value: string) => void", doc: "Called with the new value. Put it in the URL." },
     { name: "label", type: "string", doc: "Names the row of tabs for a screen reader: Invoice sections." },
     { name: "children", type: "ReactNode", doc: "The open tab's panel. Leave it out when the page renders the panel itself, with the tab's id and panelId." },
@@ -50,6 +50,7 @@ export default {
       "Tab enters at the open tab. Left, Right, Home and End move the selection and the focus together.",
       "Each tab has an id and a panelId, and its panel has role tabpanel and aria-labelledby, with its own focus ring.",
       "A count is read as words: Line items, 12 items. When the tabs do not fit, the row scrolls sideways and the tab in hand scrolls into view.",
+      "A tab given as a plain string takes its label as a slug for its value: Opening hours is opening-hours. value and defaultValue take that slug, never the label; a label passed there matches nothing and the first tab opens.",
     ],
     Layout: ["Underlined: a full-width row on a hairline, with the first label flush with the title above it. Focus is drawn inside the tab, because the row scrolls and would clip a ring drawn outside it."],
     States: ["The open tab takes text-strong and a 2px primary underline. An attention count takes the highlight."],
@@ -199,6 +200,8 @@ export default {
       example: "overflow",
       async run({ page, scope, expect }) {
         const list = scope.getByRole("tablist", { name: "Settings sections" })
+        // The faces first: one that loads after the row has scrolled changes every tab's width and moves the last one.
+        await page.evaluate(() => document.fonts.ready)
         expect(await list.evaluate((el) => el.scrollWidth > el.clientWidth), "the row is wider than its box")
         await scope.getByRole("tab", { selected: true }).focus()
         await page.keyboard.press("End")
@@ -209,8 +212,21 @@ export default {
           look()
         }))
         expect(selected, "End selects and focuses the last tab")
-        const [l, t] = await Promise.all([list.boundingBox(), last.boundingBox()])
-        expect(t.x >= l.x - 1 && t.x + t.width <= l.x + l.width + 1, "the last tab is in view")
+        // Both edges read in one pass in the page, and waited for: two separate box reads, once, failed under a
+        // machine loaded with other browsers while the same kit passed the rounds either side.
+        const inView = await last.evaluate((el) => new Promise((done) => {
+          const row = el.closest("[role=tablist]")
+          const start = Date.now()
+          const look = () => {
+            const l = row.getBoundingClientRect()
+            const t = el.getBoundingClientRect()
+            if (t.left >= l.left - 1 && t.right <= l.right + 1) return done("")
+            if (Date.now() - start > 3000) return done(`its edges at ${Math.round(t.left - l.left)}px and ${Math.round(t.right - l.right)}px from the row's`)
+            setTimeout(look, 25)
+          }
+          look()
+        }))
+        expect(inView === "", `the last tab is in view${inView ? ` (${inView})` : ""}`)
       },
     },
     {

@@ -25,7 +25,8 @@ for (const p of pages) {
   const page = await context.newPage()
   try {
     await page.goto(p.url, { waitUntil: p.kind === "route" ? "networkidle" : "load", timeout: 60000 })
-    if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { timeout: 20000 })
+    // Attached, not visible: a board with no height of its own (a dialog over its page) never counts as visible.
+    if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { state: "attached", timeout: 20000 })
     if (p.kind === "route") await page.waitForSelector("h1", { timeout: 10000 }).catch(() => {})
     await page.evaluate(() => document.fonts?.ready)
     await page.waitForTimeout(300)
