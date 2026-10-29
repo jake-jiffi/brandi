@@ -82,8 +82,10 @@ const Header = React.forwardRef<HTMLElement, PageHeaderProps>(function PageHeade
   return (
     <header ref={ref} data-slot="page-header" className={cn("@container/page-header flex min-w-0 flex-col gap-3", className)}>
       {breadcrumbs?.length ? <Breadcrumbs items={breadcrumbs} /> : null}
-      <div data-slot="page-header-row" className="flex min-w-0 items-start gap-6 @max-[640px]/page-header:flex-col @max-[640px]/page-header:gap-4">
-        <div className="flex min-w-0 flex-1 flex-col gap-1 @max-[640px]/page-header:w-full">
+      {/* On a phone the row wraps: actions with a labelled control fill a row of their own under the title, but
+          icon buttons alone (the overflow, once the primary has gone to the foot) stay at the end of the title's row. */}
+      <div data-slot="page-header-row" className="flex min-w-0 items-start gap-6 @max-[640px]/page-header:flex-wrap @max-[640px]/page-header:gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
             {/* Focusable from script only, so focus can land here after an action removes what had it. */}
             {/* A display face set in capitals keeps them for short titles; a long one reads in its own case, since
@@ -116,7 +118,7 @@ const Header = React.forwardRef<HTMLElement, PageHeaderProps>(function PageHeade
           ) : null}
         </div>
         {hasActions ? (
-          <div data-slot="page-header-actions" className="flex shrink-0 flex-wrap items-center gap-2 @max-[640px]/page-header:w-full">
+          <div data-slot="page-header-actions" className="flex shrink-0 flex-wrap items-center gap-2 @max-[640px]/page-header:has-[:is(a,button,input,select,textarea):not([data-size^=icon])]:w-full">
             {actions}
             {bar ? null : primary}
           </div>

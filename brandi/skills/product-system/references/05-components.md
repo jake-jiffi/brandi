@@ -906,16 +906,17 @@ by itself under 420px. As lines it holds a receipt: order lines, fees and a tota
   `{ label, value, empty }`, any of them with `total`). `layout` (`columns`, `stacked`, `lines`).
 - **Layout.** `lines` keeps each label and its value on one line at any width, a phone's included:
   the value at the end, in tabular figures, on the label's first line, and a long label wraps
-  beside it. A value takes up to two thirds of the line; a longer one wraps there. No hairlines
-  between lines. An item with `total` sits under a rule in `line-strong`, label and value in
-  `text-strong`.
+  beside it. A value takes up to two thirds of the line; a longer one wraps there and reads
+  left-aligned, its box still at the end of the line. No hairlines between lines. An item with
+  `total` sits under a rule in `line-strong`, label and value in `text-strong`.
 - **Rules.** Labels in `text-subtle`, values in `text`; in `lines` the label is the line itself, so
   it takes `text`. A missing value says so ("Not set"), never blank. An item with a value and a
   badge shows both, the value first. Order lines, a receipt or a price breakdown are `lines`: List,
   DataTable and `columns` all put the value under its label on a phone.
 - **Review.** An item with both dropped its value. A checkout's order lines read as a form at
   358px, each price under its label and left-aligned, so a run drew its receipt by hand (a proof
-  run, round 2).
+  run, round 2). A value that wrapped in `lines` read right-aligned, ragged on the left (a proof
+  run, round 3).
 
 #### Timeline
 
@@ -1249,14 +1250,17 @@ and Tabs underneath.
 
 - **Contract.** `title`, `description`, `breadcrumbs`. `actions` (the secondary ones). `primary`
   (the one primary action). `meta` (badges, such as SampleBadge). `children` (Tabs).
-- **Layout.** On phones the actions drop below the title, and inside AppShell `primary` moves to the
-  bar at the foot. Long titles wrap.
+- **Layout.** On phones actions with a labelled control drop below the title and fill the row, and
+  inside AppShell `primary` moves to the bar at the foot. Icon buttons alone, such as the overflow
+  that is left once the primary has moved, stay at the end of the title's row, never on a row of
+  their own. Long titles wrap.
 - **Rules.** One title per screen, the page's only `h1`, in the title style. The title is the noun
   people use ("Clients", "[Client name]"), never "Dashboard". One primary at most, on the right.
   Where the display face is set in capitals (`displayCase`), a title over 40 characters reads in
   the face's own case: a long line of capitals is hard going, and the detector reports it as
   all-caps body text.
-- **Review.** Long names overflowed the phone title (round 3).
+- **Review.** Long names overflowed the phone title (round 3). Once the primary moved to the foot,
+  the overflow sat alone on a row under the title (a proof run, round 3).
 
 #### Breadcrumbs
 

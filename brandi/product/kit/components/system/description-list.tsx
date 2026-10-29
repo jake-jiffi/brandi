@@ -77,8 +77,9 @@ export const DescriptionList = React.forwardRef<HTMLDListElement, DescriptionLis
               "min-w-0",
               item.total ? "type-label text-text-strong" : "type-body text-text",
               // A value never gives way to its label, up to two thirds of the line; past that a long one wraps
-              // there rather than pushing the line off a phone.
-              lines ? "max-w-2/3 shrink-0 text-end tabular-nums wrap-anywhere" : "wrap-anywhere"
+              // there rather than pushing the line off a phone. The box sits at the end, but its text starts each
+              // line at the left, so a wrapped value reads as a paragraph; a one-line value fills its box either way.
+              lines ? "max-w-2/3 shrink-0 text-start tabular-nums wrap-anywhere" : "wrap-anywhere"
             )}
           >
             {loading ? (
