@@ -3110,6 +3110,20 @@ function starterIllustrationLines(ill) {
   ];
 }
 
+/**
+ * A brand with no drawn logo, as the starter says it: which files the record names and nobody has drawn, and how to
+ * add them. The stand-in is the kit's, never a mark made for the brand, so the starter only says what to do.
+ */
+function starterStandInLines(b) {
+  return [
+    `lib/brand.ts: ${b.name} has no drawn logo yet, so it carries the kit's stand-in mark (a rounded square and the letters PRODUCT) under the name "${b.name}", and says in the file that it is not the brand's logo. ${b.character ? 'With the character.' : `${b.name} has no character, so Character draws nothing.`}`,
+    b.missing.length
+      ? `  Not drawn yet: ${b.missing.join(', ')}, which ${b.from} names. Looked for in the brand folder and the project root.`
+      : '  No logo on record: brand.json names no primary logo file, and product.json names no marks.',
+    `  To add it: put the brand's outlined artwork ${b.missing.length ? 'at that path' : 'in brand.json\'s identity.logo.files'}, make one with the logo forge (\`brandi logo plan\` to \`brandi logo master\`), or set an interim typeset wordmark (\`brandi logo wordmark\`, brand-system references/08-logo-system.md section 7). Or name the files in product.json's brand.marks. Then run \`brandi product starter\` again.`,
+  ];
+}
+
 function productAuditLines(audit) {
   const lines = [auditSummary(audit)];
   for (const f of audit.fails) {
@@ -3315,12 +3329,13 @@ async function cmdProduct(flags, positional) {
       ...res.kept.map((k) => `  kept ${k}: it no longer carries the generated marker, so it is the product's own`),
       ...(res.retired?.removed ?? []).map((r) => `  removed ${r}: the kit no longer has it, and nobody had changed it`),
       ...(res.retired?.kept ?? []).map((r) => `  kept ${r}: the kit dropped it, but it has changed since the kit wrote it. Remove it if it is only the kit's old copy`),
-      res.brand ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
+      res.brand && !res.placeholder ? `lib/brand.ts: ${res.brand.marks.join(', ')}${res.brand.character ? ', the character' : ''}, from ${res.brand.from}${res.brand.kept.length ? `. Kit defaults for ${res.brand.kept.join(', ')}` : ''}.` : '',
+      ...(res.placeholder ? starterStandInLines(res.brand) : []),
+      ...(!res.placeholder && res.brand?.missing?.length ? [`  Not drawn yet, so left out: ${res.brand.missing.join(', ')}. Put each file where ${res.brand.from} says and run the starter again.`] : []),
       ...(res.brand?.refused ?? []).map((r) => `  Not used: ${r}`),
       ...(res.brand?.inkPoses?.length ? [`  Drawn in one ink, so they take the text colour on dark: ${res.brand.inkPoses.join(', ')}.`] : []),
       ...(res.brand?.notes ?? []).map((n) => `  Logo: ${n}.`),
       ...starterIllustrationLines(res.brand?.illustrations),
-      res.placeholder ? "lib/brand.ts still holds the kit's placeholder mark. Name the brand's marks in product.json (brand.marks) or record a logo master." : '',
       '',
       res.fresh ? `Next: npm install in ${rel}, then \`brandi product bundle\`.` : flags.kit ? 'Copied the kit\'s components and tools again, and rewrote the generated files. Next: `brandi product bundle`.' : 'Generated files only. Pass --kit to copy the kit\'s components and tools again.',
     ].join('\n'), { ok: true, identity, fresh: res.fresh, files: res.written, kept: res.kept, retired: res.retired, starter: rel });

@@ -113,7 +113,49 @@ describe('where the marks come from', () => {
     assert.deepEqual(fromBrand.files, { full: 'brand/logo/master/primary.svg' });
     assert.equal(fromBrand.inkFrom, 'brand/logo/master/mono-black.svg');
     assert.deepEqual(fromBrand.logo, { clearSpace: 0.5, minLongSide: 80 });
-    assert.equal(brandSources({ product: {}, brand: null }), null);
+    assert.deepEqual(brandSources({ product: {}, brand: null }).files, {}, 'neither names a mark, so the stand-in carries it');
+  });
+
+  test("a logo the record names before anyone has drawn it never stops the starter: a missing file is listed, and with no full logo the kit's stand-in carries the brand's name", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-undrawn-'));
+    await mkdir(path.join(dir, 'brand', 'assets', 'logos'), { recursive: true });
+    const record = (files) => ({ meta: { name: 'Acme' }, identity: { logo: { files, clearSpace: 'equal to the height of the letter A', minSizes: [{ variant: 'Primary', screenPx: 140 }] } } });
+    const from = (files) => brandSources({ product: {}, brand: record(files), productDir: path.join(dir, 'product'), brandRoot: dir });
+    // A brand stage documents a logo before it is drawn; the run that met one stopped with "does not exist" and wrote nothing.
+    const none = brandConstant(from([{ path: 'assets/logos/acme-primary.svg', role: 'primary' }]));
+    assert.equal(none.placeholder, true);
+    assert.deepEqual(none.missing, ['assets/logos/acme-primary.svg']);
+    assert.match(none.source, /export const BRAND: Brand = \{\n  name: "Acme",\n  marks: STAND_IN_MARKS,\n  logo: \{ height: 24, minHeight: 16, symbolMinHeight: 16, clearSpace: 0\.25 \},\n\}/, "the stand-in, at the kit's sizes: the record's numbers are for the mark nobody has drawn");
+    assert.match(none.source, /\/\/ Not the brand's logo\. Acme has no drawn mark yet[\s\S]*assets\/logos\/acme-primary\.svg/, 'the file says the mark is not the brand\'s, and which file is missing');
+    assert.doesNotMatch(none.source, /character: \{/, 'and draws no character the brand never had');
+    // The full logo drawn and the others not: the drawn one is used, and the rest are left out and named.
+    await writeFile(path.join(dir, 'brand', 'assets', 'logos', 'acme-primary.svg'), WIDE);
+    const some = brandConstant(from([{ path: 'assets/logos/acme-primary.svg', role: 'primary' }, { path: 'assets/logos/acme-reversed.svg', role: 'mono-white' }, { path: 'assets/logos/acme-black.svg', role: 'mono-black' }]));
+    assert.equal(some.placeholder, false);
+    assert.deepEqual(some.marks, ['full']);
+    assert.deepEqual(some.missing, ['assets/logos/acme-reversed.svg', 'assets/logos/acme-black.svg']);
+    assert.match(some.source, /\/\/ Not drawn yet, so left out: assets\/logos\/acme-reversed\.svg, assets\/logos\/acme-black\.svg\./);
+    // A file product.json names is the product's own pick, so one missing there still stops it, naming the file.
+    assert.throws(() => brandConstant(brandSources({ product: { brand: { marks: { full: 'assets/acme.svg' } } }, brand: null, productDir: path.join(dir, 'product') })), /assets\/acme\.svg does not exist/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("with no logo on record anywhere, lib/brand.ts still carries the brand's name, and a character only when the brand names one", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-nologo-'));
+    const bare = brandConstant({ ...brandSources({ product: {}, brand: null, productDir: dir }), name: 'Acme' });
+    assert.equal(bare.placeholder, true);
+    assert.deepEqual(bare.missing, []);
+    assert.equal(bare.character, false);
+    assert.match(bare.source, /name: "Acme",\n  marks: STAND_IN_MARKS,/);
+    assert.match(bare.source, /with no logo on record/);
+    assert.doesNotMatch(bare.source, /character: \{/, "no placeholder character: a product showed one its brand never had");
+    // A character product.json names comes through without any marks.
+    await writeFile(path.join(dir, 'wave.svg'), '<svg viewBox="0 0 10 10"><path d="M1 1h9" fill="#2E7D32"/></svg>');
+    const drawn = brandConstant(brandSources({ product: { brand: { name: 'Acme', character: { name: '[Acme drawings]', poses: { welcome: 'wave.svg' } } } }, brand: null, productDir: dir }));
+    assert.equal(drawn.placeholder, true);
+    assert.equal(drawn.character, true);
+    assert.match(drawn.source, /name: "Acme",[\s\S]*character: \{\n    name: "\[Acme drawings\]",/);
+    await rm(dir, { recursive: true, force: true });
   });
 
   test("brand.json's paths are read from the brand folder, and free-text roles find the master, the dark-ground file and the one ink", async () => {
@@ -281,6 +323,15 @@ describe('lib/brand.ts', () => {
     assert.equal((second.match(/export const BRAND/g) ?? []).length, 1);
     assert.match(second, /name: "Two"/);
     assert.equal(brandModule('export const BRAND = mine\n', 'anything'), null, "a file without either marker is the product's own");
+  });
+
+  test("the stand-in mark sits with the types, so a brand with no drawn logo keeps it while the kit's own brand and character go", async () => {
+    const kit = await readFile(path.join(KIT, 'lib', 'brand.ts'), 'utf8');
+    const file = brandModule(kit, brandConstant({ from: null, name: 'Acme', files: {}, logo: {} }).source);
+    assert.match(file, /export const STAND_IN_MARKS: Brand\["marks"\] = \{/);
+    assert.equal(file.includes('// PLACEHOLDER.'), false, "the kit's own brand is gone");
+    assert.doesNotMatch(file, /const figure|name: "Placeholder"/, 'and its character with it');
+    assert.equal((file.match(/export const BRAND\b/g) ?? []).length, 1);
   });
 });
 

@@ -1,4 +1,5 @@
-// Character's one definition. The kit carries a placeholder pack (lib/brand.ts) with five poses, one in a single ink.
+// Character's one definition. The kit carries a placeholder pack (lib/brand.ts) with five poses, one in a single ink; a
+// starter carries the brand's own pack, or none when the brand has no character.
 const STATES = ["welcome", "working", "done", "caught-up", "needs-person", "nothing-found", "could-not-load", "help"]
 // A Character the check mounts itself, in a pose this brand's pack has ("missing": one it lacks), so the
 // checks run on any brand's pack, drawn or still. Resolves to the pose mounted, or null when there is none.
@@ -19,6 +20,9 @@ const mount = (page, want, props = {}) =>
     [want, props, STATES]
   )
 const mounted = (page) => page.locator('#check-mount [data-slot="character"]')
+// Whether the bundle was built with a pack holding any pose: a brand with none draws no character anywhere.
+const hasPack = (page) =>
+  page.evaluate(() => Object.keys(Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.character?.poses ?? {}).length > 0)
 const pose = (name, caption) =>
   `<div class="flex flex-col items-center gap-2"><x-import component-from-global-scope="NS.Character" pose="${name}"></x-import><span class="type-meta text-text-muted">${caption}</span></div>`
 
@@ -40,6 +44,7 @@ export default {
       "A pose in a colour, or in more than one, keeps its own colours, so on a dark ground it can lose contrast or glare: the pack has no dark rendition. Keep such a pose off dark grounds, or ask the brand for one drawn for them. A still (PNG, JPEG, WebP) is a picture and keeps its colours too.",
       "Its loop never runs under reduced motion, and stops or starts when the setting changes while it is on screen.",
       "Renders nothing when the brand has no character, or no pose for the moment.",
+      "A brand with no character draws none, and its card says so in place of the poses: the words carry every moment.",
     ],
     Rules: [
       "One per screen, and only in empty, loading, done, error, welcome and help moments. Never in tables, forms or a busy dashboard.",
@@ -49,17 +54,21 @@ export default {
     ],
   },
   frame: { width: 960, height: 760 },
+  logic: `hasCharacter: Object.keys(NS.BRAND.character?.poses ?? {}).length > 0,
+    noCharacter: !Object.keys(NS.BRAND.character?.poses ?? {}).length,
+    brandName: NS.BRAND.name`,
   examples: [
     {
       id: "poses",
       title: "The pack's poses",
-      markup: `<div class="flex flex-wrap items-end gap-10">
+      markup: `<sc-if value="{{hasCharacter}}"><div class="flex flex-wrap items-end gap-10">
 ${pose("welcome", "welcome")}
 ${pose("working", "working")}
 ${pose("done", "done")}
 ${pose("nothing-found", "nothing-found")}
 ${pose("help", "help, in one ink")}
-</div>`,
+</div></sc-if>
+<sc-if value="{{noCharacter}}"><p class="type-body max-w-measure text-text-muted">{{brandName}} has no character, so Character draws nothing, here or in the product. The words beside it carry each moment, as the examples below show.</p></sc-if>`,
     },
     {
       id: "moment",
@@ -93,9 +102,20 @@ ${pose("help", "help, in one ink")}
       name: "It is decoration, hidden from screen readers",
       async run({ page, expect }) {
         const characters = page.locator('[data-slot="character"]')
-        expect.atLeast(await characters.count(), 1, "characters on the board")
+        // A brand with no character has none to draw: wanting one failed a characterless brand's Accessibility gate.
+        if (await hasPack(page)) expect.atLeast(await characters.count(), 1, "characters on the board")
+        else expect.equal(await characters.count(), 0, "characters drawn for a brand with no character")
         for (const c of await characters.all()) expect.equal(await c.getAttribute("aria-hidden"), "true", "hidden from screen readers")
         expect.equal(await page.getByRole("img").count(), 0, "images a screen reader would announce")
+      },
+    },
+    {
+      name: "A brand with no character says so on its card, in place of the poses",
+      example: "poses",
+      async run({ page, scope, expect }) {
+        const pack = await hasPack(page)
+        expect.equal(await scope.getByText("has no character, so Character draws nothing").count(), pack ? 0 : 1, "the words saying the brand has no character")
+        if (!pack) expect.equal(await scope.getByText("help, in one ink").count(), 0, "captions for poses that are not there")
       },
     },
     {

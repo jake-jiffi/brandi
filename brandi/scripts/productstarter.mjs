@@ -243,26 +243,27 @@ const PENDING = '.brandi/starter-pending';
 export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null, brand = null, brandRoot = null, brandDir, productDir = null }) {
   let files;
   let src;
-  let generated = null;
+  let generated;
   let textureFrom = null;
   try {
     files = generatedFiles(tokens, identity);
-    // The brand's marks and character, from its own files. Without any, the kit's placeholder stays.
+    // The brand's marks and character, from its own files. With no logo drawn yet, the kit's stand-in mark carries the
+    // brand's own name, and a character only when the brand has one: a run's product showed the kit's "Product" and
+    // its placeholder figure.
     src = brandSources({ product, brand, productDir, brandRoot, brandDir });
-    if (src) {
-      // Pose stills go into the bundle drawn down, so boards on the canvas show them too. Headless Chrome can miss
-      // one under load, so each gets three tries; one it never draws goes in at full size rather than as a path.
-      const stills = new Map();
-      for (const rel of [...Object.values(src.character?.poses ?? {}), ...Object.values(src.character?.flat ?? {})]) {
-        const still = path.resolve(src.base, rel);
-        if (/\.(png|jpe?g|webp)$/i.test(rel) && existsSync(still) && !stills.has(still)) {
-          let uri = null;
-          for (let i = 0; i < 3 && !uri; i++) uri = await shrinkStill(still);
-          if (uri) stills.set(still, uri);
-        }
+    src.name ??= brandName ?? identity.name;
+    // Pose stills go into the bundle drawn down, so boards on the canvas show them too. Headless Chrome can miss
+    // one under load, so each gets three tries; one it never draws goes in at full size rather than as a path.
+    const stills = new Map();
+    for (const rel of [...Object.values(src.character?.poses ?? {}), ...Object.values(src.character?.flat ?? {})]) {
+      const still = path.resolve(src.base, rel);
+      if (/\.(png|jpe?g|webp)$/i.test(rel) && existsSync(still) && !stills.has(still)) {
+        let uri = null;
+        for (let i = 0; i < 3 && !uri; i++) uri = await shrinkStill(still);
+        if (uri) stills.set(still, uri);
       }
-      generated = brandConstant(src, { stills });
     }
+    generated = brandConstant(src, { stills });
     const texture = textureMove(tokens);
     if (texture) {
       textureFrom = productDir ? path.join(productDir, texture.file) : null;
@@ -314,13 +315,15 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   written.push('components/system/index.ts');
   const kept = [];
   let brandMarks = null;
-  if (generated) {
-    const file = path.join(out, 'lib', 'brand.ts');
-    // A starter made before the kit had lib/brand.ts takes the types from the kit's copy.
-    const current = readFileSync(existsSync(file) ? file : path.join(kit, 'lib', 'brand.ts'), 'utf8');
-    const next = brandModule(current, generated.source);
-    if (next) { writeFileSync(file, next); written.push('lib/brand.ts'); brandMarks = { ...generated, from: src.from, notes: src.notes ?? [], illustrations: src.illustrations ?? null }; } else kept.push('lib/brand.ts');
-  }
+  const brandFile = path.join(out, 'lib', 'brand.ts');
+  const kitBrand = path.join(kit, 'lib', 'brand.ts');
+  // A starter made before the kit had lib/brand.ts takes the types from the kit's copy, and so does one made before
+  // the types carried the stand-in mark, when it needs it: BRAND would name a constant the file lacks.
+  let current = readFileSync(existsSync(brandFile) ? brandFile : kitBrand, 'utf8');
+  if (generated.placeholder && !current.includes('export const STAND_IN_MARKS') && brandModule(current, '')) current = readFileSync(kitBrand, 'utf8');
+  const next = brandModule(current, generated.source);
+  // The record's minimum and clear space are not said for the stand-in: they belong to the mark nobody has drawn.
+  if (next) { writeFileSync(brandFile, next); written.push('lib/brand.ts'); brandMarks = { ...generated, from: src.from, name: src.name, notes: generated.placeholder ? [] : src.notes ?? [], illustrations: src.illustrations ?? null }; } else kept.push('lib/brand.ts');
   // Impeccable's context files. Rewritten while they carry the marker; once a person or Impeccable
   // has taken one over (the marker gone), it is theirs and left alone.
   const defs = await loadDefinitions(path.join(out, 'components', 'system'));
@@ -331,7 +334,7 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
     written.push(rel);
   }
   rmSync(pending, { force: true });
-  return { fresh, written, kept, retired, brand: brandMarks, placeholder: !src };
+  return { fresh, written, kept, retired, brand: brandMarks, placeholder: Boolean(brandMarks?.placeholder) };
 }
 
 /**
