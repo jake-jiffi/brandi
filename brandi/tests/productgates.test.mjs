@@ -22,7 +22,8 @@ const clean = () => ({
   axe: { pages: 120, violations: 0, errors: 0, results: [] },
   checks: { passed: 210, failed: [] },
 });
-const critique = (scores, findings = []) => ({ heuristics: scores.map((score, i) => ({ name: `H${i + 1}`, score })), findings });
+// Every score under 4 carries what cost the point, as the Craft gate asks (08-quality-gates.md, The round record).
+const critique = (scores, findings = []) => ({ heuristics: scores.map((score, i) => ({ name: `H${i + 1}`, score, ...(score < 4 && { note: `ConsoleHome1440: what cost H${i + 1} its point` }) })), findings });
 const rules = (findings) => ({ findings });
 
 describe('a round held against the bar', () => {
@@ -263,28 +264,35 @@ describe('what the round record holds about the reviews', () => {
     assert.match(md, /## Still open\n\n- Craft P3: Title clipped at 390\. Owner: Sam\.\n- Craft P3: Tight gap in the rail\. Owner: none named\.\n- Rules Low: Long label wraps\. Owner: Jo\.\n/);
   });
 
-  test('a heuristic under 4 carries a note naming what cost the point, printed beside its score; the Craft line names any without one', () => {
+  test('a heuristic under 4 carries a note naming what cost the point, printed beside its score; one without fails the Craft gate, named', () => {
     // A run scored five heuristics 3 of 4 with no reason for any: nobody could tell where the points went, or what
-    // the next round should fix.
+    // the next round should fix. Naming them failed nothing, so a score with no reason could still meet the bar.
     const c = reviewed().critique;
     c.heuristics[7].note = 'AcmeHome390 | the title clipped at 390 (C1)';
     c.heuristics[8].note = '  ';
     const judged = judgeRound(clean(), { critique: c, rules: rules([]) });
     const craft = judged.verdicts.find((v) => v.gate === 'Craft');
-    assert.equal(craft.pass, true, 'a missing note is reported, as a finding missing its fields is, and fails nothing');
+    assert.equal(craft.pass, false, 'a lost point with no reason cannot be acted on in the next round');
+    assert.equal(judged.met, false);
     assert.match(craft.detail, /; under 4 with no note on what cost the point: H9, H10$/);
     const md = roundMarkdown(clean(), judged, { critique: c });
     assert.match(md, /\| Heuristic \| Score \| What cost the point \|\n\| --- \| --- \| --- \|\n\| H1 \| 4 \|  \|\n/);
     assert.match(md, /\| H8 \| 3 \| AcmeHome390 \\\| the title clipped at 390 \(C1\) \|\n\| H9 \| 3 \|  \|/);
     for (const h of c.heuristics) h.note ??= 'evidence';
     c.heuristics[8].note = 'ConsoleRosters1440: the approve button sits below the fold (C3)';
-    assert.doesNotMatch(judgeRound(clean(), { critique: c, rules: rules([]) }).verdicts.find((v) => v.gate === 'Craft').detail, /no note/, 'nothing said when every score under 4 has its note');
+    const noted = judgeRound(clean(), { critique: c, rules: rules([]) }).verdicts.find((v) => v.gate === 'Craft');
+    assert.equal(noted.pass, true, 'every score under 4 has its note');
+    assert.doesNotMatch(noted.detail, /no note/, 'nothing said when every score under 4 has its note');
+    const full = critique([4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
+    assert.equal(judgeRound(clean(), { critique: full, rules: rules([]) }).verdicts.find((v) => v.gate === 'Craft').pass, true, 'a 4 needs no note');
   });
 
-  test('a record written before these fields still judges and prints as it did', () => {
-    const c = critique(scores, [{ severity: 'P2', title: 'Old finding', status: 'fixed' }]);
+  test('a record written before these fields still judges and prints as it did, but for a lost point with no note', () => {
+    const c = critique(scores.map(() => 4), [{ severity: 'P2', title: 'Old finding', status: 'fixed' }]);
     const judged = judgeRound(clean(), { critique: c, rules: rules([]) });
     assert.equal(judged.met, true);
+    const old = { heuristics: scores.map((score, i) => ({ name: `H${i + 1}`, score })), findings: [] };
+    assert.equal(judgeRound(clean(), { critique: old, rules: rules([]) }).met, false, 'a 3 from before the notes has no reason either');
     const md = roundMarkdown(clean(), judged, { critique: c, rules: rules([]) });
     assert.match(md, /\n- P2: Old finding \(fixed\)\n/);
     assert.match(md, /\| Heuristic \| Score \|\n\| --- \| --- \|\n/, 'the scores table keeps its two columns when no heuristic has a note');
@@ -516,7 +524,7 @@ describe('a board with no height of its own', () => {
   // A dialog drawn over its page (06-canvas.md) puts everything in a wrapper at position: absolute; inset: 0, so the
   // document has no height and html never counts as visible. Waiting for a visible html[data-dc-ready] left that
   // board unscanned at every width, by axe and by reflow, for two rounds.
-  const flat = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A dialog</title></head><body style="margin:0"><x-dc><div style="position:absolute;inset:0;overflow:hidden"><main><h1>A dialog over its page</h1><p>Some text.</p></main></div></x-dc><script>setTimeout(() => document.documentElement.setAttribute("data-dc-ready", ""), 200)</script></body></html>';
+  const flat = '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A dialog</title></head><body style="margin:0"><x-dc><div style="position:absolute;inset:0;overflow:hidden"><main><h1>A dialog over its page</h1><p>Some text.</p></main></div></x-dc><script src="/runtime/dc-shim.js"></script><script>setTimeout(() => document.documentElement.setAttribute("data-dc-ready", ""), 200)</script></body></html>';
   const list = (base) => [{ kind: 'board', label: 'DialogOverPage1440', url: `${base}/flat`, width: 1440, height: 900, theme: 'light' }];
   const serve = (url) => (url === '/flat' ? flat : null);
 
@@ -530,6 +538,30 @@ describe('a board with no height of its own', () => {
     const run = await axePagesOn(serve, (base) => list(base).map((p) => ({ ...p, width: 320, height: 800 })), 'reflow-pages.mjs');
     assert.equal(run.result('DialogOverPage1440').error, undefined, run.result('DialogOverPage1440').error);
     assert.equal(run.result('DialogOverPage1440').overflow, false);
+  });
+
+  // A board with nothing to mount renders without the runtime, so nothing ever marks it ready: axe and reflow waited
+  // for the mark on any page with <x-dc>, as measure-boards.mjs once did, and left every static board unscanned
+  // after 20 seconds. Only a page that loads the shim waits, and a board the shim could not draw says so at once. A
+  // board that mounts components but rendered without the runtime (React not fetched, offline) is no static board:
+  // read as one, its unmounted tags would pass.
+  const boards = {
+    '/unmounted': '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>An unmounted board</title></head><body style="margin:0"><x-dc><main><h1>Mounts a component</h1><x-import component-from-global-scope="Acme.Button">Go</x-import></main></x-dc></body></html>',
+    '/static': '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A static board</title></head><body style="margin:0"><x-dc><main><h1>Drawn in plain markup</h1><p>Nothing to mount.</p></main></x-dc></body></html>',
+    '/failed': '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>A broken board</title></head><body style="margin:0"><x-dc><main><h1>Mounts a component</h1></main></x-dc><script src="/runtime/dc-shim.js"></script><script>document.documentElement.setAttribute("data-dc-error", "boom")</script></body></html>',
+  };
+  const both = (base, width) => Object.keys(boards).map((p) => ({ kind: 'board', label: p, url: `${base}${p}`, width, height: 800, theme: 'light' }));
+
+  test('a static board is scanned and measured with no ready mark; one the shim could not draw, or that rendered without it, fails at once, saying why', needsKit, async () => {
+    const axe = await axePagesOn((url) => boards[url] ?? null, (base) => both(base, 1440));
+    assert.equal(axe.result('/static').error, undefined, axe.result('/static').error);
+    assert.match(axe.result('/failed').error ?? '', /^the board did not render: boom$/);
+    assert.match(axe.result('/unmounted').error ?? '', /^the board mounts components and rendered without its runtime/);
+    const reflow = await axePagesOn((url) => boards[url] ?? null, (base) => both(base, 320), 'reflow-pages.mjs');
+    assert.equal(reflow.result('/static').error, undefined, reflow.result('/static').error);
+    assert.equal(reflow.result('/static').overflow, false);
+    assert.match(reflow.result('/failed').error ?? '', /^the board did not render: boom$/);
+    assert.match(reflow.result('/unmounted').error ?? '', /^the board mounts components and rendered without its runtime/);
   });
 
   test('a page axe could not scan fails the Accessibility gate, and its line says how many', () => {

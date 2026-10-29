@@ -10,7 +10,8 @@
  *   reflow     every fluid board and route at 320px wide: nothing scrolls sideways (WCAG 1.4.10)
  *   checks     every definition's scripted checks, real keyboard
  *   sizes      every board's frame against its content, and no box on a board hiding its own content
- *   coverage   every surface product.json lists: a board at each of its widths, a states board per module
+ *   coverage   every surface product.json lists: a board at each of its widths, a states board per module, and
+ *              each core page on a board or skipped with a reason
  *
  * The judged gates (the Impeccable craft critique against Nielsen's heuristics, the ui-ux-pro-max
  * rules review) are run by reviewers, not by this file. `brandi product round` folds their results
@@ -498,10 +499,12 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
       z.skipped ? `not run: ${z.skipped}` : faults.length ? faults.join('; ') : `every frame fits its content on ${count(z.boards, 'board')}, and nothing on a board hides its own content`);
   }
   // Likewise: a round from before coverage has no line for it, and one with no surfaces to hold the canvas to fails.
+  // A surface with modules that names no core pages yet passes, and the line says it was not checked.
   if (gates.coverage) {
     const short = (gates.coverage.surfaces ?? []).filter((s) => s.missing.length);
+    const unchecked = (gates.coverage.surfaces ?? []).filter((s) => s.core?.unchecked);
     add('Coverage', !gates.coverage.skipped && !short.length,
-      gates.coverage.skipped ?? `${gates.coverage.surfaces.length - short.length} of ${gates.coverage.surfaces.length} surfaces covered${short.length ? `; missing: ${short.map((s) => `${s.name} (${s.missing.length})`).join(', ')}` : ''}`);
+      gates.coverage.skipped ?? `${gates.coverage.surfaces.length - short.length} of ${gates.coverage.surfaces.length} surfaces covered${short.length ? `; missing: ${short.map((s) => `${s.name} (${s.missing.length})`).join(', ')}` : ''}${unchecked.length ? `; core pages unchecked on ${unchecked.map((s) => s.name).join(', ')} until product.json names them` : ''}`);
   }
   if (critique) {
     const scores = critique.heuristics ?? [];
@@ -510,9 +513,10 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
     const open = (critique.findings ?? []).filter((f) => BAR.critiqueOpen.includes(f.severity) && !['fixed', 'accepted'].includes(f.status));
     const stray = strayStatuses(critique.findings ?? []);
     // A score under 4 says what cost the point (08-quality-gates.md): five heuristics at 3 with no reason left nobody
-    // knowing where the points went. Named, not failed, as a finding missing its fields prints with less to say.
+    // knowing where the points went, and a lost point with no reason cannot be acted on in the next round. Each one
+    // without a note fails the gate, named.
     const unexplained = scores.filter((h) => h.score < 4 && !given(h.note));
-    add('Craft', scores.length === 10 && total >= BAR.craftTotal && !low.length && !open.length,
+    add('Craft', scores.length === 10 && total >= BAR.craftTotal && !low.length && !open.length && !unexplained.length,
       `${total}/40 on ${scores.length} heuristics${low.length ? `; under ${BAR.craftMinimum}: ${low.map((h) => h.name).join(', ')}` : ''}${open.length ? `; open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : ''}${stray ? `; ${stray}` : ''}${unexplained.length ? `; under 4 with no note on what cost the point: ${unexplained.map((h) => h.name).join(', ')}` : ''}`);
   } else {
     add('Craft', false, 'no critique recorded for this round');
@@ -594,7 +598,10 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
       ...(s.reused?.length ? [`a written pattern reused for ${s.reused.join(', ')}`] : []),
     ].map((t) => `; ${t}`).join('');
     for (const s of gates.coverage.surfaces ?? []) {
-      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}${trail(s)}`);
+      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}${trail(s)}${s.core?.unchecked ? '; core pages unchecked until product.json names them (06-canvas.md)' : ''}`);
+      // Each core page on its board, and each skip with its reason, so a reviewer can open the screen or question the skip.
+      if (s.core?.named?.length) lines.push(`  - Core pages: ${s.core.named.map((n) => `${n.pattern} on ${n.board}`).join(', ')}`);
+      if (s.core?.skipped?.length) lines.push(`  - Skipped: ${s.core.skipped.map((k) => `${k.pattern} (${sentence(k.reason)})`).join(', ')}`);
     }
   }
   if (gates.shape) {

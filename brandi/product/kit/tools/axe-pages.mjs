@@ -62,8 +62,18 @@ for (const p of pages) {
   try {
     await page.goto(p.url, { waitUntil: route ? "networkidle" : "load", timeout: 60000 })
     // Attached, not visible: a dialog drawn over its page (06-canvas.md) leaves the document no height, so html never
-    // counts as visible, and waiting for that left the board unscanned at every width.
-    if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { state: "attached", timeout: 20000 })
+    // counts as visible, and waiting for that left the board unscanned at every width. Only a board drawn through the
+    // runtime shim says it is ready, or that it failed, as measure-boards.mjs reads it: a static board has no runtime
+    // and never says, and waiting for it left every one unscanned after 20 seconds.
+    if (await page.$("script[src*='dc-shim']")) {
+      await page.waitForSelector("html[data-dc-ready], html[data-dc-error]", { state: "attached", timeout: 20000 })
+      const failed = await page.evaluate(() => document.documentElement.getAttribute("data-dc-error"))
+      if (failed) throw new Error(`the board did not render: ${failed}`)
+    } else if (await page.$("x-import, dc-import, sc-for, sc-if")) {
+      // Its unmounted tags are no static board: offline, with React not yet fetched, a board renders without the
+      // runtime, and scanned as it stands it would pass.
+      throw new Error("the board mounts components and rendered without its runtime: React could not be fetched, so connect once and run the gates again")
+    }
     // A route is scanned as people meet it: hydrated, measured and settled, not as the server's first draft.
     // Every page has one h1, and a streamed page's loading skeleton has none, so wait for it. Under load a
     // record page was still streaming after network idle, and axe reported a page with no heading. A page

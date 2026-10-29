@@ -237,7 +237,9 @@ and read as failures.
 
 The core page patterns (home, records, list and detail, record, report, settings, create and edit,
 setup, the assistant, sign in) and the first real product's screens, drawn on the canvas with the
-real components. Every module gets a states board. Every hard screen gets options A to D, each title
+real components. Each surface with modules names, under `pages` in `product.json`, the board that
+shows each pattern, or skips it with a reason: the coverage gate fails a pattern neither named nor
+skipped. Every module gets a states board. Every hard screen gets options A to D, each title
 naming its weakness, then the pick on record. Hard means no written pattern covers it yet: the first
 module of a surface with modules draws a set, the pick goes into the screen patterns, and later
 modules reuse it, drawing a set of their own only when it does not fit. The round record says which

@@ -10,14 +10,14 @@ reviewers are briefed, and what goes in the record.
 | Gate | Pass |
 | --- | --- |
 | Detector | No findings at 1440, 820 and 390 wide, in light and dark: every component preview, every starter route and state, every canvas board |
-| Craft (Impeccable critique) | 34/40 or better on Nielsen's ten heuristics, none under 3, no P0, P1 or P2 open |
+| Craft (Impeccable critique) | 34/40 or better on Nielsen's ten heuristics, none under 3, each under 4 with a note on what cost the point, no P0, P1 or P2 open |
 | Rules (ui-ux-pro-max) | No Critical, High or Medium open |
 | Accessibility | axe clean on every page, none left unscanned, every image loaded; nothing scrolls sideways at 320px wide on a fluid board or route; every scripted behaviour check passing |
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree (`09-operate.md`) |
 | Canvas runtime | Every board renders without an error under the Design canvas's own runtime, in a cross-origin frame (`06-canvas.md` step 3) |
 | Board sizes | Every board's frame fits its content, a page at its whole height, and nothing on a board hides its own content (Board sizes, below) |
-| Coverage | Every surface `product.json` lists has a board at each of its widths and a states board for each of its modules (Coverage, below) |
+| Coverage | Every surface `product.json` lists has a board at each of its widths and a states board for each of its modules, and a surface with modules shows each core page on a board or skips it with a reason (Coverage, below) |
 | Record | Every tool's version pinned and written down |
 
 The two review scales map onto one another, so "nothing Medium or above" means the same thing in
@@ -59,8 +59,14 @@ more, and do not lower the bar to finish.
    when the page scrolls sideways; no detector or axe there, just the overflow, with what sticks out
    named in the record. Both wait for a board to say it is ready (`data-dc-ready` on `html`), not
    for it to be visible: a dialog drawn over its page (`06-canvas.md`) has no height of its own, so
-   it never counts as visible, and that board went unscanned at every width for two rounds. A page
-   axe could not scan fails the Accessibility gate, and its line says how many ("6 not scanned").
+   it never counts as visible, and that board went unscanned at every width for two rounds. Only a
+   board drawn through the runtime shim says it is ready, or that it failed (`data-dc-error`, which
+   the record prints as "the board did not render"). A static board, with nothing to mount, renders
+   without the runtime and never says, so it is scanned and measured as it loads. Waiting for it
+   left every static board unscanned after 20 seconds. A board that mounts components but rendered
+   without the runtime (offline, with React not yet fetched) is not static: it fails unscanned,
+   since its bare tags would pass. A page axe could not scan fails the Accessibility gate, and its
+   line says how many ("6 not scanned").
    Every board is also measured once against its frame (Board sizes, below). The summary the
    command prints ends with a line for every machine gate, the canvas runtime and board sizes
    included: one run's board failed under the canvas runtime and only a progress line said so.
@@ -101,6 +107,7 @@ depth and almost nothing of the website, the app or the messages, and every gate
 | `boards` | The prefix every board of the surface starts with (`06-canvas.md`, Names): `"Console"` | The surface's name in PascalCase, `OpsConsole`. Set a short one |
 | `widths` | The widths the surface is drawn at: `[1440, 820, 390]` for a console, `[390]` for a phone app | The three checked widths |
 | `modules` | The surface's modules: `["Rosters", "Opening hours"]` | None |
+| `pages` | Each core page pattern (`04-written-system.md`, Screen patterns) and the board that shows it, or `{ "skip": "why" }`: `{ "Home": "ConsoleHome1440", "Setup": { "skip": "stores are set up by head office" } }` | Unchecked, and the Coverage line says so, on a surface with modules. Nothing to check on one without |
 
 Each surface needs at least one board at each of its widths (the width is the last number in a
 board's name, before `Dark`), and each module a states board: a board whose name holds the prefix,
@@ -111,10 +118,27 @@ cannot share a prefix. The Coverage line names what is missing, and the record l
 surface. Add each new module to its surface's `modules` when it opens (`09-operate.md`), so the gate
 asks for its states board.
 
+A surface with modules (a console, or an app with areas of its own) is also held to the ten core
+page patterns. They are Home, Records, List and detail, Record, Report, Settings, Create and edit,
+Setup, The assistant and Sign in, the names `04-written-system.md` gives them. A key matches without
+its case or a leading "the". Its `pages` names the board that shows each, one of the surface's own
+boards on the canvas, or skips the pattern with a reason. Coverage fails on a pattern neither named
+nor skipped, a board not on the canvas or of another surface, a skip with no reason, or a name that
+is no pattern. Each is listed by surface.
+
+A run drew no create and edit screen at all, every gate passed, and its craft review then lost
+points on error prevention and user control, which those screens carry. A `product.json` from before
+the key stays valid: its Coverage line says which surfaces' core pages are unchecked until it names
+them. A surface without modules (a marketing site, messages) has none to check unless it names its
+own. The gates read `pages` when they run, so name each page as its board is drawn, before
+`$A product gates`.
+
 The record's Coverage section also says, surface by surface, which modules drew options A to D and
 which reused a written pattern (`06-canvas.md`, section 4), read from the option boards' names: a
 module with two or more boards ending in a letter before the width (`ConsoleRostersC1440`) drew a
-set. It is a record, not a pass or a fail: a module that reused a pattern needs nothing drawn.
+set. It is a record, not a pass or a fail: a module that reused a pattern needs nothing drawn. Under
+each surface it lists each core page on its board and each skip with its reason, so a reviewer can
+open the screen or question the skip.
 
 ## Board sizes
 
@@ -283,8 +307,8 @@ reviewer's report beside it, then turn the two judged reports into the files the
 `critique.json` holds all ten heuristics. Each one scored under 4 carries a `note` saying what cost
 the point: the board, route or finding that took it, so the next round knows what to fix. One run
 scored five heuristics 3 of 4 and gave no reason for any, and nobody could tell where the points
-went. The Craft line names every heuristic under 4 with no note, and `record.md` prints each note
-beside its score; a missing note fails nothing, as a finding missing its fields fails nothing.
+went. A score under 4 with no note fails the Craft gate, named on its line: a lost point with no
+reason cannot be acted on in the next round. `record.md` prints each note beside its score.
 `rules.json` holds `findings` alone, with ui-ux-pro-max's severities. Both carry:
 
 - `method`: how the review ran, in a sentence: single-context, or isolation by procedure (Reviewers
@@ -295,7 +319,8 @@ beside its score; a missing note fails nothing, as a finding missing its fields 
   keyboard path behind it), `owner` (who fixes it, or owns it while it stays open) and `class`
   (kit, generator, gate, reference or brand only: `09-operate.md`, After every round).
 
-A record written before these fields still judges and prints, with less to say. Then
+A record written before these fields still judges and prints, with less to say, but a score under 4
+still needs its note. Then
 `$A product round --round N --critique critique.json --rules rules.json --sign-off "<name>"` holds
 every gate against the bar and writes `record.md` and `record.json`. It exits 1 until the bar is
 met. `record.md` prints each review's method above its scores, each finding with its where,
@@ -309,8 +334,9 @@ carries, with a summary row in the quality-gates section:
 - Scores per gate (critique /40 with each heuristic and, under 4, what cost the point; audit /20),
   and whether each ran single-context.
 - Detector findings by target, axe results, behaviour check counts, the token audit line.
-- Coverage: each surface, its prefix, how many boards it has, what it is missing, and which modules
-  drew options and which reused a written pattern.
+- Coverage: each surface, its prefix, how many boards it has, what it is missing, which modules
+  drew options and which reused a written pattern, and each core page on its board or skipped with
+  its reason.
 - Board sizes: each frame off its content, each box that hides content, each board not measured.
 - Findings by severity, each with its status and evidence.
 - Accepted deviations, each with its reason.

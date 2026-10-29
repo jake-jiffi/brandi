@@ -1,7 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
-import { canvasCoverage, surfacePrefix, boardWidth, moduleWords, DEFAULT_WIDTHS } from '../scripts/productcoverage.mjs';
+import { canvasCoverage, surfacePrefix, boardWidth, moduleWords, DEFAULT_WIDTHS, CORE_PAGES } from '../scripts/productcoverage.mjs';
 import { judgeRound, roundMarkdown, WIDTHS } from '../scripts/productgates.mjs';
 
 const surfaces = [
@@ -70,6 +71,59 @@ describe('the canvas covers every surface the product ships on', () => {
   });
 });
 
+describe('the core pages a surface with modules shows', () => {
+  // A run drew no create and edit screen at all and met the bar: coverage checked widths and states boards only, and
+  // its craft review then lost points on error prevention and user control, which those screens carry.
+  const app = (pages) => ({ name: 'Ops console', boards: 'Console', widths: [1440], modules: ['Rosters'], pages });
+  const drawn = ['Main.dc.html', 'ConsoleHome1440.dc.html', 'ConsoleRosters1440.dc.html', 'ConsoleRoster1440.dc.html', 'ConsoleRostersStates1440.dc.html', 'ConsoleReport1440.dc.html', 'ConsoleSettings1440.dc.html', 'ConsoleRosterEdit1440Dark.dc.html', 'ConsoleSignIn1440.dc.html', 'StaffHome390.dc.html'];
+  const all = {
+    Home: 'ConsoleHome1440', Records: 'ConsoleRosters1440', 'List and detail': { skip: 'no queue: each roster is opened from its list' },
+    Record: 'ConsoleRoster1440.dc.html', Report: 'ConsoleReport1440', Settings: 'ConsoleSettings1440', 'Create and edit': 'ConsoleRosterEdit1440Dark',
+    Setup: { skip: 'stores are set up by head office, outside the product' }, 'the assistant': { skip: 'the console has no assistant yet' }, 'Sign in': 'ConsoleSignIn1440',
+  };
+
+  test('the patterns are the ten 04-written-system.md teaches, in its order, so the gate and the written system say the same thing', async () => {
+    const text = await readFile(new URL('../skills/product-system/references/04-written-system.md', import.meta.url), 'utf8');
+    const block = text.slice(text.indexOf('The ten core patterns:'), text.indexOf('A product that needs a page none of these covers'));
+    assert.deepEqual([...block.matchAll(/^ {2}- \*([^*]+?)\.?\*/gm)].map((m) => m[1]), [...CORE_PAGES]);
+  });
+
+  test('each pattern named on a board of the surface or skipped with a reason covers it, and the skips keep their reasons', () => {
+    const s = canvasCoverage({ surfaces: [app(all)], files: drawn }).surfaces[0];
+    assert.deepEqual(s.missing, []);
+    assert.deepEqual(s.core.named.map((n) => `${n.pattern} ${n.board}`), ['Home ConsoleHome1440', 'Records ConsoleRosters1440', 'Record ConsoleRoster1440', 'Report ConsoleReport1440', 'Settings ConsoleSettings1440', 'Create and edit ConsoleRosterEdit1440Dark', 'Sign in ConsoleSignIn1440']);
+    assert.deepEqual(s.core.skipped, [
+      { pattern: 'List and detail', reason: 'no queue: each roster is opened from its list' },
+      { pattern: 'Setup', reason: 'stores are set up by head office, outside the product' },
+      { pattern: 'The assistant', reason: 'the console has no assistant yet' },
+    ], 'a key is matched without its case or a leading "the"');
+  });
+
+  test('a pattern neither named nor skipped, named on a board not on the canvas or of another surface, or skipped with no reason fails, as does a name that is no pattern', () => {
+    const { 'Create and edit': _ce, Report: _r, ...rest } = all;
+    const pages = { ...rest, Settings: 'ConsoleSettings820', Home: 'StaffHome390', Setup: { skip: ' ' }, Help: 'ConsoleHome1440' };
+    const cov = canvasCoverage({ surfaces: [app(pages), { name: 'Staff app', boards: 'Staff', widths: [390] }], files: drawn });
+    assert.equal(cov.covered, false);
+    assert.deepEqual(cov.surfaces[0].missing, [
+      'core pages neither named nor skipped: Report, Create and edit (under the surface\'s pages in product.json, name the board that shows each, as "Report": "ConsoleReport1440", or skip it with { "skip": "why the surface has none" })',
+      'Home is named on StaffHome390, which is not a Console board',
+      'Settings is named on ConsoleSettings820, which is not on the canvas',
+      'Setup is skipped with no reason: say why the surface has none',
+      'pages names Help, which is not a core pattern (04-written-system.md, Screen patterns: Home, Records, List and detail, Record, Report, Settings, Create and edit, Setup, The assistant, Sign in)',
+    ]);
+    assert.deepEqual(cov.surfaces[1].missing, [], 'the other surface is listed apart');
+  });
+
+  test('a surface with modules and no pages is still covered, its core pages unchecked; one with neither has nothing to check', () => {
+    const cov = canvasCoverage({ surfaces: [app(undefined), { name: 'Staff app', boards: 'Staff', widths: [390] }], files: drawn });
+    assert.equal(cov.covered, true);
+    assert.deepEqual(cov.surfaces[0].core, { unchecked: true, named: [], skipped: [], missing: [] });
+    assert.equal(cov.surfaces[1].core, null);
+    const opted = canvasCoverage({ surfaces: [{ name: 'Staff app', boards: 'Staff', widths: [390], pages: { Home: 'StaffHome390' } }], files: drawn }).surfaces[0];
+    assert.match(opted.missing[0] ?? '', /^core pages neither named nor skipped: Records, List and detail/, 'a surface that names its pages is held to all ten');
+  });
+});
+
 describe('coverage as a gate', () => {
   const clean = () => ({
     round: 2, at: '2026-10-29T00:00:00.000Z', widths: [...WIDTHS],
@@ -84,7 +138,7 @@ describe('coverage as a gate', () => {
     const judged = judgeRound(g);
     const verdict = judged.verdicts.find((v) => v.gate === 'Coverage');
     assert.equal(verdict.pass, false);
-    assert.match(verdict.detail, /^1 of 3 surfaces covered; missing: Ops console \(1\), Email and messaging \(1\)$/);
+    assert.match(verdict.detail, /^1 of 3 surfaces covered; missing: Ops console \(1\), Email and messaging \(1\); core pages unchecked on Ops console until product\.json names them$/);
     const md = roundMarkdown(g, judged);
     assert.match(md, /## Coverage\n\n- Ops console \(Console\*, 7 boards\): no states board for the Menu module/);
     assert.match(md, /- Staff app \(Staff\*, 1 board\): covered at 390\n/);
@@ -94,7 +148,22 @@ describe('coverage as a gate', () => {
     const g = clean();
     g.coverage = canvasCoverage({ surfaces: surfaces.slice(0, 1), files: [...files, 'ConsoleMenuStates1440.dc.html', ...['A', 'B', 'C', 'D'].map((l) => `ConsoleOpeningHours${l}1440.dc.html`)] });
     const md = roundMarkdown(g, judgeRound(g));
-    assert.match(md, /- Ops console \(Console\*, 12 boards\): covered at 1440, 820, 390, with a states board for Rosters, Opening hours, Menu; options A to D for Opening hours; a written pattern reused for Rosters, Menu\n/);
+    assert.match(md, /- Ops console \(Console\*, 12 boards\): covered at 1440, 820, 390, with a states board for Rosters, Opening hours, Menu; options A to D for Opening hours; a written pattern reused for Rosters, Menu; core pages unchecked until product\.json names them \(06-canvas\.md\)\n/);
+  });
+
+  test('the record prints each core page on its board and each skip with its reason, and the Coverage line says which surfaces left them unchecked', () => {
+    const named = { name: 'Ops console', boards: 'Console', widths: [1440], modules: ['Menu'], pages: {
+      Home: 'ConsoleHome1440', Records: 'ConsoleMenu1440', 'List and detail': { skip: 'no queue.' }, Record: 'ConsoleMenu1440', Report: { skip: 'figures live in the head office tool' },
+      Settings: 'ConsoleShell820', 'Create and edit': 'ConsoleMenu1440', Setup: { skip: 'set up by head office' }, 'The assistant': { skip: 'none yet' }, 'Sign in': 'ConsoleHome390' } };
+    const g = clean();
+    g.coverage = canvasCoverage({ surfaces: [named, { name: 'Tablet tool', boards: 'Staff', widths: [390], modules: ['Shifts'] }], files: [...files, 'ConsoleMenuStates1440.dc.html', 'StaffShiftsStates390.dc.html'] });
+    const judged = judgeRound(g);
+    const verdict = judged.verdicts.find((v) => v.gate === 'Coverage');
+    assert.equal(verdict.pass, true, 'unchecked is not missing');
+    assert.equal(verdict.detail, '2 of 2 surfaces covered; core pages unchecked on Tablet tool until product.json names them');
+    const md = roundMarkdown(g, judged);
+    assert.match(md, /- Ops console \(Console\*, \d+ boards\): covered at 1440, with a states board for Menu; a written pattern reused for Menu\n {2}- Core pages: Home on ConsoleHome1440, Records on ConsoleMenu1440, Record on ConsoleMenu1440, Settings on ConsoleShell820, Create and edit on ConsoleMenu1440, Sign in on ConsoleHome390\n {2}- Skipped: List and detail \(no queue\), Report \(figures live in the head office tool\), Setup \(set up by head office\), The assistant \(none yet\)\n/);
+    assert.match(md, /- Tablet tool \(Staff\*, 2 boards\): covered at 390, with a states board for Shifts; a written pattern reused for Shifts; core pages unchecked until product.json names them \(06-canvas\.md\)\n/);
   });
 
   test('a covered canvas passes, and a round from before the gate has no line for it', () => {

@@ -25,8 +25,16 @@ for (const p of pages) {
   const page = await context.newPage()
   try {
     await page.goto(p.url, { waitUntil: p.kind === "route" ? "networkidle" : "load", timeout: 60000 })
-    // Attached, not visible: a board with no height of its own (a dialog over its page) never counts as visible.
-    if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { state: "attached", timeout: 20000 })
+    // Attached, not visible: a board with no height of its own (a dialog over its page) never counts as visible. Only a
+    // board drawn through the runtime shim says it is ready or failed; a static board never says, so it is not waited on.
+    if (await page.$("script[src*='dc-shim']")) {
+      await page.waitForSelector("html[data-dc-ready], html[data-dc-error]", { state: "attached", timeout: 20000 })
+      const failed = await page.evaluate(() => document.documentElement.getAttribute("data-dc-error"))
+      if (failed) throw new Error(`the board did not render: ${failed}`)
+    } else if (await page.$("x-import, dc-import, sc-for, sc-if")) {
+      // A board that needed the runtime and rendered without it (React not fetched, offline) is no static board.
+      throw new Error("the board mounts components and rendered without its runtime: React could not be fetched, so connect once and run the gates again")
+    }
     if (p.kind === "route") await page.waitForSelector("h1", { timeout: 10000 }).catch(() => {})
     await page.evaluate(() => document.fonts?.ready)
     await page.waitForTimeout(300)

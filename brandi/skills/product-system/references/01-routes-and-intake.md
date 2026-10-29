@@ -104,13 +104,25 @@ canvas to them (`08-quality-gates.md`, Coverage). A surface with no `widths` is 
 widths, which suit pages. Messages are read at their own widths, so a messaging surface names them:
 an email at 600, a notification on a 390 phone.
 
+A surface with modules (a console, or an app with areas of its own) also gets `pages` once its
+boards are drawn. It names each of the ten core page patterns, as `04-written-system.md` (Screen
+patterns) names them, with the board that shows it. A pattern the surface does not have is skipped
+with `{ "skip": "why" }`: a product with no queue has no list and detail. A marketing site or
+messages have no modules and need no `pages`. Until a surface with modules has the key, the gates
+say its core pages are unchecked. Once it has it, a pattern neither named nor skipped fails the
+round (`06-canvas.md`, Every core page).
+
 ```json
 {
   "name": "Acme product system",
   "route": "B",
   "surfaces": [
     { "name": "Ops console", "people": "Store managers", "jobs": "Approve rosters, fix sync failures", "platforms": ["web"],
-      "boards": "Console", "widths": [1440, 820, 390], "modules": ["Rosters", "Sync"] },
+      "boards": "Console", "widths": [1440, 820, 390], "modules": ["Rosters", "Sync"],
+      "pages": { "Home": "ConsoleHome1440", "Records": "ConsoleRosters1440", "List and detail": "ConsoleSync1440",
+        "Record": "ConsoleRoster1440", "Report": "ConsoleReport1440", "Settings": "ConsoleSettings1440",
+        "Create and edit": "ConsoleRosterEdit1440", "Setup": { "skip": "stores are set up by head office, outside the product" },
+        "The assistant": "ConsoleAsk1440", "Sign in": "ConsoleSignIn1440" } },
     { "name": "Staff app", "people": "Floor staff", "jobs": "Check in, see the day", "platforms": ["ios", "android"],
       "boards": "Staff", "widths": [390] },
     { "name": "Messages", "people": "Store managers", "jobs": "Know a roster needs approving", "platforms": ["email", "ios", "android"],

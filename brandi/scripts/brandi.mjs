@@ -3030,15 +3030,17 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       --serve builds and starts the starter and scans tools/routes.json, or
       --route names a running page (once for each). Holds the canvas to the
       surfaces product.json lists (a board at each width, a states board for
-      each module), measures every board's frame against its content, and
-      leaves out detector findings product.json "accepted" records with a
-      reason. Writes product/rounds/round-N/gates.json with every tool
+      each module, and on a surface with modules each core page on the board
+      its "pages" names, or skipped with a reason), measures every board's
+      frame against its content, and leaves out detector findings
+      product.json "accepted" records with a reason. Writes product/rounds/round-N/gates.json with every tool
       version, and heights.json with the height each board's frame wants.
 
   brandi product round --round N [--critique <file>] [--rules <file>] [--sign-off <name>]
       Fold the craft critique (Nielsen's ten, from Impeccable) and the rules
-      review (ui-ux-pro-max) into the round, hold every gate against the bar,
-      and write record.md and record.json: each review's method, each finding
+      review (ui-ux-pro-max) into the round, hold every gate against the bar
+      (each heuristic under 4 needs a note on what cost the point), and
+      write record.md and record.json: each review's method, each finding
       with where, evidence, owner and class, the accepted deviations with
       their reasons, and what is still open with its owner. Exits 1 until the
       bar is met.
