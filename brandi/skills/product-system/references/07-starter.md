@@ -70,7 +70,13 @@ since a brand stage writes them as free text ("secondary: black logo outline rev
 White, reversed or knocked out is `full-on-dark`. Black, mono or one colour is the one ink, an SVG
 only. A role saying primary is `full`. An exact role (`primary`, `mono-white`, `mono-black`, as the logo forge
 writes) wins over a match, white is read before black, and a ground the role names ("on black") is not
-an ink. A value the record lacks keeps the kit default, and the file says which. A symbol more than
+an ink. The record's `identity.logo.variants` are read the same way, by name, for whatever
+`identity.logo.files` lacks: a variant's bare file name is looked for beside the master. A name for
+the symbol alone ("Mark only", "Symbol alone", never "Wordmark only") is `symbol`, and its colour
+words give `symbol-on-dark` and `symbol-ink`; the symbol's family and the full logo's never mix, so a
+reversed symbol is not the full logo's dark-ground file. A test brand's "Mark only" and "Reversed" sat
+only in its variants, and its `BRAND` had no symbol. A variant named there and not drawn is listed like
+any other missing file. A value the record lacks keeps the kit default, and the file says which. A symbol more than
 1.5 times as wide as it is tall is left out, and the file says why (`02-brand-to-product.md`, a mark for
 narrow places). A pose drawn in one dark ink is turned to `currentColor`, so it reads on a dark ground,
 and the file names those poses. The tight-viewBox wordmark files ship in `public/brand/`, for email and
@@ -95,6 +101,25 @@ beside the brand's name in words, so every screen names the brand and none names
 sign-in and booking pages said PRODUCT and never the brand, and its review marked it down. The
 brand's own logo replaces both on the next run.
 
+**A brand whose logo is one coloured file.** Many brands arrive with the full-colour logo and nothing
+else: no reversed file, no one ink. Without a one ink the logo kept its light-ground colours on a dark
+ground and in forced colours, and three Logo checks failed on the first run. So when the brand has no
+`full-ink` (or `symbol-ink`), the starter makes one from the brand's own file, every ink turned to
+`currentColor`. That is the recolour `brandi assets` uses for a brand's black and white files
+(`<brandi>/skills/brand-system/references/08-logo-system.md` section 6.1), never a redraw. It does
+this only where the mark stays itself in one ink. A picture cannot take the text colour. A gradient
+or a pattern has no one ink to become. A mask that reads lightness changes with the colour. And a
+near-white part of a mark drawn for light grounds shows only where it sits on another of its inks, so
+in one ink it fills in. Each derived rendition is named as derived in `lib/brand.ts` and in what the
+starter prints, with what to ask the brand for: its own one-ink SVG, and a version for dark grounds
+when it has none, quoting the record's one-colour rule (`identity.logo.monochrome.rule`), which a
+recolour does not apply. On a dark ground `Logo` draws the brand's dark-ground file, else the single
+ink in the text colour. A logo that cannot be recoloured gets no single ink. The starter says why, and
+the Logo checks fail naming the file the brand has to supply (a reversed file, role `mono-white`, or a
+one-ink SVG, role `mono-black`) rather than a rendition name. If the brand approves its full-colour
+logo on dark grounds as it is, say so in product.json's `brand.marks`, naming that file as both `full`
+and `full-on-dark` (the sizes then come from `brand.logo`).
+
 **A brand with no character.** `BRAND` has a character only when product.json's `brand.character`
 names one, or a drawing in the illustration library carries a moment's own name. Otherwise there is
 none, and the starter says so: a run's product showed the kit's placeholder figure, a character its
@@ -104,7 +129,9 @@ brand never had. Character then draws nothing, and its card says the brand has n
 **The minimum and the clear space, on route A.** The minimum is the `identity.logo.minSizes` entry for
 the mark the starter draws: the one whose variant names its file in `identity.logo.variants`, or one
 named for the primary that names no other file. Without one it is `identity.logo.minSize`. A run's
-minimum sat only in `minSizes`, and the starter drew the logo under it, at the kit's 16px.
+minimum sat only in `minSizes`, and the starter drew the logo under it, at the kit's 16px. The
+symbol's minimum is only the entry whose variant names the symbol's file, never the primary's, so a
+"Mark only" at 24px is not raised to a wide logo's floor.
 Clear space is read when it is a multiple, a fraction or a percentage of the logo's height or width:
 "half the height of the mark", "25% of the logo's height", "twice the height of the logo". A rule
 measured by a part of the mark ("one e of the signature", the cap height) cannot be, since that

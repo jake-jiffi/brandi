@@ -132,7 +132,7 @@ describe('where the marks come from', () => {
     await writeFile(path.join(dir, 'brand', 'assets', 'logos', 'acme-primary.svg'), WIDE);
     const some = brandConstant(from([{ path: 'assets/logos/acme-primary.svg', role: 'primary' }, { path: 'assets/logos/acme-reversed.svg', role: 'mono-white' }, { path: 'assets/logos/acme-black.svg', role: 'mono-black' }]));
     assert.equal(some.placeholder, false);
-    assert.deepEqual(some.marks, ['full']);
+    assert.deepEqual(some.marks, ['full', 'full-ink'], 'the one ink made from the drawn logo until the brand\'s own is drawn');
     assert.deepEqual(some.missing, ['assets/logos/acme-reversed.svg', 'assets/logos/acme-black.svg']);
     assert.match(some.source, /\/\/ Not drawn yet, so left out: assets\/logos\/acme-reversed\.svg, assets\/logos\/acme-black\.svg\./);
     // A file product.json names is the product's own pick, so one missing there still stops it, naming the file.
@@ -191,7 +191,7 @@ describe('where the marks come from', () => {
     // A path written from the project root, as an older brand file may, still resolves there.
     const rooted = brandSources({ product: {}, brand: { identity: { logo: { files: [{ path: 'brand/assets/logos/primary.svg', role: 'Primary logo' }] } } }, brandRoot: dir });
     assert.equal(rooted.base, dir);
-    assert.deepEqual(brandConstant(rooted).marks, ['full']);
+    assert.deepEqual(brandConstant(rooted).marks, ['full', 'full-ink']);
     await rm(dir, { recursive: true, force: true });
   });
 
@@ -201,11 +201,11 @@ describe('where the marks come from', () => {
     await writeFile(path.join(dir, 'signature.svg'), '<svg viewBox="0 0 238 100"><path d="M0 0h238v100H0z" fill="#1F6F4A"/></svg>');
     await writeFile(path.join(dir, 'square.svg'), '<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="#1F6F4A"/></svg>');
     const wide = brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: { full: 'full.svg', symbol: 'signature.svg', 'symbol-ink': 'signature.svg' }, logo: {} });
-    assert.deepEqual(wide.marks, ['full'], 'no symbol rendition is kept');
+    assert.deepEqual(wide.marks, ['full', 'full-ink'], 'no symbol rendition is kept, nor one made from it');
     assert.match(wide.refused.join(' '), /symbol .*2\.38 times as wide as it is tall/);
     assert.match(wide.source, /\/\/ Not a symbol: /, 'lib/brand.ts says why');
     const square = brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: { full: 'full.svg', symbol: 'square.svg' }, logo: {} });
-    assert.deepEqual(square.marks, ['full', 'symbol']);
+    assert.deepEqual(square.marks, ['full', 'symbol', 'full-ink', 'symbol-ink']);
     assert.deepEqual(square.refused, []);
     await rm(dir, { recursive: true, force: true });
   });
@@ -238,6 +238,112 @@ describe('where the marks come from', () => {
     assert.match(out.source, /"full-ink": "<svg fill=\\"currentColor\\"/);
     assert.throws(() => brandConstant({ from: 'product.json', files: { full: 'missing.svg' }, base: dir }), /missing\.svg does not exist/);
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe('a brand whose logo is one coloured file', () => {
+  // A green mark beside a near-black wordmark: the logo most brands arrive with, and nothing else.
+  const TWO_INKS = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48"><circle cx="24" cy="24" r="20" fill="#2E7D32"/><path d="M60 12h120v24H60z" fill="#1C1B1A"/></svg>';
+  const SQUARE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#2E7D32"/></svg>';
+  const record = (logo = {}) => ({ meta: { name: 'Acme' }, identity: { logo: {
+    files: [{ path: 'assets/logos/acme-primary.svg', role: 'primary' }],
+    variants: [
+      { name: 'Primary horizontal', file: 'acme-primary.svg' },
+      { name: 'Wordmark only', file: 'acme-wordmark.svg' },
+      { name: 'Mark only', file: 'acme-mark.svg' },
+      { name: 'Reversed', file: 'acme-reversed.svg' },
+    ],
+    minSizes: [{ variant: 'Primary horizontal', screenPx: 140 }, { variant: 'Mark only', screenPx: 24 }],
+    monochrome: { rule: 'One ink, no tints. The droplets become outlines.' },
+    ...logo,
+  } } });
+  const logos = async (files) => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-onefile-'));
+    await mkdir(path.join(dir, 'brand', 'assets', 'logos'), { recursive: true });
+    for (const [name, svg] of Object.entries(files)) await writeFile(path.join(dir, 'brand', 'assets', 'logos', name), svg);
+    return dir;
+  };
+  const mark = (out, key) => JSON.parse(new RegExp(`"${key}": ("(?:[^"\\\\]|\\\\.)*")`).exec(out.source)[1]);
+
+  test("its one ink is made from that file, every ink turned to the text colour, and lib/brand.ts and the starter say it is derived and what to ask the brand for", async () => {
+    const dir = await logos({ 'acme-primary.svg': TWO_INKS });
+    const out = brandConstant(brandSources({ product: {}, brand: record(), productDir: path.join(dir, 'product'), brandRoot: dir }));
+    // Without it the logo kept its light-ground colours on a dark ground and in forced colours, and three Logo checks failed.
+    assert.deepEqual(out.marks, ['full', 'full-ink']);
+    assert.doesNotMatch(mark(out, 'full-ink'), /#2E7D32|#1C1B1A/i, 'neither of its inks is left');
+    assert.match(mark(out, 'full-ink'), /fill="currentColor"/);
+    assert.match(out.derived.join('\n'), /full-ink, made from assets\/logos\/acme-primary\.svg/);
+    assert.match(out.source, /\/\/ Derived, not the brand's own file: full-ink, made from assets\/logos\/acme-primary\.svg/);
+    const asked = out.asks.join('\n');
+    assert.match(asked, /one-ink SVG.*mono-black/, 'its own one ink');
+    assert.match(asked, /dark grounds.*mono-white/, 'and its file for dark grounds, since the derived ink stands in there too');
+    assert.match(asked, /One ink, no tints\. The droplets become outlines\./, 'quoting the one-colour rule a recolour does not apply');
+    assert.match(out.source, /\/\/ Ask the brand for /);
+    // The brand's own one-ink file is used as it is, and nothing is derived or asked.
+    const own = await logos({ 'acme-primary.svg': TWO_INKS, 'acme-black.svg': TWO_INKS.replace(/#2E7D32|#1C1B1A/g, '#000000'), 'acme-reversed.svg': TWO_INKS.replace(/#2E7D32|#1C1B1A/g, '#ffffff') });
+    const ownOut = brandConstant(brandSources({ brand: record({ files: [{ path: 'assets/logos/acme-primary.svg', role: 'primary' }, { path: 'assets/logos/acme-black.svg', role: 'mono-black' }] }), productDir: path.join(own, 'product'), brandRoot: own }));
+    assert.deepEqual(ownOut.marks, ['full', 'full-on-dark', 'full-ink']);
+    assert.deepEqual([ownOut.derived, ownOut.asks], [[], []]);
+    await rm(dir, { recursive: true, force: true });
+    await rm(own, { recursive: true, force: true });
+  });
+
+  test('a logo one ink cannot be made from is left without one, and the starter says why and what the brand needs to supply', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-noink-'));
+    const cases = {
+      // White parts show only where they sit on the mark's other inks: in one ink they fill in.
+      'knockout.svg': ['<svg viewBox="0 0 100 40"><rect width="100" height="40" fill="#2E7D32"/><path d="M10 10h80v20H10z" fill="#FFFFFF"/></svg>', /white|#ffffff/i],
+      'gradient.svg': ['<svg viewBox="0 0 100 40"><defs><linearGradient id="g"><stop offset="0" stop-color="#2E7D32"/><stop offset="1" stop-color="#1C1B1A"/></linearGradient></defs><rect width="100" height="40" fill="url(#g)"/></svg>', /gradient/],
+    };
+    for (const [file, [svg, why]] of Object.entries(cases)) {
+      await writeFile(path.join(dir, file), svg);
+      const out = brandConstant({ from: 'brand.json', name: 'Acme', base: dir, files: { full: file }, logo: {}, record: true });
+      assert.deepEqual(out.marks, ['full'], `${file}: no one ink made`);
+      assert.deepEqual(out.derived, []);
+      assert.match(out.asks.join('\n'), why, `${file}: the reason`);
+      assert.match(out.asks.join('\n'), /one-ink SVG.*mono-black/, `${file}: what to supply`);
+      assert.match(out.source, /\/\/ Ask the brand for /);
+    }
+    // A picture cannot take the text colour at all.
+    await writeFile(path.join(dir, 'header.png'), encodePng({ width: 4, height: 2, channels: 4, data: Buffer.alloc(4 * 2 * 4, 255) }));
+    const png = brandConstant({ from: 'brand.json', name: 'Acme', base: dir, files: { full: 'header.png' }, logo: {}, record: true });
+    assert.deepEqual(png.marks, ['full']);
+    assert.match(png.asks.join('\n'), /picture/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("the record's variants name the symbol and the file for dark grounds, beside the master; files[] wins, and a wordmark or a reversed symbol is never taken for them", async () => {
+    // Both only drawn later: the record names them and the starter lists them, never a stop.
+    const bare = await logos({ 'acme-primary.svg': TWO_INKS });
+    const src = brandSources({ brand: record(), productDir: path.join(bare, 'product'), brandRoot: bare });
+    assert.deepEqual(src.files, { full: 'assets/logos/acme-primary.svg', 'full-on-dark': 'assets/logos/acme-reversed.svg', symbol: 'assets/logos/acme-mark.svg' }, '"Mark only" is the symbol and "Reversed" the dark-ground file, read beside the master');
+    assert.deepEqual(brandConstant(src).missing, ['assets/logos/acme-reversed.svg', 'assets/logos/acme-mark.svg']);
+    // Drawn: the symbol is used, its one ink derived, and its own minimum (24px) is the symbol's floor, not the full logo's.
+    const drawn = await logos({ 'acme-primary.svg': TWO_INKS, 'acme-mark.svg': SQUARE });
+    const out = brandConstant(brandSources({ brand: record({ variants: record().identity.logo.variants.filter((v) => v.name !== 'Reversed') }), productDir: path.join(drawn, 'product'), brandRoot: drawn }));
+    assert.deepEqual(out.marks, ['full', 'symbol', 'full-ink', 'symbol-ink']);
+    assert.match(out.source, /symbolMinHeight: 24,/);
+    assert.match(out.derived.join('\n'), /symbol-ink, made from assets\/logos\/acme-mark\.svg/);
+    // A role or a name for the symbol in another colour is the symbol's, never the full logo's dark-ground file.
+    const named = brandSources({ brandRoot: drawn, brand: { identity: { logo: {
+      files: [{ path: 'assets/logos/acme-primary.svg', role: 'primary' }, { path: 'assets/logos/acme-mark-white.svg', role: 'Mark only, reversed' }],
+      variants: [{ name: 'Reversed', file: 'acme-reversed.svg' }, { name: 'Symbol', file: 'acme-mark.svg' }],
+    } } } });
+    assert.deepEqual(named.files, { full: 'assets/logos/acme-primary.svg', 'full-on-dark': 'assets/logos/acme-reversed.svg', symbol: 'assets/logos/acme-mark.svg', 'symbol-on-dark': 'assets/logos/acme-mark-white.svg' });
+    // Another lockup is another shape: a stacked or wordmark rendition is never the primary's, listed first or not.
+    const shapes = brandSources({ brandRoot: drawn, brand: { identity: { logo: {
+      files: [{ path: 'assets/logos/acme-primary.svg', role: 'primary' }],
+      variants: [{ name: 'Stacked reversed', file: 'acme-stacked-white.svg' }, { name: 'Wordmark only, one colour', file: 'acme-word-black.svg' }, { name: 'Reversed', file: 'acme-reversed.svg' }],
+    } } } });
+    assert.deepEqual([shapes.files['full-on-dark'], shapes.inkFrom], ['assets/logos/acme-reversed.svg', null]);
+    // A stacked primary keeps its own stacked renditions.
+    const stacked = brandSources({ brandRoot: drawn, brand: { identity: { logo: {
+      files: [{ path: 'assets/logos/acme-stacked.svg', role: 'Primary, stacked' }],
+      variants: [{ name: 'Stacked reversed', file: 'acme-stacked-white.svg' }],
+    } } } });
+    assert.equal(stacked.files['full-on-dark'], 'assets/logos/acme-stacked-white.svg');
+    await rm(bare, { recursive: true, force: true });
+    await rm(drawn, { recursive: true, force: true });
   });
 });
 

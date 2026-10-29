@@ -155,6 +155,30 @@ export function oneDarkInk(svg) {
   return c.L < 0.35 && c.C < 0.04;
 }
 
+/**
+ * Why a coloured mark cannot be made one ink by turning every ink to one, or null when it can. That recolour is how
+ * `brandi assets` makes a brand's black.svg and white.svg (brand-system's 08-logo-system.md, section 6.1), and it is
+ * only the mark where the mark is a silhouette: a gradient has no one ink to become, and a near-white part of a
+ * mark drawn for light grounds shows only where it sits on another of its inks, so in one ink it fills in.
+ */
+export function notOneInk(svg) {
+  const s = String(svg);
+  if (/<(?:linear|radial)Gradient\b|<pattern\b/i.test(s)) return 'it is drawn with a gradient or a pattern, which one ink cannot carry';
+  // A mask that reads its contents' lightness hides or shows the mark by the colour a recolour would change.
+  if (/<mask\b(?![^>]*mask-type\s*[:=]\s*["']?alpha)/i.test(s)) return 'it is drawn through a mask that reads lightness, which a recolour changes';
+  const inks = new Set();
+  // A clip path's or an alpha mask's fill only cuts the shape (a design tool exports a white one), so it is not an ink.
+  for (const [, raw] of s.replace(/<(clipPath|mask)\b[\s\S]*?<\/\1>/gi, '').matchAll(/\b(?:fill|stroke)\s*[:=]\s*["']?([^;"'}\s>]+)/gi)) {
+    const v = raw.toLowerCase();
+    if (v === 'none' || v === 'transparent' || v === 'currentcolor') continue;
+    if (v.startsWith('url(')) return 'it is drawn with a gradient or a pattern, which one ink cannot carry';
+    inks.add(NAMED_INKS[v] ?? v.replace(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/, '#$1$1$2$2$3$3'));
+  }
+  const light = [...inks].filter((ink) => /^#[0-9a-f]{6}$/.test(ink) && toOklch(ink).L > 0.93 && toOklch(ink).C < 0.06);
+  if (light.length && inks.size > light.length) return `its near-white parts (${light.join(', ')}) show only where they sit on its other inks, and in one ink they fill in`;
+  return null;
+}
+
 /** The one-ink rendition from a single-colour master: every ink becomes currentColor, so the mark takes the text colour. */
 export function toInk(svg) {
   let s = svg
@@ -204,14 +228,16 @@ export function clearSpaceRatio(rule, { aspect = null } = {}) {
  * The smallest size on screen of the mark the starter draws, along its long side: the minSizes entry whose variant
  * names that file (through variants[]), or one named for the primary that names no other file, else the general
  * minimum. A run's minimum sat only in minSizes, and the starter drew the logo under it at the kit's 16px.
+ * With `own`, only the entry whose variant names that file: the symbol's floor is never the primary's.
  */
-export function minimumFor(logo, file) {
+export function minimumFor(logo, file, { own = false } = {}) {
   const base = path.basename(String(file ?? '')).toLowerCase();
   const key = (v) => String(v ?? '').trim().toLowerCase();
   const named = new Map((logo?.variants ?? []).filter((v) => v?.name && v?.file).map((v) => [key(v.name), path.basename(v.file).toLowerCase()]));
   const sizes = (logo?.minSizes ?? []).filter((m) => typeof m?.screenPx === 'number' && m.screenPx > 0 && typeof m.variant === 'string');
-  const entry = sizes.find((m) => named.get(key(m.variant)) === base) ?? sizes.find((m) => !named.has(key(m.variant)) && /\bprimary\b/i.test(m.variant));
+  const entry = sizes.find((m) => named.get(key(m.variant)) === base) ?? (own ? null : sizes.find((m) => !named.has(key(m.variant)) && /\bprimary\b/i.test(m.variant)));
   if (entry) return { px: entry.screenPx, from: `identity.logo.minSizes (${entry.variant})` };
+  if (own) return null;
   const px = logo?.minSize?.screenPx;
   return typeof px === 'number' && px > 0 ? { px, from: 'identity.logo.minSize' } : null;
 }
@@ -298,6 +324,10 @@ const roleWord = (role) => {
   return ROLE_WORDS.find(([, re]) => re.test(words))?.[0] ?? null;
 };
 const namesGround = (role) => new RegExp(GROUND.source).test(String(role ?? '').toLowerCase());
+// The symbol alone, by brand-system's names for it ("Symbol alone", "Mark only"). Not "Wordmark only", and not the
+// favicon or app icon, which are redraws for a pixel grid. Its own colour words then pick its renditions.
+const SYMBOL = /\b(?:symbol|mark[- ](?:only|alone))\b/;
+const namesSymbol = (role) => SYMBOL.test(String(role ?? '').toLowerCase());
 
 /**
  * Where the marks come from: { from, name, files: { rendition: path }, inkFrom, logo, character, base, record }.
@@ -316,11 +346,13 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
   }
   const files = (brand?.identity?.logo?.files ?? []).map((f) => (typeof f === 'string' ? { path: f } : f)).filter((f) => f?.path);
   const rank = (f, r) => (f.role === r ? 0 : roleWord(f.role) !== r ? null : namesGround(f.role) ? 2 : 1);
-  const role = (r, ok = () => true) => files
+  // A role with no colour word (r null) is the mark itself; the symbol's family and the full logo's never mix, so a
+  // reversed symbol is not taken for the full logo's dark-ground file.
+  const pick = (list, r, { symbol = false, ok = () => true } = {}) => list
     .map((f, i) => ({ f, i, rank: rank(f, r) }))
-    .filter((c) => c.rank !== null && ok(c.f.path))
+    .filter((c) => c.rank !== null && namesSymbol(c.f.role) === symbol && ok(c.f))
     .sort((a, b) => a.rank - b.rank || Number(!/\.svg$/i.test(a.f.path)) - Number(!/\.svg$/i.test(b.f.path)) || a.i - b.i)[0]?.f.path ?? null;
-  const full = role('primary');
+  const full = pick(files, 'primary');
   if (!full) {
     return { from: files.length ? "brand/brand.json's logo master" : null, name: block?.name ?? brand?.meta?.name ?? null, files: {}, inkFrom: null, logo: {}, character: characterFrom(block, illustrations, productDir, brand?.meta?.name), base: productDir, notes: [], illustrations, record: files.length > 0 };
   }
@@ -340,16 +372,42 @@ export function brandSources({ product = {}, brand = null, productDir, brandRoot
   if (logo.clearSpace == null && !logo.clearSpaceWords && rec.clearSpace) {
     notes.push(`clear space is written in words the starter cannot turn into a share of the logo's height: "${rec.clearSpace}". Set product.json "brand": { "logo": { "clearSpace": <a share of the logo's height> } }, 0.25 for a quarter of its height on every side, and run it again`);
   }
-  const onDark = role('mono-white');
+  // A record names its files twice: files[] with a role, and variants[] by name, often as a bare file name beside the
+  // master. A brand's "Mark only" and "Reversed" sat only in variants[], and its BRAND had no symbol. files[] wins.
+  const variants = (rec.variants ?? [])
+    .filter((v) => v?.name && typeof v.file === 'string' && !path.isAbsolute(v.file))
+    .map((v) => ({ path: path.dirname(v.file) === '.' ? path.join(path.dirname(full), v.file) : v.file, role: v.name }));
+  const role = (r, opts) => pick(files, r, opts) ?? pick(variants, r, opts);
+  // Another lockup is another shape ("Stacked reversed", "Wordmark only, one colour"), so the full logo's renditions are
+  // of the primary's own lockup, as its role or the variant naming its file says.
+  const lockup = (name) => /\b(stacked|vertical|wordmark)\b/.exec(String(name ?? '').toLowerCase())?.[1] ?? null;
+  const own = lockup(files.find((f) => f.path === full)?.role) ?? lockup((rec.variants ?? []).find((v) => typeof v?.file === 'string' && path.basename(v.file) === path.basename(full))?.name);
+  const sameShape = (f) => [null, own].includes(lockup(f.role));
+  // The one ink takes the text colour, which only an outline drawing can.
+  const svg = (f) => /\.svg$/i.test(f.path);
+  const found = {
+    'full-on-dark': role('mono-white', { ok: sameShape }),
+    symbol: role(null, { symbol: true }) ?? role('primary', { symbol: true }),
+    'symbol-on-dark': role('mono-white', { symbol: true }),
+    'symbol-ink': role('mono-black', { symbol: true, ok: svg }),
+  };
+  const base = [brandDir, brandRoot].find((d) => d && existsSync(path.resolve(d, full))) ?? brandDir ?? brandRoot;
+  const symbolMin = found.symbol ? minimumFor(rec, found.symbol, { own: true }) : null;
+  if (symbolMin && set.symbolMinHeight == null) {
+    logo.symbolMinLongSide = symbolMin.px;
+    // Said only once the symbol is drawn: until then its minimum is for a mark the product does not show.
+    if (base && existsSync(path.resolve(base, found.symbol))) notes.push(`the symbol's minimum, ${symbolMin.px}px along the long side, from ${symbolMin.from}`);
+  }
   return {
     from: "brand/brand.json's logo master",
     name: brand.meta?.name ?? null,
-    files: { full, ...(onDark ? { 'full-on-dark': onDark } : {}) },
-    // The one ink takes the text colour, which only an outline drawing can.
-    inkFrom: role('mono-black', (p) => /\.svg$/i.test(p)),
+    files: { full, ...Object.fromEntries(Object.entries(found).filter(([, p]) => p)) },
+    inkFrom: role('mono-black', { ok: (f) => svg(f) && sameShape(f) }),
+    // The brand's one-colour rule, quoted when the starter has to make the one ink by recolouring.
+    inkRule: typeof rec.monochrome?.rule === 'string' ? rec.monochrome.rule : null,
     logo,
     character: characterFrom(block, illustrations, productDir, brand.meta?.name),
-    base: [brandDir, brandRoot].find((d) => d && existsSync(path.resolve(d, full))) ?? brandDir ?? brandRoot,
+    base,
     notes,
     illustrations,
     record: true,
@@ -420,6 +478,31 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     for (const r of ['symbol', 'symbol-on-dark', 'symbol-ink']) delete marks[r];
   }
 
+  // A brand whose logo is one coloured file has no one ink, and without one its logo kept the colours made for light
+  // grounds on a dark one and in forced colours. Where notOneInk allows it, the one ink is made from the brand's own
+  // file, every ink turned to the text colour as `brandi assets` makes black.svg, and said to be derived. Either way the
+  // brand is asked for the files it is missing: a recolour is not its own one-ink drawing.
+  const derived = [];
+  const asks = [];
+  for (const base of standIn ? [] : ['full', 'symbol']) {
+    const rel = files[base];
+    if (!rel || !marks[base] || marks[`${base}-ink`]) continue;
+    const svg = /\.png$/i.test(rel) ? null : cleanSvg(read(rel, `the ${base} mark`).text, rel);
+    const why = svg ? notOneInk(svg) : 'it is a picture, which cannot take the text colour';
+    if (!why) {
+      marks[`${base}-ink`] = scopeClasses(tighten(toInk(svg)), `brand-${base}-ink-`);
+      derived.push(`${base}-ink, made from ${rel}: every ink turned to the text colour`);
+    }
+    const dark = !marks[`${base}-on-dark`];
+    const what = `${why ? 'a' : 'its own'} one-ink SVG of the ${base === 'full' ? 'logo' : 'symbol'}${dark ? ', and a version for dark grounds,' : ''}`;
+    const where = !src.record ? `product.json's brand.marks ("${base}-ink"${dark ? `, "${base}-on-dark"` : ''})`
+      : base === 'full' ? `identity.logo.files (role mono-black${dark ? ', and mono-white' : ''})`
+        : `identity.logo.variants, named for the symbol and "one colour"${dark ? ' or "reversed"' : ''}`;
+    asks.push(why
+      ? `${what} in ${where}: ${base}-ink cannot be made from ${rel}, because ${why}, so ${dark ? 'on dark grounds it keeps the colours made for light ones, and ' : ''}in forced colours it keeps its own`
+      : `${what} in ${where}: until then ${base}-ink stands in for it${dark ? ' on dark grounds,' : ''} in forced colours and wherever it takes the text colour${src.inkRule && derived.length === 1 ? `. Its one-colour rule, "${src.inkRule}", is not applied by a recolour` : ''}`);
+  }
+
   const kept = [];
   // The stand-in keeps the kit's sizes: the record's minimum and clear space belong to the mark nobody has drawn yet.
   const logo = standIn ? { ...LOGO_DEFAULTS } : {};
@@ -429,6 +512,8 @@ export function brandConstant(src, { stills = new Map() } = {}) {
   // Brandi records the smallest size along the long side; the product sizes a logo by its height.
   const aspect = aspectOf(marks.full);
   if (logo.minHeight == null && src.logo?.minLongSide && aspect) logo.minHeight = Math.max(1, Math.ceil(src.logo.minLongSide * Math.min(aspect, 1)));
+  const symbolShape = marks.symbol ? aspectOf(marks.symbol) : null;
+  if (logo.symbolMinHeight == null && src.logo?.symbolMinLongSide && symbolShape) logo.symbolMinHeight = Math.max(1, Math.ceil(src.logo.symbolMinLongSide * Math.min(symbolShape, 1)));
   if (logo.clearSpace == null && src.logo?.clearSpaceWords && aspect) {
     const share = clearSpaceRatio(src.logo.clearSpaceWords, { aspect });
     if (share) logo.clearSpace = share;
@@ -488,6 +573,8 @@ export function brandConstant(src, { stills = new Map() } = {}) {
   const lines = [
     ...head,
     ...refused.map((r) => `// Not a symbol: ${r}`),
+    ...derived.map((d) => `// Derived, not the brand's own file: ${d}.`),
+    ...asks.map((a) => `// Ask the brand for ${a}.`),
     inkPoses.length ? `// Drawn in one dark ink, so they take the text colour on any ground: ${inkPoses.join(', ')}.` : null,
     '',
     'export const BRAND: Brand = {',
@@ -501,7 +588,7 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     lines.push('  },');
   }
   lines.push('}', '');
-  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character), refused, inkPoses, placeholder: standIn, missing };
+  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character), refused, derived, asks, inkPoses, placeholder: standIn, missing };
 }
 
 /**
@@ -514,4 +601,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, oneDarkInk, clearSpaceRatio, minimumFor, illustrationChoices, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER, SYMBOL_MAX_ASPECT };
+export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, oneDarkInk, notOneInk, clearSpaceRatio, minimumFor, illustrationChoices, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER, SYMBOL_MAX_ASPECT };
