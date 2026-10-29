@@ -10,7 +10,8 @@
  *
  * React 18 and ReactDOM must already be on the page, as the canvas has them. When the board has
  * rendered, <html> gets data-dc-ready="1"; on a failure, data-dc-error holds the message and the
- * page shows it, so a screenshot never passes off a broken board as a blank one.
+ * page shows it, so a screenshot never passes off a broken board as a blank one. data-dc-unfilled
+ * names each hole whose first name neither the board's props nor its renderVals() give.
  *
  * Props for the board come from ?props={json} on the page's address (a dark twin, a state).
  */
@@ -28,6 +29,9 @@
   var WHOLE = /^\s*\{\{\s*([^}]*?)\s*\}\}\s*$/;
 
   // --- Holes ---------------------------------------------------------------
+  // Each hole whose first name the board never gives, by its whole lookup. It renders as nothing, so a component
+  // quietly drops what it would have drawn (a proposal lost its Edit and Not now to an unreturned noop).
+  var unfilled = {};
   function lookup(expr, scope) {
     if (expr === 'true') return true;
     if (expr === 'false') return false;
@@ -37,6 +41,8 @@
     // Dotted lookups only: anything else renders as nothing, as the canvas renders it as literal text.
     if (!/^\$?[A-Za-z_][\w$]*(\.[A-Za-z_$][\w$]*|\.\d+)*$/.test(expr)) return undefined;
     var parts = expr.split('.');
+    // A first name given whose later parts are null is data (no booking yet), not a fault.
+    if (!(parts[0] in scope)) unfilled[expr] = 1;
     var v = scope;
     for (var i = 0; i < parts.length; i++) {
       if (v == null) return undefined;
@@ -230,7 +236,9 @@
     Base.prototype.constructor = Base;
     Base.prototype.render = function () {
       var vals = typeof this.renderVals === 'function' ? (this.renderVals() || {}) : {};
-      return h(React.Fragment, null, renderNodes(template, vals, ctx));
+      // The canvas resolves a hole against the board's props with renderVals() over them, so an imported board's
+      // {{label}} reads the label it was given.
+      return h(React.Fragment, null, renderNodes(template, Object.assign({}, this.props, vals), ctx));
     };
     var script = doc.querySelector('script[data-dc-script]');
     // A Design System preview is one root element and one script, so its logic arrives as a string.
@@ -306,6 +314,8 @@
         setTimeout(function () {
           if (ctx.errors.length) root.setAttribute('data-dc-error', ctx.errors.join('; '));
           if (ctx.missing.length) root.setAttribute('data-dc-missing', ctx.missing.join(' '));
+          var holes = Object.keys(unfilled);
+          if (holes.length) root.setAttribute('data-dc-unfilled', holes.join(' '));
           root.setAttribute('data-dc-ready', '1');
         }, 30);
       }, 30);

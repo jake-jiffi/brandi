@@ -514,11 +514,13 @@ export async function writeBoards({ productDir, starter, measure = true, heights
     writeFileSync(path.join(pagesDir, 'pages.json'), JSON.stringify(pages));
     const run = spawnSync(process.execPath, [path.join('tools', 'measure-boards.mjs'), '--pages', path.join(pagesDir, 'pages.json')], { cwd: starter, encoding: 'utf8', timeout: 600000 });
     try {
-      const { __sections = {}, __clipped, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
+      const { __sections = {}, __clipped, __unfilled = {}, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
       // A tool from before __clipped measures a shell page as its window, whatever it holds.
       if (__clipped === undefined) measuresPages = false;
       Object.assign(heights, measured);
       Object.assign(sectionsOf, __sections);
+      // Said here as well as in the gates: a hole the script never gives draws nothing, and nothing else says so.
+      for (const [board, names] of Object.entries(__unfilled)) log(`${board} names ${names.map((n) => `{{${n}}}`).join(', ')}, which its script never gives: return each from renderVals() (06-canvas.md, The mount).`);
     } catch { log(`could not measure the boards: ${(run.stderr || run.stdout).slice(-300)}`); }
     rmSync(pagesDir, { recursive: true, force: true });
   };

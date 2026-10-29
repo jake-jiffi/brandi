@@ -93,6 +93,7 @@ describe('the shim renders a mounted board in a real browser', async () => {
     };
     const light = await dump('Board.dc.html');
     assert.match(light, /data-dc-ready="1"/);
+    assert.equal(light.includes('data-dc-unfilled'), false, 'every hole on the board is filled');
     assert.match(light, /3 waiting/);
     assert.match(light, /<b data-hello="">Hi Ada!<\/b>/);
     assert.match(light, /<i>one<\/i><i>two<\/i>/);
@@ -102,7 +103,26 @@ describe('the shim renders a mounted board in a real browser', async () => {
     const dark = await dump('BoardDark.dc.html');
     assert.match(dark, /data-dc-ready="1"/);
     assert.match(dark, /data-theme="dark"/, 'the twin flips the page through the imported board');
-    assert.equal(/data-dc-(error|missing)/.test(dark), false);
+    assert.equal(/data-dc-(error|missing|unfilled)/.test(dark), false);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  // A proposal's on-edit and on-dismiss named a noop its board's renderVals() never returned: both holes drew nothing,
+  // the component quietly left out Edit and Not now, and a review found it a round later. A hole resolves against the
+  // board's props and its renderVals(), as the canvas resolves it, and a loop's variables inside the loop.
+  test('a hole naming a value the board never gives is named on the page; a filled one, null data, a loop variable and a prop are not', { skip: !chrome || !react ? 'needs Chrome and React 18' : false }, async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-shim-'));
+    await writeFile(path.join(dir, 'Card.dc.html'), artboard({ name: 'Card', body: '<b>{{label}}</b>' }));
+    await writeFile(path.join(dir, 'Main.dc.html'), artboard({
+      name: 'Main',
+      body: '<p>{{count}} waiting</p><p>{{booking.note}}</p><sc-for list="{{rows}}" as="r"><i>{{r.label}} {{$index}}</i></sc-for><p>{{\'Due\'}} {{true}}</p><button onClick="{{noop}}">Edit</button><p title="{{missing.note}}">Hi</p><dc-import name="Card" label="Ready" on-dismiss="{{dismiss}}" hint-size="100%,40px"></dc-import>',
+      logic: 'renderVals() { return { count: 3, booking: null, rows: [{ label: "one" }] }; }',
+    }));
+    const res = await P.previewArtboard(path.join(dir, 'Main.dc.html'), { outDir: path.join(dir, 'out'), png: false });
+    const { stdout } = await run(chrome, ['--headless=new', '--disable-gpu', '--virtual-time-budget=4000', '--dump-dom', pathToFileURL(res.html).href], { timeout: 60000 });
+    assert.match(stdout, /data-dc-ready="1"/);
+    assert.match(stdout, /<b>Ready<\/b>/, "the imported board's hole reads the prop it was given");
+    assert.deepEqual((/data-dc-unfilled="([^"]*)"/.exec(stdout)?.[1] ?? '').split(' ').sort(), ['dismiss', 'missing.note', 'noop'], 'a mounted board\'s prop is checked as an element\'s attribute is');
     await rm(dir, { recursive: true, force: true });
   });
 

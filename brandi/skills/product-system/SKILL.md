@@ -316,7 +316,7 @@ The system is never finished. Five modes, each a round of its own
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree, the docs' written values included |
 | Canvas runtime | Every board renders under the Design canvas's own runtime, in a cross-origin frame |
-| Board sizes | Every board's frame fits its content, and nothing on a board hides its own content |
+| Board sizes | Every board's frame fits its content, nothing on a board hides its own content, and every hole names a value its script gives |
 | Coverage | Every surface has a board at each of its widths and a states board for each module (one for the surface when it has none, unless it only sends messages or skips them with a reason), and a surface with modules shows each core page or skips it with a reason |
 | Record | Every tool's version pinned and written down, every round |
 
