@@ -101,6 +101,74 @@ describe('where the marks come from', () => {
     assert.equal(brandSources({ product: {}, brand: null }), null);
   });
 
+  test("brand.json's paths are read from the brand folder, and free-text roles find the master, the dark-ground file and the one ink", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-roles-'));
+    await mkdir(path.join(dir, 'brand', 'assets', 'logos'), { recursive: true });
+    const logo = (fill) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60"><path d="M0 0h120v60H0z" fill="${fill}"/></svg>`;
+    for (const [f, fill] of [['primary.svg', '#1F6F4A'], ['outline-black.svg', '#000000'], ['outline-white.svg', '#ffffff'], ['outline-green.svg', '#2E7D32'], ['header.png', null]]) {
+      if (fill) await writeFile(path.join(dir, 'brand', 'assets', 'logos', f), logo(fill));
+    }
+    // The roles a brand stage writes from the guidelines, not the logo forge's three words.
+    const brand = { meta: { name: 'Acme' }, identity: { logo: { files: [
+      { path: 'assets/logos/outline-green.svg', role: 'secondary: green logo outline on black' },
+      { path: 'assets/logos/primary.svg', role: 'primary' },
+      { path: 'assets/logos/outline-black.svg', role: 'secondary: black logo outline, one colour' },
+      { path: 'assets/logos/outline-white.svg', role: 'secondary: black logo outline reversed to white' },
+    ] } } };
+    const src = brandSources({ product: {}, brand, productDir: path.join(dir, 'product'), brandRoot: dir });
+    assert.deepEqual(src.files, { full: 'assets/logos/primary.svg', 'full-on-dark': 'assets/logos/outline-white.svg' }, 'white beats black, and a ground ("on black") is not an ink');
+    assert.equal(src.inkFrom, 'assets/logos/outline-black.svg');
+    assert.equal(src.base, path.join(dir, 'brand'), 'relative to the brand folder, where brand.json sits');
+    assert.deepEqual(brandConstant(src).marks, ['full', 'full-on-dark', 'full-ink'], 'and every file is found');
+    // A role that names a ground is weaker than one that does not, a picture weaker than an SVG, and "white
+    // background" is a ground, not a reversed file.
+    const ranked = brandSources({ brandRoot: dir, brand: { identity: { logo: { files: [
+      { path: 'assets/logos/outline-green.svg', role: 'Primary logo for dark backgrounds' },
+      { path: 'assets/logos/primary.svg', role: 'The primary logo' },
+      { path: 'assets/logos/header.png', role: 'reversed logo, raster' },
+      { path: 'assets/logos/outline-white.svg', role: 'reversed logo' },
+      { path: 'assets/logos/outline-black.svg', role: 'white background version, one colour' },
+    ] } } } });
+    assert.deepEqual(ranked.files, { full: 'assets/logos/primary.svg', 'full-on-dark': 'assets/logos/outline-white.svg' });
+    assert.equal(ranked.inkFrom, 'assets/logos/outline-black.svg');
+    // A path written from the project root, as an older brand file may, still resolves there.
+    const rooted = brandSources({ product: {}, brand: { identity: { logo: { files: [{ path: 'brand/assets/logos/primary.svg', role: 'Primary logo' }] } } }, brandRoot: dir });
+    assert.equal(rooted.base, dir);
+    assert.deepEqual(brandConstant(rooted).marks, ['full']);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a mark much wider than tall is refused as the symbol, so the icons rail shows its Home control', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-symbol-'));
+    await writeFile(path.join(dir, 'full.svg'), WIDE);
+    await writeFile(path.join(dir, 'signature.svg'), '<svg viewBox="0 0 238 100"><path d="M0 0h238v100H0z" fill="#1F6F4A"/></svg>');
+    await writeFile(path.join(dir, 'square.svg'), '<svg viewBox="0 0 24 24"><path d="M0 0h24v24H0z" fill="#1F6F4A"/></svg>');
+    const wide = brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: { full: 'full.svg', symbol: 'signature.svg', 'symbol-ink': 'signature.svg' }, logo: {} });
+    assert.deepEqual(wide.marks, ['full'], 'no symbol rendition is kept');
+    assert.match(wide.refused.join(' '), /symbol .*2\.38 times as wide as it is tall/);
+    assert.match(wide.source, /\/\/ Not a symbol: /, 'lib/brand.ts says why');
+    const square = brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: { full: 'full.svg', symbol: 'square.svg' }, logo: {} });
+    assert.deepEqual(square.marks, ['full', 'symbol']);
+    assert.deepEqual(square.refused, []);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a pose drawn in one dark ink takes the text colour; a pose in a colour, or in several, keeps its own', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-ink-'));
+    await writeFile(path.join(dir, 'line.svg'), '<svg xmlns="http://www.w3.org/2000/svg" width="99.5" height="106"><path d="M1 1h9" fill="#221f20"/><path d="M2 2h9" style="fill:#221F20;stroke:none"/><path d="M3 3h9" fill-rule="evenodd"/></svg>');
+    await writeFile(path.join(dir, 'two.svg'), '<svg viewBox="0 0 10 10"><path d="M1 1h9" fill="#000000"/><path d="M2 2h9" fill="#ffffff"/></svg>');
+    await writeFile(path.join(dir, 'green.svg'), '<svg viewBox="0 0 10 10"><path d="M1 1h9" fill="#2E7D32"/></svg>');
+    const out = brandConstant({ from: 'product/product.json', name: 'Acme', base: dir, files: {}, logo: {}, character: { name: '[Drawings]', poses: { welcome: 'line.svg', done: 'two.svg', help: 'green.svg' } } });
+    const pose = (state) => JSON.parse(new RegExp(`"${state}": ("(?:[^"\\\\]|\\\\.)*")`).exec(out.source)[1]);
+    assert.doesNotMatch(pose('welcome'), /#221f20/i, 'the black ink is gone');
+    assert.match(pose('welcome'), /<svg fill="currentColor"/, 'in its place the text colour, the unfilled path included');
+    assert.match(pose('done'), /#ffffff/, 'two inks keep their colours');
+    assert.match(pose('help'), /#2E7D32/, "one ink in the brand's green keeps it");
+    assert.deepEqual(out.inkPoses, ['welcome']);
+    assert.match(out.source, /\/\/ Drawn in one dark ink, so they take the text colour on any ground: welcome\./);
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('the minimum height comes from the long side, and every default kept is named', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-brand-'));
     await mkdir(path.join(dir, 'brand', 'logo'), { recursive: true });

@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, definitionsHash, railTone, refreshKitFiles, KIT_MANIFEST, GENERATED, KIT } from '../scripts/productstarter.mjs';
+import { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, installSystem, definitionsHash, railTone, refreshKitFiles, KIT_MANIFEST, GENERATED, KIT } from '../scripts/productstarter.mjs';
 import { toStarterGlobals } from '../scripts/productglobals.mjs';
 import { buildProductTokens } from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -55,6 +55,18 @@ describe('the brand faces through next/font', () => {
     assert.equal(/import \{ Karla \}/.test(src), false);
   });
 
+  test("boards ask Google only for the weights each hosted face's styles set, no italics, and nothing when every face ships as a file", () => {
+    const url = (t) => JSON.parse(generatedFiles(t, identity).get('system/system.json')).fontsUrl;
+    const hosted = url(tokens);
+    // A display face with one weight, asked for 500 to 700 and italics, made Google refuse the whole stylesheet.
+    assert.match(hosted, /family=Bitter:wght@400(&|$)/);
+    assert.match(hosted, /family=Karla:wght@400;500;700(&|$)/);
+    assert.doesNotMatch(hosted, /ital/);
+    const shipped = structuredClone(tokens);
+    shipped.type.fonts = ['Bitter', 'Karla', 'JetBrains Mono'].map((family) => ({ family, file: `fonts/${family.replace(/ /g, '')}.woff2`, weight: '400 700', style: 'normal' }));
+    assert.equal(url(shipped), null, 'the faces come through tokens.css, so no board links Google Fonts');
+  });
+
   test('a role whose stack starts with a system face sets nothing', () => {
     const sys = structuredClone(tokens);
     sys.type.families.mono = 'ui-monospace, Menlo, monospace';
@@ -95,6 +107,51 @@ describe('the files the system owns in a starter', () => {
     await writeStarter({ out, tokens, identity, refreshKit: true });
     assert.equal(/edited by the product/.test(await readFile(path.join(out, 'components/system/button.tsx'), 'utf8')), false);
     assert.ok(existsSync(path.join(out, 'components/system/custom-panel.tsx')), 'a product file is never deleted');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a starter that cannot be made is not started: nothing is written, and the message says so', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-'));
+    const out = path.join(dir, 'product', 'starter');
+    const brand = { meta: { name: 'Acme' }, identity: { logo: { files: [{ path: 'assets/logos/missing.svg', role: 'primary' }] } } };
+    await assert.rejects(writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') }), /^Error: Nothing was written to .*starter: the full mark: assets\/logos\/missing\.svg does not exist/);
+    assert.equal(existsSync(out), false, 'no half-copied kit');
+    // A texture move whose file is not in the product folder stops it the same way.
+    const textured = buildProductTokens(buildSystem({ primary: '#1F6F4A' }), { shape: { moves: [{ name: 'The paper ground', source: 'p13', where: ['the sign-in hero'], file: 'textures/paper.jpg', kind: 'texture', strength: 0.3 }] } });
+    await assert.rejects(writeStarter({ out, tokens: textured, identity, productDir: path.join(dir, 'product') }), /Nothing was written .*textures\/paper\.jpg/);
+    assert.equal(existsSync(out), false);
+    // With the file there, it travels into the starter, where globals.css finds it.
+    await mkdir(path.join(dir, 'product', 'textures'), { recursive: true });
+    await writeFile(path.join(dir, 'product', 'textures', 'paper.jpg'), 'jpeg bytes');
+    const made = await writeStarter({ out, tokens: textured, identity, productDir: path.join(dir, 'product') });
+    assert.ok(made.written.includes('textures/paper.jpg'));
+    assert.equal(await readFile(path.join(out, 'textures', 'paper.jpg'), 'utf8'), 'jpeg bytes');
+    assert.match(await readFile(path.join(out, 'app', 'globals.css'), 'utf8'), /url\("\.\.\/textures\/paper\.jpg"\)/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a fresh starter stopped part way is fresh again next run, so the kit is copied whole rather than "Refreshed"', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-'));
+    const out = path.join(dir, 'starter');
+    await mkdir(path.join(out, '.brandi'), { recursive: true });
+    await writeFile(path.join(out, 'package.json'), '{}');
+    await writeFile(path.join(out, '.brandi', 'starter-pending'), 'started');
+    const res = await writeStarter({ out, tokens, identity });
+    assert.equal(res.fresh, true);
+    assert.ok(existsSync(path.join(out, 'components', 'system', 'button.tsx')), 'the kit is copied');
+    assert.equal(existsSync(path.join(out, '.brandi', 'starter-pending')), false, 'and the starter marked finished');
+    assert.equal((await writeStarter({ out, tokens, identity })).fresh, false);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('the system installs beside the boards with the files tokens.css names: its faces and its texture', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-install-'));
+    const files = { 'dist/bundle.js': 'js', 'dist/bundle.css': 'css', 'starter/system/tokens.json': '{}', 'product/tokens.css': '@font-face {}', 'product/fonts/Brand.woff2': 'font', 'product/textures/paper.jpg': 'jpeg', 'product/textures/notes.txt': 'not an image' };
+    for (const [rel, text] of Object.entries(files)) { await mkdir(path.dirname(path.join(dir, rel)), { recursive: true }); await writeFile(path.join(dir, rel), text); }
+    const ds = path.join(dir, 'product', 'canvas', 'ds', 'acme');
+    installSystem(ds, { dist: path.join(dir, 'dist'), starter: path.join(dir, 'starter'), productDir: path.join(dir, 'product') });
+    for (const rel of ['components/bundle.js', 'components/bundle.css', 'tokens.json', 'tokens.css', 'fonts/Brand.woff2', 'textures/paper.jpg']) assert.ok(existsSync(path.join(ds, rel)), rel);
+    assert.equal(existsSync(path.join(ds, 'textures', 'notes.txt')), false, 'only images');
     await rm(dir, { recursive: true, force: true });
   });
 

@@ -232,6 +232,22 @@ export function pickLabel(bg, preferred) {
 
 const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 
+/** The detector's own test for a coloured ground: its channels spread 40 or more of 255. */
+const carriesColour = (hex) => {
+  const { r, g, b } = rgba(hex);
+  return Math.max(r, g, b) - Math.min(r, g, b) >= 40;
+};
+
+/** The detector's own grey: HSL saturation under 0.2, between 20% and 85% lightness. */
+const readsGrey = (hex) => {
+  const { r, g, b } = rgba(hex);
+  const hi = Math.max(r, g, b) / 255;
+  const lo = Math.min(r, g, b) / 255;
+  const l = (hi + lo) / 2;
+  const s = hi === lo ? 0 : (hi - lo) / (1 - Math.abs(2 * l - 1));
+  return s < 0.2 && l > 0.2 && l < 0.85;
+};
+
 // ---------------------------------------------------------------------------
 // The role list
 // ---------------------------------------------------------------------------
@@ -486,10 +502,25 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
     // close, the page's hairline, which shows against both. A black rail on a near-black canvas had a 1.06:1 edge.
     v['rail-edge'] = contrastRatio(v.rail, v.canvas) >= FLOORS['non-text'] ? v['rail-line'] : '{line}';
     const railGrounds = [v.rail, v['rail-hover'], v['rail-selected']];
-    const tint = oklchToHex(gamutMapOklch({ L: darkRail ? 0.93 : 0.25, C: 0.04, h: safeHue(toOklch(B[8]).h) }));
-    v['rail-text'] = solve('rail-text', tint, railGrounds, 7);
+    const mutedGrounds = [v.rail, v['rail-hover']];
+    // A rail that carries colour takes its words in its own hue, as tints of it: the rail's chroma, held between
+    // 0.05 and 0.08 so a vivid rail's tints stay quiet, and raised a step at a time while the solved value still
+    // reads grey. Mixed towards a brand-hued text instead, an emerald rail's group labels lost its chroma, and the
+    // detector reported them as grey on colour 52 times. A rail with no colour keeps the brand's hue, and its quiet
+    // words a mix of its text and the rail.
+    const coloured = railGrounds.some(carriesColour);
+    const hue = safeHue(toOklch(coloured ? v.rail : B[8]).h);
+    const tint = (L, C) => oklchToHex(gamutMapOklch({ L, C, h: hue }));
+    const tinted = (role, L, against, min, mode) => {
+      let C = Math.min(Math.max(toOklch(v.rail).C, 0.05), 0.08);
+      while (C < 0.16 && readsGrey(solveForContrast(tint(L, C), against, min, { mode }).hex)) C += 0.01;
+      return solve(role, tint(L, C), against, min, mode);
+    };
+    v['rail-text'] = coloured ? tinted('rail-text', darkRail ? 0.93 : 0.25, railGrounds, 7, 'nearest') : solve('rail-text', tint(darkRail ? 0.93 : 0.25, 0.04), railGrounds, 7);
     v['rail-text-strong'] = labelOn(v.rail).hex;
-    v['rail-muted'] = solve('rail-muted', mix(v.rail, v['rail-text'], 0.55), [v.rail, v['rail-hover']], FLOORS.text, 'floor');
+    v['rail-muted'] = coloured
+      ? tinted('rail-muted', darkRail ? 0.8 : 0.4, mutedGrounds, FLOORS.text, 'floor')
+      : solve('rail-muted', mix(v.rail, v['rail-text'], 0.55), mutedGrounds, FLOORS.text, 'floor');
     v['rail-focus'] = solve('rail-focus', v.highlight, railGrounds, FLOORS['non-text']);
   } else {
     v.rail = '{surface}';
@@ -690,8 +721,20 @@ export function checkShape(shape = {}) {
   if (moves != null && (!Array.isArray(moves) || moves.some((m) => !named(m?.name) || !named(m?.source) || !Array.isArray(m?.where) || !m.where.length))) {
     throw new TypeError('shape.moves is a list of { name, source, where: [the surfaces that carry it] }');
   }
+  // A move that names its file is carried: copied beside tokens.css and into the starter, and laid on by a class.
+  // The file sits in the product folder's textures/, as the faces sit in fonts/, so every copy finds it by one path.
+  for (const m of moves ?? []) {
+    if (m.file == null && m.kind == null && m.strength == null) continue;
+    if (m.kind !== 'texture') throw new TypeError(`shape.moves "${m.name}": kind is "texture", the one kind a move's file is carried as`);
+    if (typeof m.file !== 'string' || !/^textures\/[A-Za-z0-9_.-]+\.(png|jpe?g|webp|svg)$/.test(m.file)) throw new TypeError(`shape.moves "${m.name}": file is textures/<name>.jpg (or .png, .webp, .svg), in the product folder, got ${JSON.stringify(m.file)}`);
+    if (!(typeof m.strength === 'number' && m.strength > 0 && m.strength <= 1)) throw new TypeError(`shape.moves "${m.name}": strength is the layer's opacity, above 0 and up to 1, set so the darkest mark under the words still clears 4.5:1`);
+  }
+  if ((moves ?? []).filter((m) => m.kind === 'texture').length > 1) throw new TypeError('shape.moves carries one texture: name the others without a file');
   return { ...shape, families, shell, moves };
 }
+
+/** The texture move a system carries, or null: the one move whose file is laid on by `.brand-texture`. */
+export const textureMove = (tokens) => (tokens.radius?.moves ?? []).find((m) => m.kind === 'texture' && m.file) ?? null;
 
 /**
  * Radii from the brand's measured shapes, renamed for the jobs a product gives them. A family the brand
@@ -773,7 +816,7 @@ export function shapeKitDefaults(tokens) {
  * @param {object} system  the output of buildSystem
  * @param {object} opts
  * @param {string} [opts.name]              the system's name
- * @param {{name: string, hex: string}[]} [opts.brandColours]  the brand book's named colours
+ * @param {{name: string, hex: string}[] | Record<string, string>} [opts.brandColours]  the brand book's named colours, as a list or a name-to-hex map
  * @param {object} [opts.roles]             decided roles: { primary, brand, highlight, canvas, focus, rail } as { light, dark }
  * @param {boolean} [opts.displayForTitles] whether the display face sets titles (default true)
  * @param {object} [opts.source]            where the brand came from, recorded in meta
@@ -808,7 +851,16 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   };
   const roles = Object.fromEntries(Object.entries(rolesIn ?? {}).filter(([, val]) => val)
     .map(([k, val]) => [k, { light: expand(val.light), dark: expand(val.dark) }]));
-  const brandColours = brandColoursIn ? brandColoursIn.map((c) => ({ ...c, hex: expand(c.hex) })) : null;
+  // People write the brand's colours as a list or as a name-to-hex map, and the reference showed neither, so both
+  // are read. A map once reached `.map` and stopped the whole build with "brandColoursIn.map is not a function".
+  const listed = brandColoursIn == null ? null
+    : Array.isArray(brandColoursIn) ? brandColoursIn
+      : typeof brandColoursIn === 'object' ? Object.entries(brandColoursIn).map(([name, hex]) => ({ name, hex }))
+        : undefined;
+  if (listed === undefined || listed?.some((c) => typeof c?.name !== 'string' || !c.name.trim() || c.hex == null)) {
+    throw new TypeError('brandColours is a list of { name, hex } or a { name: hex } map, each with a name and a hex value');
+  }
+  const brandColours = listed ? listed.map((c) => ({ ...c, hex: expand(c.hex) })) : null;
 
   // The assistant's family borrows the brand's saturation, like Brandi's status colours do.
   const base = toOklch(hexOf(system.palettes.brand.light.steps[8]));
@@ -1116,11 +1168,19 @@ export function toProductCss(tokens) {
       lines.push(`.${s.name} { ${decl.join('; ')}; }`);
     }
   }
+  // The brand's texture on a layer behind the words, multiplied over the element's own colour, never as its
+  // background image: the detector reads past a background image to the page behind it. Its file sits beside
+  // tokens.css, in textures/, wherever tokens.css is installed.
+  const texture = textureMove(tokens);
+  if (texture) {
+    lines.push('.brand-texture { position: relative; isolation: isolate; }');
+    lines.push(`.brand-texture::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; background: url("${texture.file}") center / cover no-repeat; mix-blend-mode: multiply; opacity: ${texture.strength}; }`);
+  }
   return lines.join('\n') + '\n';
 }
 
 export default {
-  buildProductTokens, auditProductTokens, auditSummary, toProductCss, resolveColour, checkShape, shapeKitDefaults, SHAPE_FAMILIES,
+  buildProductTokens, auditProductTokens, auditSummary, toProductCss, resolveColour, checkShape, shapeKitDefaults, textureMove, SHAPE_FAMILIES,
   solveForContrast, composite, mix, shiftL, withAlpha, pickText, isTranslucent,
   PRODUCT_ROLES, STATUS_FAMILIES, SERIES_COUNT, FLOORS, PRODUCT_TOKENS_VERSION,
 };

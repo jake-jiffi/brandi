@@ -156,6 +156,17 @@ describe('decided roles', () => {
     assert.throws(() => P.buildProductTokens(system, { roles: { primary: { light: 'navy' } } }), /must be a hex value/);
   });
 
+  test("the brand's named colours may be a list of { name, hex } or a { name: hex } map, and nothing else", () => {
+    const brandValues = (t) => t.color.tokens.filter((x) => x.brand).map((x) => [x.name, x.value.light]);
+    const list = P.buildProductTokens(system, { brandColours: [{ name: 'acme-green', hex: '#5CBF1B' }, { name: 'acme-ink', hex: '#123' }] });
+    const map = P.buildProductTokens(system, { brandColours: { 'acme-green': '#5CBF1B', 'acme-ink': '#123' } });
+    assert.deepEqual(brandValues(list), [['brand-acme-green', '#5cbf1b'], ['brand-acme-ink', '#112233']]);
+    assert.deepEqual(brandValues(map), brandValues(list), 'a map reads the same as the list');
+    assert.throws(() => P.buildProductTokens(system, { brandColours: '#5CBF1B' }), /brandColours is a list of \{ name, hex \} or a \{ name: hex \} map/);
+    assert.throws(() => P.buildProductTokens(system, { brandColours: [{ hex: '#5CBF1B' }] }), /brandColours/);
+    assert.throws(() => P.buildProductTokens(system, { brandColours: { 'acme-green': null } }), /each with a name and a hex value/);
+  });
+
   test('a signature rail gets its own text, muted and focus colours, and they pass on it', () => {
     const tokens = P.buildProductTokens(system, { roles: { rail: { light: '#123d2a', dark: '#0b2419' } } });
     const audit = P.auditProductTokens(tokens);
@@ -163,6 +174,42 @@ describe('decided roles', () => {
     for (const n of ['rail-text', 'rail-text-strong', 'rail-muted', 'rail-focus']) {
       assert.ok(audit.rows.some((r) => r.fg === n && r.bg === 'rail'), `${n} is not measured on the rail`);
     }
+  });
+});
+
+describe("a coloured rail's quiet text", () => {
+  // The detector's own test: grey ink is HSL saturation under 0.2 between 20% and 85% lightness, and a ground is a
+  // colour when its channels spread 40 or more of 255. An emerald rail's group labels came out grey on it 52 times.
+  const hsl = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+    const hi = Math.max(r, g, b), lo = Math.min(r, g, b), l = (hi + lo) / 2, d = hi - lo;
+    return { l, s: d <= 0 || l <= 0 || l >= 1 ? 0 : d / (1 - Math.abs(2 * l - 1)) };
+  };
+  const readsGrey = (hex) => { const { l, s } = hsl(hex); return s < 0.2 && l > 0.2 && l < 0.85; };
+  const hueGap = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+
+  test('on a chromatic rail, rail-text and rail-muted are tints of its own hue, never grey, and keep their floors', () => {
+    // Near neighbours of real rails: an emerald, a navy, a plum, a maroon, a light yellow rail with dark words, and
+    // a deep teal and a pale lavender, where the rail's own chroma alone still solved to a grey.
+    for (const railHex of ['#124835', '#102B4B', '#5C2B87', '#7B202C', '#F3CA4D', '#012A23', '#E4D6FF']) {
+      const tokens = P.buildProductTokens(system, { roles: { rail: { light: railHex, dark: railHex } } });
+      const audit = P.auditProductTokens(tokens);
+      for (const theme of ['light', 'dark']) {
+        const at = (n) => P.resolveColour(tokens, n, theme);
+        const muted = at('rail-muted');
+        assert.equal(readsGrey(muted), false, `${railHex} ${theme}: rail-muted ${muted} reads grey on the rail`);
+        assert.equal(readsGrey(at('rail-text')), false, `${railHex} ${theme}: rail-text ${at('rail-text')} reads grey on the rail`);
+        assert.ok(hueGap(toOklch(muted).h, toOklch(railHex).h) < 20, `${railHex} ${theme}: rail-muted ${muted} is in the rail's hue`);
+        assert.ok(contrastRatio(muted, at('rail')) >= 4.5 && contrastRatio(muted, at('rail-hover')) >= 4.5, `${railHex} ${theme}: rail-muted keeps 4.5:1`);
+      }
+      assert.deepEqual(audit.fails.filter((f) => f.fg.startsWith('rail')), [], `${railHex}: the rail's pairs all pass`);
+    }
+  });
+
+  test('a rail with no colour of its own keeps its quiet text as it was', () => {
+    const black = P.buildProductTokens(system, { roles: { rail: { light: '#000000', dark: '#000000' } } });
+    const before = P.solveForContrast(P.mix('#000000', P.resolveColour(black, 'rail-text', 'light'), 0.55), ['#000000', P.resolveColour(black, 'rail-hover', 'light')], 4.5, { mode: 'floor' }).hex;
+    assert.equal(P.resolveColour(black, 'rail-muted', 'light'), before, 'a black rail still mixes its muted text from its text');
   });
 });
 
@@ -464,6 +511,28 @@ describe("the brand's measured shapes", () => {
       assert.throws(() => build(bad), TypeError, JSON.stringify(bad));
     }
     assert.equal(byName(build({ families: { press: { px: 'pill', source: 'the chips on p9' } } }))['radius-action'].value, '9999px');
+  });
+
+  const paper = { name: 'The paper ground', source: "the guidelines' page grounds, p13", where: ['the sign-in hero'], file: 'textures/paper.jpg', kind: 'texture', strength: 0.35 };
+
+  test("a texture move carries its file: tokens.css lays it on a layer multiplied over the element's own colour", () => {
+    const tokens = build({ moves: [paper] });
+    assert.deepEqual(tokens.radius.moves, [paper], 'the move travels in tokens.json as written');
+    const css = P.toProductCss(tokens);
+    const rule = /\.brand-texture::before \{([^}]*)\}/.exec(css)?.[1] ?? '';
+    assert.match(rule, /background: url\("textures\/paper\.jpg"\) center \/ cover no-repeat/, 'the file, beside tokens.css as a canvas holds it');
+    assert.match(rule, /mix-blend-mode: multiply/);
+    assert.match(rule, /opacity: 0\.35/, "at the move's strength");
+    assert.match(rule, /z-index: -1/, 'under the words');
+    assert.match(css, /\.brand-texture \{[^}]*isolation: isolate/, "so the layer multiplies over the element's own colour, not the page behind it");
+    assert.doesNotMatch(P.toProductCss(build({ moves: [{ name: 'An edge', source: 'p4', where: ['the email header'] }] })), /brand-texture/, 'a move with no file emits nothing');
+  });
+
+  test('a texture move is refused without its strength, outside textures/, or as a second texture', () => {
+    for (const bad of [{ ...paper, strength: undefined }, { ...paper, strength: 1.5 }, { ...paper, file: '../brand/paper.jpg' }, { ...paper, kind: 'edge' }, { ...paper, kind: undefined }]) {
+      assert.throws(() => build({ moves: [bad] }), TypeError, JSON.stringify(bad));
+    }
+    assert.throws(() => build({ moves: [paper, { ...paper, name: 'Halftone', file: 'textures/dots.png' }] }), /one texture/);
   });
 });
 

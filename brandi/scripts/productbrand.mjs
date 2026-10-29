@@ -16,6 +16,7 @@ import { promisify } from 'node:util';
 
 import { inkBounds, viewBox } from './svg.mjs';
 import { findChrome } from './preview.mjs';
+import { toOklch } from './color.mjs';
 
 const run = promisify(execFile);
 
@@ -130,6 +131,29 @@ export function scopeClasses(svg, prefix) {
   return out;
 }
 
+const NAMED_INKS = { black: '#000000', white: '#ffffff' };
+
+/**
+ * Whether a drawing is one dark ink: every colour it paints is the same near-black, or it paints none and so draws
+ * black by default. A brand's black line drawings vanished on a dark ground; drawn in currentColor they follow the
+ * text there instead. A drawing in a colour (a green, a navy) or in more than one keeps its own colours, because
+ * taking the text colour would recolour it on a light ground too. A gradient or pattern is never one ink.
+ */
+export function oneDarkInk(svg) {
+  const inks = new Set();
+  for (const [, raw] of String(svg).matchAll(/\b(?:fill|stroke)\s*[:=]\s*["']?([^;"'}\s>]+)/gi)) {
+    const v = raw.toLowerCase();
+    if (v === 'none' || v === 'transparent' || v === 'currentcolor') continue;
+    if (v.startsWith('url(')) return false;
+    inks.add(NAMED_INKS[v] ?? v.replace(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/, '#$1$1$2$2$3$3'));
+  }
+  if (inks.size > 1) return false;
+  const [ink = '#000000'] = inks;
+  if (!/^#[0-9a-f]{6}$/.test(ink)) return false;
+  const c = toOklch(ink);
+  return c.L < 0.35 && c.C < 0.04;
+}
+
 /** The one-ink rendition from a single-colour master: every ink becomes currentColor, so the mark takes the text colour. */
 export function toInk(svg) {
   let s = svg
@@ -144,6 +168,13 @@ const aspectOf = (svg) => {
   const vb = /\sviewBox="([^"]+)"/.exec(svg)?.[1].trim().split(/[\s,]+/).map(Number);
   return vb && vb[2] > 0 && vb[3] > 0 ? vb[3] / vb[2] : null;
 };
+
+/**
+ * How much wider than tall a symbol may be. A symbol fills a square place: the icons rail's home control is a 40px
+ * square, which holds one 24px tall up to 36px wide. A signature 2.38 times its height, used as the symbol, was drawn
+ * 107px wide there and overflowed the rail.
+ */
+export const SYMBOL_MAX_ASPECT = 1.5;
 
 /** "Leave clear space on every side equal to half the height of the mark" as 0.5. */
 export function clearSpaceRatio(rule) {
@@ -188,30 +219,59 @@ i.decode().then(() => {
   }
 }
 
+// Brandi's own brand file writes a logo's role as free text ("secondary: black logo outline reversed to white"),
+// and the logo forge writes primary, mono-white and mono-black. So a role is read by its words, lower-cased, once
+// any ground it names ("on black", "for dark backgrounds") is taken out, since a ground is not an ink: white,
+// reversed or knocked out is the file for dark grounds; black, mono or one colour is the one ink; primary is the
+// master. White is read before black, so "black logo outline reversed to white" is the dark-ground file. An exact
+// role wins, then a match whose role names no ground, then one that does, and an SVG before a picture.
+const ROLE_WORDS = [
+  ['mono-white', /\b(mono-?white|white|reversed?|knock(ed)?[- ]?out)\b/],
+  ['mono-black', /\b(mono-?black|black|mono|one[- ]colou?r|single[- ]colou?r)\b/],
+  ['primary', /\bprimary\b/],
+];
+const GROUND = /\b(?:(?:on|for) (?:a |the )?(?:black|white|dark|light|paper)(?: (?:back)?grounds?)?|(?:black|white|dark|light) (?:back)?grounds?)\b/g;
+const roleWord = (role) => {
+  const words = String(role ?? '').toLowerCase().replace(GROUND, ' ');
+  return ROLE_WORDS.find(([, re]) => re.test(words))?.[0] ?? null;
+};
+const namesGround = (role) => new RegExp(GROUND.source).test(String(role ?? '').toLowerCase());
+
 /**
  * Where the marks come from: { from, name, files: { rendition: path }, inkFrom, logo, character, base }.
  * Null when nothing names a mark, and the kit's placeholder stays.
+ *
+ * brand.json's logo paths are relative to the brand folder (`brandDir`, brand/ under `brandRoot` unless given),
+ * and are read from there first, then from the project root, as the brand book reads them. Read from the project
+ * root alone, a route-A starter failed on its first mark.
  */
-export function brandSources({ product = {}, brand = null, productDir, brandRoot }) {
+export function brandSources({ product = {}, brand = null, productDir, brandRoot, brandDir = brandRoot ? path.join(brandRoot, 'brand') : null }) {
   const block = product.brand;
   if (block?.marks?.full) {
     return { from: 'product/product.json', name: block.name ?? product.productName ?? brand?.meta?.name ?? null, files: block.marks, inkFrom: null, logo: block.logo ?? {}, character: block.character ?? null, base: productDir };
   }
-  const files = brand?.identity?.logo?.files ?? [];
-  const role = (r) => files.find((f) => f.role === r)?.path ?? null;
-  if (!role('primary')) return null;
+  const files = (brand?.identity?.logo?.files ?? []).map((f) => (typeof f === 'string' ? { path: f } : f)).filter((f) => f?.path);
+  const rank = (f, r) => (f.role === r ? 0 : roleWord(f.role) !== r ? null : namesGround(f.role) ? 2 : 1);
+  const role = (r, ok = () => true) => files
+    .map((f, i) => ({ f, i, rank: rank(f, r) }))
+    .filter((c) => c.rank !== null && ok(c.f.path))
+    .sort((a, b) => a.rank - b.rank || Number(!/\.svg$/i.test(a.f.path)) - Number(!/\.svg$/i.test(b.f.path)) || a.i - b.i)[0]?.f.path ?? null;
+  const full = role('primary');
+  if (!full) return null;
   const logo = {};
   const ratio = clearSpaceRatio(brand.identity.logo.clearSpace);
   if (ratio) logo.clearSpace = ratio;
   if (brand.identity.logo.minSize?.screenPx) logo.minLongSide = brand.identity.logo.minSize.screenPx;
+  const onDark = role('mono-white');
   return {
     from: "brand/brand.json's logo master",
     name: brand.meta?.name ?? null,
-    files: { full: role('primary'), ...(role('mono-white') ? { 'full-on-dark': role('mono-white') } : {}) },
-    inkFrom: role('mono-black'),
+    files: { full, ...(onDark ? { 'full-on-dark': onDark } : {}) },
+    // The one ink takes the text colour, which only an outline drawing can.
+    inkFrom: role('mono-black', (p) => /\.svg$/i.test(p)),
     logo,
     character: null,
-    base: brandRoot,
+    base: [brandDir, brandRoot].find((d) => d && existsSync(path.resolve(d, full))) ?? brandDir ?? brandRoot,
   };
 }
 
@@ -238,7 +298,7 @@ export function rasterMark(bytes, where = 'a mark') {
 export function brandConstant(src, { stills = new Map() } = {}) {
   const read = (rel, what) => {
     const file = path.resolve(src.base, rel);
-    if (!existsSync(file)) throw new Error(`${what}: ${rel} does not exist (from ${src.from}).`);
+    if (!existsSync(file)) throw new Error(`${what}: ${rel} does not exist in ${src.base} (from ${src.from}).`);
     return { file, text: readFileSync(file, 'utf8') };
   };
   const marks = {};
@@ -254,6 +314,14 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     if (rel) marks[rendition] = scopeClasses(tighten((rendition.endsWith('-ink') ? toInk : (x) => x)(cleanSvg(read(rel, `the ${rendition} mark`).text, rel))), `brand-${rendition}-`);
   }
   if (src.inkFrom && !marks['full-ink']) marks['full-ink'] = scopeClasses(tighten(toInk(cleanSvg(read(src.inkFrom, 'the one-ink mark').text, src.inkFrom))), 'brand-full-ink-');
+  // A mark much wider than tall is not a symbol, whatever it is named: without one, the icons rail shows its Home
+  // control rather than a mark that overflows its square.
+  const refused = [];
+  const symbolAspect = marks.symbol ? aspectOf(marks.symbol) : null;
+  if (symbolAspect && 1 / symbolAspect > SYMBOL_MAX_ASPECT) {
+    refused.push(`the symbol (${src.files.symbol}) is ${(1 / symbolAspect).toFixed(2)} times as wide as it is tall, and a symbol fills a square place (${SYMBOL_MAX_ASPECT} at most), so it is not used as one and the icons rail shows its Home control. Name a squarer mark as the symbol, or none.`);
+    for (const r of ['symbol', 'symbol-on-dark', 'symbol-ink']) delete marks[r];
+  }
 
   const kept = [];
   const logo = {};
@@ -274,12 +342,19 @@ export function brandConstant(src, { stills = new Map() } = {}) {
 
   let character = null;
   const full = [];
+  const inkPoses = [];
   if (src.character?.poses) {
     const poses = (map) => {
       const out = {};
       for (const [state, rel] of Object.entries(map ?? {})) {
         if (!CHARACTER_STATES.includes(state)) throw new Error(`${src.from} gives the character a "${state}" pose; the states are ${CHARACTER_STATES.join(', ')}.`);
-        if (/\.svg$/i.test(rel)) { out[state] = scopeClasses(cleanSvg(read(rel, `the ${state} pose`).text, rel), `brand-${state}-`); continue; }
+        if (/\.svg$/i.test(rel)) {
+          const svg = cleanSvg(read(rel, `the ${state} pose`).text, rel);
+          const ink = oneDarkInk(svg);
+          if (ink && !inkPoses.includes(state)) inkPoses.push(state);
+          out[state] = scopeClasses(ink ? toInk(svg) : svg, `brand-${state}-`);
+          continue;
+        }
         const { file } = read(rel, `the ${state} pose`);
         if (stills.has(file)) { out[state] = stills.get(file); continue; }
         if (!full.includes(file)) full.push(file);
@@ -296,6 +371,8 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     `${BRAND_MARKER} from ${src.from}. Change the files there and run it again;`,
     '// a hand edit here is undone by the next run.',
     kept.length ? `// The record holds no ${kept.join(', ')}, so ${kept.length === 1 ? 'it keeps the kit default' : 'they keep the kit defaults'} until it does.` : null,
+    ...refused.map((r) => `// Not a symbol: ${r}`),
+    inkPoses.length ? `// Drawn in one dark ink, so they take the text colour on any ground: ${inkPoses.join(', ')}.` : null,
     '',
     'export const BRAND: Brand = {',
     `  name: ${json(src.name ?? 'Product')},`,
@@ -310,7 +387,7 @@ export function brandConstant(src, { stills = new Map() } = {}) {
     lines.push('  },');
   }
   lines.push('}', '');
-  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character) };
+  return { source: lines.join('\n'), kept, marks: Object.keys(marks), stills: full.map((f) => path.basename(f)), character: Boolean(character), refused, inkPoses };
 }
 
 /**
@@ -323,4 +400,4 @@ export function brandModule(current, generated) {
   return `${current.slice(0, Math.min(...at) + 1)}${generated}`;
 }
 
-export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER };
+export default { shrinkStill, rasterMark, cleanSvg, inlineClassStyles, tighten, scopeClasses, toInk, oneDarkInk, clearSpaceRatio, brandSources, brandConstant, brandModule, RENDITIONS, CHARACTER_STATES, LOGO_DEFAULTS, BRAND_MARKER, SYMBOL_MAX_ASPECT };

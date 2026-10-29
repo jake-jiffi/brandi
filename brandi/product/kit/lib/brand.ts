@@ -76,10 +76,14 @@ const fullMark = (symbolFill: string) =>
 const symbolMark = (fill: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill-rule="evenodd" style="fill:${fill}" d="${SYMBOL_SHAPE}"/></svg>`
 
-// The placeholder character: a rounded figure whose face changes with the moment. Four poses on
-// purpose, so the previews show that a moment the pack has no pose for gets no picture.
+// The placeholder character: a rounded figure whose face changes with the moment. Not every moment has a
+// pose, on purpose, so the previews show that a moment the pack has no pose for gets no picture.
 const figure = (face: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 96 96"><rect x="14" y="16" width="68" height="70" rx="28" style="fill:var(--brand)"/><g style="fill:var(--on-brand);stroke:var(--on-brand)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">${face}</g></svg>`
+// One pose in a single ink, in currentColor, as the starter draws a brand's black line drawings: it takes the
+// text colour, so it reads on a dark ground as on a light one.
+const lineFigure = (face: string) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 3 96 96"><g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><rect x="14" y="16" width="68" height="70" rx="28"/>${face}</g></svg>`
 
 export const BRAND: Brand = {
   name: "Product",
@@ -99,6 +103,7 @@ export const BRAND: Brand = {
       working: figure('<circle cx="43" cy="44" r="4.5" stroke="none"/><circle cx="63" cy="44" r="4.5" stroke="none"/><path fill="none" d="M43 62h12"/>'),
       done: figure('<path fill="none" d="M32 47q6-6 12 0M52 47q6-6 12 0M36 58q12 11 24 0"/>'),
       "nothing-found": figure('<circle cx="36" cy="50" r="4.5" stroke="none"/><circle cx="56" cy="50" r="4.5" stroke="none"/><circle fill="none" cx="46" cy="64" r="3.5"/>'),
+      help: lineFigure('<circle cx="38" cy="46" r="2"/><circle cx="58" cy="46" r="2"/><path d="M41 62q7 5 14 0"/>'),
     },
   },
 }

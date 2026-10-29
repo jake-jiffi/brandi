@@ -162,7 +162,12 @@ export function shapeBoard(tokens, system) {
     ? `The rail ${shell.form === 'floating' ? 'floats, 8px in from the window edge' : 'meets the window edge, square'}. The brand's: ${shell.source}`
     : "The rail meets the window edge, square. The kit's: the plainest form, with no shell named";
   const carried = moves.length ? moves.map((m) => `${m.name}, on ${m.where.join(' and ')}. The brand's: ${m.source}`) : ["No shape move of the brand's own is carried yet."];
-  const shellNotes = [form, ...carried].map((line) => `<p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text); max-width: var(--measure, 40em);">${esc(line)}</p>`).join('\n');
+  const texture = moves.find((m) => m.kind === 'texture' && m.file);
+  const shellNotes = [
+    ...[form, ...carried].map((line) => `<p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text); max-width: var(--measure, 40em);">${esc(line)}</p>`),
+    // The texture as a screen carries it, laid on the brand colour by the class tokens.css defines.
+    texture ? `<div class="brand-texture" style="width: 480px; height: 120px; border-radius: var(--radius-md); background: var(--brand);"></div><p style="${note}">.brand-texture on the brand colour, at strength ${esc(texture.strength)}</p>` : '',
+  ].filter(Boolean).join('\n');
   const shadows = (tokens.shadow?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;"><div style="width: 160px; height: 96px; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--${t.name});"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)}</p>${t.usage ? `<p style="margin: 0; max-width: 200px; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.usage)}</p>` : ''}</div>`).join('\n');
   const sizes = (tokens.size?.tokens ?? []).map((t) => `<li style="font-size: 13px; line-height: 20px;"><span style="font-family: var(--font-mono);">${esc(t.name)}</span> · ${esc(t.value)}${t.usage ? `: ${esc(t.usage)}` : ''}</li>`).join('\n');
   return board(system, 'FoundationsShape1440', 'Space, corners and depth', [
@@ -330,6 +335,45 @@ export function contentsBoard(system, sections) {
   return board(system, 'Main', 'Contents', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: var(--measure, 30em);">The ${esc(system.name)} product system on one canvas: the foundations, every component mounted live, then each product's screens, states and options. Light boards with their dark twins beside them.</p>\n<ol style="margin: 0; padding: 0; list-style: none;">\n${body}\n</ol>`);
 }
 
+const GENERATED_NOTES = new Set(['foundations', 'components']);
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/**
+ * The sections a person made on the canvas, in canvas order, for the contents board: each title note in
+ * canvas.json with the authored boards under it, linked to its first. A board sits under the nearest note above it
+ * that starts at or left of it. Boards under no note keep a section per name, as before there were notes, and a
+ * board new since the last run, not yet placed, comes last. A note reads "Label · what it holds", as the generated
+ * ones do. Read before this, Main listed only Foundations and Components, and a rerun undid any link to the rest.
+ */
+export function authoredSections(existing, authored) {
+  const at = (a) => [a.y, a.x ?? 0];
+  const before = (a, b) => a[0] - b[0] || a[1] - b[1];
+  const notes = (existing?.annotations ?? []).filter((n) => !GENERATED_NOTES.has(n.id) && /^title/.test(n.kind ?? '') && Number.isFinite(n.y) && typeof n.text === 'string');
+  const placed = (existing?.artboards ?? []).filter((a) => authored.includes(a.file) && Number.isFinite(a.y)).sort((a, b) => before(at(a), at(b)));
+  const under = new Map(notes.map((n) => [n, []]));
+  const loose = new Map();
+  const group = (f, where) => {
+    const name = /^([A-Z][a-z0-9]+)/.exec(f)?.[1] ?? f.replace(/\.dc\.html$/, '');
+    if (!loose.has(name)) loose.set(name, { at: where, files: [] });
+    loose.get(name).files.push(f);
+  };
+  for (const a of placed) {
+    const note = notes.filter((n) => n.y <= a.y && (n.x ?? 0) <= (a.x ?? 0)).sort((m, n) => before(at(n), at(m)))[0];
+    if (note) under.get(note).push(a.file);
+    else group(a.file, at(a));
+  }
+  for (const f of authored) if (!placed.some((a) => a.file === f)) group(f, [Infinity, 0]);
+  const sections = [];
+  for (const [n, files] of under) {
+    if (!files.length) continue;
+    const [label, ...rest] = n.text.split(' · ');
+    const holds = rest.join(' · ').trim().replace(/[.\s]+$/, '');
+    sections.push({ at: at(n), label: label.trim(), first: files[0], note: `${holds ? `${holds}. ` : ''}${plural(files.length, 'board')}.` });
+  }
+  for (const [label, g] of loose) sections.push({ at: g.at, label, first: g.files[0], note: `${plural(g.files.length, 'board')}.` });
+  return sections.sort((a, b) => before(a.at, b.at)).map(({ at: _, ...s }) => s);
+}
+
 function isGenerated(file) {
   try { return readFileSync(file, 'utf8').slice(0, 2048).includes(MARKER); } catch { return false; }
 }
@@ -355,8 +399,9 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
     { label: 'Components', first: components[0]?.file ?? foundations[0].file, note: `${defs.length} components in ${components.length} groups, mounted from the bundle.` },
   ];
   const authored = readdirSync(canvas).filter((f) => f.endsWith('.dc.html') && f !== 'Main.dc.html').sort();
-  const surfaces = [...new Set(authored.map((f) => /^([A-Z][a-z0-9]+)/.exec(f)?.[1]).filter(Boolean))];
-  for (const s of surfaces) sections.push({ label: s, first: authored.find((f) => f.startsWith(s)), note: `${authored.filter((f) => f.startsWith(s)).length} boards.` });
+  let existing = null;
+  try { existing = JSON.parse(readFileSync(path.join(canvas, 'canvas.json'), 'utf8')); } catch { /* first run */ }
+  sections.push(...authoredSections(existing, authored));
   const main = contentsBoard(system, sections);
   const lights = [main, ...foundations, ...components];
   for (const b of lights) writeFileSync(path.join(canvas, b.file), b.source);
@@ -436,8 +481,6 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   row(components, 'Components · every variant and state, mounted live, light and dark', 'components');
 
   // Authored boards keep their own place; shift them below the generated rows if any would be covered.
-  let existing = null;
-  try { existing = JSON.parse(readFileSync(path.join(canvas, 'canvas.json'), 'utf8')); } catch { /* first run */ }
   const kept = (existing?.artboards ?? []).filter((a) => authored.includes(a.file));
   const top = kept.length ? Math.min(...kept.map((a) => a.y)) : Infinity;
   const shift = kept.length && top < y ? y - top + ROW_GAP_Y : 0;
@@ -463,4 +506,4 @@ export async function writeBoards({ productDir, starter, measure = true, log = (
   return { boards: [...generated, ...twins].map((b) => b.file), measured: Object.keys(heights).length, shifted: shift, tooTall, manifest };
 }
 
-export default { writeBoards, colourBoard, typeBoard, shapeBoard, iconBoard, componentBoards, packParts, partBoards, twin, contentsBoard, MARKER };
+export default { writeBoards, colourBoard, typeBoard, shapeBoard, iconBoard, componentBoards, packParts, partBoards, twin, contentsBoard, authoredSections, MARKER };

@@ -1,4 +1,4 @@
-// Character's one definition. The kit carries a placeholder pack (lib/brand.ts) with four poses.
+// Character's one definition. The kit carries a placeholder pack (lib/brand.ts) with five poses, one in a single ink.
 const STATES = ["welcome", "working", "done", "caught-up", "needs-person", "nothing-found", "could-not-load", "help"]
 // A Character the check mounts itself, in a pose this brand's pack has ("missing": one it lacks), so the
 // checks run on any brand's pack, drawn or still. Resolves to the pose mounted, or null when there is none.
@@ -36,6 +36,8 @@ export default {
   notes: {
     Behaviour: [
       "Decorative, so hidden from screen readers: the words beside it carry the meaning.",
+      "A pose drawn in one dark ink (a brand's black line drawing) is drawn in currentColor by the starter, so it takes the text colour around it and reads on a dark ground as on a light one. A brand's black line drawings vanished on dark grounds before.",
+      "A pose in a colour, or in more than one, keeps its own colours, so on a dark ground it can lose contrast or glare: the pack has no dark rendition. Keep such a pose off dark grounds, or ask the brand for one drawn for them. A still (PNG, JPEG, WebP) is a picture and keeps its colours too.",
       "Its loop never runs under reduced motion, and stops or starts when the setting changes while it is on screen.",
       "Renders nothing when the brand has no character, or no pose for the moment.",
     ],
@@ -56,6 +58,7 @@ ${pose("welcome", "welcome")}
 ${pose("working", "working")}
 ${pose("done", "done")}
 ${pose("nothing-found", "nothing-found")}
+${pose("help", "help, in one ink")}
 </div>`,
     },
     {
@@ -125,6 +128,24 @@ ${pose("nothing-found", "nothing-found")}
       async run({ page, expect }) {
         if (!(await mount(page, "working", { motion: true, size: 64 }))) return
         expect.equal(await mounted(page).evaluate((el) => el.getAnimations().length), 0, "animations under reduced motion")
+      },
+    },
+    {
+      name: "A pose drawn in one ink takes the colour of the text around it, in both themes",
+      themes: ["light", "dark"],
+      async run({ page, expect }) {
+        // A pose in one ink is markup in currentColor and nothing else. A pack with none has nothing to test here.
+        const want = await page.evaluate((states) => {
+          const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+          const poses = kit.BRAND?.character?.poses ?? {}
+          return states.find((s) => typeof poses[s] === "string" && /currentColor/i.test(poses[s]) && !/#[0-9a-f]{3,8}\b|rgba?\(|var\(/i.test(poses[s])) ?? null
+        }, STATES)
+        if (!want || (await mount(page, want)) !== want) return
+        const [ink, text] = await mounted(page).evaluate((el) => {
+          const painted = [...el.querySelectorAll("svg *")].map((n) => getComputedStyle(n)).find((c) => c.stroke !== "none" || c.fill !== "none")
+          return [painted && (painted.stroke !== "none" ? painted.stroke : painted.fill), getComputedStyle(document.body).color]
+        })
+        expect.equal(ink, text, `the ${want} pose's ink against the text colour`)
       },
     },
     {

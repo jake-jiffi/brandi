@@ -11,7 +11,7 @@ export interface LogoProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, "
   mark?: LogoMark
   /** `auto` follows the theme. Otherwise one of the brand's approved renditions; `ink` takes the colour of the text around it. */
   color?: LogoColor
-  /** Height in px. Defaults to the logo system's preferred size; values under its minimum are raised to it. */
+  /** Height in px. Defaults to the logo system's preferred size (the symbol's own, 24px); values under its minimum are raised to it. */
   height?: number
   /** Adds the logo system's clear space around the mark, as padding. */
   clearspace?: boolean
@@ -56,13 +56,19 @@ function Rendition({ name, className }: { name: MarkRendition; className: string
   )
 }
 
+// The symbol's own size, for a square place: the icons rail's home control, a 40px square, holds it at 24px. It
+// never takes BRAND.logo.height, which the starter raises to the full logo's minimum: a wide logo's 45px drew a
+// signature used as the symbol 107px wide in that square.
+const SYMBOL_HEIGHT = 24
+
 /** The brand's mark, from the master artwork: never set in type, never redrawn. */
 export const Logo = React.forwardRef<HTMLSpanElement, LogoProps>(function Logo(
   { mark = "full", color = "auto", height, clearspace = false, title = BRAND.name, className, style, ...rest },
   ref
 ) {
-  const min = mark === "symbol" && BRAND.marks.symbol ? BRAND.logo.symbolMinHeight : BRAND.logo.minHeight
-  const h = Math.max(height ?? BRAND.logo.height, min)
+  const symbol = mark === "symbol" && Boolean(BRAND.marks.symbol)
+  const min = symbol ? BRAND.logo.symbolMinHeight : BRAND.logo.minHeight
+  const h = Math.max(height ?? (symbol ? SYMBOL_HEIGHT : BRAND.logo.height), min)
   const pad = clearspace ? Math.round(h * BRAND.logo.clearSpace) : 0
   const light = rendition(mark, color, "light")
   const dark = rendition(mark, color, "dark")

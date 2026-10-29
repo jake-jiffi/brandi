@@ -14,23 +14,31 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { artboard } from './canvas.mjs';
-import { googleFontsUrl } from './artboards.mjs';
 
 const GENERIC = /^(ui-[a-z-]+|system-ui|-apple-system|serif|sans-serif|monospace|Georgia|"Times New Roman"|Arial|"Segoe UI"|Menlo|Consolas|"SF Mono")$/i;
 
 /**
- * The Google Fonts stylesheet for the faces a tokens file names and ships no file for. A canvas board
- * may load Google Fonts in its helmet and nothing else from the network, so a hosted face reaches the
- * board this way; a face the system ships as a file comes through tokens.css instead.
+ * The Google Fonts stylesheet for the faces a tokens file names and ships no file for, or null when every
+ * face ships as a file. A canvas board may load Google Fonts in its helmet and nothing else from the
+ * network, so a hosted face reaches the board this way; a face the system ships as a file comes through
+ * tokens.css instead. Each face is asked for the weights its type styles set and no italics, as
+ * app/fonts.ts asks: Google refuses the whole stylesheet when one face lacks a weight or an italic asked
+ * of it, and a display face with one weight, asked for 400 to 700 in both styles, left a board with none.
  */
 export function hostedFontsUrl(tokens) {
   const shipped = new Set((tokens.type?.fonts ?? []).map((f) => f.family));
-  const faces = Object.values(tokens.type?.families ?? {})
-    .map((stack) => String(stack).split(',')[0].trim())
-    .filter((f) => f && !GENERIC.test(f))
-    .map((f) => f.replace(/^["']|["']$/g, ''))
-    .filter((f) => !shipped.has(f));
-  return faces.length ? googleFontsUrl(faces, { weights: [400, 500, 600, 700] }) : null;
+  const weights = new Map();
+  for (const [role, stack] of Object.entries(tokens.type?.families ?? {})) {
+    const first = String(stack).split(',')[0].trim();
+    const face = first.replace(/^["']|["']$/g, '');
+    if (!first || GENERIC.test(first) || shipped.has(face)) continue;
+    const set = weights.get(face) ?? new Set();
+    for (const g of tokens.type?.groups ?? []) for (const s of g.styles) if ((s.family ?? g.family) === role) set.add(Number(s.fontWeight ?? 400));
+    weights.set(face, set);
+  }
+  if (!weights.size) return null;
+  const family = ([face, set]) => `family=${encodeURIComponent(face).replace(/%20/g, '+')}:wght@${[...(set.size ? set : [400])].sort((a, b) => a - b).join(';')}`;
+  return `https://fonts.googleapis.com/css2?${[...weights].map(family).join('&')}&display=swap`;
 }
 
 export const NOTE_ORDER = ['Behaviour', 'Layout', 'States', 'Copy', 'Rules', 'Review', 'Accepted', 'Open'];

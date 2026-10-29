@@ -20,6 +20,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
 import { toStarterGlobals } from './productglobals.mjs';
+import { textureMove } from './producttokens.mjs';
 import { relativeLuminance } from './color.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
 import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
@@ -233,19 +234,64 @@ export function generatedFiles(tokens, identity) {
   ]);
 }
 
+// Marks a starter while the kit is copied into it, until the run finishes. A run stopped part way leaves it, so the
+// next run is fresh again and copies the kit whole: a failed first run once left half a kit, and the rerun only said
+// "Refreshed".
+const PENDING = '.brandi/starter-pending';
+
 /**
  * Write or refresh a starter. A fresh folder gets the whole kit; an existing one gets only the
- * generated files unless `refreshKit`. Font files the tokens ship are copied in from `fontsDir`.
+ * generated files unless `refreshKit`. Font files the tokens ship are copied in from `fontsDir`, and the
+ * texture move's file from `productDir`.
+ *
+ * Everything that can fail on its inputs (the generated files, the brand's marks, the texture's file) is
+ * worked out before anything is written, and a failure says nothing was written.
  */
-export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null, brand = null, brandRoot = null, productDir = null }) {
-  const fresh = !existsSync(path.join(out, 'package.json'));
+export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKit = false, fontsDir = null, platformOut = null, product = {}, brandName = null, brand = null, brandRoot = null, brandDir, productDir = null }) {
+  let files;
+  let src;
+  let generated = null;
+  let textureFrom = null;
+  try {
+    files = generatedFiles(tokens, identity);
+    // The brand's marks and character, from its own files. Without any, the kit's placeholder stays.
+    src = brandSources({ product, brand, productDir, brandRoot, brandDir });
+    if (src) {
+      // Pose stills go into the bundle drawn down, so boards on the canvas show them too. Headless Chrome can miss
+      // one under load, so each gets three tries; one it never draws goes in at full size rather than as a path.
+      const stills = new Map();
+      for (const rel of [...Object.values(src.character?.poses ?? {}), ...Object.values(src.character?.flat ?? {})]) {
+        const still = path.resolve(src.base, rel);
+        if (/\.(png|jpe?g|webp)$/i.test(rel) && existsSync(still) && !stills.has(still)) {
+          let uri = null;
+          for (let i = 0; i < 3 && !uri; i++) uri = await shrinkStill(still);
+          if (uri) stills.set(still, uri);
+        }
+      }
+      generated = brandConstant(src, { stills });
+    }
+    const texture = textureMove(tokens);
+    if (texture) {
+      textureFrom = productDir ? path.join(productDir, texture.file) : null;
+      if (!textureFrom || !existsSync(textureFrom)) throw new Error(`the texture move "${texture.name}" names ${texture.file}, which is not in ${productDir ?? 'the product folder'}. Copy the brand's own file there (02-brand-to-product.md, Shape).`);
+    }
+  } catch (e) {
+    throw new Error(`Nothing was written to ${out}: ${e.message}`);
+  }
+
+  const pending = path.join(out, PENDING);
+  const fresh = !existsSync(path.join(out, 'package.json')) || existsSync(pending);
+  if (fresh || refreshKit) {
+    mkdirSync(path.dirname(pending), { recursive: true });
+    writeFileSync(pending, 'A starter being written. While this file is here, the next run copies the kit again.\n');
+  }
   const written = [];
   let retired = { removed: [], kept: [] };
   if (fresh || refreshKit) {
     retired = refreshKitFiles(out, kit);
     for (const entry of readdirSync(kit)) if (!NOT_FROM_KIT.has(entry)) written.push(entry);
   }
-  for (const [rel, content] of generatedFiles(tokens, identity)) {
+  for (const [rel, content] of files) {
     const file = path.join(out, rel);
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, content);
@@ -259,6 +305,11 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
       written.push(`app/fonts/${path.basename(f.file)}`);
     }
   }
+  if (textureFrom) {
+    mkdirSync(path.join(out, 'textures'), { recursive: true });
+    copyFileSync(textureFrom, path.join(out, 'textures', path.basename(textureFrom)));
+    written.push(`textures/${path.basename(textureFrom)}`);
+  }
   // The platform specs travel with the kit: a product starts from the kit's and owns its copies,
   // because each product's stamps move on their own schedule.
   if (platformOut && existsSync(PLATFORM_SPECS) && !existsSync(platformOut)) {
@@ -269,23 +320,9 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   writeIndex(out);
   written.push('components/system/index.ts');
   const kept = [];
-  // The brand's marks and character, from its own files. Without any, the kit's placeholder stays.
-  const src = brandSources({ product, brand, productDir, brandRoot });
   let brandMarks = null;
-  if (src) {
+  if (generated) {
     const file = path.join(out, 'lib', 'brand.ts');
-    // Pose stills go into the bundle drawn down, so boards on the canvas show them too. Headless Chrome can miss
-    // one under load, so each gets three tries; one it never draws goes in at full size rather than as a path.
-    const stills = new Map();
-    for (const rel of [...Object.values(src.character?.poses ?? {}), ...Object.values(src.character?.flat ?? {})]) {
-      const still = path.resolve(src.base, rel);
-      if (/\.(png|jpe?g|webp)$/i.test(rel) && existsSync(still) && !stills.has(still)) {
-        let uri = null;
-        for (let i = 0; i < 3 && !uri; i++) uri = await shrinkStill(still);
-        if (uri) stills.set(still, uri);
-      }
-    }
-    const generated = brandConstant(src, { stills });
     // A starter made before the kit had lib/brand.ts takes the types from the kit's copy.
     const current = readFileSync(existsSync(file) ? file : path.join(kit, 'lib', 'brand.ts'), 'utf8');
     const next = brandModule(current, generated.source);
@@ -300,7 +337,27 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
     writeFileSync(file, content);
     written.push(rel);
   }
+  rmSync(pending, { force: true });
   return { fresh, written, kept, retired, brand: brandMarks, placeholder: !src };
+}
+
+/**
+ * Install the built system in one ds/<namespace>/ folder, as a canvas holds it: the bundle, tokens.json,
+ * tokens.css, and beside it the files tokens.css names, its faces in fonts/ and its texture in textures/.
+ * bundle.css reaches the same textures/ from components/, as the starter's globals.css does from app/.
+ */
+export function installSystem(ds, { dist, starter, productDir }) {
+  mkdirSync(path.join(ds, 'components'), { recursive: true });
+  for (const f of ['bundle.js', 'bundle.css']) copyFileSync(path.join(dist, f), path.join(ds, 'components', f));
+  copyFileSync(path.join(starter, 'system', 'tokens.json'), path.join(ds, 'tokens.json'));
+  const css = path.join(productDir, 'tokens.css');
+  if (existsSync(css)) copyFileSync(css, path.join(ds, 'tokens.css'));
+  for (const [folder, kind] of [['fonts', /\.(woff2?|otf|ttf)$/i], ['textures', /\.(png|jpe?g|webp|svg)$/i]]) {
+    const from = path.join(productDir, folder);
+    if (!existsSync(from)) continue;
+    mkdirSync(path.join(ds, folder), { recursive: true });
+    for (const f of readdirSync(from).filter((x) => kind.test(x))) copyFileSync(path.join(from, f), path.join(ds, folder, f));
+  }
 }
 
 /**
@@ -378,22 +435,9 @@ export async function buildBundle({ starter, productDir }) {
   writeFileSync(path.join(starterPreviews, 'definitions.json'), `${JSON.stringify(definitionsHash(path.join(starter, 'components', 'system')))}\n`);
 
   // The system installed beside the preview boards, the canvas boards and the starter's previews.
-  for (const where of [previews, path.join(productDir, 'canvas'), starterPreviews]) {
-    const ds = path.join(where, 'ds', system.namespace);
-    mkdirSync(path.join(ds, 'components'), { recursive: true });
-    for (const f of ['bundle.js', 'bundle.css']) copyFileSync(path.join(dist, f), path.join(ds, 'components', f));
-    for (const f of ['tokens.json']) copyFileSync(path.join(starter, 'system', f), path.join(ds, f));
-    const css = path.join(productDir, 'tokens.css');
-    if (existsSync(css)) copyFileSync(css, path.join(ds, 'tokens.css'));
-    // tokens.css names its faces as fonts/<file>, so the files go beside it, as a canvas holds them.
-    const fonts = path.join(productDir, 'fonts');
-    if (existsSync(fonts)) {
-      mkdirSync(path.join(ds, 'fonts'), { recursive: true });
-      for (const f of readdirSync(fonts).filter((x) => /\.(woff2?|otf|ttf)$/i.test(x))) copyFileSync(path.join(fonts, f), path.join(ds, 'fonts', f));
-    }
-  }
+  for (const where of [previews, path.join(productDir, 'canvas'), starterPreviews]) installSystem(path.join(where, 'ds', system.namespace), { dist, starter, productDir });
   return { system, manifest, components: defs.map((d) => ({ name: d.name, group: d.group, status: d.status, checks: d.checks?.length ?? 0 })), previews };
 }
 
 export { GENERATED, slug, pascal };
-export default { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, KIT, GENERATED };
+export default { systemIdentity, fontsModule, generatedFiles, writeStarter, buildBundle, installSystem, KIT, GENERATED };

@@ -26,11 +26,12 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `displayCase` | `"upper"` when the brand only ever sets its display face in capitals: the hero, display and title styles take capitals, tracked open a little | Unset: the face's own case |
 | `time` | How the brand writes a time, `{ "minutes": ":" or ".", "onTheHour": "keep" or "drop", "space": true or false }`. "11am to 10.30pm" is `{ ".", "drop", false }`. Every time the system writes follows it | 9:30 am: minutes kept, a space before am or pm |
 | `charts.avoid` | Colours the brand keeps off one theme's grounds, `{ "light": [...], "dark": [...] }`: no chart series takes them or their hue there | None |
-| `brandColours` | The brand book's named colours, emitted as `brand-*` | The primary and accents |
+| `brandColours` | The brand book's named colours, emitted as `brand-*`: a list, `[{ "name": "green", "hex": "#2E7D32" }]`, or a map, `{ "green": "#2E7D32" }`. Names are lower case words joined by hyphens, since each becomes a CSS variable | The primary and accents |
 | `shape.families` | Each family's radius, measured from the brand's own work, with its source: `press`, `control`, `card`, `pane`, `frame` (Shape, below) | Derived from the brand's scale, never rounder than the largest radius measured, and listed as the kit's |
 | `shape.action` | Whatever a person can press, when `press` is not measured: `"pill"`, `"control"` (buttons match the inputs) or a value | The pill, listed as the kit's |
 | `shape.shell` | The rail's form, `{ "form": "edge" or "floating", "source" }` | `edge`: the rail meets the window edge, square, listed as the kit's |
-| `shape.moves` | The brand's own shape moves the product carries, `[{ "name", "source", "where" }]` | None, and every round record says so |
+| `shape.moves` | The brand's own shape moves the product carries, `[{ "name", "source", "where" }]`. A texture names its file too: `"file": "textures/paper.jpg", "kind": "texture", "strength": 0.3` (Shape, below) | None, and every round record says so |
+| `fonts` | The faces the system ships as files, `[{ "family", "file": "fonts/<name>.woff2", "weight": "400" or "300 900", "style" }]`, each file in `product/fonts/` (Type, below) | None: every face is hosted, and boards link Google Fonts for it |
 
 A decided role is used exactly as given. If it fails the audit, resolve it with the person (a
 different role, a darker variant, a different label) and record the outcome. Never move it silently.
@@ -89,6 +90,12 @@ each theme.
 for supporting copy, `text-subtle` for meta and placeholders, and nothing quieter than `text-subtle`
 (4.5:1 on every ground it sits on). On selected rows, quiet text switches to `text-muted`.
 
+**A rail in a colour speaks in its colour.** On a decided rail that carries colour (an emerald, a
+navy), `rail-text` and `rail-muted` are solved in the rail's own hue, as tints of it, and still clear
+7:1 and 4.5:1. Mixed towards the brand's hue instead, an emerald rail's group labels lost its chroma.
+The detector reported them as grey on colour 52 times, and the only fix on the product's side was to
+give up the rail. A black or grey rail keeps neutral words.
+
 **Every pair measured.** Each token declares what it sits on, and the audit measures every one of
 those pairs in both themes, including washes laid over their surface. The last system checked 162
 pairs; the engine's default set checks more.
@@ -118,6 +125,12 @@ checks it against the real face.
 **Fonts ship as files with the system**, so previews and the canvas never depend on a CDN. One
 variable file where the face has one. Record each face's licence in a Licences asset group, and
 respect the terms: a face licensed for the brand's own work only stays inside the brand's systems.
+Put the files in `product/fonts/` and list them under `fonts` in product.json (the table above).
+`tokens.css` then carries an `@font-face` for each, and `$A product bundle` installs the files beside
+every copy of it. The starter loads them through next/font/local, and generated boards carry no
+Google Fonts link. A face left hosted is asked of Google for the weights its type styles set, and no
+italics. Google refuses the whole stylesheet when one face lacks a weight asked of it: a display face
+with one weight, asked for four in both styles, left the boards with no face at all.
 
 ## Shape, space and marks
 
@@ -182,6 +195,16 @@ page behind it, and reported black words on a green band as 1.1:1 in dark when t
 strength so the darkest mark under the words still clears 4.5:1: a full-strength fleck beside a full stop
 reads as punctuation.
 
+To carry a texture, copy the brand's file into `product/textures/` and name it on the move with its
+kind and strength. Use a JPEG or WebP at about twice the largest size it is drawn, a few hundred KB
+at most. `tokens.css` and the starter's `globals.css` then define `.brand-texture`, which lays the
+file on a `::before` multiplied over the element's own colour at that strength, under its content.
+`$A product bundle` installs the file beside every copy of `tokens.css`, and `$A product starter`
+copies it into the starter's `textures/`, where `globals.css` finds it. The starter stops, writing
+nothing, when the file is missing. Put the class on the band that carries the move, with the band's
+own background colour, never on a list, a form or a table. The class positions the band (relative)
+to hold its layer, so give a band positioned any other way a wrapper instead.
+
 **The kit's choices are listed.** `$A product audit` and every round record list each shape and shell
 choice the brand did not make, with how the kit made it. Measure what you can; never present the
 rest as the brand's.
@@ -194,6 +217,11 @@ rest as the brand's.
 **A mark for narrow places.** The icons-only rail is 72px wide, too narrow for most full logos at their
 minimum. With a symbol, it shows the symbol in the rail's rendition; without one, a plain Home control,
 never a full logo cut by the edge. Ask the brand for a symbol ("Worth fixing in the brand repo").
+A symbol has a size of its own, 24px or its own minimum (`symbolMinHeight`), never the full logo's,
+which a wide logo's minimum can raise past what the rail's 40px home square holds. A mark more than
+1.5 times as wide as it is tall (a signature, a wordmark) is not a symbol. The starter leaves it out,
+says why in `lib/brand.ts`, and the rail shows its Home control. A signature 2.38 times its height,
+named as the symbol, was drawn 107px wide in the 72px rail.
 
 **The wordmark at small sizes.** Brand logo files carry clear space inside the viewBox, so at 20px
 tall the letters can end up 9px tall. The product uses tight-viewBox copies, and the clear-space rule
@@ -204,7 +232,10 @@ is applied by layout instead.
 **Characters and illustration**, when the brand has them: they mark states (welcome, working, done,
 all caught up, nothing found, could not load), one per screen, never in dense working views, always
 decorative (`alt=""`), with the words beside them carrying the meaning. A brand character is never
-the person's mistake.
+the person's mistake. A pose drawn in one dark ink (a black line drawing) is drawn in `currentColor`
+by the starter. It takes the text colour and reads on a dark ground, where a brand's black drawings
+vanished before. A pose in a colour, or in several, keeps its colours, so keep it off dark
+grounds unless the brand supplies one drawn for them, and say so in the system.
 
 ## Words
 

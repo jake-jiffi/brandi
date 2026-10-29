@@ -103,6 +103,38 @@ function styleUtility(s, fam) {
 }
 
 /**
+ * The brand's texture move as a class: a layer behind the words, multiplied over the element's own colour at the
+ * move's strength, never the element's background image, which the detector reads past to the page behind it. In
+ * the components layer, so a utility on the same element still wins. Its path is relative to app/globals.css,
+ * where the starter keeps the file in textures/, and to bundle.css in ds/<namespace>/components/, beside which the
+ * canvas install keeps the same folder.
+ */
+function textureRule(tokens) {
+  const move = (tokens.radius?.moves ?? []).find((m) => m.kind === 'texture' && m.file);
+  if (!move) return '';
+  return `/* The brand's texture, ${move.name.replace(/\*\//g, '')}: on a hero, a welcome or an email header, never behind a list, a form or a table. */
+@layer components {
+  .brand-texture {
+    position: relative;
+    isolation: isolate;
+  }
+  .brand-texture::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    pointer-events: none;
+    background: url("../${move.file}") center / cover no-repeat;
+    mix-blend-mode: multiply;
+    opacity: ${move.strength};
+  }
+}
+
+`;
+}
+
+/**
  * Render globals.css from a product tokens object.
  *
  * @param {object} tokens  product tokens (the shape `brandi product tokens` writes)
@@ -245,7 +277,7 @@ ${styles.map(([s, f]) => styleUtility(s, f)).join('\n')}
   --line: var(--rail-line);
 }
 
-/* Loading states: under a second, people see nothing; after that the skeleton fades in. */
+${textureRule(tokens)}/* Loading states: under a second, people see nothing; after that the skeleton fades in. */
 @utility appear-late {
   animation: appear-late 150ms var(--ease-standard) 800ms both;
 }
