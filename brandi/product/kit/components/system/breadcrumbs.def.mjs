@@ -1,6 +1,6 @@
 // Breadcrumbs' one definition: its README, its preview board and its scripted checks all come from here.
 
-const LONG = "[Northern Beaches Mobile Dog Grooming]"
+const LONG = "[Northern Beaches Strata Management]"
 
 export default {
   name: "Breadcrumbs",
@@ -27,7 +27,7 @@ export default {
       title: "Three levels deep",
       markup: `<x-import component-from-global-scope="NS.Breadcrumbs" items="{{trail}}"></x-import>`,
       layout: "block",
-      vals: { trail: [{ label: "Clients", href: "#clients" }, { label: "[Muddy Paws Grooming]", href: "#client" }, { label: "[Invoice 1042]" }] },
+      vals: { trail: [{ label: "Clients", href: "#clients" }, { label: "[Northside Dental]", href: "#client" }, { label: "[Invoice 1042]" }] },
     },
     {
       id: "long",
@@ -39,7 +39,7 @@ export default {
           { label: "Clients", href: "#clients" },
           { label: LONG, href: "#client" },
           { label: "Invoices", href: "#invoices" },
-          { label: "[Invoice 1042 for the March grooming package and the late fee]" },
+          { label: "[Invoice 1042 for the March maintenance plan and the late fee]" },
         ],
       },
     },
@@ -114,7 +114,7 @@ export default {
       name: "The current page wraps instead of being cut",
       example: "long",
       async run({ scope, expect }) {
-        expect.equal(await scope.locator("[aria-current=page]").textContent(), "[Invoice 1042 for the March grooming package and the late fee]", "the whole name")
+        expect.equal(await scope.locator("[aria-current=page]").textContent(), "[Invoice 1042 for the March maintenance plan and the late fee]", "the whole name")
       },
     },
     {

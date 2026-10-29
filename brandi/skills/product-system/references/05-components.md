@@ -46,7 +46,12 @@ Each entry opens with the component's job in one line. The labels after it:
 | *(practice)* | Added from general practice. No round has checked it |
 
 Prop names are the reference's, with brand-specific values generalised. Invented names in examples
-go in [brackets], as they do on every screen.
+go in [brackets], as they do on every screen. In the kit's own definitions they come from the kit's
+one sample, the trades business of `lib/sample.ts` ([Kestrel Maintenance] where a definition names
+it), its technicians and its clients, and never from a test fixture or a client. The kit once sampled a
+dog groomer under the fixture brand's own name, and a proof run on that brand found itself already
+on the kit's screens. `tests/productdocs.test.mjs` fails on any fixture brand's name under
+`product/kit`.
 
 ---
 

@@ -96,7 +96,7 @@ export default {
       title: "A long label wraps",
       markup: rail(`<x-import component-from-global-scope="NS.NavGroup" items="{{longItems}}"></x-import>`),
       layout: "block",
-      vals: { longItems: [{ label: "[Grooming packages and add-ons]", href: "#packages", icon: "Package", count: 2, attention: true }] },
+      vals: { longItems: [{ label: "[Maintenance plans and add-ons]", href: "#plans", icon: "Package", count: 2, attention: true }] },
     },
   ],
   checks: [

@@ -29,11 +29,11 @@ const inHand = (page, label) =>
 
 const user = { name: "[Sam Lee]", role: "Owner" }
 const workspaces = [
-  { value: "muddy-paws", name: "[Muddy Paws Grooming]", role: "Owner" },
-  { value: "northside", name: "[Northside Paws]", role: "Manager" },
-  { value: "bark-avenue", name: "[Bark Avenue Spa]", role: "Staff" },
+  { value: "kestrel", name: "[Kestrel Maintenance]", role: "Owner" },
+  { value: "northside", name: "[Northside Air]", role: "Manager" },
+  { value: "cove", name: "[Cove Electrical]", role: "Staff" },
 ]
-const TRIGGER = "[Sam Lee], [Muddy Paws Grooming], Owner, account menu"
+const TRIGGER = "[Sam Lee], [Kestrel Maintenance], Owner, account menu"
 const groups = [{ items: [{ label: "Home", href: "#home", icon: "House" }, { label: "Bookings", href: "#bookings", icon: "Calendar", current: true }] }]
 // A short rail with room above it, so the menu opens upward as it does at the foot of a full-height rail.
 const rail = (account) =>
@@ -84,7 +84,7 @@ export default {
     {
       id: "open",
       title: "Open, drawn for a design, below the button where nothing is under it",
-      markup: `<div style="padding-bottom: 300px;"><div style="box-sizing: border-box; width: 256px;" class="@container/rail rounded-rail border border-rail-line bg-rail p-2"><x-import component-from-global-scope="NS.WorkspaceSwitcher" open="{{yes}}" user="{{user}}" workspaces="{{workspaces}}" value="bark-avenue" items="{{accountItems}}"></x-import></div></div>`,
+      markup: `<div style="padding-bottom: 300px;"><div style="box-sizing: border-box; width: 256px;" class="@container/rail rounded-rail border border-rail-line bg-rail p-2"><x-import component-from-global-scope="NS.WorkspaceSwitcher" open="{{yes}}" user="{{user}}" workspaces="{{workspaces}}" value="cove" items="{{accountItems}}"></x-import></div></div>`,
       layout: "block",
       vals: { user, workspaces, accountItems: [{ label: "Account settings", icon: "Settings" }, { label: "Sign out", icon: "LogOut" }] },
     },
@@ -95,7 +95,7 @@ export default {
       layout: "block",
     },
   ],
-  state: { ws: "muddy-paws" },
+  state: { ws: "kestrel" },
   logic: `ws: self.state.ws,
   ui: (() => {
     const h = React.createElement;
@@ -131,7 +131,7 @@ export default {
         const button = scope.getByRole("button", { name: TRIGGER })
         expect.equal(await button.count(), 1, "the account button's name")
         expect.equal(await button.getAttribute("aria-haspopup"), "menu", "it opens a menu")
-        expect((await button.innerText()).includes("[Muddy Paws Grooming]"), "it shows the current workspace")
+        expect((await button.innerText()).includes("[Kestrel Maintenance]"), "it shows the current workspace")
       },
     },
     {
@@ -143,14 +143,14 @@ export default {
         await page.keyboard.press("Enter")
         const menu = page.getByRole("menu", { name: TRIGGER })
         await ready(menu)
-        expect(await inHand(page, "[Muddy Paws Grooming]"), "the first workspace is in hand")
-        expect.equal(await menu.getByRole("menuitemcheckbox", { name: "[Muddy Paws Grooming]" }).getAttribute("aria-checked"), "true", "the current workspace is checked")
+        expect(await inHand(page, "[Kestrel Maintenance]"), "the first workspace is in hand")
+        expect.equal(await menu.getByRole("menuitemcheckbox", { name: "[Kestrel Maintenance]" }).getAttribute("aria-checked"), "true", "the current workspace is checked")
         await page.keyboard.press("ArrowDown")
-        expect(await inHand(page, "[Northside Paws]"), "Down moves to the next workspace")
+        expect(await inHand(page, "[Northside Air]"), "Down moves to the next workspace")
         await page.keyboard.press("Enter")
         await menu.waitFor({ state: "hidden" })
         expect.equal(await scope.locator("[data-switcher-output]").textContent(), "In the product: northside", "onChange switched the workspace")
-        const now = scope.getByRole("button", { name: "[Sam Lee], [Northside Paws], Manager, account menu" })
+        const now = scope.getByRole("button", { name: "[Sam Lee], [Northside Air], Manager, account menu" })
         expect(await now.evaluate((el) => el === document.activeElement), "focus is back on the account button, which names the new workspace")
         // The status speaks after the switch has rendered, a beat later.
         const status = scope.getByRole("status")
@@ -159,7 +159,7 @@ export default {
           const look = () => (el.textContent.trim() || Date.now() - start > 2000 ? done() : setTimeout(look, 25))
           look()
         }))
-        expect.equal((await status.textContent()).trim(), "Now in [Northside Paws]", "a polite status says where the person is now")
+        expect.equal((await status.textContent()).trim(), "Now in [Northside Air]", "a polite status says where the person is now")
       },
     },
     {
@@ -241,13 +241,13 @@ export default {
       name: "On the icons-only rail the account button is the avatar, with a tooltip, and the menu opens beside the rail",
       example: "icons",
       async run({ page, scope, expect }) {
-        const name = "[Sam Lee], [Northside Paws], Manager, account menu"
+        const name = "[Sam Lee], [Northside Air], Manager, account menu"
         const button = scope.getByRole("button", { name })
         const box = await button.boundingBox()
         expect.equal(`${Math.round(box.width)}x${Math.round(box.height)}`, "40x40", "the avatar alone")
         await inView(page, button)
         await button.focus()
-        const tip = page.locator('[data-slot="tooltip-content"]:not([data-example] *)').filter({ hasText: "[Sam Lee], [Northside Paws]" })
+        const tip = page.locator('[data-slot="tooltip-content"]:not([data-example] *)').filter({ hasText: "[Sam Lee], [Northside Air]" })
         expect(await tip.waitFor({ state: "visible", timeout: 3000 }).then(() => true, () => false), "the tooltip names the person and the workspace")
         await page.keyboard.press("Enter")
         const menu = page.getByRole("menu", { name })

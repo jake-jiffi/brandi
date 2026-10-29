@@ -10,7 +10,7 @@ const cards = [
   { id: "j1", column: "to-quote", title: "[Replace hot water system]", meta: "[Harbour Physio], site visit Mon", badge: { label: "Overdue", tone: "danger" }, href: "#j1" },
   { id: "j2", column: "to-quote", title: "[Fix leaking tap]", meta: "[Northside Vets], asked 2 days ago", person: "[Priya Nair]", href: "#j2" },
   { id: "j3", column: "quoted", title: "[Rewire the shopfront]", meta: "[Coastal Dental], [$4,280] sent Tue", badge: { label: "Waiting on client", tone: "neutral" }, href: "#j3" },
-  { id: "j4", column: "quoted", title: "[Install a split system]", meta: "[Muddy Paws Grooming], [$3,150]", badge: { label: "Due soon", tone: "warning" }, href: "#j4" },
+  { id: "j4", column: "quoted", title: "[Install a split system]", meta: "[Greenway Motors], [$3,150]", badge: { label: "Due soon", tone: "warning" }, href: "#j4" },
   { id: "j5", column: "booked", title: "[Service the boiler]", meta: "Thu 6 Nov, 9:00 am", person: "[Sam Lee]", badge: { label: "Scheduled", tone: "info" }, href: "#j5" },
   { id: "j6", column: "booked", title: "[Replace smoke alarms]", meta: "Fri 7 Nov, 1:30 pm", person: "[Alex Chen]", href: "#j6" },
 ]

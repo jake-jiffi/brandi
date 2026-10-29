@@ -9,7 +9,7 @@ const email = {
   ],
   action: { label: "Review timesheets", href: "https://app.example.com/timesheets" },
   footer: [
-    "You are getting this because you approve timesheets for [Muddy Paws Grooming].",
+    "You are getting this because you approve timesheets for [Kestrel Maintenance].",
     { label: "Manage email settings", href: "https://app.example.com/settings/email" },
     "[12 Example Street, Sydney NSW 2000]",
   ],

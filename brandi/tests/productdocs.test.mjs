@@ -141,4 +141,28 @@ describe("the kit's own components", () => {
     const trigger = /export const cutTrigger = "([^"]+)"/.exec(readFileSync(path.join(KIT_SYSTEM, 'tooltip.tsx'), 'utf8'))?.[1];
     assert.deepEqual(trigger?.split(/\s+/).sort(), ['min-w-0', 'shrink-0'], "the label's own sizing: it can shrink to nothing and never shrinks in a row");
   });
+
+  test('no kit source or definition names a fixture brand, so a test brand never ships as sample copy', () => {
+    // The kit's sample business was the fixture brand's own name and trade, so a proof run on that brand found itself
+    // already on the kit's screens. The names come from the fixtures, so a fixture added later is held the same way,
+    // and they match however they are joined: "Muddy Paws", "muddy-paws", "muddypaws", "MuddyPawsCo". Not inside a
+    // lower-case word, so a one-word brand is not found in every word that holds it.
+    const fixtures = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
+    const names = readdirSync(fixtures)
+      .filter((f) => f.endsWith('.json'))
+      .map((f) => JSON.parse(readFileSync(path.join(fixtures, f), 'utf8')).meta?.name?.trim())
+      .filter(Boolean);
+    assert.ok(names.length > 0, 'the fixtures name at least one brand');
+    // Either case by hand, not the i flag: under it the lookahead could not tell "MuddyPawsCo" from "muddypawsy".
+    const anyCase = (word) => [...word].map((c) => (c.toLowerCase() !== c.toUpperCase() ? `[${c.toLowerCase()}${c.toUpperCase()}]` : c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('');
+    const patterns = names.map((n) => new RegExp(`(?<![\\p{L}\\p{N}])${n.split(/[\s_-]+/).map(anyCase).join('[\\s_-]*')}(?![\\p{Ll}\\p{N}])`, 'u'));
+    const kit = path.dirname(path.dirname(KIT_SYSTEM));
+    const walk = (dir) =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.name === 'node_modules' ? [] : e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]));
+    const found = walk(kit).flatMap((f) => {
+      const src = readFileSync(f, 'utf8');
+      return patterns.filter((p) => p.test(src)).map((p) => `${path.relative(kit, f)} names ${src.match(p)[0]}`);
+    });
+    assert.deepEqual(found, []);
+  });
 });

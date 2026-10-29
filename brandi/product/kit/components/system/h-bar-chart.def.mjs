@@ -79,7 +79,7 @@ export default {
       id: "max",
       title: "Against a fixed maximum, with a real zero and a missing value",
       layout: "block",
-      markup: `<x-import component-from-global-scope="NS.ChartFigure" title="Booking utilisation by groomer" summary="[Sam] is close to fully booked; [Alex]'s roster has not synced.">
+      markup: `<x-import component-from-global-scope="NS.ChartFigure" title="Booking utilisation by technician" summary="[Sam] is close to fully booked; [Alex]'s roster has not synced.">
 <x-import component-from-global-scope="NS.HBarChart" data="{{utilisation}}" format="percent" max="{{hundred}}"></x-import>
 </x-import>`,
       vals: {
