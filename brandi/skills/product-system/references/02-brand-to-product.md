@@ -108,6 +108,13 @@ give up the rail. A black or grey rail keeps neutral words: the hue and chroma o
 solved to the same 7:1 and 4.5:1. Tinted in the brand's hue instead, a black rail's words came out a
 pale green beside a vivid green brand.
 
+**A rail's states step away from its words.** The hovered and selected items step lighter on a dark
+rail and darker on a light one, so a black rail's current page shows. On a mid-tone rail that step
+went towards the words and took them under their floor: a mid green's selected item held its light
+words at 4.06:1, and two runs changed the brand's rail to get past it. Where the step would cost the
+words their 4.5:1, the states step the other way. A rail too close to mid-grey to carry words at all
+fails on the rail itself, and the audit says so: that one is the person's call.
+
 **The rail's logo follows the rail.** The rail and the top bar draw the logo made for the rail's
 ground: the one for dark grounds on a rail darker than its words, the one for light grounds
 otherwise, worked out for each theme. `tokens.css` and `globals.css` set it as two variables,

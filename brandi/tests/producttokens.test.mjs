@@ -242,6 +242,20 @@ describe("a coloured rail's quiet text", () => {
     }
   });
 
+  test('a mid-tone rail steps its hovered and selected items away from its words, so the words keep their floor on them', () => {
+    // Near neighbours of brand colours runs gave the rail: a mid green, blue, purple and moss under light words, and a
+    // sage under dark ones. Stepped lighter under light words, the green's selected item held them at 4.06:1.
+    for (const railHex of ['#206E4B', '#2F5E9E', '#6B4C9A', '#3C6E2F', '#7FA88E']) {
+      const tokens = P.buildProductTokens(system, { roles: { rail: railHex } });
+      const onStates = P.auditProductTokens(tokens).fails.filter((f) => f.fg.startsWith('rail') && ['rail-hover', 'rail-selected'].includes(f.bg));
+      assert.deepEqual(onStates.map((f) => `${f.theme} ${f.fg} on ${f.bg}`), [], `${railHex}: the words keep their floor on the hovered and selected items`);
+      for (const theme of ['light', 'dark']) {
+        const at = (n) => P.resolveColour(tokens, n, theme);
+        assert.ok(contrastRatio(at('rail-selected'), at('rail')) >= P.STEP.selected, `${railHex} ${theme}: the selected item still stands apart from the rail`);
+      }
+    }
+  });
+
   test("a black rail beside a vivid green brand keeps neutral words, in the page text's hue and chroma, above their floors", () => {
     // A near-black rail's words solved to a pale green tint (C 0.04) beside a vivid green brand.
     const green = buildSystem({ primary: '#58C21E', type: { display: 'Bitter', body: 'Karla' } });

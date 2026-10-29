@@ -495,10 +495,19 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
   if (railDecided) {
     v.rail = railDecided;
     const darkRail = toOklch(v.rail).L < 0.5;
-    const step = darkRail ? 1 : -1;
-    v['rail-hover'] = visibleShift(v.rail, 0.05 * step, STEP.hover);
-    v['rail-selected'] = visibleShift(v.rail, 0.1 * step, STEP.selected);
-    v['rail-line'] = visibleShift(v.rail, 0.07 * step, STEP.line);
+    // The hovered and selected items step lighter on a dark rail and darker on a light one, so a black rail's selected
+    // item shows. A mid-tone rail stepped that way, towards its words, takes them under their floor: a mid green's
+    // selected item held its light words at 4.06:1. There the states step the other way, away from the words.
+    const words = labelOn(v.rail).hex;
+    const states = (step) => ({ hover: visibleShift(v.rail, 0.05 * step, STEP.hover), selected: visibleShift(v.rail, 0.1 * step, STEP.selected), line: visibleShift(v.rail, 0.07 * step, STEP.line) });
+    let railStates = states(darkRail ? 1 : -1);
+    if (contrastRatio(words, railStates.hover) < FLOORS.text || contrastRatio(words, railStates.selected) < FLOORS.text) {
+      const away = states(darkRail ? -1 : 1);
+      if (Math.min(contrastRatio(words, away.hover), contrastRatio(words, away.selected)) > Math.min(contrastRatio(words, railStates.hover), contrastRatio(words, railStates.selected))) railStates = away;
+    }
+    v['rail-hover'] = railStates.hover;
+    v['rail-selected'] = railStates.selected;
+    v['rail-line'] = railStates.line;
     // The rail's edge against the page. Where the two already stand apart (3:1) its own line will do; where they sit
     // close, the page's hairline, which shows against both. A black rail on a near-black canvas had a 1.06:1 edge.
     v['rail-edge'] = contrastRatio(v.rail, v.canvas) >= FLOORS['non-text'] ? v['rail-line'] : '{line}';
