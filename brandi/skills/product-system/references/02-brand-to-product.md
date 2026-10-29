@@ -34,6 +34,15 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `shape.moves` | The brand's own shape moves the product carries, `[{ "name", "source", "where" }]`. A texture names its file too: `"file": "textures/paper.jpg", "kind": "texture", "strength": 0.3` (Shape, below) | None, and every round record says so |
 | `fonts` | The faces the system ships as files, `[{ "family", "file": "fonts/<name>.woff2", "weight": "400" or "300 900", "style" }]`, each file in `product/fonts/` (Type, below) | None: every face is hosted, and boards link Google Fonts for it |
 
+**A role is one colour or two.** Each of the seven roles takes the forms a direction's role takes: a
+hex, one of the brand's colours by name (`acme-green` or `brand-acme-green`), or `{ "light", "dark" }`
+of those with either left out. One colour is both themes, and it is audited in both. That suits a
+rail or a highlight, which mean the same at night. It rarely suits a canvas, an ink or a primary,
+which a dark theme needs its own of: the audit fails the theme the value cannot serve, and
+`$A product tokens` exits 1. Any other key under `roles` is refused by name, and so is a value in any
+other form. A run wrote `"rail": "#1B5D40"` before roles took one colour, and the rail stayed the
+surface with no word said.
+
 A decided role is used exactly as given. If it fails the audit, resolve it with the person (a
 different role, a darker variant, a different label) and record the outcome. Never move it silently.
 
@@ -298,6 +307,57 @@ by the starter. It takes the text colour and reads on a dark ground, where a bra
 vanished before. A pose in a colour, or in several, keeps its colours, so keep it off dark
 grounds unless the brand supplies one drawn for them, and say so in the system.
 
+## Motion
+
+**The product moves like the brand.** A brand's motion signature is its own move: a name, what moves,
+a duration and a curve (Settle: content rises 8px into place over 240ms on
+`cubic-bezier(0.2, 0, 0, 1)`). `$A product tokens` reads it into the product's motion tokens, so
+the product's sheets and menus arrive the way the brand's pages do. The tokens once carried the
+kit's motion for every brand and read no signature.
+
+**Where the signature lives.** On route A it is `identity.motionSignature` in `brand/brand.json`,
+and nowhere else. The system and the brand's own `tokens.json` and `tokens.css` carry the motion
+stance's durations and Brandi's four curves, which are the same for every brand at a stance, not the
+signature. On route B, write it into the input file as `motionSignature`, in the same form:
+`{ "name", "description", "durationMs", "easing" }`, from the guidelines or the live site. A brand
+that names none keeps the kit's motion, and the tokens say so.
+
+**How it maps.**
+
+| Product token | The kit's value | What it times | From the signature |
+| --- | --- | --- | --- |
+| `ease-standard` | `cubic-bezier(0.2, 0.8, 0.2, 1)` | Every transition | Its curve |
+| `ease-exit` | `cubic-bezier(0.4, 0, 1, 1)` | Things leaving | Never: something leaving accelerates away, and a signature's curve says how things arrive |
+| `duration-fast` | 120ms | Hover, press, focus | Its duration, when under 150ms |
+| `duration-base` | 180ms | Menus, tabs and toggles | Its duration, from 150ms up to 220ms |
+| `duration-slow` | 260ms | Sheets and dialogs | Its duration, from 220ms, and 400ms at most |
+| `duration-scene` | 1250ms | A character scene | Never: a signature times the interface |
+
+The duration sets the one job whose kit value is nearest it, and a tie goes to the slower job. The
+other durations stay the kit's, so the product keeps a fast, a middle and a slow step.
+
+**Feedback stays quick.** A signature's duration is how long the brand's own move takes, usually
+an arrival, and it is rarely a speed for a control's feedback. A hover, press or focus that answers
+in 240ms reads as lag, so a signature of 150ms or more never sets `duration-fast`. Settle's 240ms
+sets `duration-slow` instead: a sheet or dialog arriving is the job nearest the brand's own
+arrival. A signature over 400ms (a slow hero reveal) sets `duration-slow` held to 400ms, past
+which a sheet keeps a person waiting in the middle of a task. The held value is recorded as the
+kit's, with the brand's figure beside it.
+
+**Whose each value is.** Each duration and curve says where it came from, as a radius does: `source`
+for the brand's (the signature's name, the field and the file), `derived` for the kit's (how it
+chose). `$A product tokens` prints the six under "Motion", each the brand's or the kit's. A curve
+CSS cannot draw (anything but `cubic-bezier(x1, y1, x2, y2)` with both x values from 0 to 1, or a
+keyword such as `ease-out`), a duration that is not a number of milliseconds above 0, or a field a
+signature does not hold (`duration` for `durationMs`, which would leave the kit's motion with no
+word said), stops the run with the reason. Fix it in the brand file or the input file, where the
+signature lives.
+
+**The stance is not read.** `identity.motion` (still, restrained, fluid, lively) scales Brandi's
+durations for the brand's own surfaces. A working screen keeps its short, calm steps whatever the
+stance, and reduced motion still keeps fades and drops movement. A brand that wants its product to
+move differently names a signature.
+
 ## Words
 
 **The dial.** Warm in greetings, first runs and finishes; plain on working screens; straight and
@@ -329,7 +389,7 @@ reasons:
 1. What carries straight over.
 2. Colour.
 3. Type.
-4. Shape, space and marks.
+4. Shape, space and marks, and motion: whose each duration and curve is.
 5. Words.
 6. Code.
 7. Characters and imagery (only when the brand has them).
