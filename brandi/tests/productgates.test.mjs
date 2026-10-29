@@ -908,6 +908,7 @@ describe('axe on an authored states grid and a message board', () => {
   const row = (inner) => `<tr><td style="padding: 16px 24px;">${inner}</td></tr>`;
   const email = (outer) => `<${outer} style="width: 600px; padding: 24px 0;"><table role="presentation" style="width: 100%;"><tbody>${row('<h1 style="margin: 0;">[Rex] is booked in</h1>')}${row('<p>Saturday 7 November at 9am.</p>')}${row('<a href="#">See the booking</a>')}</tbody></table></${outer}>`;
   const texts = (title) => `<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden;"><header style="height: 56px;">${title}</header><main style="flex: 1; overflow: auto; padding: 16px;"><div style="display: flex; flex-direction: column; gap: 16px;"><ol aria-label="Texts"><li>Your booking is confirmed.</li><li>Thanks!</li></ol></div></main></div>`;
+  const phone = (open) => `<div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden;"><header style="height: 56px;"><h1 style="margin: 0;">Your booking</h1></header>${open} style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px;"><div style="display: flex; flex-direction: column; gap: 16px;">${Array.from({ length: 30 }, (_, i) => `<p>Line ${i + 1} of the booking's details.</p>`).join('')}</div></main></div>`;
   const pages = {
     '/grid': doc('Rosters, states', grid('main')),
     '/grid-bare': doc('Rosters, states', grid('div')),
@@ -915,6 +916,9 @@ describe('axe on an authored states grid and a message board', () => {
     '/email-bare': doc('Booked', email('div')),
     '/texts': doc('Texts', texts('<h1 style="margin: 0;">Texts from Acme</h1>')),
     '/texts-bare': doc('Texts', texts('<p style="margin: 0;">Texts from Acme</p>')),
+    // A phone frame whose main scrolls a screen of text with nothing to press: a keyboard reaches it only with tabindex.
+    '/phone': doc('Booking', phone('<main tabindex="0"')),
+    '/phone-bare': doc('Booking', phone('<main')),
   };
   let run;
   before(async () => {
@@ -927,6 +931,11 @@ describe('axe on an authored states grid and a message board', () => {
 
   test('a states grid in a main, an email in a main and a texts frame whose top bar is the h1 pass every rule axe runs on boards', needsKit, () => {
     for (const p of ['/grid', '/email', '/texts']) assert.deepEqual(run.ids(p), [], `${p}: ${JSON.stringify(run.result(p).violations)}`);
+  });
+
+  test("a phone frame's main that scrolls takes tabindex, so a keyboard can scroll a screen with nothing to press", needsKit, () => {
+    assert.deepEqual(run.ids('/phone'), [], JSON.stringify(run.result('/phone').violations));
+    assert.ok(run.ids('/phone-bare').includes('scrollable-region-focusable'), run.ids('/phone-bare').join(', '));
   });
 
   test('drawn as the run drew them, the grid and the email have no main, the email\'s rows sit outside every landmark, and the texts board has no h1', needsKit, () => {

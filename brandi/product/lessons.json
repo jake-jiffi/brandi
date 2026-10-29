@@ -2695,6 +2695,22 @@
     "file": "skills/product-system/references/05-components.md",
     "heading": "DescriptionList"
    }
+  },
+  {
+   "id": "L145",
+   "broke": "The phone frame's main scrolled with nothing in it to press, so a keyboard could not reach it and axe failed six of a run's phone boards.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a phone frame's main that scrolls takes tabindex, so a keyboard can scroll a screen with nothing to press"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "A phone frame"
+   }
   }
  ]
 }

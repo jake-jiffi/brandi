@@ -346,7 +346,7 @@ height and main scrolls past the frame's bottom:
 ```html
 <div style="width: 390px; height: 844px; display: flex; flex-direction: column; overflow: hidden; background: var(--canvas);">
   <x-import component-from-global-scope="Acme.PhoneTopBar" title="Your booking" back="{{back}}"></x-import>
-  <main style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px;">
+  <main tabindex="0" style="flex: 1; min-height: 0; overflow-y: auto; padding: 16px;">
     <div style="display: flex; flex-direction: column; gap: 16px;">
       <!-- the screen: cards, lists and alerts, each at its own height -->
     </div>
@@ -358,6 +358,10 @@ height and main scrolls past the frame's bottom:
   <x-import component-from-global-scope="Acme.PhoneTabBar" items="{{tabs}}" value="Menu" label="App"></x-import>
 </div>
 ```
+
+`main` takes `tabindex="0"`: it scrolls, and on a screen of cards and text with nothing to press, a
+keyboard could not reach it to scroll. axe's scrollable-region-focusable failed six of a run's phone
+boards for it.
 
 - Never make main itself the flex column or a grid. A flex item that clips its content, as a card
   does, may shrink below that content when the column has a fixed height, and a grid row does the
