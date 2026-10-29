@@ -41,7 +41,7 @@ Foundations and components appear once. The other families repeat for each surfa
 | Foundations | The visual foundations the system's README covers (`12-design-system-artifact.md`) | 1440 |
 | Components | One board per group (actions and inputs, status and data, charts and feedback, navigation and overlays), every variant and state mounted live. One more for the empty, loading and problem components | 1440 |
 | Shell | The shell at each checked width, the phone menu open, and the shell again for each role whose navigation differs | 1440, 820, 390 |
-| The working day | Per product, the screen patterns (`04-written-system.md`) in the order its main person meets them: Home, Records, a Record, the dialog that acts on it, the Report. Then Settings, the assistant, Sign in and Setup | The surface's main width |
+| The working day | Per product, the ten core screen patterns (`04-written-system.md`) in the order its main person meets them: Home, Records, List and detail, a Record, Create and edit (the dialog, sheet or page that acts on it), the Report. Then Settings, the assistant, Sign in and Setup | The surface's main width |
 | States | One per module (section 3) | The module's surface width |
 | Options | A to D for each hard screen (section 4) | The surface's main width |
 | Phone | The 390 version of each main page | 390 |
@@ -55,6 +55,22 @@ Foundations and components appear once. The other families repeat for each surfa
 (`08-quality-gates.md`, Coverage) fails the round until each surface has a board at each of its
 widths and a states board for each module. A run that drew the console in depth and almost nothing
 of the website, the app or the messages passed every other gate.
+
+**Every core page, not the easy ones.** A surface with modules names, under `pages`, the board that
+shows each core pattern, by its name in `04-written-system.md`, or skips it with a reason
+(`01-routes-and-intake.md`, Recording it). Three of the ten:
+
+```json
+"pages": { "Home": "ConsoleHome1440", "Create and edit": "ConsoleRosterEdit1440",
+  "List and detail": { "skip": "no queue: each roster is opened from its list" } }
+```
+
+The named board is one of the surface's own and on the canvas. A pattern neither named nor skipped,
+or named on a board that is not there, fails coverage. Skips go into the round record with their
+reasons, so a reviewer can question one. One run drew no create and edit screen, met the bar, and
+lost points in its craft review on error prevention and user control, which those screens carry.
+Draw create and edit as its size calls for (a dialog over its page, a sheet, or a page of its own),
+with an error on a field and the summary on a long form.
 
 `Main.dc.html` is the entry board, and the one name without a width. `brandi product boards` writes
 it as the contents board and rewrites it on every run: Foundations, Components, then every section
