@@ -793,7 +793,7 @@ definition.
 - **Contract.**
   - Data: `columns` (each `{ key, label, type, sortable, align, width, wrap, maxWidth, empty,
     items, render, phone }`), `rows`, `rowKey`, and `labelKey` (the column that names a row, the
-    first by default).
+    first by default). `noun` (`{ one, other }`): what a row is, for the toolbar's count.
   - Selection: `selectable`, `selectedKeys` or `defaultSelected`, `onSelectionChange`.
   - Sorting: `sort` with `onSortChange` (server side), or `defaultSort`.
   - Display: `density` (`comfortable` 48px rows, `compact` 40px), `caption`, `maxHeight` (the head
@@ -821,15 +821,18 @@ definition.
     hairlines between rows and no zebra stripes.
   - One density per table, never tighter than compact. Keep the phone list's meta line short.
   - Selecting rows swaps the toolbar's filters for bulk actions. Those act only on rows on screen,
-    with a selection bar that says how many.
+    with a selection bar that says how many. With bulk actions and no filters the toolbar still
+    keeps its row, saying how many rows there are in the table's noun ("6 invoices", else "6
+    rows"), so it is never blank and selecting never moves the table. A table showing one page of
+    many gives its total as `toolbar.summary`.
 - **Review.** Selecting a row opened it, rows could not be reached by keyboard, and some data
   crashed it (round 1). Bulk approve acted on rows that were not on screen (round 3). Tables kept
   their desktop layout at phone width (round 4). On a touch tablet the sort buttons and the row's
   link were 16 and 20px; each now takes its whole cell. A search that emptied the table said
   nothing, because the count in the footer unmounted; the footer stays mounted, out of sight. A
   selectable table with bulk actions and no filters had a blank band above it at 390 (a proof run,
-  rounds 1 to 3): with no filters the toolbar takes no room until rows are selected. Order lines
-  went label over price at 358px: a receipt is a DescriptionList in `lines`, never a table.
+  rounds 1 to 3): the band now holds the count. Order lines went label over price at 358px: a
+  receipt is a DescriptionList in `lines`, never a table.
 - **Open.** No shift-click range selection. Up and Down between a list and its detail, which
   `03-fundamentals-first.md` §5 requires, was left to each product.
 
@@ -1261,9 +1264,11 @@ One row of search, filters and view controls above a table or list, wrapping on 
 view switcher and secondary actions. Selecting rows swaps the filters for bulk actions. It sits 12px
 above its table, as one block, and sticks while the table scrolls. On a screen under 560px tall, a
 laptop at 200% zoom, it stops sticking: there a sticky bar hid the focused row under it. It keeps
-its height when rows are selected, so the table never moves; with no filters it takes no room until
-rows are selected, because the row kept for them read as a blank band (a proof run, rounds 1 to 3),
-and clearing the selection then puts focus on the next control, the table's select-all.
+its height when rows are selected, so the table never moves under the pointer. With no filters its
+row holds `summary`, the count of what it acts on ("12 issues") in the quiet text style, where the
+selected count will stand: an empty row read as a blank band (a proof run, rounds 1 to 3), and
+collapsing it moved the table at the moment of selection, which is worse. Clearing the selection
+puts focus on the first filter, or with none on the next control, the table's select-all.
 
 #### Spacer
 
