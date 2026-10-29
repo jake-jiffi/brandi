@@ -2509,6 +2509,22 @@
     "file": "skills/product-system/references/06-canvas.md",
     "heading": "Directions"
    }
+  },
+  {
+   "id": "L134",
+   "broke": "A run's own shell and button radius printed after \"The brand's:\" on the shape board, because a shape's source said nothing of whether the brand or the run had decided it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a value a run filled keeps its source but is never shown as the brand's: the record lists it, and the shape board says it was filled"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
   }
  ]
 }

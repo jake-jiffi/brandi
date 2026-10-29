@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import * as P from '../scripts/producttokens.mjs';
+import { shapeBoard } from '../scripts/productboards.mjs';
 import { buildSystem } from '../scripts/system.mjs';
 import { toStarterGlobals } from '../scripts/productglobals.mjs';
 import { systemInputFromBrand } from '../scripts/brandfile.mjs';
@@ -795,6 +796,24 @@ describe("the brand's measured shapes", () => {
     })).map((d) => d.choice);
     for (const c of ['radius-action', 'radius-control', 'radius-md', 'radius-lg', 'radius-frame', 'radius-rail', 'shell', 'moves']) assert.ok(!full.includes(c), `${c} still listed: ${full}`);
     assert.ok(P.shapeKitDefaults(build({})).every((d) => d.how), 'each says how the kit chose it');
+  });
+
+  test("a value a run filled keeps its source but is never shown as the brand's: the record lists it, and the shape board says it was filled", () => {
+    // A run's own shell and button radius printed after "The brand's:" on the shape board, against 02's provenance rule.
+    const tokens = build({
+      families: { card: { px: 16, source: 'the guidelines, p12' }, press: { px: 10, source: 'buttons match the inputs, decided by the run', filled: true } },
+      shell: { form: 'edge', source: 'decided by the run: no live site to measure', filled: true },
+    });
+    const listed = Object.fromEntries(P.shapeKitDefaults(tokens).map((d) => [d.choice, d.how]));
+    assert.match(listed['radius-action'], /^filled by the run, not the brand's: buttons match the inputs/);
+    assert.match(listed.shell, /^filled by the run, not the brand's: decided by the run/);
+    assert.equal(listed['radius-md'], undefined, "the brand's own card radius is not listed");
+    const board = shapeBoard(tokens, {}).source;
+    assert.match(board, /Filled by the run, not the brand's: buttons match the inputs/);
+    assert.match(board, /Filled by the run, not the brand's: decided by the run: no live site/);
+    assert.match(board, /The brand's: the guidelines, p12/);
+    assert.doesNotMatch(board, /The brand's: buttons match the inputs|The brand's: decided by the run/);
+    assert.throws(() => build({ families: { card: { px: 16, source: 'p12', filled: 'yes' } } }), /filled is true for a value a run decided/);
   });
 
   test("the rail's edge shows against the page: its own line on a light canvas, the page's hairline where rail and canvas sit close", () => {

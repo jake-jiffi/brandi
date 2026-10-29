@@ -197,7 +197,15 @@ brief), `extracted` (measured from a real artefact, such as the guidelines' path
 (from its own channels, such as its website) are sources. `decided` and `assumed` fill gaps. A record
 in `governance.decisions` is a choice, never a source. Where its rationale cites evidence, take the
 value from that evidence: the figure the decision derived from it is a gap-fill. Each family's
-`source` in product.json says which kind it is.
+`source` in product.json says which kind it is, and a family or a shell the run decided itself
+carries `"filled": true` beside its source: the shape board then says "Filled by the run, not the
+brand's", and the round record lists it with the kit's choices. A run's own shell and button radius
+once printed after "The brand's:" on the shape board.
+
+The one family the scale does not fill is press. With no measured press and no `shape.action`, the
+kit's pill stands, listed as the kit's ("if it is a pill, you can press it"). Where the brand's
+buttons match its inputs, set `"action": "control"`; where they take a radius of their own, measure
+press.
 
 **Reading the live work.** `$A product measure --url <site>` reads a live site in the installed
 Chrome. It suggests each family and the shell with its source, counting only the brand's own text

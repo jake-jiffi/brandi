@@ -153,13 +153,13 @@ export function typeBoard(tokens, system) {
 export function shapeBoard(tokens, system) {
   const spacing = (tokens.spacing?.tokens ?? []).map((t) => `<div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; align-items: center;"><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p><div style="height: 12px; width: ${esc(t.value)}; background: var(--primary); border-radius: var(--radius-xs);"></div></div>`).join('\n');
   // Each corner says whose it is: the brand's, with where it was measured, or the kit's, with how it chose.
-  const whose = (t) => (t.source ? `The brand's: ${t.source}` : t.derived ? `The kit's: ${t.derived}` : t.name === 'radius-pill' ? "The kit's: the full round, the same for every brand" : '');
+  const whose = (t) => (t.source ? `${t.filled ? "Filled by the run, not the brand's" : "The brand's"}: ${t.source}` : t.derived ? `The kit's: ${t.derived}` : t.name === 'radius-pill' ? "The kit's: the full round, the same for every brand" : '');
   const note = 'margin: 0; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted);';
   const radii = (tokens.radius?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 200px;"><div style="width: 120px; height: 72px; background: var(--surface); border: 1px solid var(--line-control); border-radius: ${esc(t.value)};"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p>${t.usage ? `<p style="margin: 0; text-wrap: pretty; font-size: 13px; line-height: 18px; color: var(--text);">${esc(t.usage)}</p>` : ''}${whose(t) ? `<p style="${note}">${esc(whose(t))}</p>` : ''}</div>`).join('\n');
   const shell = tokens.radius?.shell;
   const moves = tokens.radius?.moves ?? [];
   const form = shell
-    ? `The rail ${shell.form === 'floating' ? 'floats, 8px in from the window edge' : 'meets the window edge, square'}. The brand's: ${shell.source}`
+    ? `The rail ${shell.form === 'floating' ? 'floats, 8px in from the window edge' : 'meets the window edge, square'}. ${shell.filled ? "Filled by the run, not the brand's" : "The brand's"}: ${shell.source}`
     : "The rail meets the window edge, square. The kit's: the plainest form, with no shell named";
   const carried = moves.length ? moves.map((m) => `${m.name}, on ${m.where.join(' and ')}. The brand's: ${m.source}`) : ["No shape move of the brand's own is carried yet."];
   const texture = moves.find((m) => m.kind === 'texture' && m.file);

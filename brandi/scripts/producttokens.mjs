@@ -729,7 +729,9 @@ export function checkShape(shape = {}) {
     const pill = family === 'press' && f?.px === 'pill';
     if (!pill && !(typeof f?.px === 'number' && f.px >= 0)) throw new TypeError(`shape.families.${family}: px is a radius in pixels${family === 'press' ? ', or "pill"' : ''}`);
     if (!named(f.source)) throw new TypeError(`shape.families.${family}: source says where it was measured`);
+    if (f.filled != null && typeof f.filled !== 'boolean') throw new TypeError(`shape.families.${family}: filled is true for a value a run decided to fill a gap, never the brand's`);
   }
+  if (shell?.filled != null && typeof shell.filled !== 'boolean') throw new TypeError('shape.shell.filled is true for a form a run decided to fill a gap, never the brand\'s');
   if (shell != null && (!['edge', 'floating'].includes(shell.form) || !named(shell.source))) throw new TypeError('shape.shell is { form: "edge" or "floating", source }');
   if (moves != null && (!Array.isArray(moves) || moves.some((m) => !named(m?.name) || !named(m?.source) || !Array.isArray(m?.where) || !m.where.length))) {
     throw new TypeError('shape.moves is a list of { name, source, where: [the surfaces that carry it] }');
@@ -765,7 +767,7 @@ function productRadii(system, shape = {}) {
   // A square photo says nothing about a card, so frames are left out of the largest measured radius.
   const lengths = Object.entries(families).filter(([family]) => family !== 'frame').map(([, f]) => f.px).filter((v) => typeof v === 'number');
   const cap = lengths.length ? Math.max(...lengths) : Infinity;
-  const measured = (family) => (families[family] ? { v: families[family].px, source: families[family].source } : null);
+  const measured = (family) => (families[family] ? { v: families[family].px, source: families[family].source, ...(families[family].filled ? { filled: true } : {}) } : null);
   const derive = (v, how, under = null) => {
     let out = Math.min(v ?? 0, cap);
     let said = out < (v ?? 0) ? `${how}, held to the largest measured radius (${px(cap)})` : how;
@@ -790,10 +792,11 @@ function productRadii(system, shape = {}) {
   const xs = derive(step.xs, `from the brand's scale, its xs step (${px(step.xs ?? 0)})`, { name: 'radius-sm', v: sm.v });
   const xl = derive(step['2xl'], `from the brand's scale, its 2xl step (${px(step['2xl'] ?? 0)})`, { name: 'the pane radius', v: pane.v });
   const rail = shell
-    ? { v: shell.form === 'floating' ? pane.v : 0, source: shell.source }
+    ? { v: shell.form === 'floating' ? pane.v : 0, source: shell.source, ...(shell.filled ? { filled: true } : {}) }
     : { v: 0, derived: 'square, meeting the window edge: the plainest form, with no shell named' };
 
-  const token = (name, r, usage) => ({ name, value: px(r.v), usage, ...(r.source ? { source: r.source } : { derived: r.derived }) });
+  // A value a run filled keeps its source and says it filled it, so no board or record shows it as the brand's.
+  const token = (name, r, usage) => ({ name, value: px(r.v), usage, ...(r.source ? { source: r.source, ...(r.filled ? { filled: true } : {}) } : { derived: r.derived }) });
   return [
     token('radius-xs', xs, 'Checkboxes, keyboard keys, tooltips and tiny marks.'),
     token('radius-sm', sm, 'Badges and tags.'),
@@ -816,9 +819,10 @@ function productRadii(system, shape = {}) {
  */
 export function shapeKitDefaults(tokens) {
   // The pill is the kit's rule for avatars and dots, not a brand choice. A token with no source is the kit's, old files' too.
-  const out = (tokens.radius?.tokens ?? []).filter((t) => !t.source && t.name !== 'radius-pill')
-    .map((t) => ({ choice: t.name, value: t.value, how: t.derived ?? 'no source recorded: written before shapes carried one' }));
+  const out = (tokens.radius?.tokens ?? []).filter((t) => (!t.source || t.filled) && t.name !== 'radius-pill')
+    .map((t) => ({ choice: t.name, value: t.value, how: t.filled ? `filled by the run, not the brand's: ${t.source}` : t.derived ?? 'no source recorded: written before shapes carried one' }));
   if (!tokens.radius?.shell) out.push({ choice: 'shell', value: 'edge', how: 'the rail meets the window edge, the plainest form, with no shell named' });
+  else if (tokens.radius.shell.filled) out.push({ choice: 'shell', value: tokens.radius.shell.form, how: `filled by the run, not the brand's: ${tokens.radius.shell.source}` });
   if (!tokens.radius?.moves?.length) out.push({ choice: 'moves', value: 'none', how: 'no shape move of the brand\'s own is carried into the product' });
   return out;
 }
