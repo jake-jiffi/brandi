@@ -132,20 +132,67 @@ Google Fonts link. A face left hosted is asked of Google for the weights its typ
 italics. Google refuses the whole stylesheet when one face lacks a weight asked of it: a display face
 with one weight, asked for four in both styles, left the boards with no face at all.
 
+A face Google Fonts hosts has no file in the brand's material, and `$A product fonts` fetches it. For
+each face the product's type names with no file in `product/fonts/`, it writes the woff2 Google serves,
+in the latin subset (`--subset latin,latin-ext` adds others, each its own file). A face with a weight
+axis comes whole. Any other comes in the weights the type sets, and italics come only where the type
+sets them. The licence file from the family's download goes beside them. Each file joins product.json's
+`fonts` with a `licence`: its name, its file and where it came from. A weight the type sets that the
+face lacks is named.
+
+A face Google does not host is the brand's to supply, files and licence both, and the command records
+an open question for it. With no network it says what is missing and gives the stylesheet address to
+open by hand. Run it in Translate, before `$A product tokens`. The tokens write an `@font-face` for each
+file product.json lists, and the starter, the bundle and the canvas copy the files from `product/fonts/`.
+
 ## Shape, space and marks
 
 **Measure the brand's shapes before choosing any.** A product drifts towards the kit's look unless its
-shapes come from the brand. Measure each family from the brand's own work and record where: the
-guidelines first, then its live work (website, app, signage) where the guidelines say nothing. Measure a
-drawn shape in a PDF from its path, and a live site from its computed style: `$A product measure --url
-<site>` reads the site in the installed Chrome and suggests each family and the shell with its source,
-counting only the brand's own text buttons (not app-store badges or icons). One page can mislead: one
-site's buttons were 6px on its home page, 10px on its contact page and 7px on its locations page. Give
-`--url` once for each page, or `--follow <n>` to take n pages from the first page's navigation; each
-family is then taken across every page, and its source shows each page's own radius. A form embedded
-from another site sits in a frame the page cannot read, and the command names that frame rather than
-reporting no fields. Keep what the guidelines settle and take the rest. Never take a shape from another
-brand, however good it looks.
+shapes come from the brand. Measure each family from the brand's own work and record where. Measure a
+drawn shape in a PDF from its path, and a live site from its computed style. Never take a shape from
+another brand, however good it looks.
+
+**Which source wins.** Three kinds of value can speak for a family. They rank in this order:
+
+1. What the guidelines state or draw: a rule ("buttons take 4px corners"), or a shape on their pages
+   measured from its path.
+2. The brand's live work (website, app, signage), for a family the guidelines say nothing about.
+3. A decision the brand pass made to fill a gap: the shape stance (`identity.shape`) and the radius
+   scale it gives, or a record such as "controls take radius-md". It came from a scale, not a source.
+   It stands only where the guidelines and the live work both say nothing.
+
+One brand's record set controls at 10px and cards at 15px from its scale. Its guidelines drew cards
+with 12pt corners (16px), and its website's fields were 6px. The cards took 16px and the controls 6px.
+`$A product tokens` keeps the same order: a family in product.json wins, and the scale fills only what
+is left, listed as the kit's.
+
+On route A, brand.json tells the three apart. Each evidence record names the field it supports
+(`"field": "identity.shape"`) and its `provenance`. `supplied` (the brand said it: guidelines, a
+brief), `extracted` (measured from a real artefact, such as the guidelines' paths) and `published`
+(from its own channels, such as its website) are sources. `decided` and `assumed` fill gaps. A record
+in `governance.decisions` is a choice, never a source. Where its rationale cites evidence, take the
+value from that evidence: the figure the decision derived from it is a gap-fill. Each family's
+`source` in product.json says which kind it is.
+
+**Reading the live work.** `$A product measure --url <site>` reads a live site in the installed
+Chrome. It suggests each family and the shell with its source, counting only the brand's own text
+buttons, not app-store badges or icons. One page can mislead: one site's buttons were 6px on its home
+page, 10px on its contact page and 7px on its locations page. Give `--url` once for each page, or
+`--follow <n>` to take n more of the first page's links.
+
+Taking the first four navigation links once measured four menu pages and no form field. So
+`--follow` gives one place to a page likely to hold a form: its link or path says contact, enquiries,
+careers, sign up, log in, catering, franchise or the like. The rest go one page per section of the
+site in turn, grouped by the first part of the path. It prints each page it took and why.
+
+Each page votes once per family with its own most common radius, and the family takes what most pages
+agree on. Counted by element, one page repeating a 7px link 111 times outvoted every other page's 6px.
+A tie goes to the page measured first among the tied: the `--url` pages in the order given, then the
+followed ones. The source line keeps each page's own radius.
+
+When no page shows a form field, the command says so: give `--url` a contact, careers or sign-up page.
+A form embedded from another site sits in a frame the page cannot read, and the command names the
+frame rather than reporting no fields.
 
 | Family | Sets | Measure |
 | --- | --- | --- |

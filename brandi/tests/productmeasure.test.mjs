@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { summarise, measureSite, measurePages } from '../scripts/productmeasure.mjs';
+import { summarise, measureSite, measurePages, pickFollow } from '../scripts/productmeasure.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 
 describe("measuring a brand's live work for its shapes", () => {
@@ -33,19 +33,49 @@ describe("measuring a brand's live work for its shapes", () => {
     assert.deepEqual(summarise({ url: 'x', press: [], control: [], card: [], frame: [], shell: null }), { families: {}, shell: null, frames: [] }, 'a page that shows nothing suggests nothing');
   });
 
-  test('across pages each family takes the radius most of all its elements share, and the source shows each page\'s own', () => {
-    const page = (url, press, control = []) => ({ url, press: press.map((radius) => ({ radius, w: 120, h: 40 })), control: control.map((radius) => ({ radius, w: 300, h: 40 })), card: [], frame: [], shell: null, frames: [] });
+  const page = (url, press, control = []) => ({ url, press: press.map((radius) => ({ radius, w: 120, h: 40 })), control: control.map((radius) => ({ radius, w: 300, h: 40 })), card: [], frame: [], shell: null, frames: [] });
+
+  test('across pages each page votes once per family with its own most common radius, so one page repeating a link cannot outvote the rest', () => {
+    // One site's locations page repeated a 7px link 111 times: counted by element, every family said 7px.
     const raws = [
       { ...page('https://example.test/', [6, 6, 6, 6, 20, 0]), shell: { radius: 0, w: 1440, left: 0, top: 0, viewport: 1440, tag: 'header' } },
-      page('https://example.test/contact/', [10, 10, 10, 6], [4, 4]),
-      page('https://example.test/locations/', [7, 7, 6]),
+      page('https://example.test/contact/', [6, 6, 6, 10], [4, 4]),
+      page('https://example.test/locations/', [...Array(111).fill(7), 6]),
     ];
     const s = summarise(raws, { date: new Date('2026-10-29T00:00:00Z') });
     assert.equal(s.families.press.px, 6);
-    assert.equal(s.families.press.source, 'https://example.test/ and 2 more pages, computed style on 2026-10-29: 6 of 13 visible filled buttons and links across 3 pages are 6px; the others 10px x3, 7px x2, pill x1, 0px x1. By page: / 6px (4 of 6), /contact/ 10px (3 of 4), /locations/ 7px (2 of 3).');
+    assert.equal(s.families.press.source, 'https://example.test/ and 2 more pages, computed style on 2026-10-29: 2 of 3 pages showing filled buttons and links are mostly 6px, 1 mostly 7px. By page: / 6px (4 of 6), /contact/ 6px (3 of 4), /locations/ 7px (111 of 112).');
     assert.equal(s.families.control.px, 4);
-    assert.match(s.families.control.source, /2 of 2 visible form fields across 3 pages are 4px\. By page: \/contact\/ 4px \(2 of 2\)\.$/, 'a page with no fields is left out of the spread');
+    assert.match(s.families.control.source, /1 of 1 page showing form fields is mostly 4px\. By page: \/contact\/ 4px \(2 of 2\)\.$/, 'a page with no fields has no vote and is left out of the spread');
     assert.match(s.shell.source, /^https:\/\/example\.test\/, computed style/, 'the shell is the first page\'s');
+  });
+
+  test('a tie between pages goes to the page measured first among them, and the source says so', () => {
+    const three = summarise([page('https://example.test/', [6, 6, 6, 20]), page('https://example.test/contact/', [10, 10, 10, 6]), page('https://example.test/locations/', [7, 7, 6])], { date: new Date('2026-10-29T00:00:00Z') });
+    assert.equal(three.families.press.px, 6, 'three pages, three values: the first page given settles it');
+    assert.equal(three.families.press.source, 'https://example.test/ and 2 more pages, computed style on 2026-10-29: 1 of 3 pages showing filled buttons and links is mostly 6px, 1 mostly 10px, 1 mostly 7px; a tie, settled by the page measured first. By page: / 6px (3 of 4), /contact/ 10px (3 of 4), /locations/ 7px (2 of 3).');
+    // The first page shows no field, so it has no say: the tie goes to the earliest page that does.
+    const fields = summarise([page('https://example.test/', [6]), page('https://example.test/careers/', [], [10, 10]), page('https://example.test/franchise/', [], Array(18).fill(6))]);
+    assert.equal(fields.families.control.px, 10);
+    assert.match(fields.families.control.source, /1 of 2 pages showing form fields is mostly 10px, 1 mostly 6px; a tie, settled by the page measured first\./);
+    const settled = summarise([page('https://example.test/', [6]), page('https://example.test/a/', [8]), page('https://example.test/b/', [8])]);
+    assert.equal(settled.families.press.px, 8, 'two pages agreeing outvote the first page');
+    assert.doesNotMatch(settled.families.press.source, /tie/);
+    assert.match(summarise([page('https://example.test/', [20, 20]), page('https://example.test/b/', [20])]).families.press.source, /2 of 2 pages showing filled buttons and links are mostly pills\. By page: \/ pill \(2 of 2\)/, 'a 40px button at 20px is a pill');
+  });
+
+  test('--follow takes a page likely to hold a form, then one page from each section in turn, and says why each was taken', () => {
+    const at = (p, text = '') => ({ href: `https://example.test${p}`, text });
+    const nav = [at('/menu/chicken/', 'Chicken'), at('/menu/wraps/', 'Wraps'), at('/menu/sides/', 'Sides'), at('/menu/drinks/', 'Drinks'), at('/locations/parramatta/', 'Parramatta'), at('/about/', 'Our story'), at('/menu/chicken/', 'Chicken again')];
+    const footer = [at('/get-in-touch/', 'Contact us'), at('/franchising/', 'Franchising')];
+    const picked = pickFollow([...nav, ...footer], 4);
+    assert.deepEqual(picked.map((p) => new URL(p.url).pathname), ['/get-in-touch/', '/menu/chicken/', '/locations/parramatta/', '/about/'], 'four menu pages took every place before');
+    assert.match(picked[0].why, /likely to hold a form: its link reads "Contact us"/);
+    assert.match(picked[1].why, /\/menu\/, the first of 4 links there/);
+    assert.deepEqual(pickFollow([...nav, ...footer], 6).map((p) => new URL(p.url).pathname).slice(4), ['/franchising/', '/menu/wraps/'], 'then the next section, then a second page from a section');
+    assert.match(pickFollow([at('/careers/'), at('/menu/')], 1)[0].why, /its path says \/careers\//, 'a path can say it too');
+    assert.deepEqual(pickFollow(nav, 2).map((p) => new URL(p.url).pathname), ['/menu/chicken/', '/locations/parramatta/'], 'no form page: sections only');
+    assert.deepEqual(pickFollow([at('/contact/', 'Contact')], 3, { skip: ['https://example.test/contact/'] }), [], 'a page given already is not taken again');
   });
 
   test('a frame from another site is named, since a form inside it cannot be measured', () => {
@@ -80,7 +110,7 @@ describe("measuring a brand's live work for its shapes", () => {
   });
 
   test('follows the first page\'s navigation to more pages in one browser, reads fields in a frame of its own site, and names a frame from another', { skip: findChrome() ? false : 'no headless browser on this machine' }, async () => {
-    const shell = (body) => `<!doctype html><html><body style="margin:0;font:16px sans-serif"><header style="background:#111;padding:16px"><nav><a href="/contact" style="color:#fff">Contact</a> <a href="/about" style="color:#fff">About</a> <a href="https://elsewhere.example/" style="color:#fff">Elsewhere</a> <a href="#top" style="color:#fff">Top</a></nav></header><main style="padding:40px">${body}</main></body></html>`;
+    const shell = (body) => `<!doctype html><html><body style="margin:0;font:16px sans-serif"><header style="background:#111;padding:16px"><nav><a href="/contact" style="color:#fff">Contact</a> <a href="/about" style="color:#fff">About</a> <a href="https://elsewhere.example/" style="color:#fff">Elsewhere</a> <a href="#top" style="color:#fff">Top</a></nav></header><main style="padding:40px">${body}</main><footer><a href="/careers">Careers</a></footer></body></html>`;
     const form = '<!doctype html><html><body><form><input placeholder="Name" style="width:300px;height:40px;border:1px solid #888;border-radius:3px"><textarea style="width:300px;height:80px;border:1px solid #888;border-radius:3px"></textarea></form></body></html>';
     let port;
     const pages = {
@@ -90,6 +120,7 @@ describe("measuring a brand's live work for its shapes", () => {
       // The second, lazy and far below the fold, has not loaded: it still holds a blank page of this site's own.
       '/about': () => shell(`<iframe src="http://localhost:${port}/form" style="width:500px;height:300px;border:0"></iframe><div style="height:6000px"></div><iframe loading="lazy" src="http://localhost:${port}/form" style="width:400px;height:200px;border:0"></iframe>`),
       '/form': () => form,
+      '/careers': () => shell('<p>Join us.</p>'),
     };
     const server = createServer((req, res) => (pages[req.url] ? res.writeHead(200, { 'content-type': 'text/html' }).end(pages[req.url]()) : res.writeHead(404).end()));
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
@@ -98,19 +129,20 @@ describe("measuring a brand's live work for its shapes", () => {
     try {
       const one = await measurePages([`${base}/`], { follow: 1, settle: 300 });
       assert.deepEqual(one.errors, []);
-      assert.deepEqual(one.pages.map((p) => new URL(p.url).pathname), ['/', '/contact'], 'one link followed, from the navigation, its own site only');
+      assert.deepEqual(one.pages.map((p) => new URL(p.url).pathname), ['/', '/contact'], 'one link followed, its own site only');
+      assert.match(one.followed[0].why, /likely to hold a form: its link reads "Contact"/);
       const s = summarise(one.pages);
       assert.equal(s.families.control?.px, 3, JSON.stringify(one.pages[1].control));
       assert.match(s.families.control.source, /By page: \/contact 3px \(2 of 2\)\.$/);
       const both = await measurePages([`${base}/`, `${base}/about`], { follow: 5, settle: 300 });
-      assert.deepEqual(both.pages.map((p) => new URL(p.url).pathname), ['/', '/about', '/contact'], 'given pages first, then followed ones, none twice');
+      assert.deepEqual(both.pages.map((p) => new URL(p.url).pathname), ['/', '/about', '/contact', '/careers'], 'given pages first, then followed ones from the navigation and the footer, none twice');
       assert.deepEqual(summarise(both.pages).frames, [{ page: `${base}/about`, origin: `http://localhost:${port}`, w: 500, h: 300 }, { page: `${base}/about`, origin: `http://localhost:${port}`, w: 400, h: 200 }]);
     } finally {
       server.close();
     }
   });
 
-  test('brandi product measure takes --url more than once, and says when a page shows no field rather than leaving it out', { skip: findChrome() ? false : 'no headless browser on this machine' }, async () => {
+  test('brandi product measure takes --url more than once, says which pages --follow took and why, and says when no page shows a field', { skip: findChrome() ? false : 'no headless browser on this machine' }, async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-measure-cli-'));
     await writeFile(path.join(dir, 'a.html'), '<!doctype html><html><body><a href="#" style="background:#2a7;padding:10px 16px;border-radius:6px">Order now</a></body></html>');
     await writeFile(path.join(dir, 'b.html'), '<!doctype html><html><body><a href="#" style="background:#2a7;padding:10px 16px;border-radius:8px">Join</a></body></html>');
@@ -120,9 +152,18 @@ describe("measuring a brand's live work for its shapes", () => {
     assert.equal(human.status, 0, human.stderr);
     assert.match(human.stdout, /^Measured 2 pages at 1440 wide/);
     assert.match(human.stdout, /\n {2}control \(none on the pages measured\)\n/);
-    assert.match(human.stdout, /across 2 pages are 6px; the others 8px x1\. By page: /);
+    assert.match(human.stdout, /\nNo page measured shows a form field\. Try --url with a page that holds one: a contact or enquiries page, careers, sign up or log in, catering or franchise\.\n/);
+    assert.match(human.stdout, /1 of 2 pages showing filled buttons and links is mostly 6px, 1 mostly 8px; a tie, settled by the page measured first\. By page: /);
     const json = JSON.parse(spawnSync(process.execPath, [cli, 'product', 'measure', '--url', urls[0], '--url', urls[1], '--json'], { encoding: 'utf8' }).stdout);
     assert.deepEqual(json.urls, urls);
+    await writeFile(path.join(dir, 'home.html'), '<!doctype html><html><body><header><a href="menu.html">Menu</a> <a href="join.html">Sign up</a></header></body></html>');
+    await writeFile(path.join(dir, 'join.html'), '<!doctype html><html><body><input style="width:300px;height:40px;border:1px solid #888;border-radius:5px"></body></html>');
+    await writeFile(path.join(dir, 'menu.html'), '<!doctype html><html><body><p>Menu</p></body></html>');
+    const followed = spawnSync(process.execPath, [cli, 'product', 'measure', '--url', pathToFileURL(path.join(dir, 'home.html')).href, '--follow', '1'], { encoding: 'utf8' });
+    assert.equal(followed.status, 0, followed.stderr);
+    assert.match(followed.stdout, /\nFollowed 1 of the first page's links:\n {2}file:\S+\/join\.html \(likely to hold a form: its link reads "Sign up"\)\n/);
+    assert.match(followed.stdout, /\n {2}control 5px/);
+    assert.doesNotMatch(followed.stdout, /No page measured shows a form field/);
     await rm(dir, { recursive: true, force: true });
   });
 });
