@@ -555,6 +555,9 @@ describe('neutrals the brand names in words', () => {
     assert.match(said[0], /^The brand speaks of sand neutrals, and its record carries no sand value: the neutrals follow the neutral hue, its primary \(#1F6F4A\)\. Ask the brand for the sand it means/);
     assert.deepEqual(P.neutralsInWords({ ...brand, identity: { ...brand.identity, colour: { ...brand.identity.colour, neutralHue: '#C9B48A' } } }), [], 'a neutral hue of its own is the brand\'s');
     assert.deepEqual(P.neutralsInWords({ identity: { colour: { primary: '#1F6F4A', ratio: '60/30/10: cool neutrals, green actions' } } }), [], 'cool neutrals names no colour');
+    // Once recorded as a question for the brand, it is not asked again on every run.
+    assert.deepEqual(P.neutralsInWords(brand, { asked: [{ id: 'q2', question: 'What sand do the neutrals take?' }] }), []);
+    assert.equal(P.neutralsInWords(brand, { asked: ['Which orange is the action?'] }).length, 1, 'a question about something else leaves it asked');
   });
 });
 

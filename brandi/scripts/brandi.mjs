@@ -3185,7 +3185,7 @@ async function cmdProduct(flags, positional) {
     const moving = [...tokens.easing.tokens, ...tokens.duration.tokens];
     const motionLines = ['Motion:', ...moving.map((t) => `  ${t.name}  ${t.value}  ${t.source ? `the brand's: ${t.source}` : `the kit's: ${t.derived}`}`)];
     // A colour the brand names in words and its record does not carry is a question for the brand, said here.
-    const asks = neutralsInWords(brandRecord);
+    const asks = neutralsInWords(brandRecord, { asked: [...(config.openQuestions ?? []), ...(config.decisions ?? [])] });
     const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), ...(directions.length ? ['', ...directions] : []), '', ...motionLines, ...(asks.length ? ['', 'To ask the brand:', ...asks.map((a) => `  ${a}`)] : []), '', ...written.map((w) => `  ${w}`)];
     emit(lines.join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, motion: moving.map(({ name: n, value, source: s, derived }) => ({ name: n, value, ...(s ? { source: s } : { derived }) })), files: written });
     if (!audit.ok) process.exitCode = 1;
