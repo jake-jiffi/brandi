@@ -2350,6 +2350,64 @@
     "file": "skills/product-system/references/08-quality-gates.md",
     "heading": "How a round runs"
    }
+  },
+  {
+   "id": "L125",
+   "broke": "A brand whose logo was one coloured file had no one-ink or dark-ground rendition, so its logo kept light-ground colours on dark grounds and in forced colours, and three Logo checks failed on the first run.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "its one ink is made from that file, every ink turned to the text colour, and lib/brand.ts and the starter say it is derived and what to ask the brand for"
+    },
+    {
+     "kind": "check",
+     "component": "Logo",
+     "name": "The theme picks the rendition, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "Email",
+     "name": "A brand with a one ink and no logo of its own for dark grounds sends its one ink to dark mail, in one colour, never its light-ground colours"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L126",
+   "broke": "The record's Mark only and Reversed files sat only in its logo variants, which the starter never read, so BRAND had no symbol.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "the record's variants name the symbol and the file for dark grounds, beside the master; files[] wins, and a wordmark or a reversed symbol is never taken for them"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L127",
+   "broke": "A generated brand file kept the types of the file it replaced, so a starter made before the stand-in sat with the types broke the refreshed kit's lockup.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "a starter made before the kit's types carried the stand-in takes the kit's types again, so the kit's lockup builds for a brand with its own logo"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
   }
  ]
 }

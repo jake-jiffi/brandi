@@ -101,6 +101,12 @@ beside the brand's name in words, so every screen names the brand and none names
 sign-in and booking pages said PRODUCT and never the brand, and its review marked it down. The
 brand's own logo replaces both on the next run.
 
+**The types are the kit's.** Everything in `lib/brand.ts` above the brand's constant (the types and
+`STAND_IN_MARKS`) is taken from the kit's copy on every run, because the kit's components import it.
+A starter made before the stand-in sat with the types kept its older ones, and a refreshed kit's
+lockup then named a constant the file lacked. A file with neither marker is the product's own and
+is left alone.
+
 **A brand whose logo is one coloured file.** Many brands arrive with the full-colour logo and nothing
 else: no reversed file, no one ink. Without a one ink the logo kept its light-ground colours on a dark
 ground and in forced colours, and three Logo checks failed on the first run. So when the brand has no
