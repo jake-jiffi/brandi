@@ -32,6 +32,11 @@ export interface ToolbarProps extends Omit<React.ComponentPropsWithoutRef<"div">
   sticky?: boolean
   /** Search first, then filter chips, a Spacer, then the view switcher and secondary actions. */
   children?: React.ReactNode
+  /**
+   * With no filters, what the row says while nothing is selected: the count of what it acts on ("12 issues"), in
+   * the quiet text style. DataTable gives its own.
+   */
+  summary?: React.ReactNode
 }
 
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
@@ -54,15 +59,15 @@ function scrollParent(el: HTMLElement): HTMLElement {
 
 /** One row of search, filters and view controls above a table or list, wrapping when the space runs out. */
 export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
-  { label, selectedCount = 0, bulkActions = [], onClearSelection, sticky = true, className, children, ...rest },
+  { label, selectedCount = 0, bulkActions = [], onClearSelection, sticky = true, className, children, summary, ...rest },
   ref
 ) {
   const own = React.useRef<HTMLDivElement | null>(null)
   const merged = useMergedRef(ref, own)
   const filters = React.useRef<HTMLDivElement | null>(null)
   const selecting = selectedCount > 0
-  // With nothing in the filters row it takes no room until rows are selected: kept for a selection that has not
-  // happened, the empty row read as a blank band above the table (a proof run's rounds 1 to 3).
+  // The row keeps its height whatever it holds, so selecting never moves the table. With no filters it holds the
+  // summary: an empty row read as a blank band above the table (a proof run's rounds 1 to 3).
   const hasFilters = React.Children.toArray(children).some((c) => typeof c !== "string" || c.trim() !== "")
   // Set when a button in the selection row is pressed: if that press ends the selection, the button goes
   // with it, and focus has to land somewhere useful.
@@ -72,9 +77,9 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
     if (selecting) return
     const lost = !document.activeElement || document.activeElement === document.body
     if (pressedInSelection.current && lost) {
-      // The first filter; with no filters row to return to, the first control after the toolbar (the table's
-      // select-all checkbox), never the empty toolbar, which shows nothing to focus.
-      const first = filters.current?.querySelector<HTMLElement>(FOCUSABLE) ?? (hasFilters || !own.current ? null : nextControl(own.current))
+      // The first filter; with no control in the row to return to, the first control after the toolbar (the table's
+      // select-all checkbox), never the toolbar itself, which has nothing to press.
+      const first = filters.current?.querySelector<HTMLElement>(FOCUSABLE) ?? (own.current ? nextControl(own.current) : null)
       if (first) first.focus()
       else if (own.current) {
         own.current.tabIndex = -1
@@ -82,7 +87,7 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
       }
     }
     pressedInSelection.current = false
-  }, [selecting, hasFilters])
+  }, [selecting])
 
   // While it sticks, what scrolls under it keeps clear of it: the scroller's scroll-padding-top reaches the
   // toolbar's foot (its height, below the scroller's own top padding, where a sticky box rests), so a control Tab
@@ -121,12 +126,19 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
       aria-label={label}
       data-slot="toolbar"
       data-selecting={selecting ? "" : undefined}
-      className={cn((hasFilters || selecting) && "py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas [@media(max-height:560px)]:static", className)}
+      className={cn("py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas [@media(max-height:560px)]:static", className)}
       {...rest}
     >
       {/* The filters stay mounted while rows are selected, so nothing typed into them is lost. */}
-      <div ref={filters} data-slot="toolbar-row" hidden={selecting || !hasFilters} className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">
-        {children}
+      <div ref={filters} data-slot="toolbar-row" hidden={selecting} className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">
+        {hasFilters ? (
+          children
+        ) : summary != null && summary !== false && summary !== "" ? (
+          // Where the selected count will stand, so the one gives way to the other in place.
+          <span data-slot="toolbar-summary" className="px-1 type-meta text-text-muted tabular-nums">
+            {summary}
+          </span>
+        ) : null}
       </div>
       {selecting ? (
         <div data-slot="toolbar-selection" className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">

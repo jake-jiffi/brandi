@@ -108,6 +108,7 @@ export default {
     { name: "columns", type: "DataTableColumn[]", required: true, doc: "Each { key, label, type, sortable, align, width, wrap, maxWidth, empty, items, render, phone, format, goodWhen, max, editable, validate }. See Column types." },
     { name: "rows", type: "Array<Record<string, unknown>>", required: true, doc: "Plain data, as an API returns it. A value of the wrong shape reads as missing; it never breaks the table." },
     { name: "caption", type: "string", required: true, doc: "Names the table for screen readers: what the rows are. Also the name of its scroll region." },
+    { name: "noun", type: "{ one: string; other: string }", doc: "What one row is and what several are ({ one: \"issue\", other: \"issues\" }), for the count a toolbar with no filters shows. Rows otherwise." },
     { name: "rowKey", type: "string", default: '"id"', doc: "The field that keys each row." },
     { name: "labelKey", type: "string", doc: "The column that names a row, the first by default. It holds the row's link or button, and titles the row on a phone." },
     { name: "selectable", type: "boolean", default: "false", doc: "A checkbox on every row and in the head. Shift selects a run. Selecting a row never opens it." },
@@ -120,7 +121,7 @@ export default {
     { name: "density", type: '"comfortable" | "compact"', default: '"comfortable"', doc: "48px rows, or 40px. One density per table, never tighter than compact." },
     { name: "maxHeight", type: "number | string", doc: "The rows scroll under a head that sticks. px, or any CSS length." },
     { name: "footer", type: "ReactNode", doc: "Under the rows, on the subtle surface: put Pagination here." },
-    { name: "toolbar", type: "{ label: string; bulkActions?: Array<{ label: string; icon?: IconName; variant?: \"secondary\" | \"primary\" | \"danger\"; disabled?: boolean; onSelect?: (keys: string[]) => void }>; children?: ReactNode; sticky?: boolean }", doc: "A Toolbar above the table. Selecting rows hands it the count, and its bulk actions get the keys of the selected rows on screen." },
+    { name: "toolbar", type: "{ label: string; bulkActions?: Array<{ label: string; icon?: IconName; variant?: \"secondary\" | \"primary\" | \"danger\"; disabled?: boolean; onSelect?: (keys: string[]) => void }>; children?: ReactNode; summary?: ReactNode; sticky?: boolean }", doc: "A Toolbar above the table. Selecting rows hands it the count, and its bulk actions get the keys of the selected rows on screen. With no filters (children) it shows how many rows there are, in the table's noun, until rows are selected; summary replaces that, for a table showing one page of many." },
     { name: "loading", type: "boolean", default: "false", doc: "The head stays; the rows wait as skeletons, and the table says it is loading." },
     { name: "loadingRows", type: "number", default: "5", doc: "How many skeleton rows stand in." },
     { name: "error", type: "ReactNode | { title: ReactNode; description?: ReactNode; actions?: FeedbackAction[] }", doc: "Replaces the rows when they could not load, keeping the head. Name the system that failed." },
@@ -181,6 +182,7 @@ export default {
       "Numbers are right-aligned in tabular figures, and exact.",
       "One density per table, never tighter than compact. Keep the phone list's meta line short.",
       "Selecting rows swaps the toolbar's filters for bulk actions. Those act only on rows on screen, with a count that says how many.",
+      "With bulk actions and no filters the toolbar still keeps its row, saying how many rows there are in the table's noun (6 invoices, or 6 rows), where the selected count will stand: never blank, and selecting never moves the table.",
     ],
     Review: [
       "Selecting a row opened it, rows could not be reached by keyboard, and some data crashed it (round 1): checks select with Space and with a press, open with Enter, and tab through every row.",
@@ -188,6 +190,7 @@ export default {
       "Tables kept their desktop layout at phone width (round 4): a check at 390px finds the list and nothing scrolling sideways.",
       "On a touch tablet the sort buttons were 16px and the row's name 20px, the only control that opens the row for a screen reader (a pilot's round 1): each now takes its whole cell as the tap area, and a check taps the top and the foot of the cell.",
       "A search that emptied the table said nothing, because the count in the footer unmounted with the rows (a pilot's round 1): the footer stays mounted under the empty state, out of sight.",
+      "A selectable table with bulk actions and no filters had a blank band above it at 390 (a proof run, rounds 1 to 3): the band now holds the count, and a check selects a row and finds the table where it was.",
     ],
     Accepted: [
       "The actions column's menu stands in for Menu until it lands in the kit: the same props and behaviour on the same primitive. Swapping it is one import.",
@@ -196,7 +199,7 @@ export default {
       "Up and Down between a list and its detail is still left to the page, as the reference left it.",
     ],
   },
-  frame: { width: 960, height: 3520 },
+  frame: { width: 960, height: 3880 },
   state: { opened: "", reminded: "", retried: 0 },
   logic: `openedLine: self.state.opened ? "Opened " + self.state.opened + "." : "No invoice open.",
 openInvoice: (row) => self.setState({ opened: (row.client && row.client.title) || String(row.id) }),
@@ -238,6 +241,13 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
       markup: `<x-import component-from-global-scope="NS.DataTable" caption="Invoices" columns="{{invoiceColumns}}" rows="{{invoices}}" selectable="{{yes}}" toolbar="{{toolbar}}" footer="{{pages}}" on-row-click="{{openInvoice}}"></x-import>
 <p data-slot="example-status" class="type-meta text-text-muted">{{openedLine}} {{remindedLine}}</p>`,
       vals: { invoiceColumns, invoices, yes: true },
+    },
+    {
+      id: "bulk-only",
+      title: "Bulk actions and no filters: the toolbar says how many",
+      layout: "block",
+      markup: `<x-import component-from-global-scope="NS.DataTable" caption="Invoices to send" noun="{{invoiceNoun}}" columns="{{invoiceColumns}}" rows="{{toSend}}" selectable="{{yes}}" toolbar="{{sendBar}}"></x-import>`,
+      vals: { invoiceNoun: { one: "invoice", other: "invoices" }, toSend: invoices.slice(0, 3), sendBar: { label: "[Invoice] actions", bulkActions: [{ label: "Send", icon: "Send" }] } },
     },
     {
       id: "types",
@@ -349,6 +359,28 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
         expect.equal(await scope.locator('[data-slot="toolbar-status"]').textContent(), "1 selected", "said politely")
         expect(await isFocused(box), "focus stays on the checkbox")
         expect((await statusLine(scope)).startsWith("No invoice open."), "the row did not open")
+      },
+    },
+    {
+      name: "With bulk actions and no filters the toolbar shows the count in the table's noun, and selecting a row never moves the table",
+      example: "bulk-only",
+      async run({ page, scope, expect }) {
+        const toolbar = scope.locator('[data-slot="toolbar"]')
+        const table = scope.locator('[data-slot="data-table-box"]')
+        const summary = () => scope.locator('[data-slot="toolbar-summary"]').innerText()
+        expect.equal((await summary()).trim(), "3 invoices", "the count, in the table's noun")
+        const bar = Math.round((await toolbar.boundingBox()).height)
+        const top = Math.round((await table.boundingBox()).y)
+        await scope.getByRole("checkbox", { name: "Select [Harbour Physio]" }).click()
+        expect.equal(await scope.locator('[data-slot="toolbar-count"]').innerText(), "1 selected", "the count gives way to the selection")
+        expect.equal(Math.round((await toolbar.boundingBox()).height), bar, "the toolbar's height through the selection")
+        expect.equal(Math.round((await table.boundingBox()).y), top, "the table stays where it was")
+        await scope.getByRole("button", { name: "Clear selection" }).focus()
+        await page.keyboard.press("Enter")
+        await scope.locator('[data-slot="toolbar-selection"]').waitFor({ state: "detached", timeout: 3000 })
+        expect.equal((await summary()).trim(), "3 invoices", "the count is back")
+        const focus = await page.evaluate(() => ({ body: document.activeElement === document.body, label: document.activeElement?.getAttribute("aria-label") ?? "" }))
+        expect(!focus.body && /^Select all/.test(focus.label), `focus is on the table's select-all, not the page body (${focus.label || "nothing"})`)
       },
     },
     {

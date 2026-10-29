@@ -124,6 +124,11 @@ export interface DataTableToolbar {
   bulkActions?: DataTableBulkAction[]
   /** Search, filter chips, a Spacer, then view controls. */
   children?: React.ReactNode
+  /**
+   * With no filters, what the toolbar says while nothing is selected. The rows' count in the table's noun by default
+   * ("6 invoices"); a table showing one page of many gives its total.
+   */
+  summary?: React.ReactNode
   sticky?: boolean
 }
 
@@ -132,6 +137,8 @@ export interface DataTableProps extends Omit<React.HTMLAttributes<HTMLDivElement
   rows: DataTableRow[]
   /** Names the table for screen readers: what the rows are. */
   caption: string
+  /** What one row is and what several are, for the toolbar's count: { one: "issue", other: "issues" }. Rows otherwise. */
+  noun?: { one: string; other: string }
   /** The field that keys each row. "id" by default. */
   rowKey?: string
   /** The column that names a row. The first column by default. */
@@ -212,6 +219,9 @@ const typeOf = (col: DataTableColumn): DataTableColumnType => col.type ?? "text"
 const alignOf = (col: DataTableColumn) => col.align ?? (isNumberStyle(typeOf(col)) || typeOf(col) === "delta" || typeOf(col) === "actions" ? "end" : "start")
 const length = (v: number | string | undefined) => (typeof v === "number" ? `${v}px` : v)
 const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s)
+/** "6 invoices", "1 invoice", or rows when the table names no noun. */
+const countOf = (n: number, noun?: { one: string; other: string }) =>
+  `${formatNumber(n)} ${n === 1 ? (noun?.one ?? "row") : (noun?.other ?? "rows")}`
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" })
 
@@ -263,6 +273,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
     columns,
     rows,
     caption,
+    noun,
     rowKey = "id",
     labelKey,
     selectable = false,
@@ -822,6 +833,9 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
             onSelect: () => action.onSelect?.(chosen),
           }))}
           onClearSelection={() => setSelected([])}
+          // A toolbar with no filters says how many rows there are, in the space the selected count takes, so the
+          // row is never blank and selecting never moves the table.
+          summary={toolbar.summary ?? (view === "rows" ? countOf(shown.length, noun) : null)}
         >
           {toolbar.children}
         </Toolbar>
