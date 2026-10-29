@@ -2075,6 +2075,22 @@
     "file": "skills/product-system/references/08-quality-gates.md",
     "heading": "How a round runs"
    }
+  },
+  {
+   "id": "L110",
+   "broke": "Once directions became a list of roles to solve, a product.json that had recorded its direction picks under the same key, as a record per family, stopped product tokens with an error.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a product.json from before directions solved roles, recording its picks under the key, still writes its tokens and is told how to draw one"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "Directions"
+   }
   }
  ]
 }

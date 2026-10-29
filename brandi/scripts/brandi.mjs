@@ -3117,6 +3117,11 @@ async function cmdProduct(flags, positional) {
     const configFile = path.join(dir, 'product.json');
     const config = existsSync(configFile) ? JSON.parse(await readFile(configFile, 'utf8')) : {};
     const { system, name, source } = await productSource(flags);
+    // Before directions were part of the system, runs recorded their picks under the same key, as
+    // { family: { picked, boards, ... } }. A record like that moves no role: it is left as it is, nothing is solved
+    // from it, and the run is told how to draw a direction by class. A single direction not in a list is still refused.
+    const given = config.directions;
+    const picks = given && typeof given === 'object' && !Array.isArray(given) && !('roles' in given) && Object.values(given).every((d) => d && typeof d === 'object' && !('roles' in d)) ? Object.keys(given) : null;
     const tokens = buildProductTokens(system, {
       name: config.name ?? (name ? `${name} product system` : 'Product system'),
       roles: config.roles ?? {},
@@ -3126,7 +3131,7 @@ async function cmdProduct(flags, positional) {
       brandColours: config.brandColours ?? null,
       fonts: config.fonts ?? [],
       shape: config.shape ?? {},
-      directions: config.directions ?? [],
+      directions: picks ? [] : (given ?? []),
       source,
     });
     const audit = auditProductTokens(tokens);
@@ -3144,6 +3149,7 @@ async function cmdProduct(flags, positional) {
       const moved = Object.keys(d.light).filter((n) => !n.startsWith('rail-mark-'));
       return `  direction ${d.name}: .${d.class}, ${moved.length ? `${plural(moved.length, 'role')} moved (${moved.slice(0, 6).join(', ')}${moved.length > 6 ? ', ...' : ''})` : "nothing moved: it is today's system"}`;
     });
+    if (picks) directions.push(`  directions in product.json records picks (${picks.join(', ')}), not roles to solve, so no direction class was written. To draw a direction by class, list it as [{ "name", "roles", "note" }] (06-canvas.md, Directions).`);
     const lines = [`${tokens.name}: product tokens written.`, '', ...productAuditLines(audit), ...(directions.length ? ['', ...directions] : []), '', ...written.map((w) => `  ${w}`)];
     emit(lines.join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, files: written });
     if (!audit.ok) process.exitCode = 1;

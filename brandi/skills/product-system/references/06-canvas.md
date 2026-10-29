@@ -533,6 +533,10 @@ that move:
   `direction-` class on a board that no direction makes.
 - **Overlays open outside it.** A menu, dialog or toast renders in a portal outside the board's
   element, so it shows the system's own roles, not the direction's.
+- **An older record of picks is left alone.** A product.json written before directions were solved
+  may record its picks under the same key, as `{ "staff": { "picked": "A", "boards": [...] } }`.
+  `product tokens` keeps that record, solves nothing from it and says so; list a direction as above
+  to draw it by class.
 
 ---
 

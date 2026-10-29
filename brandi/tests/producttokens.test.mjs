@@ -1,6 +1,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import os from 'node:os';
 import path from 'node:path';
 import * as P from '../scripts/producttokens.mjs';
 import { buildSystem } from '../scripts/system.mjs';
@@ -459,6 +461,23 @@ describe('directions: a role a concept board moves, solved and carried as a clas
     assert.throws(build([{ name: 'B', roles: { rail: 'acme-teal' } }]), /B: rail names acme-teal, which is not a hex value or one of the brand's colours \(acme-green, acme-black, acme-emerald\)/);
     assert.throws(build([{ name: 'B', roles: { rail: { dark: '#12345' } } }]), /direction B: rail names #12345, which is not a hex value/, 'a broken hex names its direction');
     assert.throws(build([{ name: 'B', roles: { rail: '#58C21E' } }, { name: 'b', roles: { rail: '#134A36' } }]), /"b" makes direction-b a second time/);
+  });
+
+  test('a product.json from before directions solved roles, recording its picks under the key, still writes its tokens and is told how to draw one', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'brandi-directions-'));
+    try {
+      writeFileSync(path.join(dir, 'system.json'), JSON.stringify({ primary: '#58C21E', type: { display: 'Bitter', body: 'Karla' } }));
+      const picks = { customer: { picked: 'A', boards: ['DirectionAppA390', 'DirectionAppB390'] }, staff: { picked: 'B', boards: ['DirectionConsoleA1440'] } };
+      writeFileSync(path.join(dir, 'product.json'), JSON.stringify({ name: 'Acme product system', directions: picks }));
+      const out = execFileSync(process.execPath, [path.join(import.meta.dirname, '..', 'scripts', 'brandi.mjs'), 'product', 'tokens', '--input', 'system.json', '--out', '.'], { cwd: dir, encoding: 'utf8' });
+      assert.match(out, /product tokens written/);
+      assert.match(out, /directions in product\.json records picks \(customer, staff\), not roles to solve, so no direction class was written/);
+      const tokens = JSON.parse(readFileSync(path.join(dir, 'tokens.json'), 'utf8'));
+      assert.equal(tokens.meta.directions, undefined);
+      assert.deepEqual(JSON.parse(readFileSync(path.join(dir, 'product.json'), 'utf8')).directions, picks, 'the record is left as it was');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
