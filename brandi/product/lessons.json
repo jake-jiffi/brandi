@@ -1305,7 +1305,7 @@
     {
      "kind": "test",
      "file": "tests/productmeasure.test.mjs",
-     "name": "across pages each family takes the radius most of all its elements share, and the source shows each page's own"
+     "name": "across pages each page votes once per family with its own most common radius, so one page repeating a link cannot outvote the rest"
     },
     {
      "kind": "test",
@@ -1543,6 +1543,537 @@
    "teaches": {
     "file": "skills/product-system/references/06-canvas.md",
     "heading": "1. Board families and layout"
+   }
+  },
+  {
+   "id": "L84",
+   "broke": "On a near-black rail beside a vivid green brand, the rail's words solved to a pale green tint, while the brand-to-product rule says a black or grey rail keeps neutral words.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a black rail beside a vivid green brand keeps neutral words, in the page text's hue and chroma, above their floors"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
+   }
+  },
+  {
+   "id": "L85",
+   "broke": "A direction drawn as the skill said, with role values on the board's root, failed the drift check on its raw colours; rewritten through brand tokens and colour mixes it passed drift but lost the solved values, and the detector then flagged the concept board.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "each is the system with its roles over the decided ones, and only what differs is kept, where the page does not read"
+    },
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "tokens.css draws each with a class, light and dark, and the rail's logo follows the rail it sets"
+    },
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "after the pick, the picked roles are the system and every direction still draws as it did"
+    },
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a direction's failing pairs are reported under its name, and the system's own still pass"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productdrift.test.mjs",
+     "name": "a direction drawn by its class passes; a class tokens.json has no direction for is drift"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "Directions"
+   }
+  },
+  {
+   "id": "L86",
+   "broke": "A direction that turned the rail green still drew the logo made for a dark rail, because the rendition was chosen when the bundle was built.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Logo",
+     "name": "On the rail it draws the rendition made for the rail's ground, and a direction's class flips it with the rail, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "Sidebar",
+     "name": "The lockup draws the logo made for the rail's ground, and a direction's class moves it with the rail, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "PhoneTopBar",
+     "name": "The bar's lockup draws the logo made for the rail's ground, and a direction's class moves it with the rail, in both themes"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "the rail and the top bar take the logo from the rail as it renders, never from a tone fixed when the bundle was built"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productglobals.test.mjs",
+     "name": "each theme says which of the logo's renditions the rail shows, from the rail's own tone in that theme"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
+   }
+  },
+  {
+   "id": "L87",
+   "broke": "The starter read only the logo's single minimum, which was empty, while the brand recorded a 76px minimum for its mark in a list, so the kit's 16px default would have drawn the logo under it. Clear space written in words was dropped without a word.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "the minimum is the minSizes entry for the mark the starter draws, found through its variant"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a clear space written as a multiple, a fraction or a percentage of the logo's height or width is read; anything else is not"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "clear space in words it cannot read is printed with the product.json key to set, and that key is read on route A"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a clear space given as a share of the width is read against the drawn mark"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L88",
+   "broke": "The brand held a library of 17 drawings, but the starter mapped none to the character's poses, so a run mapped five by hand without the skill saying how.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "the drawings are listed with the block to fill, and only an exact name is taken, saying so"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L89",
+   "broke": "The Design System's staging sent the numbered sections before the README its comment said came first.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productds.test.mjs",
+     "name": "the written system goes README first, then the sections in their numbered order"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/12-design-system-artifact.md",
+    "heading": "The index"
+   }
+  },
+  {
+   "id": "L90",
+   "broke": "Measuring with --follow took the first four navigation links, all menu pages, and measured no form field.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "--follow takes a page likely to hold a form, then one page from each section in turn, and says why each was taken"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "brandi product measure takes --url more than once, says which pages --follow took and why, and says when no page shows a field"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L91",
+   "broke": "Counted by element across pages, one page repeating a 7px link 111 times set the press radius to 7px, where most pages used 6px.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "across pages each page votes once per family with its own most common radius, so one page repeating a link cannot outvote the rest"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "a tie between pages goes to the page measured first among them, and the source says so"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L92",
+   "broke": "The skill did not say where a decision the brand pass made to fill a gap stands, so a radius derived from a scale could outrank what the guidelines drew and the live site used.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a measured family sets its role with its source, and nothing derived goes rounder than the largest measured radius"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L93",
+   "broke": "A brand whose faces are on Google Fonts had no font files, and a run downloaded the latin subsets by hand from Google's stylesheet.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productfonts.test.mjs",
+     "name": "writes the latin woff2 of each face with no file, and its licence, and returns the fonts entries with where the licence came from"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productfonts.test.mjs",
+     "name": "brandi product fonts writes the files, records them and an open question for a face to supply in product.json, and says what comes next"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Type"
+   }
+  },
+  {
+   "id": "L94",
+   "broke": "A board's own Tailwind class, one the kit never uses, was not in bundle.css, so its layout silently fell to one column.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "validate names a class no stylesheet the board loads has a rule for, and the board"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "Five limits"
+   }
+  },
+  {
+   "id": "L95",
+   "broke": "Two holes in one text node of a board rendered \"[object Object][object Object]\".",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a board whose text or an attribute reads [object Object] fails, naming where; a script or a clean page does not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "The mount"
+   }
+  },
+  {
+   "id": "L96",
+   "broke": "In a phone frame whose main scrolled, cards shrank and clipped and hid a checkout's total, and no gate saw it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a box that clips content taller than itself is named, with how much of it shows"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "the phone frame with a plain block in its main holds its cards at their height, and truncation, scrolling, the visually hidden, an overlay drawn open and a page under a scrim are left alone"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "A phone frame"
+   }
+  },
+  {
+   "id": "L97",
+   "broke": "The printed summary of the gates left out the canvas runtime line, so a board that failed showed only in a progress line.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "the gates' printed summary carries every machine gate the round judges, the canvas runtime and board sizes included"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L98",
+   "broke": "A phone states strip, one device frame per state as the skill asks, failed axe's region and duplicate-banner rules by construction.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "frames in labelled sections under a header pass; bare frames fail on region and duplicate banners"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "3. The states board"
+   }
+  },
+  {
+   "id": "L99",
+   "broke": "Authored boards had no way to be measured, and a shell page measured as the 900px window, so boards came out clipped or a third blank.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a shell page measures its bars plus main's whole scroll height, and never less than the window"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "with heights, each authored board is measured and written at its height, and the rows under it move down"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "every board's frame is held to its content, and a box that hides content fails the round, each named in the record"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "6. Sizes"
+   }
+  },
+  {
+   "id": "L100",
+   "broke": "Generated rows grew until they ran into the first authored row, and the run had to work out where its own rows should start.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "generated rows that grow past the first authored row move it and its note below them, and say where authored rows start"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "Rows and title notes"
+   }
+  },
+  {
+   "id": "L101",
+   "broke": "Every hard screen got options and the first page of every module counted as hard, so five modules meant 20 option boards; a run drew one set and recorded the rest as not drawn.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "the record says, surface by surface, which modules drew options A to D and which reused a written pattern"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "4. The options board"
+   }
+  },
+  {
+   "id": "L102",
+   "broke": "A badge cut by a narrow grid column hung its board in a render loop (React error 185): the tooltip wrapped round the cut label would not shrink, so the column grew, the badge unwrapped, and was cut again.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Badge",
+     "name": "A badge squeezed by its row is cut and settles, wrapped in its tooltip"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productdocs.test.mjs",
+     "name": "a cut label is wrapped in a Tooltip that sizes as the label does, so wrapping it never loops"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.11 Long text"
+   }
+  },
+  {
+   "id": "L103",
+   "broke": "At phone width every kit way of showing a label and its value put the value under the label, so a run drew a checkout's receipt by hand.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "DescriptionList",
+     "name": "Lines keep each label and value on one line at any width, the value at the end in tabular figures"
+    },
+    {
+     "kind": "check",
+     "component": "DescriptionList",
+     "name": "In lines the total sits under a rule, label and value in text-strong"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "DescriptionList"
+   }
+  },
+  {
+   "id": "L104",
+   "broke": "Cards shrank inside a phone's scrolling main and hid a checkout's total, because a card with overflow hidden is a scroll container and its automatic minimum height is zero.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Card",
+     "name": "In a short column that scrolls, as a flex or grid item, a card keeps its content's height and the column scrolls"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.4 Sized by its own container"
+   }
+  },
+  {
+   "id": "L105",
+   "broke": "A two-line banner in a short scrolling column was squashed to its 48px minimum height and its words ran over what followed.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Banner",
+     "name": "In a short column that scrolls, a banner keeps its height and its words, and a one-line banner is still 48px"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.4 Sized by its own container"
+   }
+  },
+  {
+   "id": "L106",
+   "broke": "A selectable table with bulk actions and no filters kept an empty toolbar row, a blank band above it at 390 for three rounds.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Toolbar",
+     "name": "With no filters it shows the count, not a blank band, keeps its height through a selection, and clearing puts focus on the next control"
+    },
+    {
+     "kind": "check",
+     "component": "DataTable",
+     "name": "With bulk actions and no filters the toolbar shows the count in the table's noun, and selecting a row never moves the table"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Toolbar"
+   }
+  },
+  {
+   "id": "L107",
+   "broke": "Coverage held only each surface's widths and states boards, so a run drew no create and edit screen at all, met the bar, and lost craft points on error prevention and user control, which those screens carry.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "a pattern neither named nor skipped, named on a board not on the canvas or of another surface, or skipped with no reason fails, as does a name that is no pattern"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "the patterns are the ten 04-written-system.md teaches, in its order, so the gate and the written system say the same thing"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productcoverage.test.mjs",
+     "name": "a surface with modules and no pages is held to every core page; one with neither has nothing to check"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Coverage"
+   }
+  },
+  {
+   "id": "L108",
+   "broke": "Five heuristics scored 3 with no reason written met the bar, so nobody could tell where the points went or what the next round should fix.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a heuristic under 4 carries a note naming what cost the point, printed beside its score; one without fails the Craft gate, named"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "The round record"
+   }
+  },
+  {
+   "id": "L109",
+   "broke": "The axe and reflow checks waited for a ready mark a static board never sends, leaving every static board unscanned after 20 seconds, and a board that mounts components but rendered without its runtime would have passed as static.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a static board is scanned and measured with no ready mark; one the shim could not draw, or that rendered without it, fails at once, saying why"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "measuring a board that mounts components but rendered without its runtime fails it, where a static board is measured"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
    }
   }
  ]

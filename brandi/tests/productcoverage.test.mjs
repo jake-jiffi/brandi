@@ -33,7 +33,8 @@ describe('the canvas covers every surface the product ships on', () => {
   test('a surface wants a board at each of its widths and a states board for each module, and says what is missing', () => {
     const cov = canvasCoverage({ surfaces, files });
     const by = Object.fromEntries(cov.surfaces.map((s) => [s.name, s]));
-    assert.deepEqual(by['Ops console'].missing, ['no states board for the Menu module (a board named Console, a word of Menu, then States, as ConsoleMenuStates1440)']);
+    assert.deepEqual(by['Ops console'].missing.slice(0, 1), ['no states board for the Menu module (a board named Console, a word of Menu, then States, as ConsoleMenuStates1440)']);
+    assert.match(by['Ops console'].missing[1] ?? '', /^core pages neither named nor skipped: Home, /, 'a surface with modules names its core pages');
     assert.equal(by['Ops console'].boards, 7, 'ConsoleMenu1440 is a page of the Menu module, not its states board');
     assert.deepEqual(by['Staff app'].missing, []);
     assert.deepEqual(by['Email and messaging'].missing, ['no board at all: name each one Mail, its screen, then its width, as MailHome600']);
@@ -114,10 +115,10 @@ describe('the core pages a surface with modules shows', () => {
     assert.deepEqual(cov.surfaces[1].missing, [], 'the other surface is listed apart');
   });
 
-  test('a surface with modules and no pages is still covered, its core pages unchecked; one with neither has nothing to check', () => {
+  test('a surface with modules and no pages is held to every core page; one with neither has nothing to check', () => {
     const cov = canvasCoverage({ surfaces: [app(undefined), { name: 'Staff app', boards: 'Staff', widths: [390] }], files: drawn });
-    assert.equal(cov.covered, true);
-    assert.deepEqual(cov.surfaces[0].core, { unchecked: true, named: [], skipped: [], missing: [] });
+    assert.equal(cov.covered, false);
+    assert.match(cov.surfaces[0].core.missing[0] ?? '', /^core pages neither named nor skipped: Home, Records, List and detail/);
     assert.equal(cov.surfaces[1].core, null);
     const opted = canvasCoverage({ surfaces: [{ name: 'Staff app', boards: 'Staff', widths: [390], pages: { Home: 'StaffHome390' } }], files: drawn }).surfaces[0];
     assert.match(opted.missing[0] ?? '', /^core pages neither named nor skipped: Records, List and detail/, 'a surface that names its pages is held to all ten');
@@ -138,7 +139,7 @@ describe('coverage as a gate', () => {
     const judged = judgeRound(g);
     const verdict = judged.verdicts.find((v) => v.gate === 'Coverage');
     assert.equal(verdict.pass, false);
-    assert.match(verdict.detail, /^1 of 3 surfaces covered; missing: Ops console \(1\), Email and messaging \(1\); core pages unchecked on Ops console until product\.json names them$/);
+    assert.match(verdict.detail, /^1 of 3 surfaces covered; missing: Ops console \(2\), Email and messaging \(1\)$/);
     const md = roundMarkdown(g, judged);
     assert.match(md, /## Coverage\n\n- Ops console \(Console\*, 7 boards\): no states board for the Menu module/);
     assert.match(md, /- Staff app \(Staff\*, 1 board\): covered at 390\n/);
@@ -146,12 +147,13 @@ describe('coverage as a gate', () => {
 
   test('the record says, surface by surface, which modules drew options A to D and which reused a written pattern', () => {
     const g = clean();
-    g.coverage = canvasCoverage({ surfaces: surfaces.slice(0, 1), files: [...files, 'ConsoleMenuStates1440.dc.html', ...['A', 'B', 'C', 'D'].map((l) => `ConsoleOpeningHours${l}1440.dc.html`)] });
+    const skipped = Object.fromEntries(CORE_PAGES.map((p) => [p, { skip: 'not what this test is about' }]));
+    g.coverage = canvasCoverage({ surfaces: [{ ...surfaces[0], pages: skipped }], files: [...files, 'ConsoleMenuStates1440.dc.html', ...['A', 'B', 'C', 'D'].map((l) => `ConsoleOpeningHours${l}1440.dc.html`)] });
     const md = roundMarkdown(g, judgeRound(g));
-    assert.match(md, /- Ops console \(Console\*, 12 boards\): covered at 1440, 820, 390, with a states board for Rosters, Opening hours, Menu; options A to D for Opening hours; a written pattern reused for Rosters, Menu; core pages unchecked until product\.json names them \(06-canvas\.md\)\n/);
+    assert.match(md, /- Ops console \(Console\*, 12 boards\): covered at 1440, 820, 390, with a states board for Rosters, Opening hours, Menu; options A to D for Opening hours; a written pattern reused for Rosters, Menu\n/);
   });
 
-  test('the record prints each core page on its board and each skip with its reason, and the Coverage line says which surfaces left them unchecked', () => {
+  test('the record prints each core page on its board and each skip with its reason, and a surface that names none fails with every pattern to name', () => {
     const named = { name: 'Ops console', boards: 'Console', widths: [1440], modules: ['Menu'], pages: {
       Home: 'ConsoleHome1440', Records: 'ConsoleMenu1440', 'List and detail': { skip: 'no queue.' }, Record: 'ConsoleMenu1440', Report: { skip: 'figures live in the head office tool' },
       Settings: 'ConsoleShell820', 'Create and edit': 'ConsoleMenu1440', Setup: { skip: 'set up by head office' }, 'The assistant': { skip: 'none yet' }, 'Sign in': 'ConsoleHome390' } };
@@ -159,11 +161,11 @@ describe('coverage as a gate', () => {
     g.coverage = canvasCoverage({ surfaces: [named, { name: 'Tablet tool', boards: 'Staff', widths: [390], modules: ['Shifts'] }], files: [...files, 'ConsoleMenuStates1440.dc.html', 'StaffShiftsStates390.dc.html'] });
     const judged = judgeRound(g);
     const verdict = judged.verdicts.find((v) => v.gate === 'Coverage');
-    assert.equal(verdict.pass, true, 'unchecked is not missing');
-    assert.equal(verdict.detail, '2 of 2 surfaces covered; core pages unchecked on Tablet tool until product.json names them');
+    assert.equal(verdict.pass, false, 'a surface with modules that names no core pages is not covered');
+    assert.equal(verdict.detail, '1 of 2 surfaces covered; missing: Tablet tool (1)');
     const md = roundMarkdown(g, judged);
     assert.match(md, /- Ops console \(Console\*, \d+ boards\): covered at 1440, with a states board for Menu; a written pattern reused for Menu\n {2}- Core pages: Home on ConsoleHome1440, Records on ConsoleMenu1440, Record on ConsoleMenu1440, Settings on ConsoleShell820, Create and edit on ConsoleMenu1440, Sign in on ConsoleHome390\n {2}- Skipped: List and detail \(no queue\), Report \(figures live in the head office tool\), Setup \(set up by head office\), The assistant \(none yet\)\n/);
-    assert.match(md, /- Tablet tool \(Staff\*, 2 boards\): covered at 390, with a states board for Shifts; a written pattern reused for Shifts; core pages unchecked until product.json names them \(06-canvas\.md\)\n/);
+    assert.match(md, /- Tablet tool \(Staff\*, 2 boards\): core pages neither named nor skipped: Home, Records, /);
   });
 
   test('a covered canvas passes, and a round from before the gate has no line for it', () => {

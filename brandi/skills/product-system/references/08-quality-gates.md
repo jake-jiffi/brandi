@@ -127,9 +127,9 @@ nor skipped, a board not on the canvas or of another surface, a skip with no rea
 is no pattern. Each is listed by surface.
 
 A run drew no create and edit screen at all, every gate passed, and its craft review then lost
-points on error prevention and user control, which those screens carry. A `product.json` from before
-the key stays valid: its Coverage line says which surfaces' core pages are unchecked until it names
-them. A surface without modules (a marketing site, messages) has none to check unless it names its
+points on error prevention and user control, which those screens carry. So a surface with modules
+and no `pages` fails Coverage with every pattern listed, and a `product.json` from before the key
+needs it before its next round. A surface without modules (a marketing site, messages) has none to check unless it names its
 own. The gates read `pages` when they run, so name each page as its board is drawn, before
 `$A product gates`.
 

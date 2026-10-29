@@ -304,13 +304,14 @@ The system is never finished. Five modes, each a round of its own
 | Gate | Pass |
 | --- | --- |
 | Detector | No findings at 1440, 820 and 390 wide, in light and dark: component previews, starter screens and canvas boards |
-| Craft (Impeccable critique) | 34/40 or better on Nielsen's ten heuristics, none under 3, no P0, P1 or P2 open |
+| Craft (Impeccable critique) | 34/40 or better on Nielsen's ten heuristics, none under 3, each under 4 with a note on what cost the point, no P0, P1 or P2 open |
 | Rules (ui-ux-pro-max) | No Critical, High or Medium open |
 | Accessibility | axe clean, and the scripted behaviour checks all pass |
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree, the docs' written values included |
 | Canvas runtime | Every board renders under the Design canvas's own runtime, in a cross-origin frame |
 | Board sizes | Every board's frame fits its content, and nothing on a board hides its own content |
+| Coverage | Every surface has a board at each of its widths and a states board for each module, and a surface with modules shows each core page or skips it with a reason |
 | Record | Every tool's version pinned and written down, every round |
 
 Impeccable is the craft gate. ui-ux-pro-max is the rules engine: its accessibility, forms,

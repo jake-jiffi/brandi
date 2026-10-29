@@ -564,6 +564,13 @@ describe('a board with no height of its own', () => {
     assert.match(reflow.result('/unmounted').error ?? '', /^the board mounts components and rendered without its runtime/);
   });
 
+  test('measuring a board that mounts components but rendered without its runtime fails it, where a static board is measured', needsKit, async () => {
+    const out = await measureOn((url) => boards[url] ?? null, (base) => both(base, 1440));
+    assert.equal(typeof out['/static'], 'number', JSON.stringify(out['/static']));
+    assert.match(out['/unmounted']?.error ?? '', /^the board mounts components and rendered without its runtime/);
+    assert.match(out['/failed']?.error ?? '', /^the board did not render: boom$/);
+  });
+
   test('a page axe could not scan fails the Accessibility gate, and its line says how many', () => {
     const g = clean();
     g.axe.errors = 6;

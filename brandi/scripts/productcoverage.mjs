@@ -51,11 +51,12 @@ export function moduleWords(module) {
  * Hold a surface's `pages` to the core patterns: each names the board that shows it, one of the surface's own, or
  * skips it as { "skip": "why" }. A run drew no create and edit screen and met the bar, then lost points in review on
  * error prevention and user control, which those screens carry. A key is matched without its case or a leading "the".
- * Returns the named, the skipped and what is missing; `unchecked` for a surface with modules that names none yet, so
- * a product.json from before the key stays valid; null for a surface with neither, which has nothing to check.
+ * Returns the named, the skipped and what is missing; null for a surface with neither modules nor pages, which has
+ * nothing to check. A surface with modules that names none is held to every pattern: left unchecked, the run that drew
+ * no create and edit screen would meet the bar again.
  */
 export function corePages(pages, { prefix, widths, modules, boards, canvas }) {
-  if (pages == null) return modules.length ? { unchecked: true, named: [], skipped: [], missing: [] } : null;
+  if (pages == null && !modules.length) return null;
   const key = (name) => String(name).trim().toLowerCase().replace(/^the\s+/, '');
   const given = new Map();
   const strays = [];
@@ -85,7 +86,7 @@ export function corePages(pages, { prefix, widths, modules, boards, canvas }) {
     ...faults,
     ...strays.map((name) => `pages names ${name}, which is not a core pattern (04-written-system.md, Screen patterns: ${CORE_PAGES.join(', ')})`),
   ];
-  return { unchecked: false, named, skipped, missing };
+  return { named, skipped, missing };
 }
 
 /** Every board in a canvas folder, probe boards (`_probe...`) left out. */

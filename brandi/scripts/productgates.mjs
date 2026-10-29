@@ -499,12 +499,10 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
       z.skipped ? `not run: ${z.skipped}` : faults.length ? faults.join('; ') : `every frame fits its content on ${count(z.boards, 'board')}, and nothing on a board hides its own content`);
   }
   // Likewise: a round from before coverage has no line for it, and one with no surfaces to hold the canvas to fails.
-  // A surface with modules that names no core pages yet passes, and the line says it was not checked.
   if (gates.coverage) {
     const short = (gates.coverage.surfaces ?? []).filter((s) => s.missing.length);
-    const unchecked = (gates.coverage.surfaces ?? []).filter((s) => s.core?.unchecked);
     add('Coverage', !gates.coverage.skipped && !short.length,
-      gates.coverage.skipped ?? `${gates.coverage.surfaces.length - short.length} of ${gates.coverage.surfaces.length} surfaces covered${short.length ? `; missing: ${short.map((s) => `${s.name} (${s.missing.length})`).join(', ')}` : ''}${unchecked.length ? `; core pages unchecked on ${unchecked.map((s) => s.name).join(', ')} until product.json names them` : ''}`);
+      gates.coverage.skipped ?? `${gates.coverage.surfaces.length - short.length} of ${gates.coverage.surfaces.length} surfaces covered${short.length ? `; missing: ${short.map((s) => `${s.name} (${s.missing.length})`).join(', ')}` : ''}`);
   }
   if (critique) {
     const scores = critique.heuristics ?? [];
@@ -598,7 +596,7 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
       ...(s.reused?.length ? [`a written pattern reused for ${s.reused.join(', ')}`] : []),
     ].map((t) => `; ${t}`).join('');
     for (const s of gates.coverage.surfaces ?? []) {
-      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}${trail(s)}${s.core?.unchecked ? '; core pages unchecked until product.json names them (06-canvas.md)' : ''}`);
+      lines.push(`- ${s.name} (${s.prefix}*, ${count(s.boards, 'board')}): ${s.missing.length ? s.missing.join('; ') : `covered at ${s.widths.join(', ')}${s.modules.length ? `, with a states board for ${s.modules.join(', ')}` : ''}`}${trail(s)}`);
       // Each core page on its board, and each skip with its reason, so a reviewer can open the screen or question the skip.
       if (s.core?.named?.length) lines.push(`  - Core pages: ${s.core.named.map((n) => `${n.pattern} on ${n.board}`).join(', ')}`);
       if (s.core?.skipped?.length) lines.push(`  - Skipped: ${s.core.skipped.map((k) => `${k.pattern} (${sentence(k.reason)})`).join(', ')}`);

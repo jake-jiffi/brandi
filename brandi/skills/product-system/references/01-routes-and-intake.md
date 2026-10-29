@@ -108,9 +108,9 @@ A surface with modules (a console, or an app with areas of its own) also gets `p
 boards are drawn. It names each of the ten core page patterns, as `04-written-system.md` (Screen
 patterns) names them, with the board that shows it. A pattern the surface does not have is skipped
 with `{ "skip": "why" }`: a product with no queue has no list and detail. A marketing site or
-messages have no modules and need no `pages`. Until a surface with modules has the key, the gates
-say its core pages are unchecked. Once it has it, a pattern neither named nor skipped fails the
-round (`06-canvas.md`, Every core page).
+messages have no modules and need no `pages`. A pattern neither named nor skipped fails the round,
+and so does a surface with modules and no `pages` at all, with every pattern listed to name
+(`06-canvas.md`, Every core page).
 
 ```json
 {

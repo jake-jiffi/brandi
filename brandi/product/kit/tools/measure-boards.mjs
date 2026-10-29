@@ -76,6 +76,9 @@ for (const p of pages) {
     await page.waitForSelector("html[data-dc-ready], html[data-dc-error]", { state: "attached", timeout: shimmed ? 20000 : 2000 }).catch((e) => { if (shimmed) throw e })
     const failed = await page.evaluate(() => document.documentElement.getAttribute("data-dc-error"))
     if (failed) throw new Error(`the board did not render: ${failed}`)
+    // Its unmounted tags are no static board: offline, with React not yet fetched, a board renders without the
+    // runtime, and measured as it stands its size would be the bare tags'.
+    if (!shimmed && await page.$("x-import, dc-import, sc-for, sc-if")) throw new Error("the board mounts components and rendered without its runtime: React could not be fetched, so connect once and run the gates again")
     await page.evaluate(() => document.fonts?.ready)
     if (p.frame) {
       await settle(page)
