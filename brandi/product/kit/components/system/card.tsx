@@ -133,7 +133,8 @@ export const Card = React.forwardRef<HTMLElement, CardProps>(function Card(
         {hasBody ? (
           <CardContent
             className={cn(
-              "gap-4",
+              // Grows into a stretched card, so the footer sits at its foot: cards in a row end on one line.
+              "grow gap-4",
               flush ? "px-0" : box ? INSET_X : "px-0",
               hasHeader ? (nested ? "pt-2" : "pt-4") : box && !flush && INSET_TOP,
               box && !flush && !footer && INSET_BOTTOM

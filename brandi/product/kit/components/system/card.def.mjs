@@ -128,12 +128,29 @@ ${["flex", "grid"].map((kind) => `<div data-frame="${kind}" style="width: 300px;
       vals: { payWith: [{ value: "saved", label: "Saved card ending [4821]" }, { value: "gift", label: "Gift card" }, { value: "new", label: "A new card" }] },
     },
     {
+      id: "row",
+      title: "Cards in a row, their footers on one line",
+      markup: `<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; width: 640px;">
+<x-import component-from-global-scope="NS.Card" title="Bay 1" footer="Updated 9:41 am">${body("[Rex], a wash and dry, 20 minutes left.")}</x-import>
+<x-import component-from-global-scope="NS.Card" title="Bay 2" footer="Updated 9:41 am">${body("[Juno], a full groom, 45 minutes left. The dryer is booked after her, and [Biscuit] waits at the desk.")}</x-import>
+</div>`,
+    },
+    {
       id: "narrow",
       title: "A narrow card",
       markup: `<div class="w-72"><x-import component-from-global-scope="NS.Card" title="Overtime" description="This week.">${body("[12.5] hours across [4] people.")}</x-import></div>`,
     },
   ],
   checks: [
+    {
+      name: "Cards in a row end their footers on one line, the body taking a stretched card's space",
+      example: "row",
+      async run({ scope, expect }) {
+        const tops = await scope.locator('[data-slot="card-footer"]').evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().bottom)))
+        expect.equal(tops.length, 2, "two footers")
+        expect(Math.abs(tops[0] - tops[1]) <= 1, `the footers end on one line: ${tops.join(" and ")}`)
+      },
+    },
     {
       name: "A linked card's chevron ends the title's line, is decoration, and the card is still one link",
       example: "chevron",

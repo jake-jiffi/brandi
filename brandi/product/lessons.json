@@ -2557,6 +2557,22 @@
     "file": "skills/product-system/SKILL.md",
     "heading": "The command line does the arithmetic"
    }
+  },
+  {
+   "id": "L137",
+   "broke": "Cards stretched to share a row kept their footers mid-card, because the body did not grow into the extra height.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Card",
+     "name": "Cards in a row end their footers on one line, the body taking a stretched card's space"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Card"
+   }
   }
  ]
 }

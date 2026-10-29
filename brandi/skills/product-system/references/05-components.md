@@ -785,6 +785,9 @@ The container on the canvas: a title, an optional description and actions, a bod
   line, the cue that the whole card opens something, as ListRow has).
 - **Layout.** In a column that scrolls, as a flex or a grid item, a card keeps its content's height
   and the column scrolls. It clips its corners with `overflow: clip`, never `hidden` (section 2.4).
+- **A stretched card ends at its footer.** In a grid row the cards stretch to the tallest, and the
+  body takes the extra height, so every card's footer sits on one line. A run stretched its bay
+  cards by hand and the footers stayed mid-card until the body grew.
 - **Rules.** Never a card inside a card. The title says what the card shows, in sentence case, with
   no small uppercase label above it. One idea per card: a card that needs tabs is a page.
 - **Review.** An uppercase kicker sat above card titles, which the craft gate bans (round 1). Cards
