@@ -171,6 +171,8 @@ interface Placed {
   lanes: number
   /** How many earlier events it overlaps, each drawn under it and showing at its left. */
   depth: number
+  /** How far down it, in hours, a later event drawn over it starts: its lines stop above that. */
+  room?: number
   time: string
   name: string
 }
@@ -216,15 +218,16 @@ interface GridEventProps {
 
 /**
  * One event on the grid, placed over the hours it covers. It shows whole lines only: the title always, then the
- * time, then its line, as its height allows. Narrow, its lines end in an ellipsis; with room, the title takes two
- * lines. Anything cut short or left out shows in full in a tooltip, on hover, focus and a long press.
+ * time, then its line, as its height allows. Drawn over part-way down by a later event, it shows the lines that fit
+ * above that one, and none when not even its title does. Narrow, its lines end in an ellipsis; with room, the title
+ * takes two lines. Anything cut short or left out shows in full in a tooltip, on hover, focus and a long press.
  */
 function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClick }: GridEventProps) {
   const box = React.useRef<HTMLElement | null>(null)
   const cut = useCut(box)
   // The lines are a column that wraps: one with no room below starts a second column, a gap's width out past the
   // edge, where it is hidden whole. Squeezed instead, a one-hour booking showed half its time and a sliver of its
-  // line. The event is a size container in its title's type, so 1lh in a query is a title line: the title takes
+  // line. The column is a size container in its title's type, so 1lh in a query is a title line: the title takes
   // two lines only with room for a line under them, and the time two with room for two of the title's.
   const props: Record<string, unknown> = {
     ref: box,
@@ -235,7 +238,7 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
     onFocus,
     "aria-label": p.name,
     className: cn(
-      "@container-size/event flex size-full flex-col flex-wrap gap-x-[100%] overflow-hidden rounded-sm border border-transparent px-2 py-0.5 text-left",
+      "flex size-full flex-col overflow-hidden rounded-sm border border-transparent px-2 py-0.5 text-left",
       // Never shorter than one title line, so a short event still shows its title, and a 24px target at least.
       "min-h-[max(1.5rem,calc(1lh+6px))]",
       view === "day" ? "type-label" : "type-caption",
@@ -246,8 +249,20 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
     ),
   }
   const content = (
-    <>
-      <span className="flex w-full min-w-0 shrink-0 items-start gap-1.5">
+    <span
+      className="@container-size/event flex min-h-0 flex-1 flex-col flex-wrap gap-x-[100%]"
+      // Under a later event, the column ends 6px short of where that one starts: this event's border and top padding,
+      // that one's ring, and a pixel between.
+      style={p.room === undefined ? undefined : { maxHeight: `calc(var(--hour) * ${p.room} - 6px)` }}
+    >
+      <span
+        className={cn(
+          "flex w-full min-w-0 shrink-0 items-start gap-1.5",
+          // A column's first line stays in it even with no room, so a title that does not fit above the later event is
+          // hidden, not drawn under it. It may run into the pixel left between, since layout rounds a line height.
+          p.room !== undefined && "[@container_event_not_(min-height:calc(1lh_-_1px))]:invisible"
+        )}
+      >
         <span aria-hidden="true" className={cn("size-2 shrink-0 rounded-full forced-color-adjust-none @max-[48px]/event:hidden", view === "day" ? "mt-1.5" : "mt-1", DOT[p.slot])} />
         <span
           data-measure=""
@@ -273,7 +288,7 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
           {p.event.meta}
         </span>
       ) : null}
-    </>
+    </span>
   )
   return (
     <div
@@ -401,6 +416,7 @@ export const Schedule = React.forwardRef<HTMLDivElement, ScheduleProps>(function
           lane: 0,
           lanes: 1,
           depth: 0,
+          room: undefined as number | undefined,
           time,
           name: [e.event.title, time, e.event.meta].filter(Boolean).join(", "),
           a,
@@ -418,6 +434,14 @@ export const Schedule = React.forwardRef<HTMLDivElement, ScheduleProps>(function
       const depth = under.length ? Math.min(3, Math.max(...under.map((g) => g.depth)) + 1) : 0
       group.forEach((p, i) => Object.assign(p, { lane: i, lanes: group.length, depth }))
       done.push({ depth, end: Math.max(...group.map((p) => p.b)) })
+    }
+    // An event that starts in a later hour, while this one is still drawn, and at least as deep, is drawn over it. Its
+    // lines laid out for its own height sat under the later one, drawn and covered, so they stop where it starts. A
+    // short event is drawn a title line tall at least, past its end, and an hour holds any line; a later event that
+    // starts below it leaves room for all it holds, so counting one changes nothing.
+    for (const p of dayItems) {
+      const over = dayItems.filter((q) => q.hour > p.hour && q.a < p.a + Math.max(p.span, 1) * 60 && q.depth >= p.depth)
+      if (over.length) p.room = (Math.min(...over.map((q) => q.a)) - p.a) / 60
     }
     return dayItems
   })

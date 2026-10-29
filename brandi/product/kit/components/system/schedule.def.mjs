@@ -32,14 +32,32 @@ const jobs = [
   job("j6", "[Hang a door]", "2026-11-04T15:00", "2026-11-04T16:00", "[Kaur household]", 2),
   job("j7", "[Bleed the radiators]", "2026-11-05T08:00", "2026-11-05T09:00", "[Lee household]", 3),
 ]
+// Jobs that run into each other, each later one drawn over an earlier one part-way down it: an hour in, 40 minutes in
+// past two jobs side by side, ten minutes in, less than a line, and a quarter-hour job drawn a line tall, past its end,
+// where the next job starts.
+const crowded = [
+  job("o0", "[Swap a fuse]", "2026-11-05T08:45", "2026-11-05T09:00", "[Martin household]", 2),
+  job("o1", "[Service the boiler]", "2026-11-05T09:00", "2026-11-05T11:00", "[Lee household]", 1),
+  job("o2", "[Replace a tap]", "2026-11-05T10:00", "2026-11-05T10:45", "[Okafor household]", 2),
+  job("o3", "[Quote a kitchen]", "2026-11-05T12:00", "2026-11-05T13:10", "[Martin household]", 3),
+  job("o4", "[Fix a leak under the sink]", "2026-11-05T12:35", "2026-11-05T14:00", "[Chen household]", 4),
+  job("o5", "[Check smoke alarms]", "2026-11-05T13:15", "2026-11-05T14:00", "[Nair household]", 1),
+  job("o6", "[Hang a door]", "2026-11-05T13:20", "2026-11-05T13:40", "[Kaur household]", 2),
+  job("o7", "[Bleed the radiators]", "2026-11-05T15:50", "2026-11-05T16:45", "[Lee household]", 3),
+  job("o8", "[Clean the gutters]", "2026-11-05T16:00", "2026-11-05T17:00", "[Okafor household]", 4),
+]
 
 // Each line of every event drawn on a grid: whether any of it shows inside the event's edge, whether it sits wholly
-// inside the event's padding, and whether it is a whole number of its own lines tall, not squeezed to part of one.
+// inside the event's padding, whether it is a whole number of its own lines tall, not squeezed to part of one, and
+// whether another event is drawn over any of its place.
 const eventLines = (scope) =>
   scope.locator('[data-slot="schedule-event"]').evaluateAll((els) =>
     els.flatMap((el, n) => {
-      const r = el.getBoundingClientRect()
       // An event in a grid that is not shown, as under 640px.
+      if (!el.getBoundingClientRect().width) return []
+      // The browser says what is on top only at points in view, and the lines sit at the event's top.
+      el.scrollIntoView({ block: "start" })
+      const r = el.getBoundingClientRect()
       if (!r.width || !r.height) return []
       const s = getComputedStyle(el)
       const px = (v) => parseFloat(v) || 0
@@ -49,6 +67,18 @@ const eventLines = (scope) =>
         const b = line.getBoundingClientRect()
         const lh = px(getComputedStyle(line).lineHeight)
         const count = lh ? line.clientHeight / lh : 0
+        // The browser's own hit test at points across the part of the line inside the event's edge: another event
+        // there is drawn over it. A ring is a shadow, which the hit test does not see, so a line touching one passes.
+        const [x0, x1, y0, y1] = [Math.max(b.left, edge.left), Math.min(b.right, edge.right), Math.max(b.top, edge.top), Math.min(b.bottom, edge.bottom)]
+        const under =
+          x1 > x0 &&
+          y1 > y0 &&
+          [0.05, 0.25, 0.5, 0.75, 0.95].some((fx) =>
+            [0.1, 0.5, 0.9].some((fy) => {
+              const hit = document.elementFromPoint(x0 + (x1 - x0) * fx, y0 + (y1 - y0) * fy)?.closest('[data-slot="schedule-event"]')
+              return Boolean(hit && hit !== el)
+            })
+          )
         return {
           event: n,
           name: el.getAttribute("aria-label").replace(/\s+/g, " "),
@@ -57,9 +87,11 @@ const eventLines = (scope) =>
           tip: Boolean(el.parentElement?.querySelector(":scope > [hidden]")?.textContent.trim()),
           i,
           text: line.textContent.replace(/\s+/g, " ").trim(),
-          shown: b.width > 0 && b.height > 0 && b.left < edge.right && b.right > edge.left && b.top < edge.bottom && b.bottom > edge.top,
+          shown: getComputedStyle(line).visibility === "visible" && b.width > 0 && b.height > 0 && b.left < edge.right && b.right > edge.left && b.top < edge.bottom && b.bottom > edge.top,
           inside: b.top >= box.top - 0.5 && b.bottom <= box.bottom + 0.5,
           whole: Math.round(count) >= 1 && Math.abs(count - Math.round(count)) < 0.05,
+          under,
+          seen: x0 >= 0 && y0 >= 0 && x1 <= innerWidth && y1 <= innerHeight,
         }
       })
     })
@@ -70,13 +102,24 @@ async function wholeLines({ page, expect }) {
   expect(new Set(lines.map((l) => l.event)).size >= 20, `the preview's events are measured (${new Set(lines.map((l) => l.event)).size})`)
   const cut = lines.filter((l) => l.shown && !(l.inside && l.whole))
   expect.equal(cut.map((l) => `${l.name}: "${l.text}"`).join("; "), "", "every line that shows is whole and inside its event")
-  const untitled = lines.filter((l) => l.i === 0 && !l.shown)
+  // Unless a later event is drawn over where its title would go: then it leaves the title out too.
+  const untitled = lines.filter((l) => l.i === 0 && !l.shown && !l.under)
   expect.equal(untitled.map((l) => l.name).join("; "), "", "every event shows its title")
   // In order: a line shows only when the one before it does, so the time goes before the event's line does.
   const skipped = lines.filter((l) => l.i > 0 && l.shown && !lines.find((m) => m.event === l.event && m.i === l.i - 1).shown)
   expect.equal(skipped.map((l) => `${l.name}: "${l.text}"`).join("; "), "", "no line shows after one left out")
   const short = [...new Set(lines.filter((l) => !l.shown && !l.tip).map((l) => l.name))]
   expect.equal(short.join("; "), "", "an event with a line left out shows in full in its tooltip")
+}
+
+// Whether any line an event shows lies under another event drawn over it.
+async function clearLines({ page, expect }) {
+  const lines = await eventLines(page.locator("body"))
+  // A point out of view hits nothing, so a line out of view would pass unmeasured.
+  const unseen = lines.filter((l) => l.shown && !l.seen)
+  expect.equal(unseen.map((l) => `${l.name}: "${l.text}"`).join("; "), "", "every line an event shows is in view when it is measured")
+  const covered = lines.filter((l) => l.shown && l.under)
+  expect.equal(covered.map((l) => `${l.name}: "${l.text}"`).join("; "), "", "no line an event shows lies under another event")
 }
 
 async function tabTo(page, locator, max = 60) {
@@ -150,7 +193,7 @@ export default {
       "Today's column carries aria-current=\"date\" and the word today.",
     ],
     Layout: [
-      "Events sit on the hours they cover, in the category's quiet fill with its series dot. Events that start in the same hour sit side by side; one that starts later while another runs is drawn over it, indented and ringed in the surface, so both names stay readable. An event shows whole lines only: its title always, then its time, then its line, as its height allows. A line with no room is left out, never cut, and the whole event shows in its tooltip. A title wraps to two lines when there is room for a line under it. The grid starts at startHour and ends at endHour, reaching further to fit any event. Hour rows are 48px, and 64px on a touch screen.",
+      "Events sit on the hours they cover, in the category's quiet fill with its series dot. Events that start in the same hour sit side by side, each to its own height; one that starts in a later hour while another runs is drawn over it, indented and ringed in the surface, and the earlier one shows at its left. An event shows whole lines only: its title always, then its time, then its line, as its height allows. A line with no room is left out, never cut, and the whole event shows in its tooltip. Drawn over part-way down, an event shows only the lines that fit above where the later one starts, and none when not even its title fits, so no line it shows lies under another event. A title wraps to two lines when there is room for a line under it. The grid starts at startHour and ends at endHour, reaching further to fit any event. Hour rows are 48px, and 64px on a touch screen.",
       "Under 640px of its own width the grid becomes a list by day, as a DataTable becomes a list: each day's heading, then its events, and Nothing scheduled on a free day. Tab moves through the events.",
     ],
     States: [
@@ -164,7 +207,7 @@ export default {
     ],
     Open: ["Month, the reference's third view, is not built: it is a grid of dates, not of hours."],
   },
-  frame: { width: 960, height: 4950 },
+  frame: { width: 960, height: 6205 },
   examples: [
     {
       id: "week",
@@ -204,6 +247,16 @@ export default {
 <x-import component-from-global-scope="NS.Schedule" label="Jobs, by week" events="{{jobs}}" default-date="2026-11-04" today="2026-11-04" start-hour="{{eight}}" end-hour="{{five}}" heading-level="{{h3}}"></x-import>
 </div>`,
       vals: { jobs, eight: 8, five: 17 },
+    },
+    {
+      id: "overlap",
+      title: "A job drawn over an earlier one part-way down it: the earlier shows the lines that fit above it, and its tooltip the rest",
+      layout: "block",
+      markup: `<div style="display: flex; flex-direction: column; gap: 40px;">
+<x-import component-from-global-scope="NS.Schedule" label="Crowded jobs, by day" events="{{crowded}}" default-view="day" default-date="2026-11-05" today="2026-11-05" start-hour="{{eight}}" end-hour="{{six}}" heading-level="{{h3}}"></x-import>
+<x-import component-from-global-scope="NS.Schedule" label="Crowded jobs, by week" events="{{crowded}}" default-date="2026-11-05" today="2026-11-05" start-hour="{{eight}}" end-hour="{{six}}" heading-level="{{h3}}"></x-import>
+</div>`,
+      vals: { crowded, eight: 8, six: 18 },
     },
   ],
   checks: [
@@ -340,6 +393,32 @@ export default {
       name: "Every event shows whole lines on a touch screen, at 64px an hour, too",
       touch: true,
       run: wholeLines,
+    },
+    {
+      // A board's earlier booking laid its time and owner out for its own height, under the later booking that started
+      // part-way down it: the text was drawn, and covered (the detector's text-occlusion, a proof run).
+      name: "An event drawn over by a later one shows only the lines that fit above where the later one starts, and no line lies under another event",
+      async run({ page, expect }) {
+        await clearLines({ page, expect })
+        const lines = await eventLines(page.locator('[data-example="overlap"]'))
+        const of = (title) => lines.filter((l) => l.name.startsWith(`${title},`))
+        for (const title of ["[Service the boiler]", "[Fix a leak under the sink]"]) {
+          const own = of(title)
+          expect(own.some((l) => l.i === 0 && l.shown), `${title}, drawn over part-way down, still shows its title above the later job`)
+          expect(own.some((l) => !l.shown && l.tip), `${title} leaves out a line that would sit under the later job, and its tooltip has it`)
+        }
+        for (const title of ["[Bleed the radiators]", "[Swap a fuse]"]) {
+          const sliver = of(title)
+          expect(sliver.length && sliver.every((l) => !l.shown && l.tip), `${title}, drawn over less than a line down, shows no line, and its tooltip has them all`)
+        }
+        const beside = of("[Quote a kitchen]")
+        expect(beside.some((l) => l.i > 0 && l.shown), "[Quote a kitchen], beside a job that starts in the same hour, keeps its own height: it shows more than its title")
+      },
+    },
+    {
+      name: "No line an event shows lies under another event on a touch screen, at 64px an hour, too",
+      touch: true,
+      run: clearLines,
     },
     {
       name: "Forced colours keep each event's edge, the today marker and the focused slot",
