@@ -425,7 +425,7 @@ async function main(argv) {
   }
 
   if (!positional.length) {
-    console.error('usage: preview.mjs <file.dc.html> [--width N] [--height N] [--png false]  |  --dir <folder> [--out <folder>] [--png false]');
+    console.error('usage: preview.mjs <file.dc.html> [--width N] [--height N] [--png false] [--out <folder>]  |  --dir <folder> [--out <folder>] [--png false]');
     process.exit(1);
   }
   // One file gets the same frame resolution as the whole directory: the
@@ -443,7 +443,8 @@ async function main(argv) {
     path.basename(only),
   );
   const res = await previewArtboard(only, {
-    outDir: args.get('out'),
+    // Beside the folder's boards in _preview, as --dir does: a PNG beside them is published with the canvas.
+    outDir: args.get('out') ?? path.join(path.dirname(path.resolve(only)), '_preview'),
     width: frame.w,
     height: frame.h,
     png: wantPng,

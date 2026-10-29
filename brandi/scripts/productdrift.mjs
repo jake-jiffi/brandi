@@ -138,7 +138,9 @@ export async function driftCheck({ productDir, starter }) {
     for (const name of [...exported].sort()) if (!carded.has(name) && !defs.some((d) => (d.parts ?? []).includes(name))) add('catalogue', `components/system: ${name}`, 'has no card (definition)', 'a definition beside it, or fold it into a component that has one');
     for (const name of [...carded].sort()) if (!exported.has(name)) add('catalogue', `${name}.def.mjs`, 'a card with no component', `components/system exports no ${name}`);
   }
-  return { differences, unchecked: ['Screens on the canvas against the pattern definitions and the starter\'s routes: compare them by eye, page by page, and record the result.'] };
+  // The starter's routes are the kit's worked example, not the brand's product (SKILL.md, step 5), so the by-eye
+  // comparison is with the product built from it, once there is one.
+  return { differences, unchecked: ['Screens on the canvas against the pattern definitions, and against the brand\'s own product once one is built from the starter (its example routes are the kit\'s worked example): compare them by eye, page by page, and record the result.'] };
 }
 
 /** The report, one line per difference, in a shape a person can scan. */

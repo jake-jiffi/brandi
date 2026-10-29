@@ -285,6 +285,17 @@ describe('the canvas fallback renders each artboard as it is', () => {
     // 1200x2400 default, so `preview.mjs brand/canvas/Mobile.dc.html` came back
     // at a different size from the same file inside `--dir` over its folder.
     // Two ways of looking at one artboard have to agree about how big it is.
+    test('one artboard named on its own writes its preview to _preview beside it, never into the folder a canvas publishes', async () => {
+      const { execFile } = await import('node:child_process');
+      const { promisify } = await import('node:util');
+      const run = promisify(execFile);
+      const cli = path.join(import.meta.dirname, '..', 'scripts', 'preview.mjs');
+      const { stdout } = await run(process.execPath, [cli, path.join(src, 'Mobile.dc.html'), '--png', 'false'], { timeout: 300000 });
+      assert.equal(path.dirname(stdout.trim()), path.join(src, '_preview'), stdout);
+      assert.equal(existsSync(path.join(src, 'Mobile.preview.html')), false, 'nothing lands beside the boards');
+      await rm(path.join(src, '_preview'), { recursive: true, force: true });
+    });
+
     test('one artboard named on its own is framed exactly as it is inside --dir', async () => {
       const { execFile } = await import('node:child_process');
       const { promisify } = await import('node:util');

@@ -54,6 +54,8 @@ $A product audit                      # measure every pair a tokens file declare
 $A product globals                    # the starter's globals.css, from the tokens
 $A product starter                    # the product kit as a Next.js starter, dressed in the tokens
 $A product bundle                     # the canvas bundle from the starter's components, and every card
+$A product boards                     # the boards the system draws for itself: foundations, every component, Main
+$A product ds --title <name>          # the Design System artifact, staged for publishing (--live: only what changed)
 $A product gates                      # the machine gates for a round: tokens, detector, axe, checks
 $A product round --round N            # the round held against the whole bar, with the judged gates
 $A product specs                      # check the platform specs and their coverage
@@ -190,6 +192,13 @@ playful while the staff tool is a calm console, as long as both are recognisably
 direction on the canvas as one real screen, not a mood board, and let the person pick. If they pick
 none, ask what was wrong rather than averaging the three.
 
+Build the tokens, the starter and the bundle first (`$A product tokens`, `starter`, `bundle`), so the
+directions mount the real components. A direction that differs in a role colour, not only in layout,
+sets that role on its own board's root, `style="--rail: <value>; --rail-text: <value>"` and so on,
+and says which roles it moves: one installed system means one set of roles, and a choice like the
+rail's colour belongs in front of the person as a drawing, not decided quietly in the tokens. The pick
+then goes into product.json, and the tokens are solved again.
+
 ### 5. System (no questions)
 
 The fundamentals first (above), then the components, each with a README carrying its behaviour rules
@@ -202,6 +211,16 @@ Native code is generated on demand, never kept by default.
 the whole catalogue already built, each component with its definition; fit it to the brand through
 the tokens, the brand's marks in `lib/brand.ts` and the type, never by editing a component's look
 per brand. `$A product specs` reports any component and platform pair still without a spec.
+
+The starter is the system's reference build, not the brand's first product: its example routes stay
+the kit's worked example, dressed in the brand, so every component and pattern is proven in code. The
+brand's own screens live on the canvas until a product is built in its own repo from the starter; the
+drift check's by-eye row then compares the canvas with that product, not with the example. If `npm
+install` fails on a cache permission, run it with `--cache <work folder>/notes/tmp/npm-cache`.
+
+**What a run costs.** One `$A product gates --serve` renders about 500 pages and takes about 40
+minutes; the trait loop about 8 minutes a trait. Plan rounds around that, and run nothing else
+Chrome-heavy beside the gates: under load, browser checks time out and read as failures.
 
 ### 6. Patterns and proof (VISUAL, the stress test)
 
