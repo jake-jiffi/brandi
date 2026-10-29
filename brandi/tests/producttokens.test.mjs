@@ -450,6 +450,8 @@ describe('directions: a role a concept board moves, solved and carried as a clas
       assert.equal(P.resolveColour({ ...picked, color: { tokens: picked.color.tokens.map((t) => (quiet[m][t.name] !== undefined ? { ...t, value: { ...t.value, [m]: quiet[m][t.name] } } : t)) } }, 'rail', m), P.resolveColour(before, 'rail', m), `${m}: the quiet concept's rail is the rail before the pick`);
     }
     assert.match(P.toProductCss(picked), /\.direction-quiet-rail \{[^}]*--rail: var\(--surface\)/, 'drawn by the class, as the surface it was');
+    // Audited as the rail it draws: undecided, so held to the undecided rail's pairs, not the decided one's 7:1 and steps.
+    assert.deepEqual(P.auditProductTokens(picked).fails.map((f) => `${f.theme} ${f.fg} on ${f.bg} (${f.direction})`), [], 'the quiet concept passes its audit');
     assert.throws(() => P.buildProductTokens(green, { brandColours, directions: [{ name: 'Q', roles: { rail: undefined } }] }), /names at least one role/, 'an undefined role is no role');
   });
 

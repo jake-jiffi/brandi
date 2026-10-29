@@ -1267,7 +1267,9 @@ export function resolveColour(tokens, ref, theme) {
  * declared when the direction decides a rail the system leaves quiet.
  */
 function drawnWith(tokens, d) {
-  const railDecided = Boolean(tokens.meta?.roles?.rail || d.roles?.rail);
+  // A direction that names the rail null draws it undecided, so it is held to the undecided rail's pairs: held to the
+  // decided rail's, a quiet rail's hover and selected failed their steps on the surface, and a run typed hexes again.
+  const railDecided = d.roles?.rail === null ? false : Boolean(tokens.meta?.roles?.rail || d.roles?.rail);
   const tokensOut = tokens.color.tokens.map((t) => {
     const value = ['light', 'dark'].some((m) => t.name in (d[m] ?? {})) ? { ...t.value, ...Object.fromEntries(['light', 'dark'].filter((m) => t.name in d[m]).map((m) => [m, d[m][t.name]])) } : t.value;
     return { ...t, value, contrast: PRODUCT_ROLES.includes(t.name) ? contrastFor(t.name, { railDecided }) : t.contrast };
