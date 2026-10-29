@@ -112,9 +112,11 @@ function scopeIds(svg: string, scope: string) {
 
 /** The mark as inline SVG with its colours written in, in one scheme. */
 function inlineMark(scheme: EmailScheme, height: number, label: string, scope: string, symbol = false) {
-  const name: MarkRendition = symbol
-    ? scheme === "dark" && BRAND.marks["symbol-on-dark"] ? "symbol-on-dark" : "symbol"
-    : scheme === "dark" && BRAND.marks["full-on-dark"] ? "full-on-dark" : "full"
+  // On a dark ground, as Logo does: the brand's file for dark grounds, else its one ink in the scheme's text colour,
+  // else the mark as it is. A brand with one coloured file put its near-black wordmark on the dark email before.
+  const base = symbol ? "symbol" : "full"
+  const name: MarkRendition =
+    scheme !== "dark" ? base : BRAND.marks[`${base}-on-dark`] ? `${base}-on-dark` : BRAND.marks[`${base}-ink`] ? `${base}-ink` : base
   const svg = scopeIds(BRAND.marks[name] ?? BRAND.marks.full, `${scope}-${scheme}`)
   const box = /viewBox="([\d.\s-]+)"/.exec(svg)?.[1].trim().split(/\s+/).map(Number) ?? [0, 0, 4, 1]
   const width = Math.round((height * (box[2] || 4)) / (box[3] || 1))

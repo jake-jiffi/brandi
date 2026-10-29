@@ -194,6 +194,22 @@ export default {
       },
     },
     {
+      name: "A brand with a one ink and no logo of its own for dark grounds sends its one ink to dark mail, in one colour, never its light-ground colours",
+      async run({ page, expect }) {
+        const seen = await page.evaluate(([props, find]) => {
+          const kit = new Function(`return (${find})`)()()
+          const marks = kit.BRAND.marks
+          if (marks["full-on-dark"] || !marks["full-ink"]) return null
+          const dark = /<div class="em-mark-dark"[^>]*>([\s\S]*?)<\/div>/.exec(kit.Email.html(props))?.[1] ?? ""
+          return { dark: Boolean(dark), colours: [...new Set([...dark.matchAll(/(?:fill|stroke)(?:="|:\s*)(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/g)].map((m) => m[1].toLowerCase()))] }
+        }, [email, ns.toString()])
+        // A brand with its own file for dark grounds, or no one ink, has nothing this holds.
+        if (!seen) return
+        expect(seen.dark, "the sent email carries a mark for dark mail")
+        expect.equal(seen.colours.length, 1, `one ink on dark mail: got ${seen.colours.join(", ")}`)
+      },
+    },
+    {
       name: "The lockup leads, named as ProductLockup names it, then the heading, the body, the action and the footer, in reading order",
       example: "timesheets",
       async run({ scope, expect, brand }) {

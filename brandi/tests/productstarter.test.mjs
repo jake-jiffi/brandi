@@ -154,6 +154,26 @@ describe('the files the system owns in a starter', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test("a starter made before the kit's types carried the stand-in takes the kit's types again, so the kit's lockup builds for a brand with its own logo", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-types-'));
+    const out = path.join(dir, 'product', 'starter');
+    const brand = JSON.parse(await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+    await mkdir(path.join(dir, 'assets', 'logos'), { recursive: true });
+    await writeFile(path.join(dir, 'assets', 'logos', 'muddy-paws-primary.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 24"><rect width="24" height="24" fill="#1F6F4A"/></svg>');
+    const res = await writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') });
+    assert.equal(res.placeholder, false, 'the brand has its own logo');
+    // ProductLockup imports STAND_IN_MARKS from lib/brand.ts. A brand file generated before it sat with the types
+    // kept its own older types, so a refreshed kit's lockup named a constant the file lacked and the bundle failed.
+    const old = (await readFile(path.join(out, 'lib', 'brand.ts'), 'utf8')).replace(/\/\*\*\n \* The kit's stand-in mark[\s\S]*?\n\}\n/, '');
+    assert.doesNotMatch(old, /STAND_IN_MARKS/);
+    await writeFile(path.join(out, 'lib', 'brand.ts'), old);
+    await writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') });
+    const file = await readFile(path.join(out, 'lib', 'brand.ts'), 'utf8');
+    assert.match(file, /export const STAND_IN_MARKS: Brand\["marks"\]/);
+    assert.doesNotMatch(file, /marks: STAND_IN_MARKS,/, 'and BRAND keeps the brand\'s own marks');
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('the starter command on a brand whose logo is named and never drawn writes the starter, and says which files are missing and how to add them', async () => {
     const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-cli-'));
     await mkdir(path.join(dir, 'brand'), { recursive: true });

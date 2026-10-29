@@ -317,11 +317,11 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
   let brandMarks = null;
   const brandFile = path.join(out, 'lib', 'brand.ts');
   const kitBrand = path.join(kit, 'lib', 'brand.ts');
-  // A starter made before the kit had lib/brand.ts takes the types from the kit's copy, and so does one made before
-  // the types carried the stand-in mark, when it needs it: BRAND would name a constant the file lacks.
-  let current = readFileSync(existsSync(brandFile) ? brandFile : kitBrand, 'utf8');
-  if (generated.placeholder && !current.includes('export const STAND_IN_MARKS') && brandModule(current, '')) current = readFileSync(kitBrand, 'utf8');
-  const next = brandModule(current, generated.source);
+  // The types are the kit's, so a generated file takes them from the kit's copy on every run: a starter made before
+  // the types carried the stand-in mark kept its older types, and the kit's lockup, which imports the stand-in, then
+  // named a constant the file lacked. A file without the markers is the product's own and is left alone.
+  const current = readFileSync(existsSync(brandFile) ? brandFile : kitBrand, 'utf8');
+  const next = brandModule(current, '') === null ? null : brandModule(readFileSync(kitBrand, 'utf8'), generated.source);
   // The record's minimum and clear space are not said for the stand-in: they belong to the mark nobody has drawn.
   if (next) { writeFileSync(brandFile, next); written.push('lib/brand.ts'); brandMarks = { ...generated, from: src.from, name: src.name, notes: generated.placeholder ? [] : src.notes ?? [], illustrations: src.illustrations ?? null }; } else kept.push('lib/brand.ts');
   // Impeccable's context files. Rewritten while they carry the marker; once a person or Impeccable
