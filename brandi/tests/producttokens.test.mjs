@@ -544,6 +544,18 @@ describe('directions: a role a concept board moves, solved and carried as a clas
   });
 });
 
+describe('neutrals the brand names in words', () => {
+  test('a brand that speaks of sand neutrals with no sand value is told so; one that set its own neutral hue is not', () => {
+    // The fixture's ratio says "sand neutrals" and its neutral hue is its primary green, so the neutrals came out a
+    // green grey and nothing said why.
+    const said = P.neutralsInWords(brand);
+    assert.equal(said.length, 1);
+    assert.match(said[0], /^The brand speaks of sand neutrals, and its record carries no sand value: the neutrals follow the neutral hue, its primary \(#1F6F4A\)\. Ask the brand for the sand it means/);
+    assert.deepEqual(P.neutralsInWords({ ...brand, identity: { ...brand.identity, colour: { ...brand.identity.colour, neutralHue: '#C9B48A' } } }), [], 'a neutral hue of its own is the brand\'s');
+    assert.deepEqual(P.neutralsInWords({ identity: { colour: { primary: '#1F6F4A', ratio: '60/30/10: cool neutrals, green actions' } } }), [], 'cool neutrals names no colour');
+  });
+});
+
 describe("motion: a product built from a brand moves like the brand", () => {
   const signature = brand.identity.motionSignature;
   const from = 'identity.motionSignature in muddy-paws.json';

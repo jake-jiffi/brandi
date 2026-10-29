@@ -126,6 +126,18 @@ describe('the boards a system generates for itself', () => {
     assert.equal(/>Part \d/.test(B.componentBoards(defs, system)[0].source), false, 'a board that is whole carries no part number');
   });
 
+  test("each component board says its examples are the kit's specimens in its own sample copy, not the product's words", () => {
+    // A dog wash's component boards showed invoices and a dental client, and a reviewer read them as the product's.
+    const defs = [
+      { name: 'Button', group: 'Actions', job: 'The pressable action.', status: 'proven', props: [], examples: [{ id: 'a', title: 'Variants', markup: '<x-import component-from-global-scope="NS.Button">Go</x-import>' }] },
+      { name: 'Badge', group: 'Status', job: 'A status.', status: 'proven', props: [], examples: [{ id: 'a', title: 'Tones', markup: '<x-import component-from-global-scope="NS.Badge">New</x-import>' }] },
+    ];
+    for (const b of B.componentBoards(defs, system)) {
+      assert.match(b.source, /data-board-note="specimens"[^>]*>The kit's specimens, in its own sample copy: a trades business, every name and figure in brackets\./, b.name);
+      assert.match(b.source, /This product's own boards carry its words\./, b.name);
+    }
+  });
+
   test('an example wider than the board is drawn down to fit, layout box and all, and says so; one that fits is left alone', () => {
     // A 1440px shell in a 1440px board padded 56px each side lost its right 56px, the page's primary with it.
     const frame = (w, h) => `<div data-shell="x" style="width: ${w}px; height: ${h}px;"><x-import component-from-global-scope="NS.AppShell"></x-import></div>`;

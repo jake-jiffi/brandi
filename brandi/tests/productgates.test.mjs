@@ -495,17 +495,42 @@ describe('reflow at 320px', () => {
   });
 });
 
-describe('a route the detector cannot scan', () => {
-  test('a route that answers 404 is listed as not scanned rather than counted clean, and the record says so', async () => {
-    const pages = [{ kind: 'route', label: 'Page not found', url: 'http://localhost:9/nope', width: 1440, theme: 'light' }];
-    const result = await runDetector(pages, '/no/detector/needed', { status: async () => 404 });
-    assert.deepEqual(result.findings, []);
-    assert.deepEqual(result.unscanned, [{ page: 'Page not found', width: 1440, theme: 'light', reason: 'answers 404' }]);
-    const g = clean();
-    g.detector.unscanned = result.unscanned;
-    assert.match(roundMarkdown(g, judgeRound(g), {}), /The detector did not scan Page not found \(answers 404\), at any width; axe covered it\./);
+describe('a route the detector cannot scan as it stands', () => {
+  // The detector skips a page that answers 404, so the not-found page was never scanned at any width. It is now
+  // scanned through a local proxy that answers 200 for it; any other error status is still a broken route.
+  test('the not-found page is scanned through a proxy that answers 200, and any other error is listed as not scanned', async () => {
+    const server = createServer((req, res) => {
+      if (req.url.startsWith('/nope')) { res.writeHead(404, { 'content-type': 'text/html' }); res.end('<!doctype html><title>Not found</title><h1 id="not-found-page">Page not found</h1>'); return; }
+      res.writeHead(500, { 'content-type': 'text/plain' }); res.end('broken');
+    });
+    await new Promise((done) => server.listen(0, '127.0.0.1', done));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-detector-'));
+    // A stand-in for the engine: like it, it reports nothing for a page that answers 404.
+    const fake = path.join(dir, 'detector.mjs');
+    await writeFile(fake, `#!/usr/bin/env node\nconst url = process.argv.at(-1)\nconst r = await fetch(url)\nconst body = await r.text()\nprocess.stdout.write(JSON.stringify(r.status === 200 && body.includes('not-found-page') ? [{ antipattern: 'seen', severity: 'warning', selector: 'h1', snippet: 'Page not found' }] : []))\n`, { mode: 0o755 });
+    try {
+      const pages = [
+        { kind: 'route', label: 'Page not found', url: `${base}/nope`, width: 1440, theme: 'light' },
+        { kind: 'route', label: 'Broken', url: `${base}/broken`, width: 1440, theme: 'light' },
+      ];
+      const result = await runDetector(pages, fake);
+      assert.deepEqual(result.findings.map((f) => `${f.page}: ${f.rule}`), ['Page not found: seen'], 'the not-found page was scanned');
+      assert.deepEqual(result.unscanned, [{ page: 'Broken', width: 1440, theme: 'light', reason: 'answers 500' }]);
+      assert.deepEqual(result.notFound, [{ page: 'Page not found', width: 1440, theme: 'light' }]);
+      const g = clean();
+      g.detector.unscanned = result.unscanned;
+      g.detector.notFound = result.notFound;
+      const md = roundMarkdown(g, judgeRound(g), {});
+      assert.match(md, /The detector scanned Page not found through a local proxy that answers 200, since it skips a page that answers 404\./);
+      assert.match(md, /The detector did not scan Broken \(answers 500\), at any width; axe covered it\./);
+    } finally {
+      server.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
+
 
 // axe-pages.mjs runs on the kit's own node_modules (Playwright and axe-core), which Brandi does not carry. Point
 // BRANDI_KIT_MODULES at an installed starter's node_modules to run these; without one they are skipped out loud.

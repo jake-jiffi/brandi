@@ -541,7 +541,7 @@
     {
      "kind": "test",
      "file": "tests/productgates.test.mjs",
-     "name": "a route that answers 404 is listed as not scanned rather than counted clean, and the record says so"
+     "name": "the not-found page is scanned through a proxy that answers 200, and any other error is listed as not scanned"
     }
    ],
    "teaches": {
@@ -2572,6 +2572,54 @@
    "teaches": {
     "file": "skills/product-system/references/05-components.md",
     "heading": "Card"
+   }
+  },
+  {
+   "id": "L138",
+   "broke": "The detector skips a page that answers 404, so the not-found page was never scanned at any width.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "the not-found page is scanned through a proxy that answers 200, and any other error is listed as not scanned"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L139",
+   "broke": "A dog wash's generated component boards showed invoices and a dental client, and a reviewer read the kit's sample copy as the product's own words.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "each component board says its examples are the kit's specimens in its own sample copy, not the product's words"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "1. Board families and layout"
+   }
+  },
+  {
+   "id": "L140",
+   "broke": "A brand that spoke of sand neutrals with no sand value got green-grey neutrals from its primary, and nothing said why.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a brand that speaks of sand neutrals with no sand value is told so; one that set its own neutral hue is not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
    }
   }
  ]

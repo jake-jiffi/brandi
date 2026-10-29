@@ -249,6 +249,9 @@ function groupBoard(system, group, members, part = null) {
       '</section>',
     ].join('\n');
   }).join('\n');
+  // The examples are the kit's, in its own sample copy, and the board says so: a dog wash's component boards showed
+  // invoices and a dental client, and a reviewer read them as the product's own words.
+  const specimens = `<p data-board-note="specimens" style="margin: 0; max-width: var(--measure, 30em); text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted);">The kit's specimens, in its own sample copy: a trades business, every name and figure in brackets. They show what each component does and how it behaves. This product's own boards carry its words.</p>`;
   const name = `Components${pascal(groupWord(group))}${part && part.index > 1 ? pascal(members[0].name) : ''}1440`;
   // The canvas label keeps "2 of 4"; the heading, set in the display face, does not, because a brand's display
   // face may never set numerals. The part number goes under it in the body face.
@@ -269,7 +272,7 @@ function groupBoard(system, group, members, part = null) {
     '  return vals;',
     '}',
   ].join('\n');
-  return { ...board(system, name, title, body, { logic, heading, note: split ? `Part ${part.index} of ${part.count}` : '' }), group, members: members.map((d) => d.name) };
+  return { ...board(system, name, title, `${specimens}\n${body}`, { logic, heading, note: split ? `Part ${part.index} of ${part.count}` : '' }), group, members: members.map((d) => d.name) };
 }
 
 /**

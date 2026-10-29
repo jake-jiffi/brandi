@@ -881,6 +881,23 @@ function isCurve(s) {
   return x1 >= 0 && x1 <= 1 && x2 >= 0 && x2 <= 1;
 }
 
+/**
+ * Neutrals the brand names in words that its record does not carry: "sand neutrals" in the colour ratio, with the
+ * neutral hue left as the primary, so the product's neutrals came out a green grey and nothing said so. Returns one
+ * line per such word, for the run to ask the brand for the value; nothing when the record carries its own neutral.
+ */
+export function neutralsInWords(brand) {
+  const colour = brand?.identity?.colour ?? {};
+  const hex = (v) => String(v ?? '').trim().toLowerCase();
+  // A neutral hue the brand set apart from its primary is the brand's own; one that is the primary was filled in.
+  if (colour.neutralHue && hex(colour.neutralHue) !== hex(colour.primary)) return [];
+  const said = [colour.ratio, ...(brand?.strategy?.distinctiveAssets ?? []).map((a) => a?.asset), brand?.identity?.imagery?.treatment].filter((t) => typeof t === 'string');
+  const plain = new Set(['cool', 'warm', 'neutral', 'grey', 'gray', 'soft', 'quiet', 'light', 'dark', 'the', 'and']);
+  const words = new Set();
+  for (const t of said) for (const m of t.matchAll(/\b([a-z]+) neutrals?\b/gi)) if (!plain.has(m[1].toLowerCase())) words.add(m[1].toLowerCase());
+  return [...words].map((w) => `The brand speaks of ${w} neutrals, and its record carries no ${w} value: the neutrals follow ${colour.neutralHue ? `the neutral hue, its primary (${colour.neutralHue})` : 'its primary'}. Ask the brand for the ${w} it means and set identity.colour.neutralHue to it, or record the gap as an open question.`);
+}
+
 /** What a motion signature holds, as brand.json's identity.motionSignature does, and where it was read. */
 const SIGNATURE_KEYS = Object.freeze(['name', 'description', 'durationMs', 'easing', 'source']);
 

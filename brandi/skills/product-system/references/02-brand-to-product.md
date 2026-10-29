@@ -108,6 +108,11 @@ give up the rail. A black or grey rail keeps neutral words: the hue and chroma o
 solved to the same 7:1 and 4.5:1. Tinted in the brand's hue instead, a black rail's words came out a
 pale green beside a vivid green brand.
 
+**Neutrals the brand names in words.** A record that speaks of "sand neutrals" and leaves its
+neutral hue as the primary gives a green grey, not sand. `$A product tokens` says so under "To ask
+the brand", naming the word. Ask for the value and set `identity.colour.neutralHue`, or record the
+gap as an open question: never pick a sand yourself.
+
 **A rail's states step away from its words.** The hovered and selected items step lighter on a dark
 rail and darker on a light one, so a black rail's current page shows. On a mid-tone rail that step
 went towards the words and took them under their floor: a mid green's selected item held its light

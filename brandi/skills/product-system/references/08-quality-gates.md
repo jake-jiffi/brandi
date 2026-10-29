@@ -50,7 +50,9 @@ more, and do not lower the bar to finish.
    they find before the reviewers start. A fluid board is drawn afresh at each width it is scanned
    at: drawn once at its frame's width, every fluid 1440 board scrolled sideways at 390 and 820. A board can show a page frame more than once (a shell at
    four widths, a flow of screens), so there axe skips the three rules about one page's landmarks.
-   The routes run every rule, and the round record names what was skipped. axe scans a route once its
+   The routes run every rule, and the round record names what was skipped. The detector skips a page
+   that answers 404, so the not-found page is scanned through a proxy on this machine that answers
+   200 for it; the record says so. Any other error status is a broken route, listed as not scanned. axe scans a route once its
    h1 shows; a route with none after ten seconds is loaded once more and waited for again, its result
    marked `retried`, counted in the summary line and named in the round record, so a slow page stays on
    the record even when its second load passes. One with no h1 on the second load is scanned anyway and
@@ -194,6 +196,8 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
 - **The bar, and the system's own rules to judge against** (the README and the relevant sections).
 - **Where everything is:** component pages in both themes, the starter's routes and their port, the
   canvas boards and their port, the source folders, and which board widths are fluid and which fixed.
+  The generated component boards are the kit's specimens in its own sample copy, and each says so:
+  judge their behaviour and states there, and the product's words on its own boards.
 - **The previous round's findings**, each marked `fixed`, `open` (with a note on what is left) or
   `accepted` (with the recorded deviation), and the evidence.
 - **The three status words.** A finding's status is `open`, `fixed` or `accepted`, nothing else: a

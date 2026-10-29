@@ -39,7 +39,7 @@ Foundations and components appear once. The other families repeat for each surfa
 | Family | What it holds | Width |
 | --- | --- | --- |
 | Foundations | The visual foundations the system's README covers (`12-design-system-artifact.md`) | 1440 |
-| Components | One board per group (actions and inputs, status and data, charts and feedback, navigation and overlays), every variant and state mounted live. One more for the empty, loading and problem components | 1440 |
+| Components | One board per group (actions and inputs, status and data, charts and feedback, navigation and overlays), every variant and state mounted live. One more for the empty, loading and problem components. The examples are the kit's, in its own sample copy (a trades business, every name in brackets), and each board says so in its first line: the product's own boards carry its words | 1440 |
 | Shell | The shell at each checked width, the phone menu open, and the shell again for each role whose navigation differs | 1440, 820, 390 |
 | The working day | Per product, the ten core screen patterns (`04-written-system.md`) in the order its main person meets them: Home, Records, List and detail, a Record, Create and edit (the dialog, sheet or page that acts on it), the Report. Then Settings, the assistant, Sign in and Setup | The surface's main width |
 | States | One per module (section 3) | The module's surface width |

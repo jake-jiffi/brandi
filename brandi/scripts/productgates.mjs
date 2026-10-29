@@ -19,6 +19,7 @@
  */
 
 import { spawn, spawnSync } from 'node:child_process';
+import http from 'node:http';
 import net from 'node:net';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -166,13 +167,24 @@ const withTheme = (page) => (page.theme === 'dark' && page.kind !== 'route' ? `$
 export async function runDetector(pages, detector, { concurrency = 4, status = httpStatus } = {}) {
   const findings = [];
   const errors = [];
-  // A route that answers 404 is not scanned by the detector, which then reports nothing: that read as
-  // clean. It is listed instead, and axe still covers it.
+  // The detector skips a page that answers 404, so the not-found page went unscanned at every width. It is scanned
+  // through a proxy on this machine that answers 200 for it and passes everything else through. Any other error
+  // is a broken route: it is listed as not scanned, never counted clean, and axe still covers it.
   const unscanned = [];
+  const notFound = [];
+  const proxies = new Map();
   let next = 0;
   const one = async (page) => {
     if (page.kind === 'route') {
       const code = await status(page.url);
+      if (code === 404) {
+        const origin = new URL(page.url).origin;
+        if (!proxies.has(origin)) proxies.set(origin, answering200(origin));
+        const proxy = await proxies.get(origin);
+        notFound.push({ page: page.label, width: page.width, theme: page.theme });
+        await scan({ ...page, url: `${proxy.base}${page.url.slice(origin.length)}` });
+        return;
+      }
       if (code >= 400) { unscanned.push({ page: page.label, width: page.width, theme: page.theme, reason: `answers ${code}` }); return; }
     }
     await scan(page);
@@ -191,10 +203,28 @@ export async function runDetector(pages, detector, { concurrency = 4, status = h
       resolve();
     });
   });
-  await Promise.all(Array.from({ length: Math.min(concurrency, pages.length) }, async () => {
-    while (next < pages.length) await one(pages[next++]);
-  }));
-  return { findings, errors, unscanned };
+  try {
+    await Promise.all(Array.from({ length: Math.min(concurrency, pages.length) }, async () => {
+      while (next < pages.length) await one(pages[next++]);
+    }));
+  } finally {
+    for (const p of proxies.values()) (await p).close();
+  }
+  return { findings, errors, unscanned, notFound };
+}
+
+/** A proxy on this machine in front of `origin` that answers 200 where it answers 404, so the detector scans it. */
+function answering200(origin) {
+  const target = new URL(origin);
+  const server = http.createServer((req, res) => {
+    const upstream = http.request({ hostname: target.hostname, port: target.port, path: req.url, method: req.method, headers: { ...req.headers, host: target.host } }, (r) => {
+      res.writeHead(r.statusCode === 404 ? 200 : r.statusCode, r.headers);
+      r.pipe(res);
+    });
+    upstream.on('error', () => { res.writeHead(502); res.end(); });
+    req.pipe(upstream);
+  });
+  return new Promise((done) => server.listen(0, '127.0.0.1', () => done({ base: `http://127.0.0.1:${server.address().port}`, close: () => server.close() })));
 }
 
 /**
@@ -419,7 +449,7 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     // Where the kit speaks instead of the brand: a radius nobody measured, a shell or shape move never named.
     shape: { kitDefaults: shapeKitDefaults(tokens) },
     drift: { differences: drift.differences, unchecked: drift.unchecked },
-    detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null, unscanned: detection.unscanned ?? [] },
+    detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null, unscanned: detection.unscanned ?? [], notFound: detection.notFound ?? [] },
     axe: axeGate(axe),
     reflow,
     checks: { passed: checks.passed, failed: checks.failed, retried: checks.retried ?? [] },
@@ -582,6 +612,8 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   for (const [k, v] of Object.entries(gates.versions)) lines.push(`- ${k}: ${typeof v === 'object' && v ? `${v.version ?? ''} (${v.path ?? ''})` : v ?? 'not found'}`);
   const unscanned = [...new Set((gates.detector.unscanned ?? []).map((u) => `${u.page} (${u.reason})`))];
   if (unscanned.length) lines.push('', `The detector did not scan ${unscanned.join(', ')}, at any width; axe covered ${unscanned.length === 1 ? 'it' : 'them'}.`);
+  const notFound = [...new Set((gates.detector.notFound ?? []).map((u) => u.page))];
+  if (notFound.length) lines.push('', `The detector scanned ${notFound.join(', ')} through a local proxy that answers 200, since it skips a page that answers 404.`);
   const detector = judged.detector ?? { open: gates.detector.findings, accepted: [], unused: [] };
   if (detector.open.length) {
     lines.push('', '## Detector findings', '');
