@@ -285,6 +285,20 @@ wraps its column, so a line that does not fit starts a second column out past th
 it is a size container in its title's type, so a query in `lh` picks how many lines the title
 takes. Its check measures every event on its preview, by day and by week, at 48px and 64px an hour.
 
+A line drawn under another element is lost as surely as one cut short, and no clip check sees it,
+because nothing overflows. Schedule draws a booking that starts in a later hour over an earlier one
+it overlaps, indented, but each booking laid its lines out for its own height, so the earlier one's
+time and owner sat under the later one, drawn and covered (the detector's `text-occlusion`, a proof
+run's console board). The earlier booking's column of lines now ends above where the later one
+starts: it shows the lines that fit there, by the same whole-lines rule, and its tooltip says the
+rest. With less than a title line of room it shows no line at all, only its colour, since a title
+drawn there would be cut. A quarter-hour booking is drawn a title line tall, past its end, so one
+that starts at its end counts too. Bookings side by side in one hour keep their own heights. Its
+check asks the browser what is on top at points across every line an event shows
+(`elementFromPoint`, each event scrolled into view first) and fails if any lies under another
+event. Anything that draws one item over another must lay out the lower item's content for the part
+left showing.
+
 ### 2.12 On the canvas
 
 Boards mount the real components (`06-canvas.md`), which asks four things of each one.
