@@ -246,7 +246,7 @@ function GridEvent({ p, view, target, tabbable, onFocus, link: Link, onEventClic
           {p.event.title}
         </span>
       </span>
-      {/* Spaces between the lines, so the visible text reads as the name does: "Grooming 9:00 to 10:00" (WCAG 2.5.3). */}
+      {/* Spaces between the lines, so the visible text reads as the name does: "Annual service 9:00 to 10:00" (WCAG 2.5.3). */}
       {p.span >= 0.75 ? " " : null}
       {p.span >= 0.75 ? (
         <span data-measure="" className={cn("min-w-0 text-text", view === "day" ? "type-meta" : "type-caption", p.span >= 1.5 ? fits : "truncate")}>

@@ -1,7 +1,7 @@
 // PageHeader's one definition: its README, its preview board and its scripted checks all come from here.
 
 // Long enough to need cutting at two lines in a condensed face too.
-const LONG = "[Invoice 1042 for the March grooming package, the late fee, the travel surcharge, the second dog's nail trim and the flea treatment we added on the day]"
+const LONG = "[Invoice 1042 for the March maintenance plan, the late fee, the travel surcharge, the second unit's filter clean and the smoke alarm we replaced on the day]"
 
 export default {
   name: "PageHeader",
@@ -43,13 +43,13 @@ export default {
       id: "page",
       title: "On a page",
       // An h2 here: on a board the example sits under the board's own h1, and a second h1 breaks its outline.
-      markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h2}}" title="[Muddy Paws Grooming]" description="A client since [March 2023], with three pets and a booking every fortnight." breadcrumbs="{{trail}}" meta="{{ui.meta}}" actions="{{ui.actions}}" primary="{{ui.primary}}">
+      markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h2}}" title="[Northside Dental]" description="A client since [March 2023], with three sites and a service visit every month." breadcrumbs="{{trail}}" meta="{{ui.meta}}" actions="{{ui.actions}}" primary="{{ui.primary}}">
 <x-import component-from-global-scope="NS.Tabs" label="Client sections" tabs="{{sections}}"></x-import>
 </x-import>`,
       layout: "block",
       vals: {
         h2: 2,
-        trail: [{ label: "Clients", href: "#clients" }, { label: "[Muddy Paws Grooming]" }],
+        trail: [{ label: "Clients", href: "#clients" }, { label: "[Northside Dental]" }],
         sections: ["Overview", { label: "Invoices", count: 8 }, { label: "Bookings", count: 2, attention: true }, "Notes"],
       },
     },
@@ -57,7 +57,7 @@ export default {
       id: "phone",
       title: "A long name on a phone",
       width: 390,
-      markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h2}}" title="${LONG}" description="Sent to [Muddy Paws Grooming] on [3 October]." breadcrumbs="{{invoiceTrail}}" meta="{{ui.overdue}}" actions="{{ui.actions}}" primary="{{ui.send}}"></x-import>`,
+      markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h2}}" title="${LONG}" description="Sent to [Northside Dental] on [3 October]." breadcrumbs="{{invoiceTrail}}" meta="{{ui.overdue}}" actions="{{ui.actions}}" primary="{{ui.send}}"></x-import>`,
       layout: "block",
       vals: { h2: 2, invoiceTrail: [{ label: "Invoices", href: "#invoices" }, { label: "[Invoice 1042]" }] },
     },
@@ -90,9 +90,9 @@ export default {
           const host = document.createElement("div")
           host.id = "check-mount"
           document.body.append(host)
-          window.ReactDOM.flushSync(() => window.ReactDOM.createRoot(host).render(window.React.createElement(kit.PageHeader, { title: "[Muddy Paws Grooming]" })))
+          window.ReactDOM.flushSync(() => window.ReactDOM.createRoot(host).render(window.React.createElement(kit.PageHeader, { title: "[Northside Dental]" })))
         })
-        const title = page.locator("#check-mount").getByRole("heading", { level: 1, name: "[Muddy Paws Grooming]" })
+        const title = page.locator("#check-mount").getByRole("heading", { level: 1, name: "[Northside Dental]" })
         expect.equal(await title.count(), 1, "the title is an h1")
         expect.equal(await title.getAttribute("tabindex"), "-1", "focusable from script only")
         expect.equal(await title.getAttribute("data-slot"), "page-title", "found by its slot")

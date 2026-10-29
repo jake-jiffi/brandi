@@ -60,7 +60,7 @@ export const accountButton = React.forwardRef<HTMLButtonElement, AccountButtonPr
 /** One place someone can work in. */
 export interface Workspace {
   value: string
-  /** As people say it: "[Muddy Paws Grooming]". */
+  /** As people say it: "[Kestrel Maintenance]". */
   name: string
   /** The person's role there, shown under its name in the menu: "Owner". */
   role?: string

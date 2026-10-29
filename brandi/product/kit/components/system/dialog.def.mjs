@@ -75,10 +75,10 @@ export default {
     {
       id: "change",
       title: "A change to an account, with what is recorded",
-      markup: `<x-import component-from-global-scope="NS.Dialog" inline="{{yes}}" heading-level="{{h3}}" title="Change the billing email?" description="Invoices for [Muddy Paws Grooming] go to the new address from the next run." footnote="The change is recorded in the client's history." footer="{{ui.changeFooter}}">
+      markup: `<x-import component-from-global-scope="NS.Dialog" inline="{{yes}}" heading-level="{{h3}}" title="Change the billing email?" description="Invoices for [Northside Dental] go to the new address from the next run." footnote="The change is recorded in the client's history." footer="{{ui.changeFooter}}">
 <dl style="margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 8px 24px;">
-<dt style="color: var(--text-muted);">Now</dt><dd style="margin: 0; color: var(--text-strong);">[accounts@muddypaws.example]</dd>
-<dt style="color: var(--text-muted);">From the next run</dt><dd style="margin: 0; color: var(--text-strong);">[billing@muddypaws.example]</dd>
+<dt style="color: var(--text-muted);">Now</dt><dd style="margin: 0; color: var(--text-strong);">[accounts@northside.example]</dd>
+<dt style="color: var(--text-muted);">From the next run</dt><dd style="margin: 0; color: var(--text-strong);">[billing@northside.example]</dd>
 </dl>
 </x-import>`,
     },

@@ -82,7 +82,7 @@ export default {
         iconTabs: [
           { label: "Details", icon: "FileText" },
           { label: "Invoices", icon: "Receipt", count: 8 },
-          { label: "Pets", icon: "Heart", count: 2 },
+          { label: "Sites", icon: "MapPin", count: 2 },
           { label: "History", icon: "History" },
         ],
       },
@@ -100,8 +100,8 @@ export default {
   logic: `tab: self.state.tab,
   setTab: (value) => self.setState({ tab: value }),
   panelText: ({
-    overview: "[Invoice 1042] for [Muddy Paws Grooming], sent on [3 October] and due on [17 October].",
-    "line-items": "12 line items, from the March grooming package to a late fee.",
+    overview: "[Invoice 1042] for [Northside Dental], sent on [3 October] and due on [17 October].",
+    "line-items": "12 line items, from the March maintenance plan to a late fee.",
     payments: "3 payments are overdue. The next reminder goes out on the due date.",
     activity: "Opened twice by the client. Sent on [3 October].",
   })[self.state.tab]`,
@@ -158,7 +158,7 @@ export default {
       async run({ page, scope, expect }) {
         expect.equal(await scope.getByRole("tab", { name: "Line items, 12 items" }).count(), 1, "Line items, 12 items")
         expect.equal(await scope.getByRole("tab", { name: "Payments, 3 overdue" }).count(), 1, "Payments, 3 overdue")
-        expect.equal(await page.locator("[data-example=icons]").getByRole("tab", { name: "Pets, 2 items" }).count(), 1, "Pets, 2 items")
+        expect.equal(await page.locator("[data-example=icons]").getByRole("tab", { name: "Sites, 2 items" }).count(), 1, "Sites, 2 items")
         expect.equal(await scope.getByRole("tab", { name: "Overview", exact: true }).count(), 1, "a tab without a count keeps its label")
       },
     },

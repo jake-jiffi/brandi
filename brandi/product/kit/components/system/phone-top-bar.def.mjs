@@ -41,7 +41,7 @@ const onDarkOf = (page) =>
     return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
   })
 const phone = (inner) => `<div style="width: 390px;" class="outline outline-line">${inner}</div>`
-const LONG = "[Invoice 1042 for the March grooming package and the late fee]"
+const LONG = "[Invoice 1042 for the March maintenance plan and the late fee]"
 
 export default {
   name: "PhoneTopBar",

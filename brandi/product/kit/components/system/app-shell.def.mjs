@@ -55,9 +55,9 @@ const footer = [
   { label: "Help", href: "#help", icon: "LifeBuoy" },
 ]
 const workspaces = [
-  { value: "muddy-paws", name: "[Muddy Paws Grooming]", role: "Owner" },
-  { value: "northside", name: "[Northside Paws]", role: "Manager" },
-  { value: "bark-avenue", name: "[Bark Avenue Spa]", role: "Staff" },
+  { value: "kestrel", name: "[Kestrel Maintenance]", role: "Owner" },
+  { value: "northside", name: "[Northside Air]", role: "Manager" },
+  { value: "cove", name: "[Cove Electrical]", role: "Staff" },
 ]
 const tabs = [
   { label: "Home", href: "#home", icon: "House" },
@@ -175,7 +175,7 @@ export default {
       vals: { yes: true },
     },
   ],
-  state: { ws: "muddy-paws", searches: 0 },
+  state: { ws: "kestrel", searches: 0 },
   logic: `ui: (() => {
     const h = React.createElement;
     const account = h(NS.WorkspaceSwitcher, {
@@ -234,7 +234,7 @@ export default {
         const icons = [
           [nav.getByRole("button", { name: "Search or ask", exact: true }), "Search or ask"],
           ...["Home", "Inbox, 2 need you", "Approvals, 3 need you", "Bookings", "Invoices, 12 waiting on others", "Clients", "Reports", "Settings", "Help"].map((w) => [nav.getByRole("link", { name: w, exact: true }), w]),
-          [nav.getByRole("button", { name: "[Sam Lee], [Muddy Paws Grooming], Owner, account menu" }), "[Sam Lee], [Muddy Paws Grooming]"],
+          [nav.getByRole("button", { name: "[Sam Lee], [Kestrel Maintenance], Owner, account menu" }), "[Sam Lee], [Kestrel Maintenance]"],
         ]
         expect.equal(await nav.locator("ul a").count(), 9, "nine destinations on the rail")
         for (const [target, words] of icons) {

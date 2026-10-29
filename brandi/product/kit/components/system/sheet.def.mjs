@@ -22,7 +22,7 @@ const luminance = (rgb) => {
 
 // A record's details, as a board would draw them: plain markup inside the sheet.
 const details = `<dl style="margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 12px 24px;">
-<dt style="color: var(--text-muted);">Client</dt><dd style="margin: 0; color: var(--text-strong);">[Muddy Paws Grooming]</dd>
+<dt style="color: var(--text-muted);">Client</dt><dd style="margin: 0; color: var(--text-strong);">[Northside Dental]</dd>
 <dt style="color: var(--text-muted);">Amount</dt><dd style="margin: 0; color: var(--text-strong); font-variant-numeric: tabular-nums;">[$2,490.50]</dd>
 <dt style="color: var(--text-muted);">Status</dt><dd style="margin: 0; color: var(--text-strong);">Overdue by 4 days</dd>
 <dt style="color: var(--text-muted);">Issued</dt><dd style="margin: 0; color: var(--text-strong);">[3 October]</dd>
@@ -70,7 +70,7 @@ export default {
       id: "record",
       title: "A record",
       // Drawn against the right edge of a page, as it opens: a sheet is attached to the window, never loose on a board.
-      markup: `<div style="position: relative; box-sizing: border-box; width: 760px; height: 520px; overflow: hidden; background: var(--canvas); border: 1px solid var(--line);"><x-import component-from-global-scope="NS.Sheet" style="position: absolute; top: var(--shell-inset, 0px); right: var(--shell-inset, 0px); bottom: var(--shell-inset, 0px); width: 440px;" inline="{{yes}}" heading-level="{{h3}}" title="[Invoice 1039]" description="Sent to [Muddy Paws Grooming] on [3 October]" footer="{{ui.recordFooter}}">
+      markup: `<div style="position: relative; box-sizing: border-box; width: 760px; height: 520px; overflow: hidden; background: var(--canvas); border: 1px solid var(--line);"><x-import component-from-global-scope="NS.Sheet" style="position: absolute; top: var(--shell-inset, 0px); right: var(--shell-inset, 0px); bottom: var(--shell-inset, 0px); width: 440px;" inline="{{yes}}" heading-level="{{h3}}" title="[Invoice 1039]" description="Sent to [Northside Dental] on [3 October]" footer="{{ui.recordFooter}}">
 ${details}
 </x-import></div>`,
       vals: { yes: true, h3: 3 },
@@ -81,7 +81,7 @@ ${details}
       markup: `<x-import component-from-global-scope="NS.Button" variant="ghost" icon="FileText" on-click="{{open1042}}">[Invoice 1042]</x-import>
 <x-import component-from-global-scope="NS.Button" variant="ghost" icon="FileText" on-click="{{open1043}}">[Invoice 1043]</x-import>
 <x-import component-from-global-scope="NS.Button" variant="ghost" icon="FileText" on-click="{{open1044}}">[Invoice 1044]</x-import>
-<x-import component-from-global-scope="NS.Sheet" open="{{sheetOpen}}" on-close="{{closeSheet}}" title="{{sheetTitle}}" description="Sent to [Muddy Paws Grooming] on [3 October]" footer="{{ui.liveFooter}}">
+<x-import component-from-global-scope="NS.Sheet" open="{{sheetOpen}}" on-close="{{closeSheet}}" title="{{sheetTitle}}" description="Sent to [Northside Dental] on [3 October]" footer="{{ui.liveFooter}}">
 ${details}
 <p style="margin: 24px 0 0; color: var(--text-muted); max-width: 34em;">The client opened the invoice twice and has not paid. A reminder goes out on the due date unless you send one now.</p>
 <p style="margin: 12px 0 0; color: var(--text-muted); max-width: 34em;">Payments recorded here reach the bank feed overnight.</p>

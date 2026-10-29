@@ -18,8 +18,8 @@ const groups = [
       { label: "Payments", icon: "Wallet", meta: "Page" },
       { label: "Clients", icon: "Users", meta: "Page" },
       { label: "Reports", icon: "ChartColumn", meta: "Page" },
-      { label: "[Invoice 1042]", icon: "FileText", description: "[Muddy Paws Grooming]", meta: "Invoice", keywords: ["muddy paws"] },
-      { label: "[Muddy Paws Grooming]", icon: "Store", meta: "Client" },
+      { label: "[Invoice 1042]", icon: "FileText", description: "[Northside Dental]", meta: "Invoice", keywords: ["northside dental"] },
+      { label: "[Northside Dental]", icon: "Store", meta: "Client" },
     ],
   },
   {
@@ -184,8 +184,8 @@ export default {
       example: "live",
       async run({ page, scope, expect }) {
         const { dialog } = await open(page, scope)
-        await page.keyboard.type("muddy")
-        expect.equal((await optionTexts(dialog)).join(", "), "[Invoice 1042], [Muddy Paws Grooming], Ask about “muddy”", "the results for muddy")
+        await page.keyboard.type("northside")
+        expect.equal((await optionTexts(dialog)).join(", "), "[Invoice 1042], [Northside Dental], Ask about “northside”", "the results for northside")
       },
     },
     {
