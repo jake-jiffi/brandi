@@ -252,6 +252,14 @@ ${answer('question="What did [Kim\'s Cafe] order last month?" thinking="{{thinki
     }`,
   checks: [
     {
+      name: "The question is a heading and balances its lines, as every heading does",
+      async run({ page, expect }) {
+        const wraps = await page.locator('[data-slot="ai-answer-question"]').evaluateAll((els) => els.map((el) => getComputedStyle(el).textWrap || getComputedStyle(el).textWrapStyle))
+        expect(wraps.length > 0, "a question on the preview")
+        expect(wraps.every((w) => /balance/.test(w)), `every question balances: ${wraps.join(", ")}`)
+      },
+    },
+    {
       name: "Announced once it finishes, never word by word, through a live region there from the start",
       example: "failed",
       async run({ page, scope, expect }) {

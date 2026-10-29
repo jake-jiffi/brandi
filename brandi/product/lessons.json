@@ -2711,6 +2711,22 @@
     "file": "skills/product-system/references/06-canvas.md",
     "heading": "A phone frame"
    }
+  },
+  {
+   "id": "L146",
+   "broke": "AIAnswer's question was set pretty, not balanced, so a run's question wrapped ragged and the detector reported an unbalanced heading.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "AIAnswer",
+     "name": "The question is a heading and balances its lines, as every heading does"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "AIAnswer"
+   }
   }
  ]
 }

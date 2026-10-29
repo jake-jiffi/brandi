@@ -1347,6 +1347,8 @@ Search and ask in one field: records, people, actions, or a question for the ass
 What the assistant made, or is making: who made it, the question, its steps, the answer, its
 sources, its status and the person's next move.
 
+- The question is a heading and balances its lines, as every heading does: set pretty, a run's
+  question wrapped ragged and the detector reported it.
 - **Contract.**
   - Content: `question` (shown in full; the answer's heading), `headingLevel` (3 by default),
     `name`, `children`, `sources` (`{ label, icon, href }`), `caveat`.

@@ -206,12 +206,13 @@ export const AIAnswer = React.forwardRef<HTMLElement, AIAnswerProps>(function AI
       {...rest}
     >
       <header className="flex flex-col gap-1.5">
-        {/* The question leads at 20px, and steps down to 16px in a narrow answer, such as one in the AskPanel. */}
+        {/* The question leads at 20px, and steps down to 16px in a narrow answer, such as one in the AskPanel. It is a
+            heading, so it balances its lines: pretty left a run's question ragged, and the detector said so. */}
         <Heading
           id={questionId}
           tabIndex={-1}
           data-slot="ai-answer-question"
-          className="rounded-xs type-heading-lg text-pretty text-text-strong wrap-break-word @max-[399px]:type-heading"
+          className="rounded-xs type-heading-lg text-balance text-text-strong wrap-break-word @max-[399px]:type-heading"
         >
           {question}
         </Heading>
