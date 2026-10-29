@@ -990,6 +990,96 @@ bow tie, which is a real thing to type and renders as something that looks delib
 false until somebody has rendered it and looked, because corners nobody checked are corners somebody
 typed.
 
+## v1.22.0: the product-system skill
+
+A fourth skill, `product-system`, turns a brand into the design system its products are built
+from. It writes product tokens solved for contrast in both themes, and a component kit with a
+behaviour contract and scripted checks per component. Its Next.js starter is the same code the
+canvas bundle is built from. It also writes the written system, a Design canvas of boards, and quality
+gates run in rounds. It publishes a Design System artifact and a Design canvas with that system
+installed.
+
+### Status
+
+Not merged into main. Branch `product-system`, pull request 1. The last proof run met the bar on
+its own review, and an independent review then found two P2 findings still open. The merge waits
+for a person to accept that or for one more round.
+
+### How to run it
+
+Follow the skill's steps in order:
+
+```bash
+brandi product fonts
+brandi product tokens
+brandi product starter
+npm install --prefix product/starter
+brandi product bundle
+brandi product boards
+brandi product boards --heights
+brandi product gates --round 1 --serve
+brandi product round --round 1
+brandi product ds --title "<the system's name>"
+```
+
+Authored boards go between `boards` and `--heights`, the written system goes in `product/docs/`,
+and the craft and rules reviews run between `gates` and `round`. Rounds repeat until `round` says
+the bar is met. `brandi canvas --system <url>` comes last, after the Design System is published.
+
+The canvas runtime gate needs the Design canvas's own runtime at `product/.cache/dc-runtime.js`.
+Read `artifact-type/dc-runtime.js` from any Design canvas with the Artifact tool and save it there.
+
+### What a run costs
+
+One gates run renders about 550 pages and took 26 to 28 minutes on a quiet machine. Allow up to 90
+for a first round under load. The last proof run took 2 hours 10 minutes from intake to a staged
+publish, 81 of them in the gates. Run nothing else that drives Chrome beside the gates.
+
+### The bar
+
+Every machine gate passes: Tokens, Drift, Detector, Accessibility, Canvas runtime, Board sizes,
+Coverage and Record. Craft is 34 of 40 or better, with no heuristic under 3, a note on every one
+under 4, and no P0 to P2 open. No Critical, High or Medium rules finding is open. `brandi product
+round` exits 1 until all of that holds, and `brandi product gates` exits 1 when a machine gate fails.
+
+### How it was proven
+
+Six proof runs. Each was a fresh agent following only the committed skill, on a brand the skill
+was not tuned on, logging every place the skill or the tool let it down. Each gap came back as a
+fix with a test or a component check, and a lesson in `brandi/product/lessons.json` naming what
+broke, the guard and the reference heading that teaches it. There are 137 lessons.
+
+A run that had to work round a kit bug was stopped, and the next started on the fixed code. The
+first run of the night opened with 14 detector findings and 17 axe violations. The last passed every
+machine gate in round 2 and round 3. Its own craft review gave 37 of 40. An independent reviewer
+gave 34 of 40 and found two P2 findings it had missed:
+- The generated component boards show the kit's sample business (invoices, a dental client) inside
+  a dog-wash product. The kit's sample copy is a trades business, and a builder copying a preview
+  takes that copy with it.
+- The run's own Settings board could set only one of its three groom prices. That one is the run's
+  board, not the skill.
+
+The last run used one workaround, keeping a concept's look after a direction was picked. That is
+fixed: a direction may name a role `null`.
+
+### Still open
+
+- The component boards' sample copy (above). The fix is a design call: draw component boards in
+  the product's own nouns, or label them as the kit's specimens.
+- A surface without modules is never held to error states, so a booking page drew none.
+- A brand that names a colour in words with no value ("sand neutrals") is not flagged.
+- Help scored 3 in every run. No board shows what Help opens.
+- Nothing scans a route that answers 404.
+
+### Before changing anything
+
+- A scripted check that fails under load runs once more alone. One that passes then is named in the
+  record, never passed silently.
+- Run the full suite with nothing else driving Chrome. Under load the logo, PNG and deck renders
+  time out. Run a failing file alone with `--test-concurrency=1` before believing it.
+- Kit sample copy never names a fixture brand. A test fails if it does.
+- The types at the top of a starter's `lib/brand.ts` are the kit's, rewritten on every run.
+
 ## If more work is wanted
 
 Nothing is outstanding. Ideas, not obligations:
