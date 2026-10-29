@@ -38,6 +38,7 @@ import {
   toOklch, oklchToHex, gamutMapOklch, oklchToOklab, oklabToOklch,
   contrastRatio, cvdSafePair, tonalRamp, dataVizPalette,
 } from './color.mjs';
+import { railMarks } from './productglobals.mjs';
 
 export const PRODUCT_TOKENS_VERSION = '1.0.0';
 
@@ -506,17 +507,20 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
     // A rail that carries colour takes its words in its own hue, as tints of it: the rail's chroma, held between
     // 0.05 and 0.08 so a vivid rail's tints stay quiet, and raised a step at a time while the solved value still
     // reads grey. Mixed towards a brand-hued text instead, an emerald rail's group labels lost its chroma, and the
-    // detector reported them as grey on colour 52 times. A rail with no colour keeps the brand's hue, and its quiet
-    // words a mix of its text and the rail.
+    // detector reported them as grey on colour 52 times. A rail with no colour (a black, a grey) keeps neutral words:
+    // the hue and chroma the page's own text uses, and its quiet words a mix of its text and the rail. Tinted in the
+    // brand's hue, a black rail's words came out a pale green beside a vivid green brand.
     const coloured = railGrounds.some(carriesColour);
-    const hue = safeHue(toOklch(coloured ? v.rail : B[8]).h);
+    const hue = safeHue(toOklch(v.rail).h);
     const tint = (L, C) => oklchToHex(gamutMapOklch({ L, C, h: hue }));
     const tinted = (role, L, against, min, mode) => {
       let C = Math.min(Math.max(toOklch(v.rail).C, 0.05), 0.08);
       while (C < 0.16 && readsGrey(solveForContrast(tint(L, C), against, min, { mode }).hex)) C += 0.01;
       return solve(role, tint(L, C), against, min, mode);
     };
-    v['rail-text'] = coloured ? tinted('rail-text', darkRail ? 0.93 : 0.25, railGrounds, 7, 'nearest') : solve('rail-text', tint(darkRail ? 0.93 : 0.25, 0.04), railGrounds, 7);
+    const page = toOklch(v.text);
+    const neutral = (L) => oklchToHex(gamutMapOklch({ L, C: page.C, h: safeHue(page.h) }));
+    v['rail-text'] = coloured ? tinted('rail-text', darkRail ? 0.93 : 0.25, railGrounds, 7, 'nearest') : solve('rail-text', neutral(darkRail ? 0.93 : 0.25), railGrounds, 7);
     v['rail-text-strong'] = labelOn(v.rail).hex;
     v['rail-muted'] = coloured
       ? tinted('rail-muted', darkRail ? 0.8 : 0.4, mutedGrounds, FLOORS.text, 'floor')
@@ -820,6 +824,7 @@ export function shapeKitDefaults(tokens) {
  * @param {object} [opts.roles]             decided roles: { primary, brand, highlight, canvas, focus, rail } as { light, dark }
  * @param {boolean} [opts.displayForTitles] whether the display face sets titles (default true)
  * @param {object} [opts.source]            where the brand came from, recorded in meta
+ * @param {object[]} [opts.directions]      roles a concept board moves: [{ name, roles, note }] (checkDirections)
  */
 /**
  * The faces a system ships as files: { family, file, weight, style }. A hosted face (Google) has no
@@ -838,7 +843,44 @@ export function checkFonts(fonts) {
   });
 }
 
-export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, displayCase = null, charts = {}, source = null, fonts: fontFiles = [], shape = {} } = {}) {
+/** The roles a direction may move: the ones product.json's `roles` decides. */
+export const DIRECTION_ROLES = Object.freeze(['primary', 'brand', 'highlight', 'canvas', 'ink', 'focus', 'rail']);
+
+/**
+ * product.json's `directions`, checked: [{ name, roles, note }], each role a hex, one of the brand's colours by name
+ * (with or without brand-), or { light, dark } of those. Returns each with its class (direction-<name>) and its roles
+ * as { light, dark } hexes. `brandHex` maps a brand colour's name to its hex.
+ */
+export function checkDirections(directions, brandHex) {
+  if (!Array.isArray(directions)) throw new TypeError('directions is a list of { name, roles, note }');
+  const classes = new Set();
+  return directions.map((d) => {
+    if (typeof d?.name !== 'string' || !d.name.trim()) throw new TypeError('each direction needs a name, such as "B"');
+    const slug = d.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const cls = `direction-${slug}`;
+    if (!slug) throw new TypeError(`direction ${JSON.stringify(d.name)}: its name needs a letter or a digit, for its class`);
+    if (classes.has(cls)) throw new TypeError(`"${d.name}" makes ${cls} a second time: give each direction a name of its own`);
+    classes.add(cls);
+    if (!d.roles || typeof d.roles !== 'object' || Array.isArray(d.roles) || !Object.keys(d.roles).length) {
+      throw new TypeError(`direction ${d.name}: roles names at least one role the direction moves. A direction that only changes the layout needs no class`);
+    }
+    const colour = (role, v) => {
+      if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(String(v))) return v;
+      const key = String(v).toLowerCase().replace(/^brand-/, '');
+      if (brandHex.has(key)) return brandHex.get(key);
+      throw new TypeError(`direction ${d.name}: ${role} names ${v}, which is not a hex value or one of the brand's colours (${[...brandHex.keys()].join(', ')})`);
+    };
+    const roles = {};
+    for (const [role, v] of Object.entries(d.roles)) {
+      if (!DIRECTION_ROLES.includes(role)) throw new TypeError(`direction ${d.name}: ${role} is not a role a direction can move; it moves ${DIRECTION_ROLES.join(', ')}`);
+      const both = v && typeof v === 'object' ? v : { light: v, dark: v };
+      roles[role] = Object.fromEntries(['light', 'dark'].filter((m) => both[m] != null).map((m) => [m, colour(role, both[m]).toLowerCase()]));
+    }
+    return { name: d.name.trim(), class: cls, ...(d.note ? { note: String(d.note) } : {}), roles };
+  });
+}
+
+export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, displayCase = null, charts = {}, source = null, fonts: fontFiles = [], shape = {}, directions = [] } = {}) {
   if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved Brandi system');
 
   // Decided values arrive as people write them: "#fff" as often as "#FFFFFF",
@@ -933,7 +975,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
 
   const notes = [...light.notes, ...dark.notes];
 
-  return {
+  const tokens = {
     name,
     version: PRODUCT_TOKENS_VERSION,
     meta: {
@@ -1017,6 +1059,31 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
       tokens: [{ name: 'opacity-disabled', value: '0.5', usage: 'Never the only sign: a disabled control also says why nearby.' }],
     },
   };
+
+  // Directions: the system again with each direction's roles over the decided ones, keeping only the variables that
+  // move. They sit in meta, which the Design System page does not read, and tokens.css draws each as a class. A
+  // board that set raw values on its root failed the drift check, and one rewritten through color-mix lost the
+  // solved values.
+  const brandHex = new Map(primitives.map((p) => [p.name.replace(/^brand-/, '').toLowerCase(), p.value.light]));
+  const checked = checkDirections(directions ?? [], brandHex);
+  if (checked.length) {
+    tokens.meta.directions = checked.map((d) => {
+      const merged = { ...roles };
+      for (const [role, v] of Object.entries(d.roles)) merged[role] = { ...roles[role], ...v };
+      const solved = buildProductTokens(system, { name, brandColours: brandColoursIn, roles: merged, displayForTitles, displayCase, charts, source, fonts: fontFiles, shape });
+      // Kept in both themes when it moves in either: a value left out of the dark rule would let the light one show at night.
+      const seen = (t, m, set) => resolveColour(set, t.name, m).toLowerCase();
+      const moved = solved.color.tokens.filter((t) => ['light', 'dark'].some((m) => seen(t, m, solved) !== seen(t, m, tokens)));
+      const marks = ['light', 'dark'].map((m) => [railMarks(solved, m), railMarks(tokens, m)]);
+      const marksMove = marks.some(([a, b]) => JSON.stringify(a) !== JSON.stringify(b));
+      const values = (m, i) => ({
+        ...Object.fromEntries(moved.map((t) => [t.name, t.value[m]])),
+        ...(marksMove ? Object.fromEntries(marks[i][0]) : {}),
+      });
+      return { ...d, light: values('light', 0), dark: values('dark', 1) };
+    });
+  }
+  return tokens;
 }
 
 // ---------------------------------------------------------------------------
@@ -1052,31 +1119,54 @@ export function resolveColour(tokens, ref, theme) {
  * looks like a status, success and danger under colour-vision deficiency, and
  * chart neighbours that collapse into each other.
  */
+/**
+ * The token set a board with a direction's class draws: the direction's values over the system's, and the rail's pairs
+ * declared when the direction decides a rail the system leaves quiet.
+ */
+function drawnWith(tokens, d) {
+  const railDecided = Boolean(tokens.meta?.roles?.rail || d.roles?.rail);
+  const tokensOut = tokens.color.tokens.map((t) => {
+    const value = ['light', 'dark'].some((m) => t.name in (d[m] ?? {})) ? { ...t.value, ...Object.fromEntries(['light', 'dark'].filter((m) => t.name in d[m]).map((m) => [m, d[m][t.name]])) } : t.value;
+    return { ...t, value, contrast: PRODUCT_ROLES.includes(t.name) ? contrastFor(t.name, { railDecided }) : t.contrast };
+  });
+  return { ...tokens, color: { ...tokens.color, tokens: tokensOut } };
+}
+
+/** Every declared pair in one theme, each a row; `direction` names the direction the rows were measured for. */
+function measurePairs(tokens, theme, direction = null) {
+  const rows = [];
+  const named = direction ? { direction } : {};
+  for (const t of tokens.color.tokens) {
+    for (const c of t.contrast ?? []) {
+      for (const on of c.on) {
+        // A pair that names a role the file does not define (a shipped product's tokens can) is a
+        // failure to report, not a reason to stop measuring every other pair.
+        let fg;
+        let bg;
+        try {
+          fg = resolveColour(tokens, t.name, theme);
+          bg = resolveColour(tokens, on, theme);
+        } catch (e) {
+          rows.push({ theme, ...named, fg: t.name, bg: on, ratio: null, min: c.min, kind: c.kind, ok: false, problem: e.message });
+          continue;
+        }
+        if (isTranslucent(fg)) fg = composite(fg, bg);
+        const ratio = contrastRatio(fg, bg);
+        rows.push({ theme, ...named, fg: t.name, bg: on, ratio: Math.round(ratio * 100) / 100, min: c.min, kind: c.kind, ok: ratio >= c.min });
+      }
+    }
+  }
+  return rows;
+}
+
 export function auditProductTokens(tokens) {
   const themes = (tokens.color.themes ?? [{ id: 'light' }, { id: 'dark' }]).map((t) => t.id ?? t);
   const rows = [];
   const warnings = [];
   for (const theme of themes) {
-    for (const t of tokens.color.tokens) {
-      for (const c of t.contrast ?? []) {
-        for (const on of c.on) {
-          // A pair that names a role the file does not define (a shipped product's tokens can) is a
-          // failure to report, not a reason to stop measuring every other pair.
-          let fg;
-          let bg;
-          try {
-            fg = resolveColour(tokens, t.name, theme);
-            bg = resolveColour(tokens, on, theme);
-          } catch (e) {
-            rows.push({ theme, fg: t.name, bg: on, ratio: null, min: c.min, kind: c.kind, ok: false, problem: e.message });
-            continue;
-          }
-          if (isTranslucent(fg)) fg = composite(fg, bg);
-          const ratio = contrastRatio(fg, bg);
-          rows.push({ theme, fg: t.name, bg: on, ratio: Math.round(ratio * 100) / 100, min: c.min, kind: c.kind, ok: ratio >= c.min });
-        }
-      }
-    }
+    rows.push(...measurePairs(tokens, theme));
+    // Each direction's pairs too, under its name: a concept board in front of the person is held to the same floors.
+    for (const d of tokens.meta?.directions ?? []) rows.push(...measurePairs(drawnWith(tokens, d), theme, d.name));
     const has = (n) => tokens.color.tokens.some((t) => t.name === n);
     const at = (n) => resolveColour(tokens, n, theme);
     if (has('highlight') && has('warning-solid')) {
@@ -1139,11 +1229,22 @@ export function toProductCss(tokens) {
     const out = [`${selector} {`];
     for (const t of tokens.color.tokens) out.push(`  ${cssName(t.name)}: ${cssValue(typeof t.value === 'string' ? t.value : t.value[theme])};`);
     for (const t of tokens.shadow?.tokens ?? []) out.push(`  ${cssName(t.name)}: ${t.value[theme]};`);
+    for (const [n, v] of railMarks(tokens, theme)) out.push(`  ${cssName(n)}: ${v};`);
     out.push('}');
     return out.join('\n');
   };
   lines.push(block(':root, [data-theme="light"]', 'light'));
   lines.push(block('[data-theme="dark"]', 'dark'));
+  // A direction's class, on the element just inside Root that holds a board: only the variables it moves, in the
+  // theme around it. The dark rule outranks the light one wherever the board is dark.
+  for (const d of tokens.meta?.directions ?? []) {
+    const rule = (selector, values) => [`${selector} {`, ...Object.entries(values).map(([n, v]) => `  ${cssName(n)}: ${cssValue(v)};`), '}'].join('\n');
+    if (!Object.keys(d.light ?? {}).length && !Object.keys(d.dark ?? {}).length) continue;
+    const c = `.${d.class}`;
+    lines.push(`/* Direction ${d.name}${d.note ? `: ${d.note}` : ''} */`.replace(/\*\/(?!$)/g, '* /'));
+    lines.push(rule(c, d.light));
+    lines.push(rule(`.dark ${c}, [data-theme="dark"] ${c}, ${c}.dark, ${c}[data-theme="dark"]`, d.dark));
+  }
   const statics = ['spacing', 'radius', 'size', 'zIndex', 'duration', 'easing', 'breakpoint', 'opacity'];
   const out = [':root {'];
   for (const fam of statics) for (const t of tokens[fam]?.tokens ?? []) out.push(`  ${cssName(t.name)}: ${t.value};`);

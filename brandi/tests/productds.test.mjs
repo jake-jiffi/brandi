@@ -73,6 +73,16 @@ describe('the Design System artifact, assembled', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('the written system goes README first, then the sections in their numbered order', async () => {
+    const { dir, starter } = await product();
+    // A plain sort puts every numbered section before README.md, and 10 before 2.
+    await writeFile(path.join(dir, 'docs', '10-operating.md'), '# Operating\n');
+    await writeFile(path.join(dir, 'docs', '2-screens.md'), '# Screens\n');
+    const res = assembleDesignSystem({ productDir: dir, starter, outDir: path.join(dir, '.publish', 'ds'), title: 'Acme product system' });
+    assert.deepEqual(res.files.slice(0, 4), ['README.md', '1-writing.md', '2-screens.md', '10-operating.md']);
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test("the brand's texture goes beside the fonts, at the path tokens.css names it by", async () => {
     const { dir, starter } = await product();
     const withMove = { ...tokens, radius: { ...tokens.radius, moves: [{ name: 'Paper grain', source: 'the guidelines', where: 'hero bands', kind: 'texture', file: 'textures/grain.jpg', strength: 0.5 }] } };

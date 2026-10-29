@@ -99,8 +99,6 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
     return () => observer.disconnect()
   }, [])
   const isCollapsed = !drawer && (collapsed || narrow)
-  // The rail's tone picks the logo's rendition: on a dark rail, the one approved on dark grounds.
-  const railLogo = PRODUCT.railTone === "dark" ? "on-dark" : "auto"
   const homeInNav = [...(groups ?? []).flatMap((g) => g.items ?? []), ...(Array.isArray(footer) ? (footer as NavItemProps[]) : [])].some((item) => item.href === home)
   const homeLink = (
     <Link
@@ -108,7 +106,8 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
       aria-label={lockupLabel(name)}
       className="hidden size-10 items-center justify-center rounded-control text-rail-text-strong hover:bg-rail-hover focus-visible:outline-rail-focus @max-[160px]/rail:flex"
     >
-      {BRAND.marks.symbol ? <Logo mark="symbol" title="" color={railLogo} /> : <Icon name="House" size={20} />}
+      {/* The rendition made for the rail's ground, picked in CSS from the rail's tone, so a direction's class moves it. */}
+      {BRAND.marks.symbol ? <Logo mark="symbol" title="" color="rail" /> : <Icon name="House" size={20} />}
     </Link>
   )
   const rail = React.useMemo(() => ({ inRail: true, collapsed: isCollapsed }), [isCollapsed])
@@ -211,7 +210,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
               <Icon name="X" size={20} />
             </ButtonBase>
           ) : null}
-          <ProductLockup tone="rail" color={railLogo} product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
+          <ProductLockup tone="rail" color="rail" product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
           {/* Icons only, the rail is 72px: the brand's symbol in the rail's rendition. A brand with no symbol has a full
               logo too wide for it at its minimum, so its home is a plain Home control rather than a logo cut by the edge,
               and none at all when the navigation already has the same destination. Like every icon there, it has a tooltip. */}
@@ -225,7 +224,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
             )
           ) : !home && BRAND.marks.symbol ? (
             <span className="hidden @max-[160px]/rail:flex">
-              <Logo mark="symbol" title={lockupLabel(name)} color={railLogo} />
+              <Logo mark="symbol" title={lockupLabel(name)} color="rail" />
             </span>
           ) : null}
         </div>

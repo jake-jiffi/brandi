@@ -206,6 +206,26 @@ describe("a coloured rail's quiet text", () => {
     }
   });
 
+  test("a black rail beside a vivid green brand keeps neutral words, in the page text's hue and chroma, above their floors", () => {
+    // A near-black rail's words solved to a pale green tint (C 0.04) beside a vivid green brand.
+    const green = buildSystem({ primary: '#58C21E', type: { display: 'Bitter', body: 'Karla' } });
+    for (const roles of [{ rail: { light: '#0B0B0B', dark: '#0B0B0B' } }, { rail: { light: '#0B0B0B', dark: '#0B0B0B' }, ink: { light: '#050505' } }]) {
+      const tokens = P.buildProductTokens(green, { roles });
+      for (const theme of ['light', 'dark']) {
+        const at = (n) => P.resolveColour(tokens, n, theme);
+        const text = toOklch(at('text'));
+        for (const role of ['rail-text', 'rail-muted']) {
+          const c = toOklch(at(role));
+          assert.ok(c.C <= text.C + 0.005, `${theme} ${role} ${at(role)} carries chroma ${c.C.toFixed(3)}, the page text ${text.C.toFixed(3)}`);
+          if (text.C > 0.002) assert.ok(hueGap(c.h, text.h) < 20, `${theme} ${role} ${at(role)} is in the page text's hue`);
+        }
+        assert.ok(contrastRatio(at('rail-text'), at('rail-selected')) >= 7, `${theme} rail-text keeps 7:1 on the selected item`);
+        assert.ok(contrastRatio(at('rail-muted'), at('rail-hover')) >= 4.5, `${theme} rail-muted keeps 4.5:1 on a hovered item`);
+      }
+      assert.deepEqual(P.auditProductTokens(tokens).fails.filter((f) => f.fg.startsWith('rail')), [], "the rail's pairs all pass");
+    }
+  });
+
   test('a rail with no colour of its own keeps its quiet text as it was', () => {
     const black = P.buildProductTokens(system, { roles: { rail: { light: '#000000', dark: '#000000' } } });
     const before = P.solveForContrast(P.mix('#000000', P.resolveColour(black, 'rail-text', 'light'), 0.55), ['#000000', P.resolveColour(black, 'rail-hover', 'light')], 4.5, { mode: 'floor' }).hex;
@@ -352,6 +372,93 @@ describe('the audit warns where a pair list cannot', () => {
     assert.ok(same.warnings.some((w) => w.area === 'highlight'), 'a highlight identical to the warning colour went unremarked');
     const distinct = P.auditProductTokens(P.buildProductTokens(system, { roles: { highlight: { light: '#7FD1F4', dark: '#7FD1F4' } } }));
     assert.equal(distinct.warnings.some((w) => w.area === 'highlight'), false);
+  });
+});
+
+describe('directions: a role a concept board moves, solved and carried as a class', () => {
+  // Near neighbours of a run that drew its rail three ways: black, the brand's vivid green, and an emerald.
+  const green = buildSystem({ primary: '#58C21E', type: { display: 'Bitter', body: 'Karla' } });
+  const brandColours = { 'acme-green': '#58C21E', 'acme-black': '#0B0B0B', 'acme-emerald': '#134A36' };
+  const base = { brandColours, roles: { rail: { light: '#0B0B0B', dark: '#0B0B0B' } } };
+  const directions = [
+    { name: 'A', roles: { rail: 'acme-black' }, note: 'The black rail.' },
+    { name: 'B', roles: { rail: 'brand-acme-green' }, note: 'The green rail.' },
+    { name: 'Emerald rail', roles: { rail: { light: '#134A36', dark: 'acme-emerald' } } },
+  ];
+  const tokens = P.buildProductTokens(green, { ...base, directions });
+  const dir = (name, t = tokens) => t.meta.directions.find((d) => d.name === name);
+  const blockOf = (css, selector) => css.slice(css.indexOf(`${selector} {`), css.indexOf('}', css.indexOf(`${selector} {`)) + 1);
+
+  test('each is the system with its roles over the decided ones, and only what differs is kept, where the page does not read', () => {
+    const b = dir('B');
+    assert.equal(b.class, 'direction-b');
+    assert.equal(b.note, 'The green rail.');
+    assert.deepEqual(b.roles, { rail: { light: '#58c21e', dark: '#58c21e' } }, 'a brand colour named, with or without brand-');
+    const solved = P.buildProductTokens(green, { ...base, roles: { rail: { light: '#58C21E', dark: '#58C21E' } } });
+    for (const t of tokens.color.tokens) {
+      // Kept in both themes when it moves in either: a light-only value left out of the dark rule would show at night.
+      const seen = (set, theme) => P.resolveColour(set, t.name, theme).toLowerCase();
+      const moved = ['light', 'dark'].some((theme) => seen(solved, theme) !== seen(tokens, theme));
+      for (const theme of ['light', 'dark']) {
+        assert.equal(t.name in b[theme], moved, `${theme} ${t.name}: kept only when the direction moves it`);
+        if (moved) assert.equal(b[theme][t.name].toLowerCase(), solved.color.tokens.find((s) => s.name === t.name).value[theme].toLowerCase());
+      }
+    }
+    assert.ok('rail-text' in b.light && !('surface' in b.light), 'the rail and its words move, the page does not');
+    assert.deepEqual(dir('A').light, {}, "a direction that is today's system holds nothing");
+    assert.deepEqual(dir('Emerald rail').roles, { rail: { light: '#134a36', dark: '#134a36' } });
+    assert.equal(dir('Emerald rail').class, 'direction-emerald-rail');
+    // The Design System page reads every family but type as a { tokens: [...] } list; directions sit in meta, which it does not read.
+    for (const [key, family] of Object.entries(tokens)) {
+      if (family && typeof family === 'object' && !['meta', 'type'].includes(key)) assert.ok(Array.isArray(family.tokens), `${key} is a list of tokens`);
+    }
+  });
+
+  test("tokens.css draws each with a class, light and dark, and the rail's logo follows the rail it sets", () => {
+    const css = P.toProductCss(tokens);
+    const light = blockOf(css, '.direction-b');
+    assert.match(light, /--rail: #58c21e;/i);
+    assert.match(light, /--rail-text: #[0-9a-f]{6};/i);
+    assert.doesNotMatch(light, /--surface:/, 'nothing the direction leaves alone');
+    // The black rail takes the mark drawn for dark grounds; the green rail with dark words, the one for light grounds.
+    assert.match(blockOf(css, ':root, [data-theme="light"]'), /--rail-mark-on-light: none;\n {2}--rail-mark-on-dark: flex;/);
+    assert.match(light, /--rail-mark-on-light: flex;\n {2}--rail-mark-on-dark: none;/);
+    assert.match(css, /\.dark \.direction-b, \[data-theme="dark"\] \.direction-b, \.direction-b\.dark, \.direction-b\[data-theme="dark"\] \{\n {2}--rail: #58c21e;/i);
+    assert.equal(css.includes('.direction-a '), false, 'a direction with nothing to change writes no rule');
+    assert.match(css, /\/\* Direction B: The green rail\. \*\//);
+  });
+
+  test('after the pick, the picked roles are the system and every direction still draws as it did', () => {
+    const picked = P.buildProductTokens(green, { ...base, roles: { rail: { light: '#58C21E', dark: '#58C21E' } }, directions });
+    assert.deepEqual(dir('B', picked).light, {}, 'the pick is the system now');
+    for (const theme of ['light', 'dark']) {
+      const before = { ...Object.fromEntries(tokens.color.tokens.map((t) => [t.name, P.resolveColour(tokens, t.name, theme)])) };
+      const a = dir('A', picked)[theme];
+      // Direction A, drawn on the new system with its class, is the old system again.
+      const drawn = { ...picked, color: { ...picked.color, tokens: picked.color.tokens.map((t) => (t.name in a ? { ...t, value: { ...t.value, [theme]: a[t.name] } } : t)) } };
+      for (const t of picked.color.tokens) assert.equal(P.resolveColour(drawn, t.name, theme).toLowerCase(), before[t.name].toLowerCase(), `${theme} ${t.name}`);
+    }
+  });
+
+  test("a direction's failing pairs are reported under its name, and the system's own still pass", () => {
+    // A decided colour is used as given, so a pale primary stays pale and fails to stand off the page.
+    const pale = P.buildProductTokens(green, { ...base, directions: [{ name: 'Pale', roles: { primary: '#C8E6B5' } }] });
+    const audit = P.auditProductTokens(pale);
+    assert.ok(audit.fails.some((f) => f.direction === 'Pale' && f.fg === 'primary' && f.bg === 'surface'), JSON.stringify(audit.fails));
+    assert.deepEqual(audit.fails.filter((f) => !f.direction), []);
+    assert.equal(audit.ok, false);
+    assert.ok(P.auditProductTokens(tokens).rows.some((r) => r.direction === 'B' && r.fg === 'rail-text' && r.bg === 'rail' && r.ok), "B's rail words are measured on its rail");
+  });
+
+  test('a direction is refused with its reason', () => {
+    const build = (d) => () => P.buildProductTokens(green, { ...base, directions: d });
+    assert.throws(build({ name: 'B' }), /directions is a list/);
+    assert.throws(build([{ roles: { rail: '#58C21E' } }]), /a name/);
+    assert.throws(build([{ name: 'B', roles: {} }]), /B: roles names at least one/);
+    assert.throws(build([{ name: 'B', roles: { 'rail-text': '#000000' } }]), /B: rail-text is not a role a direction can move; it moves primary, brand, highlight, canvas, ink, focus, rail/);
+    assert.throws(build([{ name: 'B', roles: { rail: 'acme-teal' } }]), /B: rail names acme-teal, which is not a hex value or one of the brand's colours \(acme-green, acme-black, acme-emerald\)/);
+    assert.throws(build([{ name: 'B', roles: { rail: { dark: '#12345' } } }]), /direction B: rail names #12345, which is not a hex value/, 'a broken hex names its direction');
+    assert.throws(build([{ name: 'B', roles: { rail: '#58C21E' } }, { name: 'b', roles: { rail: '#134A36' } }]), /"b" makes direction-b a second time/);
   });
 });
 

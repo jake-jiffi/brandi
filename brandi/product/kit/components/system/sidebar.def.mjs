@@ -15,6 +15,29 @@ const inView = async (page, locator) => {
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
 const floating = (page, words) => page.locator('[data-slot="tooltip-content"]:not([data-example] *)').filter({ hasText: words })
+// The rendition a logo has on screen, and whether the rail is darker than its words where `el` sits: the test the
+// tokens use to set the rail's marks (--rail-mark-on-light, --rail-mark-on-dark).
+const shownMark = (logo) =>
+  logo.evaluate((el) => [...el.querySelectorAll('[data-slot="logo-rendition"]')].find((r) => r.checkVisibility())?.dataset.rendition)
+const railIsDark = (el) => {
+  const lum = (value) => {
+    const p = document.createElement("span")
+    p.style.color = value
+    el.appendChild(p)
+    const [r, g, b] = (getComputedStyle(p).color.match(/[\d.]+/g) ?? []).slice(0, 3).map((c) => {
+      const s = Number(c) / 255
+      return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+    })
+    p.remove()
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  return lum("var(--rail)") < lum("var(--rail-text-strong)")
+}
+const onDarkOf = (page) =>
+  page.evaluate(() => {
+    const marks = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {}
+    return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
+  })
 
 const groups = [
   {
@@ -68,6 +91,7 @@ export default {
       'The account button is named "[name], [role], account menu". Without onUser the person shows and nothing is pressable.',
       "Command K or Control K runs onSearch from anywhere, while typing too. The hint shows the right key for the device and hides on touch; a screen reader hears the shortcut from aria-keyshortcuts, not as part of the button's name.",
       "Icons only, the labels stay for screen readers and show as tooltips on hover, keyboard focus and a long press. The tooltips mount only then: a tooltip left mounted while hidden holds the next Escape.",
+      "The lockup and the symbol take the logo made for the rail's ground, from the rail's tone in each theme (Logo's rail colour), so a direction whose class recolours the rail moves the mark with it.",
     ],
     Layout: [
       "In the brand's shell form: against the window edge, square, with a hairline on its inner side, or floating 8px in with the rail's corners and a hairline all round when the brand floats its panels.",
@@ -111,6 +135,24 @@ export default {
   openAccount: () => self.setState((s) => ({ accounts: s.accounts + 1 })),
   noop: () => undefined`,
   checks: [
+    {
+      name: "The lockup draws the logo made for the rail's ground, and a direction's class moves it with the rail, in both themes",
+      example: "rail",
+      themes: ["light", "dark"],
+      async run({ page, scope, expect }) {
+        // Chosen when the bundle was built, a green-rail direction drew the mark made for dark grounds on green.
+        const host = scope.locator('[data-slot="sidebar"]').first()
+        const logo = host.locator('[data-slot="product-lockup"] [data-slot="logo"]').first()
+        const onDark = await onDarkOf(page)
+        const dark = await host.evaluate(railIsDark)
+        expect.equal(await shownMark(logo), dark ? onDark : "full", `the rendition on this ${dark ? "dark" : "light"} rail`)
+        await host.evaluate((el, d) => {
+          el.style.setProperty("--rail-mark-on-light", d ? "flex" : "none")
+          el.style.setProperty("--rail-mark-on-dark", d ? "none" : "flex")
+        }, dark)
+        expect.equal(await shownMark(logo), dark ? "full" : onDark, "the rendition once a direction turns the rail's tone over")
+      },
+    },
     {
       name: "A control put on the rail draws in the rail's colours, so it reads on a dark rail, in both themes",
       example: "rail",

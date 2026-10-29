@@ -4,12 +4,12 @@ import { BRAND, type MarkRendition } from "@/lib/brand"
 import { cn } from "@/lib/utils"
 
 export type LogoMark = "full" | "symbol"
-export type LogoColor = "auto" | "on-light" | "on-dark" | "ink"
+export type LogoColor = "auto" | "on-light" | "on-dark" | "ink" | "rail"
 
 export interface LogoProps extends Omit<React.HTMLAttributes<HTMLSpanElement>, "color" | "title" | "children"> {
   /** The full logo, or the symbol alone for square and narrow places. A brand without a symbol shows its full logo. */
   mark?: LogoMark
-  /** `auto` follows the theme. Otherwise one of the brand's approved renditions; `ink` takes the colour of the text around it. */
+  /** `auto` follows the theme, `rail` the rail's tone. Otherwise one of the brand's approved renditions; `ink` takes the colour of the text around it. */
   color?: LogoColor
   /** Height in px. Defaults to the logo system's preferred size (the symbol's own, 24px); values under its minimum are raised to it. */
   height?: number
@@ -25,7 +25,7 @@ function rendition(mark: LogoMark, color: LogoColor, ground: "light" | "dark" | 
   const ink: MarkRendition = has(`${m}-ink`) ? `${m}-ink` : m
   const onDark: MarkRendition = has(`${m}-on-dark`) ? `${m}-on-dark` : ink
   if (color === "ink" || ground === "forced") return ink
-  if (color === "on-dark" || (color === "auto" && ground === "dark")) return onDark
+  if (color === "on-dark" || ((color === "auto" || color === "rail") && ground === "dark")) return onDark
   return m
 }
 
@@ -84,17 +84,24 @@ export const Logo = React.forwardRef<HTMLSpanElement, LogoProps>(function Logo(
       aria-label={named ? title : undefined}
       aria-hidden={named ? undefined : true}
       // `ink` takes its colour from the parent; every other rendition sets the brand's ink for any
-      // part drawn in currentColor.
-      className={cn("inline-flex shrink-0", color !== "ink" && "text-text-strong", className)}
+      // part drawn in currentColor, the rail's own words on the rail.
+      className={cn("inline-flex shrink-0", color === "rail" ? "text-rail-text-strong" : color !== "ink" && "text-text-strong", className)}
       // The clear space is added to the height rather than through box-sizing, which a canvas's own
       // base styles override.
       style={{ ...style, height: h + 2 * pad, padding: pad || undefined }}
       {...rest}
     >
-      {/* The theme picks between the light and dark renditions in CSS, so the server and the canvas agree. */}
+      {/* The theme picks between the light and dark renditions in CSS, so the server and the canvas agree. On the rail,
+          the rail's tone does, through variables the tokens set and a direction's class can flip: chosen when the
+          bundle was built, a green-rail direction drew the mark made for dark grounds on green. */}
       <span className="contents forced-colors:hidden">
         {light === dark ? (
           <Rendition name={light} className="flex" />
+        ) : color === "rail" ? (
+          <>
+            <Rendition name={light} className="[display:var(--rail-mark-on-light,flex)]" />
+            <Rendition name={dark} className="[display:var(--rail-mark-on-dark,none)]" />
+          </>
         ) : (
           <>
             <Rendition name={light} className="flex dark:hidden" />

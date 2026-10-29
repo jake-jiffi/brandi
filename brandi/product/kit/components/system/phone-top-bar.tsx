@@ -4,7 +4,6 @@ import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
 import { useLink } from "@/lib/link"
-import { PRODUCT } from "@/lib/product"
 import { cn } from "@/lib/utils"
 
 import { Icon } from "./icon"
@@ -80,7 +79,8 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
             title
           )
         ) : (
-          <ProductLockup tone="rail" color={PRODUCT.railTone === "dark" ? "on-dark" : "auto"} product={product} href={home} height={20} />
+          // The rendition made for the rail's ground, picked in CSS from the rail's tone, so a direction's class moves it.
+          <ProductLockup tone="rail" color="rail" product={product} href={home} height={20} />
         )}
       </div>
       {actions ? (

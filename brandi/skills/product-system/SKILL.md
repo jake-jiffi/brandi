@@ -194,10 +194,15 @@ none, ask what was wrong rather than averaging the three.
 
 Build the tokens, the starter and the bundle first (`$A product tokens`, `starter`, `bundle`), so the
 directions mount the real components. A direction that differs in a role colour, not only in layout,
-sets that role on its own board's root, `style="--rail: <value>; --rail-text: <value>"` and so on,
-and says which roles it moves: one installed system means one set of roles, and a choice like the
-rail's colour belongs in front of the person as a drawing, not decided quietly in the tokens. The pick
-then goes into product.json, and the tokens are solved again.
+is part of the system: name it in product.json's `directions`, `[{ "name": "B", "roles": { "rail":
+"<a brand colour's name or hex>" }, "note": "..." }]`, with every direction that moves a role
+listed, today's included. `$A product tokens` solves each as the system with those roles over the
+decided ones, audits its pairs under its name, and writes a class per direction into `tokens.css`
+(`.direction-b`, light and dark). The board draws it with that class on the element just inside
+Root that holds the board, and the drift check passes it. A choice like the rail's colour belongs
+in front of the person as a drawing, not decided quietly in the tokens. The pick then goes into
+`roles`, the tokens are solved again, and `directions` stays, so every concept board still draws as
+it did (`references/06-canvas.md`, Directions).
 
 ### 5. System (no questions)
 

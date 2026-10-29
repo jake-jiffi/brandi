@@ -19,9 +19,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
-import { toStarterGlobals } from './productglobals.mjs';
+import { toStarterGlobals, railIsDark } from './productglobals.mjs';
 import { textureMove } from './producttokens.mjs';
-import { relativeLuminance } from './color.mjs';
 import { hostedFontsUrl, loadDefinitions, checkDefinition, componentReadme, previewBoard, previewPage, typesFile } from './productdocs.mjs';
 import { productMd, designMd, CONTEXT_MARKER } from './productcontext.mjs';
 import { brandSources, brandConstant, brandModule, shrinkStill } from './productbrand.mjs';
@@ -114,19 +113,13 @@ const pascal = (s) => String(s).normalize('NFKD').replace(/[̀-ͯ]/g, '').split(
  * market's locale and currency, the language its copy is in, and its version. product.json can set
  * any of them; the rest come from the brand's name.
  */
-/** "dark" when the light theme's rail is darker than its strong text, as a navy rail is; "light" otherwise. */
+/**
+ * "dark" when the light theme's rail is darker than its strong text, as a navy rail is; "light" otherwise. The kit's
+ * own rail and top bar follow the rail as it renders (the --rail-mark-* variables); this stays in lib/product.ts for
+ * components from an older kit, which read it, and for a product's own code.
+ */
 export function railTone(tokens) {
-  const all = new Map((tokens.color?.tokens ?? []).map((t) => [t.name, t]));
-  const light = (name, seen = new Set()) => {
-    const v = all.get(name)?.value;
-    const raw = v && typeof v === 'object' ? v.light : v;
-    const alias = typeof raw === 'string' && /^\{([a-z0-9-]+)\}$/.exec(raw);
-    return alias && !seen.has(alias[1]) ? light(alias[1], new Set([...seen, name])) : raw;
-  };
-  const rail = light('rail');
-  const text = light('rail-text-strong');
-  if (!rail || !text) return 'light';
-  return relativeLuminance(rail) < relativeLuminance(text) ? 'dark' : 'light';
+  return railIsDark(tokens, 'light') ? 'dark' : 'light';
 }
 
 export function systemIdentity(config = {}, { brandName } = {}) {
@@ -228,7 +221,7 @@ export function generatedFiles(tokens, identity) {
     ['system/system.json', `${JSON.stringify({ ...identity, fontsUrl: hostedFontsUrl(tokens) }, null, 2)}\n`],
     ['app/globals.css', toStarterGlobals(tokens)],
     ['lib/format-locale.js', localeModule(identity)],
-    ['lib/product.ts', `// The product's name and language, set once, and three things read off the system. \`brandi product starter\` writes this file.\n// railTone: whether the rail is dark in the light theme, so the rail's lockup takes the mark drawn for dark grounds.\n// lockupName: how the product name is set beside the mark, a brand-to-product decision.\n// avoidTags: tag tints on a hue the brand keeps off its grounds (charts.avoid), which a name's hash never lands on.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)}, railTone: ${JSON.stringify(railTone(tokens))}, lockupName: ${JSON.stringify(identity.lockupName ?? 'label')}, avoidTags: ${JSON.stringify(tokens.meta?.avoidTags ?? [])} } as {\n  name: string\n  lang: string\n  railTone: "light" | "dark"\n  lockupName: "label" | "eyebrow"\n  avoidTags: string[]\n}\n`],
+    ['lib/product.ts', `// The product's name and language, set once, and three things read off the system. \`brandi product starter\` writes this file.\n// railTone: whether the rail is dark in the light theme. The kit's rail and top bar follow the rail as it renders instead\n// (--rail-mark-on-light and --rail-mark-on-dark, which a direction's class can flip); components from an older kit read this.\n// lockupName: how the product name is set beside the mark, a brand-to-product decision.\n// avoidTags: tag tints on a hue the brand keeps off its grounds (charts.avoid), which a name's hash never lands on.\nexport const PRODUCT = { name: ${JSON.stringify(identity.name)}, lang: ${JSON.stringify(identity.lang)}, railTone: ${JSON.stringify(railTone(tokens))}, lockupName: ${JSON.stringify(identity.lockupName ?? 'label')}, avoidTags: ${JSON.stringify(tokens.meta?.avoidTags ?? [])} } as {\n  name: string\n  lang: string\n  railTone: "light" | "dark"\n  lockupName: "label" | "eyebrow"\n  avoidTags: string[]\n}\n`],
     ['app/fonts.ts', fontsModule(tokens)],
     ['tools/build-globals.mjs', readFileSync(GLOBALS_SOURCE, 'utf8')],
   ]);
@@ -326,7 +319,7 @@ export async function writeStarter({ out, tokens, identity, kit = KIT, refreshKi
     // A starter made before the kit had lib/brand.ts takes the types from the kit's copy.
     const current = readFileSync(existsSync(file) ? file : path.join(kit, 'lib', 'brand.ts'), 'utf8');
     const next = brandModule(current, generated.source);
-    if (next) { writeFileSync(file, next); written.push('lib/brand.ts'); brandMarks = { ...generated, from: src.from }; } else kept.push('lib/brand.ts');
+    if (next) { writeFileSync(file, next); written.push('lib/brand.ts'); brandMarks = { ...generated, from: src.from, notes: src.notes ?? [], illustrations: src.illustrations ?? null }; } else kept.push('lib/brand.ts');
   }
   // Impeccable's context files. Rewritten while they carry the marker; once a person or Impeccable
   // has taken one over (the marker gone), it is theirs and left alone.

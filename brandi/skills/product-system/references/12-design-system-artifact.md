@@ -66,9 +66,15 @@ sections for depth. In order:
 | `createdOnFiles` | When the system was first published from files | Never change: it is the creation marker |
 | `title`, `namespace` | The system's name and the global its components hang off | Set once |
 | `libraries` | The runtime the previews load (React, at a major version) | When the bundle's runtime changes |
-| `groups`, `assetGroups`, `blobs` | Asset groups, their order and their files in the asset store | When assets change |
-| `sections`, `docs` | The written sections | When a section is added or renamed |
+| `groups`, `assetGroups` | Asset groups, their order and the records of their files in the asset store | When assets change |
+| `sections`, `blobs`, `docs` | What the page keeps for itself | The page. Never write them |
 | `lastChange` | Who changed it, via what, when, and a one-line note | Every publish |
+
+`$A product ds` starts a new index with `sections` and `blobs` empty (`{}`) and `docs` as
+`{ "readme": "project/README.md", "sections": [] }`, and never fills them. The type's own
+instructions leave those three to the page, so empty is right and not a gap to log. The written
+sections reach the page as files: the staging sends `README.md` first, then the sections in their
+numbered order.
 
 ## Before publishing
 

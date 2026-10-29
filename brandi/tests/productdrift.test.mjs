@@ -86,6 +86,26 @@ describe('the drift check', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test("a direction drawn by its class passes; a class tokens.json has no direction for is drift", async () => {
+    // Raw role values on a board's root failed the check, and the color-mix rewrite that passed lost the solved values.
+    const directed = buildProductTokens(buildSystem({ primary: '#1F6F4A', type: { display: 'Bitter', body: 'Karla' } }), { name: 'Acme product system', brandColours: { 'acme-green': '#1F6F4A' }, directions: [{ name: 'B', roles: { rail: 'acme-green' } }] });
+    const { dir, starter } = await product();
+    await writeFile(path.join(dir, 'tokens.json'), JSON.stringify(directed, null, 2));
+    await writeFile(path.join(starter, 'system', 'tokens.json'), `${JSON.stringify(directed, null, 2)}\n`);
+    await writeFile(path.join(starter, 'app', 'globals.css'), toStarterGlobals(directed));
+    await writeFile(path.join(dir, 'canvas', 'ds', 'acme', 'tokens.json'), JSON.stringify(directed));
+    await writeFile(path.join(dir, 'canvas', 'ds', 'acme', 'tokens.css'), toProductCss(directed));
+    const board = (cls) => artboard({ name: 'Rail', system: 'acme', preview: { width: 600, height: 400 }, body: `<x-import component-from-global-scope="Acme.Root" theme="light"><div class="flex ${cls}"><x-import component-from-global-scope="Acme.Button">Go</x-import></div></x-import>` });
+    await writeFile(path.join(dir, 'canvas', 'RailB.dc.html'), board('direction-b'));
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify(canvasManifest([{ file: 'Main.dc.html', w: 600, h: 400 }, { file: 'RailB.dc.html', w: 600, h: 400 }])));
+    assert.deepEqual((await driftCheck({ productDir: dir, starter })).differences, []);
+    await writeFile(path.join(dir, 'canvas', 'RailB.dc.html'), board('direction-c'));
+    const { differences } = await driftCheck({ productDir: dir, starter });
+    assert.deepEqual(differences.map((d) => [d.area, d.where, d.found]), [['direction', 'RailB.dc.html', 'class direction-c']]);
+    assert.match(differences[0].expected, /product\.json "directions" has no direction-c: it has direction-b/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('a written value beside a token name must be the token\'s: the docs once kept a radius the tokens had moved on from', async () => {
     const { dir, starter } = await product();
     const md = tokens.radius.tokens.find((t) => t.name === 'radius-md').value;
