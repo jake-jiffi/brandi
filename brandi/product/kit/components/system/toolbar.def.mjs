@@ -45,6 +45,7 @@ export default {
       "Wraps by its own width, never the window. Controls stay 8px apart, and rows 8px apart when they wrap.",
       "12px of padding above and below its controls: it sits 12px above its table, and rows sliding under it while it sticks never touch the controls.",
       "At least 36px tall in both modes, 44px on touch, so selecting rows never moves the table.",
+      "With no filters it takes no room until rows are selected, then shows the selection row; clearing the selection puts focus on the next control, the table's select-all.",
       "While it sticks, its scroller's scroll-padding-top reaches its foot, so a control Tab or Shift+Tab brings into view never comes to rest beneath it. On a screen under 560px tall (200% zoom on a laptop, a phone on its side) it stops sticking, because it would take most of the screen.",
     ],
     States: ["The filters stay mounted while rows are selected, so a search someone typed or a chip they pressed is still there when the selection clears."],
@@ -56,6 +57,7 @@ export default {
     Review: [
       "Focus fell to the page body after clearing a selection (rounds 3 and 4, section 2.6): a scripted check presses Clear selection from the keyboard.",
       "At 200% and 400% zoom, Shift+Tab up a list left the focused row under the sticking toolbar (WCAG 2.4.11, a pilot's round 1): checks tab up a list under it, and look on a short screen.",
+      "A selectable table with bulk actions and no filters kept an empty row for them, a blank band above the table at 390 (a proof run, rounds 1 to 3).",
     ],
   },
   examples: [
@@ -106,10 +108,18 @@ ${Array.from({ length: 12 }, (_, i) => `<p style="margin: 0; padding: 8px 0;"><a
 ${FILTERS}
 </x-import>`,
     },
+    {
+      id: "bare",
+      title: "With no filters, only the selection shows",
+      layout: "block",
+      markup: `<x-import component-from-global-scope="NS.Toolbar" label="[Issue] actions" selected-count="{{picked}}" bulk-actions="{{assign}}" on-clear-selection="{{clearPicked}}"></x-import>
+<x-import component-from-global-scope="NS.Checkbox" label="Select all [issues]"></x-import>`,
+      vals: { assign: [{ label: "Assign", icon: "UserCheck" }] },
+    },
   ],
-  frame: { width: 960, height: 760 },
-  state: { selected: 3 },
-  logic: "selected: self.state.selected, clearSelection: () => self.setState({ selected: 0 })",
+  frame: { width: 960, height: 860 },
+  state: { selected: 3, picked: 2 },
+  logic: "selected: self.state.selected, clearSelection: () => self.setState({ selected: 0 }), picked: self.state.picked, clearPicked: () => self.setState({ picked: 0 })",
   checks: [
     {
       name: "A group named by its label",
@@ -167,6 +177,20 @@ ${FILTERS}
         const where = await page.evaluate(() => ({ body: document.activeElement === document.body, placeholder: document.activeElement?.getAttribute("placeholder") }))
         expect(!where.body, "focus is not on the page body")
         expect.equal(where.placeholder, "Search [invoices]", "focus is on the first control in the filters, the search")
+      },
+    },
+    {
+      name: "With no filters it takes no room once nothing is selected, and clearing puts focus on the next control",
+      example: "bare",
+      async run({ page, scope, expect }) {
+        const toolbar = scope.locator('[data-slot="toolbar"]')
+        expect.equal(await scope.locator('[data-slot="toolbar-count"]').innerText(), "2 selected", "the selection shows while rows are selected")
+        await scope.getByRole("button", { name: "Clear selection" }).focus()
+        await page.keyboard.press("Enter")
+        await scope.locator('[data-slot="toolbar-selection"]').waitFor({ state: "detached", timeout: 3000 })
+        expect.equal(Math.round((await toolbar.boundingBox())?.height ?? 0), 0, "no blank band where the selection was")
+        expect.equal(await toolbar.getAttribute("aria-label"), "[Issue] actions", "still there, and still named, for the next selection")
+        expect(await scope.getByRole("checkbox", { name: "Select all [issues]" }).evaluate((el) => el === document.activeElement), "focus is on the control after it, not the page body or an empty toolbar")
       },
     },
     {

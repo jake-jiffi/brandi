@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -125,5 +125,20 @@ describe('the kit against its catalogue', () => {
       seen.set(type, owner);
     }
     assert.deepEqual(twice, []);
+  });
+});
+
+describe("the kit's own components", () => {
+  test('a cut label is wrapped in a Tooltip that sizes as the label does, so wrapping it never loops', () => {
+    // Badge measured its label, wrapped it in a Tooltip when cut, and the wrapper, which would not shrink, widened a
+    // squeezed grid column until the label fitted: unwrapped, cut, wrapped, until React gave up (error 185).
+    const wrapped = new Map();
+    for (const f of readdirSync(KIT_SYSTEM).filter((x) => x.endsWith('.tsx'))) {
+      for (const m of readFileSync(path.join(KIT_SYSTEM, f), 'utf8').matchAll(/\b\w*[cC]ut\s*\?\s*(<Tooltip\b[^>]*>)/g)) wrapped.set(f, m[1]);
+    }
+    for (const f of ['badge.tsx', 'tag.tsx', 'source.tsx']) assert.ok(wrapped.has(f), `${f} wraps its cut label in a Tooltip`);
+    for (const [f, tag] of wrapped) assert.match(tag, /className=\{cutTrigger\}/, `${f}: the Tooltip round its cut label takes cutTrigger`);
+    const trigger = /export const cutTrigger = "([^"]+)"/.exec(readFileSync(path.join(KIT_SYSTEM, 'tooltip.tsx'), 'utf8'))?.[1];
+    assert.deepEqual(trigger?.split(/\s+/).sort(), ['min-w-0', 'shrink-0'], "the label's own sizing: it can shrink to nothing and never shrinks in a row");
   });
 });

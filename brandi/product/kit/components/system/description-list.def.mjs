@@ -16,6 +16,13 @@ const person = [
   { label: "Payroll", badge: { label: "Needs you", tone: "highlight" } },
   { label: "Manager", value: "", empty: "No manager yet" },
 ]
+const order = [
+  { label: "[2] × [Large flat white]", value: "[$11.00]" },
+  { label: "[1] × [Toasted banana bread with whipped butter and honey]", value: "[$8.50]" },
+  { label: "Deliver to", value: "[14 Harbour Street, Bondi]" },
+  { label: "Delivery", value: "[$4.90]" },
+  { label: "Total", value: "[$24.40]", total: true },
+]
 
 const rows = (scope) =>
   scope.locator('[data-slot="description-item"]').evaluateAll((items) =>
@@ -32,14 +39,15 @@ export default {
   job: "Label and value pairs for a record's details, in two columns or stacked.",
   status: "proven",
   props: [
-    { name: "items", type: "{ label: string; value?: ReactNode; badge?: { label: string; tone?: BadgeTone }; empty?: string }[]", doc: "The pairs, in order. A missing value shows `empty`, \"Not set\" by default. A badge shows on its own, or after the value when both are given." },
-    { name: "layout", type: '"columns" | "stacked"', default: '"columns"', doc: "Columns: label beside value, stacking under 420px of its own width. Stacked: label above value, for side panes." },
+    { name: "items", type: "{ label: string; value?: ReactNode; badge?: { label: string; tone?: BadgeTone }; empty?: string; total?: boolean }[]", doc: "The pairs, in order. A missing value shows `empty`, \"Not set\" by default. A badge shows on its own, or after the value when both are given. `total` marks the sum of the items above it: under a rule, in the strong style." },
+    { name: "layout", type: '"columns" | "stacked" | "lines"', default: '"columns"', doc: "Columns: label beside value, stacking under 420px of its own width. Stacked: label above value, for side panes. Lines: label and value on one line at any width, the value at the end in tabular figures, for order lines, a receipt or a breakdown." },
     { name: "loading", type: "boolean", default: "false", doc: "The labels stay; each value waits as a skeleton." },
   ],
   notes: {
     Layout: [
       "Columns give the label a third and the value two thirds. Under 420px of its own width the list stacks by itself, label above value, whatever the window.",
       "Long values wrap, unbroken ones (an email, an ID) included, rather than widening the list.",
+      "Lines keep each label and its value on one line at any width, a phone's included: the value at the end, in tabular figures, and a long label wraps beside it. A value takes up to two thirds of the line, and a longer one wraps there. The label is the line itself, so it takes the text colour. A total sits under a rule in text-strong.",
     ],
     States: [
       'A missing value says so: "Not set", or the item\'s own empty text. Never blank, never a zero nobody measured.',
@@ -48,9 +56,13 @@ export default {
     Rules: [
       "Labels in text-subtle, values in text.",
       "A state is a badge with its word, so it never rides on colour alone.",
+      "Order lines, a receipt, a price breakdown: lines, never columns, a List or a DataTable, which all put the value under its label on a phone.",
+    ],
+    Review: [
+      "A checkout's order lines read as a form at 358px, each price under its label and left-aligned, so a run drew the receipt by hand (a proof run, round 2). Lines hold label and value on one line at any width.",
     ],
   },
-  frame: { width: 960, height: 1640 },
+  frame: { width: 960, height: 1940 },
   examples: [
     {
       id: "columns",
@@ -71,6 +83,13 @@ export default {
       title: "Stacked, for a side pane",
       layout: "block",
       markup: `<div class="${pane} w-80"><x-import component-from-global-scope="NS.DescriptionList" items="{{person}}" layout="stacked"></x-import></div>`,
+    },
+    {
+      id: "lines",
+      title: "Lines, for an order on a phone, with its total",
+      layout: "block",
+      markup: `<div class="${pane} w-fit"><div id="lines-pane" style="width: 318px"><x-import component-from-global-scope="NS.DescriptionList" items="{{order}}" layout="lines"></x-import></div></div>`,
+      vals: { order },
     },
     {
       id: "loading",
@@ -137,6 +156,62 @@ export default {
         })
         expect.equal(label, subtle, "the label's colour")
         expect.equal(value, text, "the value's colour")
+      },
+    },
+    {
+      name: "Lines keep each label and value on one line at any width, the value at the end in tabular figures",
+      example: "lines",
+      async run({ page, scope, expect }) {
+        const list = scope.locator('[data-slot="description-list"]')
+        for (const width of [600, 318, 240]) {
+          await page.locator("#lines-pane").evaluate((el, w) => (el.style.width = `${w}px`), width)
+          const lines = await list.evaluate((el) => {
+            const end = el.getBoundingClientRect().right
+            return [...el.querySelectorAll('[data-slot="description-item"]')].map((item) => {
+              const dt = item.querySelector("dt").getBoundingClientRect()
+              const dd = item.querySelector("dd").getBoundingClientRect()
+              return { label: item.querySelector("dt").textContent, beside: dt.right <= dd.left && dd.top < dt.bottom, atEnd: Math.abs(dd.right - end) <= 1, figures: getComputedStyle(item.querySelector("dd")).fontVariantNumeric, firstLine: Math.abs(dd.top - dt.top) <= 4 }
+            })
+          })
+          expect(await list.evaluate((el) => el.scrollWidth <= el.clientWidth), `nothing runs past the list at ${width}px`)
+          for (const l of lines) {
+            expect(l.beside, `${l.label}: its value beside it at ${width}px`)
+            expect(l.atEnd, `${l.label}: its value at the end of the line at ${width}px`)
+            expect(l.figures.includes("tabular-nums"), `${l.label}: its value in tabular figures`)
+            expect(l.firstLine, `${l.label}: its value on the label's first line at ${width}px`)
+          }
+        }
+        const long = await list.locator("dt").nth(1).evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)))
+        expect.atLeast(long, 2, "at 240px a long label wraps beside its value rather than pushing it out")
+      },
+    },
+    {
+      name: "In lines the total sits under a rule, label and value in text-strong",
+      example: "lines",
+      themes: ["light", "dark"],
+      async run({ scope, expect }) {
+        const total = scope.locator('[data-slot="description-item"][data-total]')
+        expect.equal(await total.count(), 1, "one total")
+        const look = await total.evaluate((el) => {
+          const probe = (v) => {
+            const s = document.createElement("span")
+            s.style.color = `var(${v})`
+            el.append(s)
+            const c = getComputedStyle(s).color
+            s.remove()
+            return c
+          }
+          const s = getComputedStyle(el)
+          const list = el.closest('[data-slot="description-list"]').getBoundingClientRect()
+          const box = el.getBoundingClientRect()
+          return { edge: s.borderTopWidth, edgeColour: s.borderTopColor, strongLine: probe("--line-strong"), dt: getComputedStyle(el.querySelector("dt")).color, dd: getComputedStyle(el.querySelector("dd")).color, strong: probe("--text-strong"), spans: Math.abs(box.left - list.left) <= 1 && Math.abs(box.right - list.right) <= 1 }
+        })
+        expect.equal(look.edge, "1px", "a rule above the total")
+        expect.equal(look.edgeColour, look.strongLine, "drawn in line-strong")
+        expect(look.spans, "the rule runs the list's width")
+        expect.equal(look.dt, look.strong, "the total's label")
+        expect.equal(look.dd, look.strong, "the total's value")
+        expect.equal(await scope.locator('[data-slot="description-item"]:not([data-total])').evaluateAll((els) => els.filter((el) => getComputedStyle(el).borderTopWidth !== "0px").length), 0, "no hairline between the lines above it")
       },
     },
     {

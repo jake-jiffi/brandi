@@ -5,7 +5,7 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 import { Icon } from "./icon"
-import { Tooltip, useTruncated } from "./tooltip"
+import { Tooltip, cutTrigger, useTruncated } from "./tooltip"
 
 export type TagColor = 1 | 2 | 3 | 4 | 5 | 6 | "grey"
 
@@ -74,5 +74,5 @@ export const Tag = React.forwardRef<HTMLSpanElement, TagProps>(function Tag(
     </span>
   )
   // A name cut short shows in full on hover, on keyboard focus and on a long press.
-  return cut ? <Tooltip content={children}>{tag}</Tooltip> : tag
+  return cut ? <Tooltip content={children} className={cutTrigger}>{tag}</Tooltip> : tag
 })

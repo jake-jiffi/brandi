@@ -173,8 +173,17 @@ export const Tooltip = React.forwardRef<HTMLSpanElement, TooltipProps>(function 
 })
 
 /**
+ * The classes for the Tooltip around a cut label (Badge, Tag, Source): its wrapper sizes as the label's own box
+ * does, with no minimum width (min-w-0) and no shrinking in a flex row (shrink-0). A wrapper with a minimum widened a
+ * squeezed grid column until the label fitted, so it unwrapped, was cut again and wrapped again: a render loop
+ * (React error 185).
+ */
+export const cutTrigger = "min-w-0 shrink-0"
+
+/**
  * Whether an element's text is cut short, kept current as it resizes and as fonts arrive, so a cut
- * label can offer its full text on hover, focus and a long press (Badge, Tag).
+ * label can offer its full text on hover, focus and a long press (Badge, Tag). Wrap the cut label in
+ * a Tooltip with `cutTrigger`, so wrapping it never changes the width that was measured.
  */
 export function useTruncated(el: HTMLElement | null) {
   const [cut, setCut] = React.useState(false)

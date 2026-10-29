@@ -40,6 +40,7 @@ export default {
     Layout: [
       "The title's size follows its level, so the outline shows on screen too: heading-lg for a card that is a section of the page (h2), heading for a card under a section heading (h3), heading-sm below that (h4).",
       "Header actions centre on the title's line. The inset steps from 24px to 16px when the card itself is under 360px wide.",
+      "In a column that scrolls, as a flex or a grid item, a card keeps its content's height and the column scrolls. It clips its corners with overflow: clip: an overflow: hidden box is a scroll container, whose automatic minimum size is 0.",
     ],
     States: [
       "selected takes the selected tint with a 2px edge, outlined in forced colours. interactive lifts on hover, the movement only under motion-safe. flat drops the shadow.",
@@ -48,9 +49,12 @@ export default {
       "Never a card inside a card: a card inside another draws its content without a box.",
       "The title says what the card shows, with no small uppercase label above it. One idea per card: a card that needs tabs is a page.",
     ],
-    Review: ["An uppercase kicker sat above card titles, which the craft gate bans (round 1)."],
+    Review: [
+      "An uppercase kicker sat above card titles, which the craft gate bans (round 1).",
+      "Cards shrank inside a phone's scrolling main and hid the checkout's total (a proof run, round 2).",
+    ],
   },
-  frame: { width: 960, height: 1700 },
+  frame: { width: 960, height: 1800 },
   // NS. names the bundle's own global: walking window's properties reads the canvas's parent frame.
   logic: `els: {
   exportAction: window.React.createElement(NS.Button, { size: "sm", variant: "ghost", icon: "Download" }, "Export"),
@@ -106,6 +110,22 @@ export default {
 ${body("[Priya Nair] has [11.5] days of annual leave.")}
 <x-import component-from-global-scope="NS.Card" title="Booked" heading-level="{{h3}}">${body("[3 days] from [14 July].")}</x-import>
 </x-import></div>`,
+    },
+    {
+      // A phone screen as a run draws one: a column whose main fills what is left and scrolls. As flex items or grid
+      // items, the cards once shrank to fit it and clipped their own content: the order's total was cut off.
+      id: "column",
+      title: "In a short column that scrolls, each card keeps its height",
+      markup: `<div class="flex flex-wrap items-start gap-6">
+${["flex", "grid"].map((kind) => `<div data-frame="${kind}" style="width: 300px; height: 240px; display: flex; flex-direction: column; outline: 1px solid var(--line); background: var(--canvas); overflow: hidden;">
+<p class="type-label text-text-strong" style="margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line);">Checkout, main as ${kind}</p>
+<main data-main style="flex: 1; overflow: auto; padding: 16px; display: ${kind}; ${kind === "flex" ? "flex-direction: column;" : ""} gap: 16px;">
+<x-import component-from-global-scope="NS.Card" title="Your order">${body("[2] items, ready in [15] minutes.")}<p class="type-heading text-text-strong">Total [$29.40]</p></x-import>
+<x-import component-from-global-scope="NS.Card" title="Pay with"><x-import component-from-global-scope="NS.RadioGroup" legend="Payment" name="pay-${kind}" options="{{payWith}}" default-value="saved"></x-import></x-import>
+</main>
+</div>`).join("\n")}
+</div>`,
+      vals: { payWith: [{ value: "saved", label: "Saved card ending [4821]" }, { value: "gift", label: "Gift card" }, { value: "new", label: "A new card" }] },
     },
     {
       id: "narrow",
@@ -206,6 +226,27 @@ ${body("[Priya Nair] has [11.5] days of annual leave.")}
         const inset = (ex) => page.locator(`[data-example="${ex}"] [data-slot="card-content"]`).evaluate((el) => getComputedStyle(el).paddingLeft)
         expect.equal(await inset("anatomy"), "24px", "a wide card's inset")
         expect.equal(await inset("narrow"), "16px", "a 288px card's inset")
+      },
+    },
+    {
+      name: "In a short column that scrolls, as a flex or grid item, a card keeps its content's height and the column scrolls",
+      example: "column",
+      async run({ scope, expect }) {
+        for (const kind of ["flex", "grid"]) {
+          const frame = scope.locator(`[data-frame="${kind}"]`)
+          for (const card of await frame.locator('[data-slot="card"]').all()) {
+            // An overflow: hidden box is a scroll container, so its automatic minimum size is 0 and it shrinks to fit.
+            const { clipped, overflow } = await card.evaluate((el) => ({ clipped: el.scrollHeight - el.clientHeight, overflow: getComputedStyle(el).overflowY }))
+            expect(clipped <= 1, `${kind}: a card is ${clipped}px shorter than its content (overflow ${overflow})`)
+          }
+          expect(await frame.locator("[data-main]").evaluate((el) => el.scrollHeight > el.clientHeight), `${kind}: the column scrolls instead`)
+          for (const card of await frame.locator('[data-slot="card"]').all()) {
+            // Nothing inside spills past the card's foot, where the clip would cut it.
+            const spill = await card.evaluate((el) => Math.max(...[...el.querySelectorAll("*")].map((d) => d.getBoundingClientRect().bottom)) - el.getBoundingClientRect().bottom)
+            expect(spill <= 0.5, `${kind}: content runs ${Math.round(spill)}px past a card's foot`)
+          }
+          expect(await frame.getByText("Total [$29.40]").isVisible(), `${kind}: the total shows`)
+        }
       },
     },
     {

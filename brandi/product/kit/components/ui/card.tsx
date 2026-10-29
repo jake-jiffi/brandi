@@ -6,7 +6,9 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 // Patched (07-starter.md, card): radius-md, a hairline and shadow-sm on the surface role, and `as`
-// for a section, an article or a list item.
+// for a section, an article or a list item. Patched (07-starter.md, card): overflow-clip, not overflow-hidden.
+// Both clip the corners, but a hidden box is a scroll container, whose automatic minimum size is 0, so in a
+// short column that scrolls (a phone's main) the card shrank to fit and cut off its own content.
 const Card = React.forwardRef(function Card({
   className,
   size = "default",
@@ -20,7 +22,7 @@ const Card = React.forwardRef(function Card({
       data-slot="card"
       data-size={size}
       className={cn(
-        "group/card flex flex-col gap-(--card-spacing) overflow-hidden rounded-md border border-line bg-surface py-(--card-spacing) text-text shadow-sm [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-md *:[img:last-child]:rounded-b-md",
+        "group/card flex flex-col gap-(--card-spacing) overflow-clip rounded-md border border-line bg-surface py-(--card-spacing) text-text shadow-sm [--card-spacing:--spacing(6)] has-[>img:first-child]:pt-0 data-[size=sm]:[--card-spacing:--spacing(4)] *:[img:first-child]:rounded-t-md *:[img:last-child]:rounded-b-md",
         className
       )}
       {...props}

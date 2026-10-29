@@ -7,7 +7,7 @@ import { useLink } from "@/lib/link"
 import { cn } from "@/lib/utils"
 
 import { Icon } from "./icon"
-import { Tooltip, useTruncated } from "./tooltip"
+import { Tooltip, cutTrigger, useTruncated } from "./tooltip"
 
 export interface SourceProps extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "children"> {
   /** Where the figure came from: the record, the report, the document. */
@@ -55,5 +55,5 @@ export const Source = React.forwardRef<HTMLAnchorElement, SourceProps>(function 
     </Link>
   )
   // A label cut short shows in full on hover, on keyboard focus and on a long press. Its name is the full label either way.
-  return cut ? <Tooltip content={children}>{chip}</Tooltip> : chip
+  return cut ? <Tooltip content={children} className={cutTrigger}>{chip}</Tooltip> : chip
 })

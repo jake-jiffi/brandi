@@ -36,6 +36,14 @@ export interface ToolbarProps extends Omit<React.ComponentPropsWithoutRef<"div">
 
 const FOCUSABLE = 'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+/** The first control after an element in the page's order, outside it and on screen, or null. */
+function nextControl(el: HTMLElement): HTMLElement | null {
+  for (const c of document.querySelectorAll<HTMLElement>(FOCUSABLE)) {
+    if (!el.contains(c) && el.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING && c.getClientRects().length) return c
+  }
+  return null
+}
+
 /** The nearest ancestor that scrolls up and down, or the page. */
 function scrollParent(el: HTMLElement): HTMLElement {
   for (let at = el.parentElement; at; at = at.parentElement) {
@@ -53,6 +61,9 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
   const merged = useMergedRef(ref, own)
   const filters = React.useRef<HTMLDivElement | null>(null)
   const selecting = selectedCount > 0
+  // With nothing in the filters row it takes no room until rows are selected: kept for a selection that has not
+  // happened, the empty row read as a blank band above the table (a proof run's rounds 1 to 3).
+  const hasFilters = React.Children.toArray(children).some((c) => typeof c !== "string" || c.trim() !== "")
   // Set when a button in the selection row is pressed: if that press ends the selection, the button goes
   // with it, and focus has to land somewhere useful.
   const pressedInSelection = React.useRef(false)
@@ -61,7 +72,9 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
     if (selecting) return
     const lost = !document.activeElement || document.activeElement === document.body
     if (pressedInSelection.current && lost) {
-      const first = filters.current?.querySelector<HTMLElement>(FOCUSABLE)
+      // The first filter; with no filters row to return to, the first control after the toolbar (the table's
+      // select-all checkbox), never the empty toolbar, which shows nothing to focus.
+      const first = filters.current?.querySelector<HTMLElement>(FOCUSABLE) ?? (hasFilters || !own.current ? null : nextControl(own.current))
       if (first) first.focus()
       else if (own.current) {
         own.current.tabIndex = -1
@@ -69,7 +82,7 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
       }
     }
     pressedInSelection.current = false
-  }, [selecting])
+  }, [selecting, hasFilters])
 
   // While it sticks, what scrolls under it keeps clear of it: the scroller's scroll-padding-top reaches the
   // toolbar's foot (its height, below the scroller's own top padding, where a sticky box rests), so a control Tab
@@ -108,11 +121,11 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function T
       aria-label={label}
       data-slot="toolbar"
       data-selecting={selecting ? "" : undefined}
-      className={cn("py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas [@media(max-height:560px)]:static", className)}
+      className={cn((hasFilters || selecting) && "py-3", sticky && "sticky top-0 z-(--z-sticky) bg-canvas [@media(max-height:560px)]:static", className)}
       {...rest}
     >
       {/* The filters stay mounted while rows are selected, so nothing typed into them is lost. */}
-      <div ref={filters} data-slot="toolbar-row" hidden={selecting} className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">
+      <div ref={filters} data-slot="toolbar-row" hidden={selecting || !hasFilters} className="flex min-h-9 flex-wrap items-center gap-2 pointer-coarse:min-h-11">
         {children}
       </div>
       {selecting ? (

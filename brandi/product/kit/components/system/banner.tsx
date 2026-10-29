@@ -45,9 +45,12 @@ export const Banner = React.forwardRef<HTMLDivElement, BannerProps>(function Ban
       variant={variant}
       role={role}
       data-tone={tone}
-      // One line from 640px: 48px tall, with the words and icon centred on the action beside them.
+      // One line from 640px: 48px tall, with the words and icon centred on the action beside them. The 48px floor
+      // is on the grid inside (48 less the 6px padding and 1px edge, top and bottom), never the banner: a min-height
+      // on the banner replaces its automatic minimum, so a short column that scrolls squashed a two-line banner to
+      // 48px and its words ran over what came next.
       className={cn(
-        "flex min-h-12 flex-col justify-center py-1.5 @min-[640px]/alert:[&>[data-slot=alert-grid]]:items-center @min-[640px]/alert:[&>[data-slot=alert-grid]>svg]:mt-0",
+        "flex flex-col justify-center py-1.5 [&>[data-slot=alert-grid]]:min-h-[2.125rem] [&>[data-slot=alert-grid]]:content-center @min-[640px]/alert:[&>[data-slot=alert-grid]]:items-center @min-[640px]/alert:[&>[data-slot=alert-grid]>svg]:mt-0",
         onDismiss && "pr-12 pointer-coarse:pr-14",
         className
       )}
