@@ -12,9 +12,9 @@ export default {
   job: "The brand's mark, from the master artwork: never set in type, never redrawn.",
   status: "proven",
   props: [
-    { name: "mark", type: '"full" | "symbol"', default: '"full"', doc: "The full logo, or the symbol alone for square and narrow places such as the collapsed rail. A brand without a symbol shows its full logo." },
+    { name: "mark", type: '"full" | "symbol"', default: '"full"', doc: "The full logo, or the symbol alone for square and narrow places such as the collapsed rail. A brand without a symbol shows its full logo. A mark much wider than tall (over 1.5 times) is never taken as the symbol: the starter leaves it out, and the icons rail shows its Home control." },
     { name: "color", type: '"auto" | "on-light" | "on-dark" | "ink"', default: '"auto"', doc: "Which of the brand's approved renditions. See Renditions." },
-    { name: "height", type: "number", doc: "Height in px. Defaults to the logo system's preferred size; anything under its minimum is raised to it." },
+    { name: "height", type: "number", doc: "Height in px. Defaults to the logo system's preferred size, and the symbol to its own, 24px, never the full logo's. Anything under its minimum (the symbol's, for the symbol) is raised to it." },
     { name: "clearspace", type: "boolean", default: "false", doc: "Adds the logo system's clear space around the mark as padding. Off where layout already keeps it clear." },
     { name: "title", type: "string", default: "the brand's name", doc: 'Its accessible name. Pass "" when a parent link already names it.' },
   ],
@@ -37,6 +37,7 @@ export default {
     ],
     Layout: [
       "The height is set and the width follows the artwork, so it is never stretched. Clear space is padding worked out from the height and the logo system's ratio.",
+      "The symbol has a size of its own, 24px or its minimum if that is larger, so it fits the icons rail's 40px home control. The full logo's preferred height, raised to a wide logo's minimum, once drew a symbol 107px wide there.",
     ],
     Rules: [
       "In product it lives in the rail lockup and on sign-in, never repeated in page headers.",
@@ -64,7 +65,7 @@ export default {
 <div class="flex flex-col items-start gap-2"><x-import component-from-global-scope="NS.Logo" height="{{h24}}"></x-import><span class="type-meta text-text-muted">24px, preferred</span></div>
 <div class="flex flex-col items-start gap-2"><x-import component-from-global-scope="NS.Logo" height="{{h40}}"></x-import><span class="type-meta text-text-muted">40px, sign-in</span></div>
 <div class="flex flex-col items-start gap-2"><x-import component-from-global-scope="NS.Logo" height="{{h10}}" id="logo-raised"></x-import><span class="type-meta text-text-muted">Asked for 10px, drawn at 16px</span></div>
-<div class="flex flex-col items-start gap-2"><x-import component-from-global-scope="NS.Logo" mark="symbol" height="{{h24}}"></x-import><span class="type-meta text-text-muted">The symbol alone</span></div>
+<div class="flex flex-col items-start gap-2"><x-import component-from-global-scope="NS.Logo" mark="symbol" id="logo-symbol-own"></x-import><span class="type-meta text-text-muted">The symbol alone, at its own size</span></div>
 </div>`,
       vals: { h10: 10, h16: 16, h24: 24, h40: 40 },
     },
@@ -112,6 +113,18 @@ export default {
         // The brand's own minimum, as the bundle carries it: 16px is only the kit's placeholder.
         const min = await page.evaluate(() => Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.logo?.minHeight ?? 16)
         expect.equal(Math.round(box.height), Math.round(min), "drawn height for a 10px ask")
+      },
+    },
+    {
+      name: "The symbol is drawn at its own size, held to the symbol's minimum, never the full logo's height",
+      example: "sizes",
+      async run({ page, expect }) {
+        const logo = await page.evaluate(() => Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.logo)
+        const symbol = await page.evaluate(() => Boolean(Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks?.symbol))
+        const box = await page.locator("#logo-symbol-own").boundingBox()
+        // With no symbol the full logo stands in, at its own preferred size.
+        const want = symbol ? Math.max(24, logo.symbolMinHeight) : Math.max(logo.height, logo.minHeight)
+        expect.equal(Math.round(box.height), Math.round(want), "drawn height with no height asked")
       },
     },
     {

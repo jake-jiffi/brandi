@@ -17,7 +17,7 @@ export type MetricCardState = "ready" | "loading" | "unavailable"
 export interface MetricCardProps extends Omit<React.HTMLAttributes<HTMLElement>, "title"> {
   /** Says exactly what is counted: "Net revenue, before GST". */
   label: string
-  /** The figure. Missing says so; it is never drawn as zero. */
+  /** The figure. Text that is not a number ("7 of 8") shows as written. Missing says so; it is never drawn as zero. */
   value?: number | string | null
   /** The number style. Rounded for reading on a card: compact-currency shows $18K. */
   format?: NumberStyle
@@ -27,7 +27,7 @@ export interface MetricCardProps extends Omit<React.HTMLAttributes<HTMLElement>,
   deltaFormat?: NumberStyle
   /** Which way is better. Costs, overdue amounts and churn are down. */
   goodWhen?: DeltaGoodWhen
-  /** What the change is against: "vs last month". */
+  /** What the change is against: "vs last month". It shows only beside a delta; footnote is the line that always shows. */
   context?: string
   /** A trend, oldest first. null breaks the line. */
   trend?: Array<number | null>
@@ -83,7 +83,10 @@ export const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(functio
   const level = [2, 3, 4, 5, 6].includes(Number(headingLevel)) ? Number(headingLevel) : 3
   const Heading = `h${level}` as "h3"
   const view: MetricCardState = state === "loading" || state === "unavailable" ? state : "ready"
-  const figure = formatNumber(value, format)
+  // A number given as text (a board's "4") goes through the formatter. A figure the product wrote in words ("7 of 8")
+  // shows as written: it once read No data, as if nobody had measured it.
+  const words = typeof value === "string" && value.trim() !== "" && !Number.isFinite(Number(value))
+  const figure = words ? value : formatNumber(value, format)
   const points = Array.isArray(trend) ? trend : null
   const hasFootnote = footnote !== undefined && footnote !== null && footnote !== false && footnote !== ""
 

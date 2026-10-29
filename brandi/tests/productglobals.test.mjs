@@ -27,6 +27,16 @@ describe('toStarterGlobals', () => {
     assert.match(dark, /--chart-track: var\(--surface-sunken\);/);
   });
 
+  test("the brand's texture move is a class in the components layer, its file in the starter's textures/", () => {
+    assert.doesNotMatch(css, /brand-texture/, 'no texture move, no class');
+    const move = { name: 'The paper ground', source: 'p13', where: ['the sign-in hero'], file: 'textures/paper.jpg', kind: 'texture', strength: 0.35 };
+    const textured = toStarterGlobals(buildProductTokens(buildSystem(systemInputFromBrand(brand)), { shape: { moves: [move] } }));
+    const layer = textured.slice(textured.indexOf('@layer components {'));
+    // Relative to app/globals.css, and to bundle.css in ds/<namespace>/components/: both reach the one textures/ folder.
+    assert.match(layer, /\.brand-texture::before \{[^}]*url\("\.\.\/textures\/paper\.jpg"\)[^}]*mix-blend-mode: multiply;[^}]*opacity: 0\.35;/s);
+    assert.match(layer, /\.brand-texture \{[^}]*isolation: isolate;/s);
+  });
+
   test('points every shadcn variable at a product role', () => {
     for (const [name, role] of SHADCN) assert.ok(css.includes(`  --${name}: var(--${role});`), `${name} is not mapped to ${role}`);
   });

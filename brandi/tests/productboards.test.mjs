@@ -38,6 +38,9 @@ describe('the boards a system generates for itself', () => {
     assert.match(shape, /radius-control · \d+px[\s\S]*?The kit's: from the brand's scale, its md step \(\d+px\)/);
     assert.match(shape, /The rail meets the window edge, square\. The brand's: the site's navigation/);
     assert.match(shape, /No shape move of the brand's own is carried yet\./);
+    const move = { name: 'The paper ground', source: 'p13', where: ['the sign-in hero'], file: 'textures/paper.jpg', kind: 'texture', strength: 0.3 };
+    const textured = B.shapeBoard(buildProductTokens(buildSystem({ primary: '#1F6F4A' }), { shape: { moves: [move] } }), system).source;
+    assert.match(textured, /<div class="brand-texture" style="[^"]*background: var\(--brand\)/, 'the texture is shown laid on the brand colour, as a screen carries it');
   });
 
   test('one component board per group, each built from the definitions\' own examples', () => {
@@ -145,6 +148,53 @@ describe('the boards a system generates for itself', () => {
       for (const p of b.source.match(/<p style="[^"]*max-width[^"]*"/g) ?? []) assert.match(p, /max-width: var\(--measure/, `${b.name}: ${p.slice(0, 80)}`);
     }
     assert.match(main.source, /max-width: var\(--measure, 30em\)/, 'the contents paragraph takes the measure');
+  });
+
+  test("the contents board lists every section the canvas has, the title notes a person wrote included, in canvas order", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-main-'));
+    const starter = path.join(dir, 'starter');
+    await mkdir(path.join(starter, 'system'), { recursive: true });
+    await mkdir(path.join(starter, 'components', 'system'), { recursive: true });
+    await mkdir(path.join(dir, 'canvas'), { recursive: true });
+    await writeFile(path.join(dir, 'tokens.json'), JSON.stringify(tokens));
+    await writeFile(path.join(starter, 'system', 'system.json'), JSON.stringify(system));
+    await writeFile(path.join(starter, 'components', 'system', 'button.def.mjs'), def('Button', 'Actions'));
+    const boards = ['ConsoleDirectionA1440', 'AppDirectionB390', 'ConsoleHome1440', 'ConsoleSettings1440', 'ConsoleHoursA1440', 'LooseIdea1440'];
+    for (const name of boards) await writeFile(path.join(dir, 'canvas', `${name}.dc.html`), artboard({ name, system: 'acme', title: name, body: '<x-import component-from-global-scope="Acme.Root"><p style="margin:0">x</p></x-import>', preview: { width: 1440, height: 900 } }));
+    const note = (id, y, text) => ({ id, x: 0, y, text, kind: 'title1', maxW: 3000 });
+    // Written out of order, and with a note nothing sits under. LooseIdea sits above every note, so under none.
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify({
+      artboards: [
+        { file: 'LooseIdea1440.dc.html', x: 0, y: 200, w: 1440, h: 600 },
+        { file: 'ConsoleHome1440.dc.html', x: 0, y: 3300, w: 1440, h: 900 },
+        { file: 'ConsoleSettings1440.dc.html', x: 1560, y: 3300, w: 1440, h: 900 },
+        { file: 'AppDirectionB390.dc.html', x: 1560, y: 1300, w: 390, h: 844 },
+        { file: 'ConsoleDirectionA1440.dc.html', x: 0, y: 1300, w: 1440, h: 900 },
+        { file: 'ConsoleHoursA1440.dc.html', x: 0, y: 6300, w: 1440, h: 900 },
+      ],
+      annotations: [note('screens', 3000, 'Console · the working day, light and dark'), note('directions', 1000, 'Directions · two per surface family'), note('empty', 5000, 'Parked'), note('hours', 6000, 'Trading hours')],
+    }));
+    await B.writeBoards({ productDir: dir, starter, measure: false });
+    const links = async () => [...(await readFile(path.join(dir, 'canvas', 'Main.dc.html'), 'utf8')).matchAll(/<a href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => [m[2], m[1]]);
+    assert.deepEqual(await links(), [
+      ['Foundations', 'FoundationsColour1440.dc.html'],
+      ['Components', 'ComponentsActions1440.dc.html'],
+      ['Loose', 'LooseIdea1440.dc.html'],
+      ['Directions', 'ConsoleDirectionA1440.dc.html'],
+      ['Console', 'ConsoleHome1440.dc.html'],
+      ['Trading hours', 'ConsoleHoursA1440.dc.html'],
+    ]);
+    assert.match(await readFile(path.join(dir, 'canvas', 'Main.dc.html'), 'utf8'), /the working day, light and dark\. 2 boards\./, "the rest of a note's text says what the section holds");
+    // A note added since is listed on the next run.
+    const manifest = JSON.parse(await readFile(path.join(dir, 'canvas', 'canvas.json'), 'utf8'));
+    const home = manifest.artboards.find((a) => a.file === 'ConsoleHome1440.dc.html');
+    const settings = manifest.artboards.find((a) => a.file === 'ConsoleSettings1440.dc.html');
+    Object.assign(settings, { x: 0, y: home.y + 1300 });
+    manifest.annotations.push(note('settings', settings.y - 150, 'Settings · one page'));
+    await writeFile(path.join(dir, 'canvas', 'canvas.json'), JSON.stringify(manifest));
+    await B.writeBoards({ productDir: dir, starter, measure: false });
+    assert.deepEqual((await links()).map(([label]) => label), ['Foundations', 'Components', 'Loose', 'Directions', 'Console', 'Settings', 'Trading hours']);
+    await rm(dir, { recursive: true, force: true });
   });
 
   test('a dark twin imports its light board with the theme flipped', () => {

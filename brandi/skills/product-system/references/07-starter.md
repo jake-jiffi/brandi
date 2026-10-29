@@ -63,9 +63,18 @@ drawn down to a small WebP inside the bundle, because the canvas has no public f
 Chrome, or when Chrome cannot draw it in three tries, it goes into the bundle at full size, which
 every board shows but which weighs more. A pose is never a path from the page root: on a canvas that
 is a broken image no gate saw. On route A with no block, the logo master in brand.json supplies `full`,
-`full-on-dark` (the reversed master) and `full-ink`, the clear space and the minimum size. A value
-the record lacks keeps the kit default, and the file says which. The tight-viewBox wordmark files ship in
-`public/brand/`, for email and Open Graph.
+`full-on-dark` (the reversed master) and `full-ink`, the clear space and the minimum size. Its paths
+are read from the brand folder, where brand.json sits, then from the project root; read from the
+project root alone, a route-A starter failed on its first mark. Its roles are read by their words,
+since a brand stage writes them as free text ("secondary: black logo outline reversed to white").
+White, reversed or knocked out is `full-on-dark`. Black, mono or one colour is the one ink, an SVG
+only. A role saying primary is `full`. An exact role (`primary`, `mono-white`, `mono-black`, as the logo forge
+writes) wins over a match, white is read before black, and a ground the role names ("on black") is not
+an ink. A value the record lacks keeps the kit default, and the file says which. A symbol more than
+1.5 times as wide as it is tall is left out, and the file says why (`02-brand-to-product.md`, a mark for
+narrow places). A pose drawn in one dark ink is turned to `currentColor`, so it reads on a dark ground,
+and the file names those poses. The tight-viewBox wordmark files ship in `public/brand/`, for email and
+Open Graph.
 
 The example product shows the patterns working end to end. Home has figures and a chart. A records
 page has search and filters in the URL, bulk actions on the rows on screen, and an export. One
@@ -116,6 +125,7 @@ starter/
     axe-pages.mjs             axe on a list of pages, and every image loading
     reflow-pages.mjs          nothing scrolls sideways at 320px (WCAG 1.4.10)
   public/brand/               the wordmark as files
+  textures/                   the brand's texture, copied from product/textures/ when a shape move names one
 ```
 
 `app/fonts.ts` sets the variables the generated theme reads: `--font-brand-sans`,
@@ -204,7 +214,11 @@ npm run typecheck && npm run build
 1. `$A product starter` copies the kit and writes the generated files from the system. A second run
    rewrites only those, so a product's own work survives. With `--kit` it copies the kit again and
    takes back any file the kit has since dropped, unless someone changed it: a dropped placeholder
-   page left behind once shadowed the example's home page.
+   page left behind once shadowed the example's home page. It works out the brand's marks and the
+   texture's file before it writes anything, so when one is missing it stops with "Nothing was
+   written to product/starter" and the reason. A run stopped part way leaves the starter marked
+   unfinished (`.brandi/starter-pending`), and the next run copies the kit whole again: a failed
+   first run once left half a kit, and the rerun only said "Refreshed".
 2. `npm install` installs the pinned stack. Nothing outside the starter's folder changes.
 3. `$A product bundle` builds the canvas bundle from the starter's components and writes every
    card. It needs the install, because it uses the starter's own esbuild and Tailwind.

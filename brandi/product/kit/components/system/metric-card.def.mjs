@@ -46,12 +46,12 @@ export default {
   status: "proven",
   props: [
     { name: "label", type: "string", required: true, doc: "Says exactly what is counted. It is the card's heading." },
-    { name: "value", type: "number | string | null", doc: "The figure, through the formatter. Missing says No data; it is never drawn as zero." },
+    { name: "value", type: "number | string | null", doc: 'The figure, through the formatter, a number given as text too. Text that is not a number ("7 of 8") shows as written. Missing says No data; it is never drawn as zero.' },
     { name: "format", type: "NumberStyle", default: '"number"', doc: "The number style. Rounded for reading on a card: compact-currency shows $18K." },
     { name: "delta", type: "number | null", doc: "The change, signed. Left out, no delta shows; null says No comparison." },
     { name: "deltaFormat", type: "NumberStyle", default: '"percent"', doc: "percent, or points for a rate: a change in a rate is never a percent of a percent." },
     { name: "goodWhen", type: '"up" | "down" | "neither"', default: '"up"', doc: "Which way is better. Costs, overdue amounts and churn are down." },
-    { name: "context", type: "string", doc: "What the change is against, always: \"vs last month\"." },
+    { name: "context", type: "string", doc: 'What the change is against, always: "vs last month". It belongs to the delta and shows only beside one: with no delta it shows nothing. footnote is the line that always shows.' },
     { name: "trend", type: "Array<number | null>", doc: "A trend, oldest first, drawn as a Sparkline. null breaks the line." },
     { name: "trendLabel", type: "string", doc: "The trend in words, for screen readers. Without it the sparkline is decoration." },
     { name: "footnote", type: "ReactNode", doc: "What is left out, at the foot of the card." },
@@ -68,6 +68,8 @@ export default {
       "The label is a heading, an h3 unless headingLevel says otherwise, so a screen reader can move figure to figure.",
       "hint is a Toggletip behind an info button named \"About [label]\". Hover shows it after 150ms. A press, a tap or Enter opens it and reads it out; Escape or a press elsewhere closes it, and focus stays on the button.",
       "The delta is read as the whole judgement: \"Up 6.2%, better vs last month\". A trend with trendLabel is read in words; without one it is hidden.",
+      "context is the delta's comparison and shows only beside a delta. A card with no delta that needs a line under its figure uses footnote, which always shows.",
+      'A number given as text goes through the formatter, as a number does. Text that is not a number, a figure the product wrote in words such as "7 of 8", shows as written; before, it read No data.',
     ],
     Layout: [
       "The figure shrinks with its card, never the window: kpi, and kpi-sm in a card under 200px wide. Figures are the body face's kpi styles in tabular figures, the hero's too: the display face never sets a number.",
@@ -91,7 +93,7 @@ export default {
     ],
     Review: ["The hint could not be opened on touch (round 4): a check taps it open on a touch screen."],
   },
-  frame: { width: 960, height: 1180 },
+  frame: { width: 960, height: 1420 },
   examples: [
     {
       id: "row",
@@ -128,6 +130,17 @@ export default {
 <x-import component-from-global-scope="NS.MetricCard" label="Refunds this month" value="{{nothing}}" format="currency" footnote="No refunds have synced from [the payments system] yet."></x-import>`
       ),
       vals: { nothing: null },
+    },
+    {
+      id: "words",
+      title: "A figure in words, and a number given as text",
+      layout: "block",
+      markup: grid(
+        "repeat(2, minmax(0, 1fr))",
+        `<x-import component-from-global-scope="NS.MetricCard" label="Sites trading now" value="7 of 8" context="vs yesterday" footnote="[Northside] closed for a refit."></x-import>
+<x-import component-from-global-scope="NS.MetricCard" label="Orders today" value="1240" delta="{{d3}}" context="vs yesterday"></x-import>`
+      ),
+      vals: { d3: 3.2 },
     },
     {
       id: "hint-open",
@@ -209,6 +222,20 @@ export default {
         const value = card(scope, "Refunds this month").locator('[data-slot="metric-card-value"]')
         expect.equal((await value.innerText()).trim(), "No data", "what a missing figure says")
         expect(!/\d/.test(await value.innerText()), "no figure nobody measured")
+      },
+    },
+    {
+      name: "A figure in words shows as written, a number given as text is formatted, and context shows only beside a delta",
+      example: "words",
+      async run({ page, scope, expect }) {
+        const words = card(scope, "Sites trading now")
+        expect.equal((await words.locator('[data-slot="metric-card-value"]').innerText()).trim(), "7 of 8", "the figure in words")
+        expect.equal(await words.locator('[data-slot="metric-card-value"][data-missing]').count(), 0, "it is not No data")
+        expect(!(await words.innerText()).includes("vs yesterday"), "context with no delta shows nothing")
+        expect((await words.innerText()).includes("[Northside] closed for a refit."), "the footnote always shows")
+        const text = card(scope, "Orders today")
+        expect.equal((await text.locator('[data-slot="metric-card-value"]').innerText()).trim(), await fmt(page, 1240, "number"), "the number given as text, formatted")
+        expect((await text.innerText()).includes("vs yesterday"), "context beside its delta")
       },
     },
     {

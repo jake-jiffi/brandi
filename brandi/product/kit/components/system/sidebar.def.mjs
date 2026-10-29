@@ -198,7 +198,7 @@ export default {
     {
       name: "Icons only, it is 72px wide: the symbol, a search icon, 40px items and the avatar",
       example: "collapsed",
-      async run({ scope, expect, brand }) {
+      async run({ page, scope, expect, brand }) {
         const nav = scope.getByRole("navigation", { name: "Main" })
         expect.equal(Math.round((await nav.boundingBox()).width), 72, "72px wide")
         expect.equal(await nav.getAttribute("data-collapsed"), "true", "it says it is collapsed")
@@ -209,10 +209,13 @@ export default {
           // A full logo has a minimum width, and a brand with no symbol once had it cut by the window edge here.
           const home = await homeLink.evaluate((el) => {
             const box = el.getBoundingClientRect(), mark = el.firstElementChild.getBoundingClientRect(), rail = el.closest('[data-slot="sidebar"]').getBoundingClientRect()
-            return { link: [box.width, box.height].map(Math.round).join("x"), inside: mark.left >= rail.left - 0.5 && mark.right <= rail.right + 0.5 && mark.left >= box.left - 0.5 && mark.right <= box.right + 0.5 }
+            return { link: [box.width, box.height].map(Math.round).join("x"), inside: mark.left >= rail.left - 0.5 && mark.right <= rail.right + 0.5 && mark.left >= box.left - 0.5 && mark.right <= box.right + 0.5, height: Math.round(mark.height) }
           })
           expect.equal(home.link, "40x40", "home is a 40px square, so its focus ring goes round what it holds")
           expect(home.inside, "what home holds fits inside it and inside the rail")
+          // The symbol's own size, never the full logo's height: a wide logo's 45px minimum once drew it past the rail.
+          const symbolMin = await page.evaluate(() => Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.logo?.symbolMinHeight ?? 16)
+          expect.equal(home.height, Math.max(24, symbolMin), "the symbol's height in home")
         } else {
           // No symbol, and the navigation already goes Home: a second house above it would only repeat it.
           expect.equal(await homeLink.count(), 0, "no logo cut by the edge, and no second Home")

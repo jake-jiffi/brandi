@@ -336,14 +336,19 @@ One icon set, by name, drawn in `currentColor` at the set's stroke.
 
 The brand's mark, from the master artwork. Never set in type, never redrawn.
 
-- **Contract.** `color` (`auto`, then only the brand's approved renditions). `height` (the logo
-  system's preferred size; values under its minimum are raised to it). `clearspace`. `title` (its
-  accessible name; `""` when a parent link already names it).
+- **Contract.** `mark` (`full` or `symbol`). `color` (`auto`, then only the brand's approved
+  renditions). `height` (the logo system's preferred size, the symbol's own 24px for the symbol;
+  values under its minimum, the symbol's for the symbol, are raised to it). `clearspace`. `title`
+  (its accessible name; `""` when a parent link already names it).
 - **Rules.** In product it lives in the rail lockup and on sign-in, never repeated in page headers.
   Use tight-viewBox copies: with the clear space inside the viewBox, the reference's letters were
   9px tall in a 20px logo. Never stretch, rotate, add effects or recolour it outside its renditions.
   Variants, clear space and minimums come from
   `<brandi>/skills/brand-system/references/08-logo-system.md`.
+- **Review.** The symbol took the full logo's height, which the starter had raised to a wide logo's
+  45px minimum. A signature used as the symbol was drawn 107px wide in the icons rail's 40px home
+  square. The symbol now has its own size, and a mark over 1.5 times as wide as it is tall is never
+  taken as one.
 
 #### ProductLockup
 
@@ -367,7 +372,9 @@ caught up, needs a person, nothing found, help.
 - **Contract.** `pose` (one per state the system names). `size`. `flat` (the 2D rendition).
   `motion` (a gentle loop for working and calm). `label`.
 - **Behaviour.** Decorative, so hidden from screen readers: the words beside it carry the meaning.
-  Its motion stops under reduced motion.
+  Its motion stops under reduced motion. A pose in one dark ink is drawn in `currentColor`, so it
+  takes the text colour and reads on a dark ground. A pose in a colour or several keeps its colours,
+  and the pack has no dark rendition, so keep it off dark grounds.
 - **Rules.** One per screen, and only in empty, loading, done, error, welcome and help moments.
   Never in tables, forms or a busy dashboard. Never recoloured, flipped, rotated, cropped or
   squashed, and never two renditions on one screen. A character for mess or trouble stands for the
@@ -746,13 +753,16 @@ footnote.
   `hint`. `hero`. `state` (`ready`, `loading`, or `unavailable` with `unavailableText`).
 - **Behaviour.** `hint` is a toggletip behind an info button. Hover shows it after a short delay. A
   press, a tap or Enter opens it and reads it out. Escape or a press elsewhere closes it. The figure
-  shrinks with its card, not the window.
+  shrinks with its card, not the window. `context` is the delta's comparison and shows only beside a
+  delta; `footnote` is the line that always shows. A `value` given as text that is not a number ("7
+  of 8") shows as written; a number given as text goes through the formatter.
 - **Rules.** One `hero` per row at most. Tabular figures. The label says exactly what is counted,
   and the footnote or hint says what is left out. Rounded for reading on cards ($18K), exact in
   tables. When a source is down, show `unavailable` and when it last answered, never a zero nobody
   measured.
 - **Review.** The hint could not be opened on touch (round 4). The reference's toggletip waits
-  150ms on hover.
+  150ms on hover. A figure in words read No data, and a context given with no delta never showed:
+  both were found only by rendering a board.
 
 #### DataTable
 
@@ -1333,6 +1343,13 @@ The assistant asks before it acts, and nothing happens until a person presses th
   - The buttons run in reading order: Not now, Edit, then the action. Not now, Edit and Try again
     are described by the question, so a screen reader knows what they act on.
   - A failure keeps Not now, Edit and Try again, and Not now can be undone.
+  - Not now, Edit and Try again show only with `onDismiss`, `onEdit` and `onRetry`, and Undo only
+    with `onUndo` after Not now. Done shows no Undo: an action already taken is undone where the
+    product can reverse it.
+  - `question` shows under the title as "You asked: [question]", so it is the person's own words,
+    never the assistant's question, which is the title.
+- **Copy.** Its badge words are its own: Needs you, In progress, Done, Failed and Not done. The
+  written system's status table carries all five with these meanings.
 - **Rules.** Use it whenever the assistant would send, pay, approve, change another system or
   delete. One proposal waits at a time, and its action is the only primary on screen while it waits.
   List every record it will touch, five at most, with "and 12 more" in the note. Try again after a
