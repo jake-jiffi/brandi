@@ -3333,6 +3333,8 @@ async function cmdProduct(flags, positional) {
       ...(res.placeholder ? starterStandInLines(res.brand) : []),
       ...(!res.placeholder && res.brand?.missing?.length ? [`  Not drawn yet, so left out: ${res.brand.missing.join(', ')}. Put each file where ${res.brand.from} says and run the starter again.`] : []),
       ...(res.brand?.refused ?? []).map((r) => `  Not used: ${r}`),
+      ...(res.brand?.derived ?? []).map((d) => `  Derived, not the brand's own file: ${d}.`),
+      ...(res.brand?.asks ?? []).map((a) => `  Ask the brand for ${a}.`),
       ...(res.brand?.inkPoses?.length ? [`  Drawn in one ink, so they take the text colour on dark: ${res.brand.inkPoses.join(', ')}.`] : []),
       ...(res.brand?.notes ?? []).map((n) => `  Logo: ${n}.`),
       ...starterIllustrationLines(res.brand?.illustrations),

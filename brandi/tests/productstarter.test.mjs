@@ -137,7 +137,8 @@ describe('the files the system owns in a starter', () => {
     const brand = JSON.parse(await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
     const res = await writeStarter({ out, tokens, identity, brand, brandRoot: dir, productDir: path.join(dir, 'product') });
     assert.equal(res.placeholder, true);
-    assert.deepEqual(res.brand.missing, ['assets/logos/muddy-paws-primary.svg']);
+    // The record's Reversed and Mark only variants are named and not drawn either, looked for beside the master.
+    assert.deepEqual(res.brand.missing, ['assets/logos/muddy-paws-primary.svg', 'assets/logos/muddy-paws-reversed.svg', 'assets/logos/muddy-paws-mark.svg']);
     assert.equal(res.brand.character, false);
     const file = await readFile(path.join(out, 'lib', 'brand.ts'), 'utf8');
     assert.match(file, /export const STAND_IN_MARKS: Brand\["marks"\]/, 'the stand-in is in the file');
@@ -167,6 +168,31 @@ describe('the files the system owns in a starter', () => {
     assert.match(run.stdout, /brandi logo wordmark/, 'and how to add one');
     assert.match(run.stdout, /no character, so Character draws nothing/);
     assert.match(await readFile(path.join(dir, 'product', 'starter', 'lib', 'brand.ts'), 'utf8'), /name: "Muddy Paws",\n  marks: STAND_IN_MARKS,/);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test("the starter command on a brand whose logo is one coloured file says the one ink is derived and what to ask the brand for, and takes the record's \"Mark only\" as the symbol", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'brandi-starter-onefile-'));
+    await mkdir(path.join(dir, 'brand', 'assets', 'logos'), { recursive: true });
+    await mkdir(path.join(dir, 'product'), { recursive: true });
+    await writeFile(path.join(dir, 'brand', 'brand.json'), await readFile(path.join(import.meta.dirname, 'fixtures', 'muddy-paws.json'), 'utf8'));
+    await writeFile(path.join(dir, 'product', 'tokens.json'), JSON.stringify(tokens));
+    await writeFile(path.join(dir, 'brand', 'assets', 'logos', 'muddy-paws-primary.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48"><circle cx="24" cy="24" r="20" fill="#2E7D32"/><path d="M60 12h120v24H60z" fill="#1C1B1A"/></svg>');
+    const starter = () => spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'scripts', 'brandi.mjs'), 'product', 'starter'], { cwd: dir, encoding: 'utf8' });
+    const run = starter();
+    assert.equal(run.status, 0, run.stderr || run.stdout);
+    assert.match(run.stdout, /lib\/brand\.ts: full, full-ink, from brand\/brand\.json's logo master/);
+    assert.match(run.stdout, /Derived, not the brand's own file: full-ink, made from assets\/logos\/muddy-paws-primary\.svg/);
+    assert.match(run.stdout, /Ask the brand for its own one-ink SVG of the logo, and a version for dark grounds,/);
+    assert.match(run.stdout, /Not drawn yet, so left out: assets\/logos\/muddy-paws-reversed\.svg, assets\/logos\/muddy-paws-mark\.svg\./, "the record's Reversed and Mark only variants, looked for beside the master");
+    const brandTs = () => readFile(path.join(dir, 'product', 'starter', 'lib', 'brand.ts'), 'utf8');
+    assert.match(await brandTs(), /\/\/ Derived, not the brand's own file: full-ink/);
+    // The record's "Mark only" drawn: it is the symbol, at its own 24px minimum.
+    await writeFile(path.join(dir, 'brand', 'assets', 'logos', 'muddy-paws-mark.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#2E7D32"/></svg>');
+    const again = starter();
+    assert.equal(again.status, 0, again.stderr || again.stdout);
+    assert.match(again.stdout, /lib\/brand\.ts: full, symbol, full-ink, symbol-ink, from/);
+    assert.match(await brandTs(), /symbolMinHeight: 24,/);
     await rm(dir, { recursive: true, force: true });
   });
 

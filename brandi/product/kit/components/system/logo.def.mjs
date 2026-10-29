@@ -18,11 +18,35 @@ const railIsDark = (el) => {
   }
   return lum("var(--rail)") < lum("var(--rail-text-strong)")
 }
+// The brand's marks, as the bundle carries them.
+const marksOf = (page) => page.evaluate(() => Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {})
 // The rendition drawn for dark grounds, as Logo picks it: the brand's own, else its single ink, else the full logo.
-const onDarkOf = (page) =>
-  page.evaluate(() => {
-    const marks = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)?.BRAND?.marks ?? {}
-    return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
+const onDarkOf = async (page) => {
+  const marks = await marksOf(page)
+  return marks["full-on-dark"] ? "full-on-dark" : marks["full-ink"] ? "full-ink" : "full"
+}
+// What a brand short of a rendition has to supply. The starter makes the single ink from a one-coloured logo where the
+// logo rules allow it, so a brand that still lacks one has a logo that cannot be recoloured, and its printout says why.
+const SUPPLY = {
+  dark: "the brand has no rendition for dark grounds, and none could be made from its logo, so the full logo made for light grounds would stand there: add its reversed file (identity.logo.files, role mono-white) or a one-ink SVG (role mono-black), and run brandi product starter again, whose printout says why",
+  ink: "the brand has no single-ink rendition, and none could be made from its logo: add a one-ink SVG (identity.logo.files, role mono-black), and run brandi product starter again, whose printout says why",
+}
+// A rendition's colour against the nearest ground behind it, for an ink drawn in the text colour.
+const rgb = (s) => (String(s).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+const luminance = ([r, g, b]) => {
+  const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(rgb(a)), luminance(rgb(b))].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+const inkOnGround = (logo) =>
+  logo.evaluate((el) => {
+    const r = [...el.querySelectorAll('[data-slot="logo-rendition"]')].find((x) => x.checkVisibility())
+    let g = el
+    while (g && /^(transparent|rgba\(.*,\s*0\))$/.test(getComputedStyle(g).backgroundColor)) g = g.parentElement
+    return [getComputedStyle(r).color, g ? getComputedStyle(g).backgroundColor : "rgb(255, 255, 255)"]
   })
 
 const tile = "flex flex-col items-start gap-3 rounded-md border border-line bg-surface p-5"
@@ -56,6 +80,7 @@ export default {
     Behaviour: [
       'An image named by its title, the brand\'s name by default. With title="" it is hidden, for a link that already names it.',
       "The theme picks the rendition in CSS, so the server, the canvas and the product agree. Forced colours show the single ink as CanvasText, because an SVG keeps its own colours there.",
+      "A brand whose logo is one coloured file gets its single ink from the starter, made from that file with every ink turned to the text colour, and named as derived in lib/brand.ts. That ink is what a dark ground shows until the brand supplies its own reversed file. A logo that cannot be recoloured (a picture, a gradient, near-white parts that show only on its other inks) gets none, and the checks say which file the brand has to supply.",
       "On the rail the rail's tone picks it, through --rail-mark-on-light and --rail-mark-on-dark, which the tokens set in each theme and a direction's class flips with the rail. Chosen when the bundle was built, a green-rail direction drew the mark made for dark grounds on green.",
     ],
     Layout: [
@@ -159,9 +184,18 @@ export default {
       name: "The theme picks the rendition, in both themes",
       example: "renditions",
       themes: ["light", "dark"],
-      async run({ scope, expect, theme }) {
+      async run({ page, scope, expect, theme }) {
         const auto = scope.locator('[data-slot="logo"][data-color="auto"]')
-        expect.equal(await shown(auto), theme === "dark" ? "full-on-dark" : "full", "the rendition on screen")
+        // On a dark ground the brand's own rendition for it, else its single ink: a brand whose logo is one coloured
+        // file has no rendition for dark grounds, and once failed here wanting one it was never going to have.
+        const want = theme === "dark" ? await onDarkOf(page) : "full"
+        if (theme === "dark") expect(want !== "full", SUPPLY.dark)
+        expect.equal(await shown(auto), want, "the rendition on screen")
+        // The single ink is drawn in the text colour, so it is readable only while that colour holds on the ground.
+        if (want === "full-ink") {
+          const [ink, ground] = await inkOnGround(auto)
+          expect.atLeast(Math.round(contrast(ink, ground) * 100) / 100, 3, "the single ink against its dark ground")
+        }
         expect.equal(await shown(scope.locator('[data-slot="logo"][data-color="on-light"]')), "full", "on-light, whatever the theme")
       },
     },
@@ -188,6 +222,7 @@ export default {
       example: "renditions",
       forcedColors: true,
       async run({ page, scope, expect }) {
+        expect((await marksOf(page))["full-ink"], SUPPLY.ink)
         const auto = scope.locator('[data-slot="logo"][data-color="auto"]')
         expect.equal(await shown(auto), "full-ink", "the rendition on screen")
         const [ink, canvasText] = await page.evaluate(() => {
@@ -203,7 +238,8 @@ export default {
     {
       name: "The ink rendition takes the colour of the text around it",
       example: "renditions",
-      async run({ scope, expect }) {
+      async run({ page, scope, expect }) {
+        expect((await marksOf(page))["full-ink"], SUPPLY.ink)
         const ink = scope.locator('[data-slot="logo"][data-color="ink"]')
         expect.equal(await shown(ink), "full-ink", "the rendition on screen")
         const [own, parent] = await ink.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el.parentElement.parentElement).color])

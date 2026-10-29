@@ -375,6 +375,14 @@ The brand's mark, from the master artwork. Never set in type, never redrawn.
   45px minimum. A signature used as the symbol was drawn 107px wide in the icons rail's 40px home
   square. The symbol now has its own size, and a mark over 1.5 times as wide as it is tall is never
   taken as one.
+- **A brand with one coloured file.** On a dark ground it draws the brand's dark-ground file, else the
+  single ink in the text colour; in forced colours and for `ink`, the single ink. A brand that arrives
+  with one full-colour logo has neither, and three Logo checks failed on its first run. The starter now
+  makes the single ink from that file, every ink turned to `currentColor`, where the logo rules allow
+  it, and names it as derived (`07-starter.md`, A brand whose logo is one coloured file). The checks
+  read the brand's renditions: on a dark ground they want the dark-ground file, else the single ink,
+  held to 3:1 against the ground. A logo that cannot be recoloured fails them with the file the brand
+  has to supply, never a rendition name it was never going to have.
 
 #### ProductLockup
 
