@@ -29,15 +29,18 @@ export default {
     ],
     Layout: [
       "Breadcrumbs, then the title in the title style with its badges beside it, then the description, capped at the measure. The actions sit on the right, the primary last. Tabs run underneath.",
-      "By its own width: under 640px the actions drop below the title, filling the row.",
+      "By its own width: under 640px actions with a labelled control drop below the title, filling the row. Icon buttons alone, such as the overflow left once the primary has gone to the foot, stay at the end of the title's row, never on a row of their own.",
     ],
     Rules: [
       "One title per screen, the page's only h1, in the title style. The title is the noun people use, never Dashboard. One primary at most, on the right.",
       "Breadcrumbs from two levels deep only.",
     ],
-    Review: ["Long names overflowed the phone title (round 3)."],
+    Review: [
+      "Long names overflowed the phone title (round 3).",
+      "Once the primary moved to the foot, the overflow sat alone on a row under the title (a proof run, round 3). Icon buttons alone now stay on the title's row.",
+    ],
   },
-  frame: { width: 960, height: 660 },
+  frame: { width: 960, height: 1120 },
   examples: [
     {
       id: "page",
@@ -62,6 +65,15 @@ export default {
       vals: { h2: 2, invoiceTrail: [{ label: "Invoices", href: "#invoices" }, { label: "[Invoice 1042]" }] },
     },
     {
+      id: "foot",
+      title: "On a phone in AppShell, the primary at the foot and the overflow beside the title",
+      // In a shell, so the primary really moves to the bar at the foot and leaves the overflow alone in the header.
+      markup: `<div data-shell="foot" class="shrink-0 overflow-hidden outline outline-line" style="width: 390px; height: 440px;"><x-import component-from-global-scope="NS.AppShell" style="display: block; height: 100%;" class="h-full" main-id="main-foot" sidebar="{{ui.sidebar}}" product="[Front desk]" home="#home">
+<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h2}}" title="[Invoice 1042]" description="Sent to [Northside Dental] on [3 October], and due a fortnight later." breadcrumbs="{{invoiceTrail}}" meta="{{ui.overdue}}" actions="{{ui.more}}" primary="{{ui.send}}"></x-import>
+</x-import></div>`,
+      layout: "block",
+    },
+    {
       id: "plain",
       title: "Only a title and a description",
       markup: `<x-import component-from-global-scope="NS.PageHeader" style="display: block; width: 100%;" heading-level="{{h3}}" title="Clients" description="Everyone who has booked in the last two years."></x-import>`,
@@ -78,6 +90,8 @@ export default {
       actions: h(React.Fragment, null, h(NS.Button, { icon: "Pencil" }, "Edit"), h(NS.Button, { icon: "Download" }, "Download PDF")),
       primary: h(NS.Button, { variant: "primary", icon: "Plus" }, "New booking"),
       send: h(NS.Button, { variant: "primary", icon: "Send", onClick: () => self.setState((s) => ({ sent: s.sent + 1 })) }, "Send reminder"),
+      more: h(NS.Menu, { label: "More actions for [Invoice 1042]", items: [{ label: "Download PDF", icon: "Download" }, { label: "Duplicate", icon: "Copy" }, "separator", { label: "Void the invoice", icon: "CircleX", danger: true }] }),
+      sidebar: h(NS.Sidebar, { product: "[Front desk]", home: "#home", groups: [{ items: [{ label: "Clients", href: "#clients", icon: "Users" }, { label: "Invoices", href: "#invoices", icon: "Receipt", current: true }] }] }),
     };
   })()`,
   checks: [
@@ -172,6 +186,22 @@ export default {
         const box = await header.boundingBox()
         expect(actions.y >= title.y + title.height, "the actions are below the title")
         expect(Math.abs(actions.width - box.width) <= 1, "and fill the row")
+      },
+    },
+    {
+      name: "On a phone, once the primary has gone to the foot, an overflow left alone stays on the title's row (a proof run)",
+      example: "foot",
+      async run({ scope, expect }) {
+        const shell = scope.locator('[data-shell="foot"]')
+        await shell.locator('[data-slot="app-shell-action-bar"]').getByRole("button", { name: "Send reminder" }).waitFor()
+        const header = shell.locator('[data-slot="page-header"]')
+        expect.equal(await header.locator('[data-slot="page-header-actions"]').getByRole("button").count(), 1, "the overflow is all the header has left")
+        const box = await header.boundingBox()
+        const title = await header.locator('[data-slot="page-title"]').boundingBox()
+        const more = await header.getByRole("button", { name: "More actions for [Invoice 1042]" }).boundingBox()
+        expect(more.y < title.y + title.height && more.y + more.height > title.y, `level with the title, not on a row of its own (${Math.round(more.y - title.y)}px below its top)`)
+        expect(more.x >= title.x + title.width, "on its right")
+        expect(Math.abs(more.x + more.width - (box.x + box.width)) <= 1, "at the end of the row")
       },
     },
     {

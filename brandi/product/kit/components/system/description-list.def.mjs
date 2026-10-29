@@ -19,7 +19,8 @@ const person = [
 const order = [
   { label: "[2] × [Large flat white]", value: "[$11.00]" },
   { label: "[1] × [Toasted banana bread with whipped butter and honey]", value: "[$8.50]" },
-  { label: "Deliver to", value: "[14 Harbour Street, Bondi]" },
+  // Long enough to wrap at a phone's width, as an address or a note does.
+  { label: "Deliver to", value: "[Unit 4, 14 Harbour Street, Bondi: leave it with reception]" },
   { label: "Delivery", value: "[$4.90]" },
   { label: "Total", value: "[$24.40]", total: true },
 ]
@@ -47,7 +48,7 @@ export default {
     Layout: [
       "Columns give the label a third and the value two thirds. Under 420px of its own width the list stacks by itself, label above value, whatever the window.",
       "Long values wrap, unbroken ones (an email, an ID) included, rather than widening the list.",
-      "Lines keep each label and its value on one line at any width, a phone's included: the value at the end, in tabular figures, and a long label wraps beside it. A value takes up to two thirds of the line, and a longer one wraps there. The label is the line itself, so it takes the text colour. A total sits under a rule in text-strong.",
+      "Lines keep each label and its value on one line at any width, a phone's included: the value at the end, in tabular figures, and a long label wraps beside it. A value takes up to two thirds of the line, and a longer one wraps there, left-aligned: its box sits at the end of the line, and its lines start at the box's left. The label is the line itself, so it takes the text colour. A total sits under a rule in text-strong.",
     ],
     States: [
       'A missing value says so: "Not set", or the item\'s own empty text. Never blank, never a zero nobody measured.',
@@ -60,9 +61,10 @@ export default {
     ],
     Review: [
       "A checkout's order lines read as a form at 358px, each price under its label and left-aligned, so a run drew the receipt by hand (a proof run, round 2). Lines hold label and value on one line at any width.",
+      "A value that wrapped in lines read right-aligned, its lines ragged on the left (a proof run, round 3). A wrapped value now reads from the left, its box still at the end.",
     ],
   },
-  frame: { width: 960, height: 1940 },
+  frame: { width: 960, height: 1970 },
   examples: [
     {
       id: "columns",
@@ -183,6 +185,26 @@ export default {
         }
         const long = await list.locator("dt").nth(1).evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)))
         expect.atLeast(long, 2, "at 240px a long label wraps beside its value rather than pushing it out")
+      },
+    },
+    {
+      name: "In lines a value that wraps reads left-aligned, its box still at the end of the line (a proof run)",
+      example: "lines",
+      async run({ scope, expect }) {
+        const item = scope.locator('[data-slot="description-item"]').filter({ hasText: "Deliver to" })
+        const { starts, left, right, end } = await item.evaluate((el) => {
+          const dd = el.querySelector("dd")
+          const range = document.createRange()
+          range.selectNodeContents(dd)
+          // One box per line of text: where each line starts.
+          const byLine = new Map()
+          for (const r of range.getClientRects()) if (r.width > 0) byLine.set(Math.round(r.top), Math.min(byLine.get(Math.round(r.top)) ?? Infinity, r.left))
+          const box = dd.getBoundingClientRect()
+          return { starts: [...byLine.values()], left: box.left, right: box.right, end: el.closest('[data-slot="description-list"]').getBoundingClientRect().right }
+        })
+        expect.atLeast(starts.length, 2, "the value wraps at 318px")
+        for (const [i, x] of starts.entries()) expect(Math.abs(x - left) <= 1, `line ${i + 1} starts at the value's left edge (${Math.round(x - left)}px in)`)
+        expect(Math.abs(right - end) <= 1, "the value's box still ends at the line's end")
       },
     },
     {
