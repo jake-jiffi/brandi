@@ -40,11 +40,13 @@ this file wins.
 - Type is the `type-*` utilities: `type-hero`, `type-display`, `type-title`, `type-heading-lg`,
   `type-heading`, `type-heading-sm`, `type-kpi`, `type-kpi-sm`, `type-body-lg`, `type-body`,
   `type-label`, `type-meta`, `type-caption`, `type-eyebrow`, `type-code`. Never `text-sm font-medium`.
-- Corners follow the radius tokens' usages: `rounded-xs` (checkboxes, keys, tiny marks), `rounded-sm`
-  (badges, tags, tooltips), `rounded-control` (inputs, selects, menu items), `rounded-action`
-  (whatever a person can press: buttons, chips, segmented controls, the switch), `rounded-md` (cards,
-  menus, toasts), `rounded-lg` (panes, dialogs, sheets, the rail), `rounded-xl` (sign-in frames),
-  `rounded-full` (avatars, dots). Shadows: `shadow-xs` to `shadow-xl`.
+- Corners follow the radius tokens' usages: `rounded-xs` (checkboxes, keys, tooltips, tiny marks),
+  `rounded-sm` (badges, tags), `rounded-control` (inputs, selects, menu items), `rounded-action`
+  (whatever a person can press: buttons, chips, segmented controls, the switch), `rounded-list`
+  (menus, selects, listboxes: concentric round their items), `rounded-md` (cards, popovers, toasts),
+  `rounded-lg` (panes, dialogs), `rounded-rail` (the rail, its drawer and sheets, in the brand's shell
+  form), `rounded-frame` (photos), `rounded-xl` (sign-in frames), `rounded-full` (avatars, dots and
+  counts). Shadows: `shadow-xs` to `shadow-xl`.
 - Spacing is Tailwind's 4px scale. Control heights: 32, 36, 44px (`h-8`, `h-9`, `h-11`).
 
 ## Behaviour every component meets
@@ -95,7 +97,8 @@ frame?, state?, logic? }`.
 - `checks` run in Chrome through Playwright: `run({ page, scope, expect, theme, brand })`, where
   `scope` is the example's section, `brand` is `{ name, product }` and `format` is lib/format.js with
   the product's `TIME`. Expect the brand's names from `brand` and every time through `format`, never as
-  literals: a starter carries the brand's own names and its own way of writing a time. Options: `themes: ["light", "dark"]`, `touch`, `reducedMotion`,
+  literals: a starter carries the brand's own names and its own way of writing a time. Read its logo's
+  minimum and its character's poses from the bundle's `BRAND` too, never the placeholder's. Options: `themes: ["light", "dark"]`, `touch`, `reducedMotion`,
   `forcedColors`, `viewport`. Every rule marked Review gets a check. Prove keyboard paths, focus
   return, Escape order and focus after an action with real key presses.
 
@@ -109,3 +112,11 @@ Green means: the typecheck passes, the bundle builds, every named component has 
 definition, its preview renders in light and dark, the pinned detector finds nothing in either
 theme, and every check passes. Look at the preview PNGs it prints, in both themes, before calling a
 component done: a passing check is not a good-looking component.
+
+The fixture is one brand. The trait runner takes the same loop through every brand trait that has
+broken the kit before (`brandi/product/traits/README.md`), and a component is done when every trait
+passes too:
+
+```bash
+node brandi/product/tools/traits.mjs --scratch <dir> --modules <node_modules> --components Button,Dialog
+```

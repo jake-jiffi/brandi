@@ -98,6 +98,9 @@ export const TimePicker = React.forwardRef<HTMLInputElement, TimePickerProps>(fu
   const control = useFieldControl({ id, invalid: invalid || wrong, required })
   const field = control.field
   const label_ = ariaLabelProp ?? ariaLabel
+  // The clock is named after its field, as NumberInput names its steppers: seven pickers on a board all read
+  // "Show times" otherwise.
+  const what = label_ ?? field?.labelText
   const base = React.useId()
   const listId = `${base}-list`
   const step = Math.max(1, Math.round(Number(stepProp) || 15))
@@ -287,7 +290,7 @@ export const TimePicker = React.forwardRef<HTMLInputElement, TimePickerProps>(fu
         icon="Clock"
         open={isOpen}
         controls={listId}
-        label={shown ? "Hide times" : "Show times"}
+        label={`${shown ? "Hide" : "Show"} times${what ? ` for ${what}` : ""}`}
         disabled={disabled}
         onToggle={() => {
           if (design) return

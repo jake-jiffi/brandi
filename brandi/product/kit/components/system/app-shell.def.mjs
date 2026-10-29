@@ -112,7 +112,7 @@ export default {
       title: "Layouts",
       head: ["Width of the shell", "What it shows"],
       rows: [
-        ["1280px and up", "The full rail, inset 8px from the edges, with the product lockup, labels and counts"],
+        ["1280px and up", "The full rail, with the product lockup, labels and counts. It meets the window edge, or floats 8px in when the brand's shell is floating"],
         ["1024 to 1279px", "The rail as 72px of icons, each label a tooltip on hover and keyboard focus"],
         ["640 to 1023px", "The rail becomes a drawer from the left, behind a top bar that carries the menu button and the product lockup"],
         ["Under 640px", "The phone layout: the top bar and the drawer, with a tab bar or the page's primary at the foot"],
@@ -130,7 +130,7 @@ export default {
     Layout: [
       "It measures itself, not the window, so a board, a split view and a browser tab of the same width match: the look switches by container queries, which the server and a canvas draw before any script runs.",
       "The rail stays put and the main column scrolls. The column's padding steps down with the shell: 32px, then 24px under 1280px, then 16px on a phone.",
-      "The drawer comes in from the left, inset 8px like the rail, up to 320px wide. Under reduced motion it fades in without sliding.",
+      "The drawer comes in from the left in the rail's form, against the edge or 8px in when the rail floats, up to 320px wide. Under reduced motion it fades in without sliding.",
     ],
     Rules: [
       "Pages go in a route group whose layout holds the shell, so the rail stays mounted between pages.",
@@ -209,7 +209,14 @@ export default {
         expect(!(await rail("live").isVisible()), "no rail on the phone")
         const box = await rail("full").boundingBox()
         const frame = await at("full").boundingBox()
-        expect(Math.abs(box.x - frame.x - 8) <= 1 && Math.abs(box.y - frame.y - 8) <= 1, "the rail is inset 8px")
+        // The rail takes the brand's form: set in by shell-inset when it floats, against the window edge when it does not.
+        const form = await rail("full").evaluate((el) => {
+          const s = getComputedStyle(el)
+          return { inset: parseFloat(s.getPropertyValue("--shell-inset")) || 0, radius: parseFloat(s.borderTopLeftRadius) || 0, want: parseFloat(s.getPropertyValue("--radius-rail")) || 0, line: parseFloat(s.borderLeftWidth) || 0 }
+        })
+        expect(Math.abs(box.x - frame.x - form.inset) <= 1 && Math.abs(box.y - frame.y - form.inset) <= 1, `the rail sits ${form.inset}px in from the window edge`)
+        expect.equal(form.radius, form.want, "its corners are the rail's radius")
+        if (!form.inset) expect.equal(form.line, 0, "a rail against the edge draws no line on the window's side")
         const topBar = (name) => page.locator(`[data-shell="${name}"] [data-slot="phone-top-bar"]`)
         expect(await topBar("tablet").isVisible() && await topBar("live").isVisible(), "820 and 390 have the top bar")
         expect(!(await topBar("icons").isVisible()) && !(await topBar("full").isVisible()), "1100 and 1440 have none")
@@ -430,7 +437,8 @@ export default {
       async run({ page, scope, expect }) {
         const { menu, drawer } = await openDrawer(page, scope)
         const box = await drawer.boundingBox()
-        expect(Math.abs(box.x - 8) <= 1 && box.width <= 320 + 1, `the drawer comes in from the left, inset 8px, up to 320px wide (left ${box.x}, width ${box.width})`)
+        const inset = await drawer.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue("--shell-inset")) || 0)
+        expect(Math.abs(box.x - inset) <= 1 && box.width <= 320 + 1, `the drawer comes in from the left, ${inset}px in like the rail, up to 320px wide (left ${box.x}, width ${box.width})`)
         await page.waitForTimeout(150)
         await page.touchscreen.tap(370, 420)
         await drawer.waitFor({ state: "detached" })

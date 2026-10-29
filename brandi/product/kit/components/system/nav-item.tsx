@@ -113,7 +113,7 @@ export const NavItem = React.forwardRef<HTMLAnchorElement, NavItemProps>(functio
             attention
               ? // Icons-only, the highlight count keeps its figure on a small chip at the icon's corner: a dot alone
                 // would sit at under 3:1 on a light rail, and the figure keeps the on-highlight contrast.
-                "inline-flex h-5 min-w-5 items-center justify-center rounded-sm bg-highlight px-1.5 text-on-highlight @max-[160px]/rail:absolute @max-[160px]/rail:-top-0.5 @max-[160px]/rail:-right-0.5 @max-[160px]/rail:h-4 @max-[160px]/rail:min-w-4 @max-[160px]/rail:px-1"
+                "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-highlight px-1.5 text-on-highlight @max-[160px]/rail:absolute @max-[160px]/rail:-top-0.5 @max-[160px]/rail:-right-0.5 @max-[160px]/rail:h-4 @max-[160px]/rail:min-w-4 @max-[160px]/rail:px-1"
               : // On the current row the grey count takes the rail's text colour, which holds its contrast on the fill.
                 cn("px-1 @max-[160px]/rail:hidden", current ? "text-rail-text" : "text-rail-muted")
           )}

@@ -1,0 +1,5 @@
+{
+  "trait": "A condensed display face the brand only ever sets in capitals.",
+  "input": { "type": { "display": "Barlow Condensed" } },
+  "product": { "displayCase": "upper" }
+}

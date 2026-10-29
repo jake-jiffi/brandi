@@ -31,6 +31,15 @@ describe('the boards a system generates for itself', () => {
     for (const t of tokens.shadow.tokens) assert.match(shape, new RegExp(`box-shadow: var\\(--${t.name}\\)`));
   });
 
+  test('the shape board says where each corner came from: the brand, with its source, or the kit, and how', () => {
+    const measured = buildProductTokens(buildSystem({ primary: '#1F6F4A', accents: ['#D9822B'] }), { shape: { families: { card: { px: 12, source: 'the cards on p12' } }, shell: { form: 'edge', source: "the site's navigation" } } });
+    const shape = B.shapeBoard(measured, system).source;
+    assert.match(shape, /radius-md · 12px[\s\S]*?The brand's: the cards on p12/);
+    assert.match(shape, /radius-control · \d+px[\s\S]*?The kit's: from the brand's scale, its md step \(\d+px\)/);
+    assert.match(shape, /The rail meets the window edge, square\. The brand's: the site's navigation/);
+    assert.match(shape, /No shape move of the brand's own is carried yet\./);
+  });
+
   test('one component board per group, each built from the definitions\' own examples', () => {
     const defs = [
       { name: 'Button', group: 'Actions', job: 'The pressable action.', status: 'proven', props: [], examples: [{ id: 'a', title: 'Variants', markup: '<x-import component-from-global-scope="NS.Button">Go</x-import>', vals: { yes: true } }] },
@@ -86,6 +95,56 @@ describe('the boards a system generates for itself', () => {
     assert.equal(validateCanvas({ artboards: parts.map((p) => ({ file: p.file, source: p.source })), systems: ['acme'] }).errors.length, 0);
     const twin = B.twin(parts[1], system, 5200);
     assert.equal(twin.file, 'ComponentsDataDataTable1440Dark.dc.html', 'its dark twin splits the same way');
+  });
+
+  test("a part's heading keeps numerals out of the display face, which a brand may never set them in: the part number sits under it in the body face", () => {
+    const mk = (name) => ({ name, group: 'Data', job: 'A thing.', status: 'proven', props: [], examples: [{ id: 'a', title: 'A', markup: `<x-import component-from-global-scope="NS.${name}"></x-import>` }] });
+    const defs = ['Card', 'DataTable'].map(mk);
+    const parts = B.partBoards(defs, system, 'Data', [['Card'], ['DataTable']]);
+    for (const [i, p] of parts.entries()) {
+      const h1s = p.source.match(/<h1\b[^>]*>[^<]*<\/h1>/g) ?? [];
+      assert.equal(h1s.length, 1, `${p.name} keeps one h1`);
+      const [, style, text] = /<h1 style="([^"]*)">([^<]*)<\/h1>/.exec(h1s[0]);
+      assert.match(style, /font-family: var\(--font-display\)/, 'the heading is set in the display face');
+      assert.equal(/\d/.test(text), false, `${p.name}'s heading "${text}" sets numerals in the display face`);
+      const note = new RegExp(`<p style="([^"]*)">Part ${i + 1} of 2</p>`).exec(p.source);
+      assert.ok(note, `${p.name} says which part it is`);
+      assert.equal(/font-display/.test(note[1]), false, 'and says it in the body face');
+    }
+    assert.equal(parts[1].title, 'Components: data, 2 of 2', 'the canvas label still carries the part');
+    assert.equal(/>Part \d/.test(B.componentBoards(defs, system)[0].source), false, 'a board that is whole carries no part number');
+  });
+
+  test('an example wider than the board is drawn down to fit, layout box and all, and says so; one that fits is left alone', () => {
+    // A 1440px shell in a 1440px board padded 56px each side lost its right 56px, the page's primary with it.
+    const frame = (w, h) => `<div data-shell="x" style="width: ${w}px; height: ${h}px;"><x-import component-from-global-scope="NS.AppShell"></x-import></div>`;
+    const shell = { name: 'AppShell', group: 'Navigation', job: 'The frame.', status: 'proven', props: [], examples: [
+      { id: 'full', title: 'At 1440', markup: frame(1440, 900), layout: 'block' },
+      { id: 'tablet', title: 'At 820', markup: frame(820, 700), layout: 'block' },
+      { id: 'bounds', title: 'Bounds', markup: '<div style="min-width: 1600px; max-width: 2000px;">Not a width</div>', layout: 'block' },
+    ] };
+    const [nav] = B.componentBoards([shell], system);
+    const zooms = [...nav.source.matchAll(/zoom: ([\d.]+);/g)].map((m) => Number(m[1]));
+    assert.equal(zooms.length, 1, 'only the example wider than the board is scaled');
+    assert.ok(1440 * zooms[0] <= 1440 - 2 * 56, `drawn ${1440 * zooms[0]}px wide in a 1328px content box`);
+    assert.ok(1440 * zooms[0] > 1320, 'and no smaller than it has to be');
+    // Zoom on the example's own container: the shell inside still lays out at 1440, its full layout.
+    assert.match(nav.source, /zoom: 0\.92\d*;"><div data-shell="x" style="width: 1440px/);
+    assert.match(nav.source, /At 1440, drawn at 92% to fit<\/h3>/, 'its title says it is drawn smaller');
+    assert.equal(/At 820, drawn/.test(nav.source), false);
+    assert.equal(validateCanvas({ artboards: [{ file: nav.file, source: nav.source }], systems: ['acme'] }).errors.length, 0);
+  });
+
+  test("board prose is capped at the system's measure, never in ch, so a long description keeps to about 70 characters", () => {
+    const long = { ...system, name: 'Acme' };
+    const main = B.contentsBoard(long, [{ label: 'Foundations', first: 'FoundationsColour1440.dc.html', note: 'Colour, type and shape.' }]);
+    const boards = [main, B.colourBoard(tokens, system), B.iconBoard(system), ...B.componentBoards([{ name: 'Button', group: 'Actions', job: 'The pressable action, with a long enough job to wrap at any width a board is drawn at.', status: 'proven', props: [], examples: [] }], system)];
+    for (const b of boards) {
+      assert.equal(/max-width:\s*\d+ch/.test(b.source), false, `${b.name} caps prose in ch, the width of a zero`);
+      // Running prose has a cap, and the cap is the measure; a tile's caption in a narrow grid cell needs none.
+      for (const p of b.source.match(/<p style="[^"]*max-width[^"]*"/g) ?? []) assert.match(p, /max-width: var\(--measure/, `${b.name}: ${p.slice(0, 80)}`);
+    }
+    assert.match(main.source, /max-width: var\(--measure, 30em\)/, 'the contents paragraph takes the measure');
   });
 
   test('a dark twin imports its light board with the theme flipped', () => {

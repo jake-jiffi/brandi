@@ -81,7 +81,7 @@ export const PhoneTabBar = React.forwardRef<HTMLElement, PhoneTabBarProps>(funct
                         aria-hidden="true"
                         data-slot="phone-tab-count"
                         className={cn(
-                          "absolute -top-1.5 left-3 inline-flex h-4 min-w-4 items-center justify-center rounded-sm px-1 type-caption tabular-nums",
+                          "absolute -top-1.5 left-3 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 type-caption tabular-nums",
                           // A grey count's chip is edged in rail-muted, 3:1 or more on the bar, so it reads as a count and
                           // not a stray figure: rail-line is only a step off the bar.
                           item.attention ? "bg-highlight text-on-highlight" : "bg-rail text-rail-text shadow-[inset_0_0_0_1px_var(--rail-muted)]"

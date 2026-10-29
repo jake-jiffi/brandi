@@ -1,0 +1,4 @@
+{
+  "trait": "A dark navy primary, decided for the light theme.",
+  "product": { "roles": { "primary": { "light": "#16214A" } } }
+}

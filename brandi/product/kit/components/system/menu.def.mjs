@@ -9,7 +9,9 @@ const ready = async (locator) => {
   await locator.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
 
-const ns = `Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)`
+// NS. names the bundle's own global. Never walk window's properties to find it: on the canvas a board
+// runs in a frame whose parent is another origin, and reading a property of that parent throws.
+const ns = `{ Button: NS.Button }`
 
 // The action in hand is the focused menu item; its label has its own slot. Radix moves focus in a
 // timeout, so a check waits for the action it expects rather than reading straight after a key press.

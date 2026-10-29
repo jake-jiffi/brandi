@@ -55,7 +55,10 @@ The marks go in product.json's `brand` block, paths relative to `product/`:
 
 Each SVG is inlined after a safety pass: no scripts, handlers or outside references, and no fixed
 size. Its viewBox is cut to the ink, because brand files carry clear space inside it and the product
-applies clear space in layout. An `-ink` rendition is turned to `currentColor` whatever its file's ink. A still (PNG, WebP) is
+applies clear space in layout. An `-ink` rendition is turned to `currentColor` whatever its file's ink. Each rendition's
+class names are prefixed to it, because a style block inside an inlined SVG applies to the whole page: two renditions side by
+side painted each other, and the wordmark vanished on light grounds. A logo supplied only as a PNG is drawn as an SVG holding
+the picture in a viewBox of its own size, so it sizes as a mark does; an ink rendition has to be an SVG. A still (PNG, WebP) is
 drawn down to a small WebP inside the bundle, because the canvas has no public folder; without
 Chrome, or when Chrome cannot draw it in three tries, it goes into the bundle at full size, which
 every board shows but which weighs more. A pose is never a path from the page root: on a canvas that
@@ -68,6 +71,14 @@ The example product shows the patterns working end to end. Home has figures and 
 page has search and filters in the URL, bulk actions on the rows on screen, and an export. One
 record has tabs, a decision and Undo. One page's outside source is down. Then Settings, Help, and a
 kit page with every control.
+
+Settings keeps a section's unsaved changes with `useDraft("Profile", saved)`
+(`components/app/unsaved-changes.tsx`, whose words at the top take the brand's own lines): a link or a
+command that leaves the page asks "Leave without saving?" in the system's Dialog, with Keep editing
+first, and a reload or closing the tab gets the browser's own prompt. Back and Forward can't be held
+in the App Router, but they no longer lose the edit: it is kept as a draft in
+sessionStorage, by page and section, and comes back with "Your unsaved changes to Profile are back."
+and Discard changes, until Save, Discard changes, typing back to the saved value or Leave clears it.
 
 To run it, copy its `app/(app)`, `components` and `lib` folders into the app.
 
@@ -191,7 +202,9 @@ npm run typecheck && npm run build
 ```
 
 1. `$A product starter` copies the kit and writes the generated files from the system. A second run
-   rewrites only those, so a product's own work survives.
+   rewrites only those, so a product's own work survives. With `--kit` it copies the kit again and
+   takes back any file the kit has since dropped, unless someone changed it: a dropped placeholder
+   page left behind once shadowed the example's home page.
 2. `npm install` installs the pinned stack. Nothing outside the starter's folder changes.
 3. `$A product bundle` builds the canvas bundle from the starter's components and writes every
    card. It needs the install, because it uses the starter's own esbuild and Tailwind.
@@ -251,7 +264,7 @@ clipped.
 | card | `radius-md`, a hairline, `shadow-sm`. `CardTitle` is an `h2`, with `as` for `h3` and `h4` | A real outline under the page's one `h1` |
 | label, field | The label in `text-strong`. Errors in danger text with an icon, announced, without turning the whole field red. Hints in the meta style | The label stays readable when there is an error |
 | tabs | Underline by default: a full-width row on a hairline, tabs flush with the title, the active one underlined in `primary`. Focus drawn inside the tab. The panel has its own focus ring | A grey pill row reads as a segmented control. The row scrolls sideways, which clips anything drawn outside a tab |
-| dialog, sheet | The scrim token, `radius-lg`, `shadow-xl`, and the sheet inset like the rail. On phones a dialog rises from the bottom, full width, with its buttons stacked in reading order and clear of the safe area | Within reach of a thumb, in the system's material |
+| dialog, sheet | The scrim token and `shadow-xl`. A dialog floats at `radius-lg`; a sheet and the navigation drawer are attached to the window, so they take the rail's form (`radius-rail`, `shell-inset`). On phones a dialog rises from the bottom, full width, with its buttons stacked in reading order and clear of the safe area | Within reach of a thumb, in the system's material |
 | command, input-group | A tall search row with a 2px focus edge, eyebrow group labels, the active result in the hover tint with a control edge, and a foot of key hints. On touch the hints hide and a close button shows. Opens near the top on every screen. Gives focus back to whatever had it | The phone keyboard takes the bottom half. Opened from a shortcut, the dialog has no trigger for Radix to return focus to |
 | tooltip | On `surface-inverse`, small and medium weight | Matches the Tooltip card |
 | sonner | Not used: the layout mounts the system's ToastRegion. Sonner pauses on hover but never on focus, which WCAG 2.2.1 needs, so ToastRegion keeps its own clocks: bottom centre, clear of the phone action bar, 5 seconds or 8 with Undo, paused by hover, focus, Alt T or a hidden page, Undo 44px on touch | Sonner could not pause on focus without a fork. Undo is never the only way back from a bulk action |
@@ -380,6 +393,9 @@ Each is a rule, then the cause that taught it. All of them come from the last bu
   themes after every upgrade.
 - **Check SVG text with its own test.** Neither axe nor the token audit reads text drawn in SVG, so
   chart labels can fail in one theme while everything else reports clean.
+- **Write generated TypeScript with the kit's own types, never `as const`.** A literal type narrows
+  to the values written, so `lib/product.ts` written that way stopped the rail components compiling
+  on a product's own name. A test holds the generated file to the kit's text.
 
 ### In Next.js
 

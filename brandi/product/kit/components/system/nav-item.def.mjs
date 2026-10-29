@@ -23,7 +23,7 @@ const inView = async (page, locator) => {
   await locator.scrollIntoViewIfNeeded()
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
-const rail = (inner) => `<div style="box-sizing: border-box; width: 256px;" class="rounded-lg border border-rail-line bg-rail p-3">${inner}</div>`
+const rail = (inner) => `<div style="box-sizing: border-box; width: 256px;" class="rounded-rail border border-rail-line bg-rail p-3">${inner}</div>`
 
 const states = [
   { label: "Home", href: "#home", icon: "House" },

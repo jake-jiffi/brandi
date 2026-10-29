@@ -126,7 +126,8 @@ export default {
   newInvoice: self.state.newInvoice,
   closeNewInvoice: () => self.setState({ newInvoice: false }),
   ui: (() => {
-    const A = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root);
+    // NS. names the bundle's own global: walking window's properties reads the canvas's parent frame, which throws.
+    const A = { Button: NS.Button };
     const h = React.createElement;
     return { newFooter: h(React.Fragment, null, h(A.Button, { onClick: () => self.setState({ newInvoice: false }) }, "Cancel"), h(A.Button, { variant: "primary" }, "Choose client")) };
   })(),

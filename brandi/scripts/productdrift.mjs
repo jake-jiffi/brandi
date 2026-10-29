@@ -59,6 +59,18 @@ export async function driftCheck({ productDir, starter }) {
     add('globals', rel(productDir, globals), 'differs from what the tokens produce (a hand edit, or tokens that moved)', 'node tools/build-globals.mjs system/tokens.json app/globals.css');
   }
 
+  // A written value beside a token's name in the written system: `radius-md` (15px), or | `radius-md` | 15px |.
+  // The docs once kept the radii the tokens had moved on from, and nothing compared them.
+  const sizes = new Map(['spacing', 'radius', 'size'].flatMap((g) => (tokens[g]?.tokens ?? []).map((t) => [t.name, String(t.value)])));
+  const docsDir = path.join(productDir, 'docs');
+  const written = [...(existsSync(docsDir) ? readdirSync(docsDir).filter((x) => x.endsWith('.md')).sort().map((x) => path.join(docsDir, x)) : []), path.join(starter, 'CONVENTIONS.md')].filter((x) => existsSync(x));
+  for (const file of written) {
+    for (const m of readFileSync(file, 'utf8').matchAll(/`([a-z][a-z0-9.-]*)`\s*(?:\(|\|\s*)(\d+(?:\.\d+)?px)/g)) {
+      const want = sizes.get(m[1]);
+      if (want && want !== m[2]) add('docs', `${rel(productDir, file)}: ${m[1]} ${m[2]}`, '', `product/tokens.json ${m[1]} ${want}`);
+    }
+  }
+
   // Copies of the bundle and its CSS, by checksum.
   const copies = [path.join(productDir, 'components'), path.join(starter, 'canvas', 'dist'), ds && path.join(ds, 'components'), path.join(productDir, 'components', 'previews', 'ds', ns ?? '', 'components')].filter((d) => d && existsSync(path.join(d, 'bundle.js')));
   for (const f of ['bundle.js', 'bundle.css']) {

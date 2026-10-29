@@ -237,11 +237,23 @@ export const NotificationCentre = React.forwardRef<HTMLButtonElement, Notificati
                       {item.text}
                     </span>
                     {/* A space between the lines, so the visible text reads as the name does (WCAG 2.5.3). */}{" "}
-                    <span data-slot="notification-time" className="type-meta text-text-subtle">
-                      {item.time}
+                    <span className="flex flex-wrap items-baseline gap-x-2">
+                      <span data-slot="notification-time" className="type-meta text-text-subtle">
+                        {item.time}
+                      </span>
+                      {/* Unread in a word, after the time as the name says it. The dot, the weight and the colour step
+                          were all there was, and under forced colours only the dot and the weight are left. */}
+                      {fresh ? (
+                        <>
+                          {" "}
+                          <span data-slot="notification-unread" className="type-meta text-text-strong">
+                            Unread
+                          </span>
+                        </>
+                      ) : null}
                     </span>
                   </span>
-                  {/* The dot is the unread state for the eye; "(unread)" says it in words. */}
+                  {/* The dot marks the unread lines down the edge, always beside the word Unread, never alone. */}
                   <span aria-hidden="true" data-slot="notification-dot" className={cn("mt-2.5 size-2 shrink-0 rounded-full", fresh ? "bg-highlight" : "invisible")} />
                 </>
               )

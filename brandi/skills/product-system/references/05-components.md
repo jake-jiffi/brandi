@@ -88,6 +88,12 @@ Every component meets these. The entries in section 3 add only what is particula
 - One shape means "you can press this", and nothing else takes it. The reference kept the pill for
   buttons, filter chips, segmented controls and the switch. Badges, tags and tooltips took small
   radii, because they are read, not pressed. Avatars are circles, the one exception.
+- Every class that sets a corner or a shadow names a role (`rounded-action`, `rounded-list`,
+  `rounded-rail`, `shadow-rail`), and `cn` knows those names, so a later class replaces an earlier one
+  of its kind. Unknown to the merger, `rounded-md rounded-action` kept both and the cascade drew a
+  segmented control as a 16px pill on a 6px brand.
+- A field that holds a number is never narrower than its longest bound as it shows: three digits once
+  sat in a 22px field on a full-width menu at phone width.
 - Status never rides on colour alone. Every status carries a word or an icon, and a state has the
   same word in every product. The status-words table lives in the written system
   (`04-written-system.md`).
@@ -95,6 +101,10 @@ Every component meets these. The entries in section 3 add only what is particula
   is the `hover` wash, or a filled button's own hover token. Disabled fades, loses its shadow and
   says why nearby. Data components add loading, empty and error. Brand-system's eight-state contract
   is the floor (`<brandi>/skills/brand-system/references/10-implementation.md` §7).
+- A state keeps a least step from the colour it changes, and every state of one fill moves the same
+  way from it. A fixed step of lightness rounds back to black, so a black rail's selected row and a
+  black button's press came out invisible, and a dark navy that darkened on hover and lightened on
+  press read as two buttons. The tokens solve both, and the audit measures each step.
 
 ### 2.2 Both themes, every component
 
@@ -156,7 +166,10 @@ shows the phone's sizes. The kit's `pointer-coarse:` variant carries both.
 | Table rows | 48px comfortable, 40px compact |
 
 **Review.** Three targets came in short across the rounds: the toast's Undo, the assistant's steps
-line and a source chip. Measure every pressable thing.
+line and a source chip. Measure every pressable thing. A control inside a bordered group loses the
+border from its height: NumberInput's step buttons, and the list button at the end of a Combobox
+or a TimePicker, were 38px tall in a 40px small field on touch, and 2px short at every size. Inner controls reach over the group's 1px edge (a clear border of
+their own and `bg-clip-padding`, so the edge still shows), and the definition measures them.
 
 **Accepted.** Small controls are 40px on touch rather than 44px. At 44px, chips, tabs and segmented
 options crowd a phone toolbar for no gain in accuracy.
@@ -244,7 +257,7 @@ becomes a list under 640px.
 chart end labels under 300px) showed in full only in a `title` tooltip, which needs a mouse.
 
 **Review.** Long names overflowed the phone title (round 3). Text was truncated with no touch access
-(round 4).
+(round 4). A name cut by a single pixel got an ellipsis and no tooltip: any overflow counts as cut.
 
 ### 2.12 On the canvas
 
@@ -338,10 +351,13 @@ The mark with the product's name, for the top of the rail, sign-in and product e
 
 - **Contract.** `product` (the name as people say it). `color` (as Logo). `layout` (`inline`, with a
   hairline, or `stacked`). `height`. `href` (the whole lockup becomes one link, named "[Brand]
-  [product]").
+  [product]"). `tone` (`rail` on the rail and the top bar: the name takes the rail's strong text,
+  and a dark rail gets the mark drawn for dark grounds).
 - **Rules.** The name is never larger than the mark, and a long name is cut with an ellipsis rather
   than widening the rail. One per screen, top left. How the name is set is a brand-to-product
-  decision.
+  decision. A product named for the brand, in any case, shows the name once and is named once.
+- **Review.** On a dark rail the name took the page's strong text, navy on navy. A product named
+  for its brand showed the name twice, and a screen reader read it twice.
 
 #### Brand character or illustration
 
@@ -453,7 +469,10 @@ One control with its label above it, an optional marker, a hint and an error, wi
 - **Rules.** Labels go above fields, in sentence case, with no colons. Mark optional fields, not
   required ones. An error replaces the hint and says what is wrong and how to fix it ("Enter an [ID]
   with 11 digits"). It carries an icon as well as colour, and appears when the person leaves the
-  field or saves, never while they type.
+  field or saves, never while they type. A form holding a required field sets `noValidate`:
+  without it, the browser's bubble stops the submit before the form's own errors and ErrorSummary
+  can show, and the gates' axe pass fails it (`form-without-novalidate`) on a board, a preview or a
+  route.
 - **Review.** A settings field validated only on save, and field errors gained their icon (round 4).
 
 #### TextInput
@@ -643,7 +662,9 @@ pressable shape.
 - **Rules.** The word carries the meaning, and a state has the same word in every product. Sentence
   case, no full stop. A long label is cut with an ellipsis and shows in full on hover.
 - **Review.** Badge and Tag looked alike (round 1). The highlight and the warning shared a colour,
-  so "needs you" blurred with "heads up" (round 1). One state had five names at two severities
+  so "needs you" blurred with "heads up" (round 1). They are told apart by 2:1 in lightness or a
+  plain difference in colour: a highlighter yellow beside a pale warning tint is close in lightness
+  and still reads as different. One state had five names at two severities
   (round 3).
 
 #### SampleBadge
@@ -686,6 +707,8 @@ Progress toward a known end, with an optional target marker.
   readers hear). `size`.
 - **Rules.** Say the numbers in words beside it ("34 of 40 h"). An unknown length is
   `indeterminate`, never a made-up percentage.
+- **Review.** The default tone drew in the brand fill, and a light brand colour reached 2.17:1 on a
+  light track. It draws in `primary`, which is solved against the tracks a meter fills.
 
 #### Tooltip
 
@@ -755,7 +778,8 @@ definition.
   that takes focus, so the keyboard can scroll it, and the actions column sticks to the right edge.
 - **Layout.** Under 640px of its own width it shows the same rows as a list. The naming column is
   the title, the others make a meta line, badges sit on a line of their own, and the row's menu
-  stays on the right. A column's `phone` sends it to `meta` (the default), `labelled`, `badge`,
+  stays on the right. A column's `phone` sends it to `meta` (the default), `labelled` (the meta
+  line with the column's name in front, so two figures on one row can be told apart), `badge`,
   `action` or `hidden`. `action` keeps a row's one primary action (a column whose cell is a Button)
   on the row, beside its menu, rather than letting it disappear into More actions. Sorting moves to
   the page's own controls.
@@ -808,10 +832,11 @@ badge, value or chevron.
 Label and value pairs for a record's details, in two columns, or stacked for side panes. It stacks
 by itself under 420px.
 
-- **Contract.** `items` (`{ label, value }`, `{ label, badge }`, or `{ label, value, empty }`).
-  `layout` (`columns`, `stacked`).
+- **Contract.** `items` (`{ label, value }`, `{ label, badge }`, `{ label, value, badge }`, or
+  `{ label, value, empty }`). `layout` (`columns`, `stacked`).
 - **Rules.** Labels in `text-subtle`, values in `text`. A missing value says so ("Not set"), never
-  blank.
+  blank. An item with a value and a badge shows both, the value first.
+- **Review.** An item with both dropped its value.
 
 #### Timeline
 
@@ -987,7 +1012,8 @@ and the brand character working, when there is one.
 
 Grey shapes where content is about to appear, in that content's layout. `width`, `height`,
 `circle`, `lines`. It shimmers unless reduced motion is on. It is hidden from screen readers, so say
-"Loading" once, nearby.
+"Loading" once, nearby. The shapes take `line-strong`, a step past the hairline: on a tinted canvas
+the hairline left them at 1.15:1.
 
 #### Thinking
 
@@ -1086,6 +1112,7 @@ The frame of every product: a skip link, the canvas, the rail and the main colum
 - **Behaviour.** "Skip to content" comes first and targets `main`. The open drawer holds focus: the
   page behind it is inert, a Close navigation button sits at its top, Escape and the scrim close it,
   and focus returns to the menu button. Scroll padding keeps focus clear of the phone action bar.
+  The bar is a region named "Page actions", so a primary moved into it is never outside a landmark.
 - **Review.** There was no working phone layout, the only P0 in round 1. The drawer dropped focus
   and let it escape behind (round 2). An invisible tooltip swallowed Escape in the drawer, and the
   action bar could hide focus (round 3).
@@ -1143,6 +1170,9 @@ and Tabs underneath.
   bar at the foot. Long titles wrap.
 - **Rules.** One title per screen, the page's only `h1`, in the title style. The title is the noun
   people use ("Clients", "[Client name]"), never "Dashboard". One primary at most, on the right.
+  Where the display face is set in capitals (`displayCase`), a title over 40 characters reads in
+  the face's own case: a long line of capitals is hard going, and the detector reports it as
+  all-caps body text.
 - **Review.** Long names overflowed the phone title (round 3).
 
 #### Breadcrumbs
@@ -1186,7 +1216,8 @@ In-page navigation for settings and long documents.
 One row of search, filters and view controls above a table or list, wrapping on narrow screens.
 `label` names the group ("[Record] filters"). Search first, then filter chips, a Spacer, then the
 view switcher and secondary actions. Selecting rows swaps the filters for bulk actions. It sits 12px
-above its table, as one block, and sticks while the table scrolls.
+above its table, as one block, and sticks while the table scrolls. On a screen under 560px tall, a
+laptop at 200% zoom, it stops sticking: there a sticky bar hid the focused row under it.
 
 #### Spacer
 
@@ -1365,6 +1396,12 @@ A date, a time, or a period for a report. Every surface.
 - From Delta: a period says what it is compared with ("vs last month").
 - From the formatter: times and durations use the `hours` style, so what people type and what they
   read agree.
+- From NumberInput: the button that opens the list or calendar is named after its field ("Show
+  times for Start"), so seven pickers on a board never read the same. Combobox and MultiSelect
+  name theirs the same way ("Show options for Supplier").
+- Limit: the name comes from a Field label given as plain text, or the control's own aria-label. A
+  label given as an element leaves the button at "Show times" or "Show options" (a NumberInput's
+  steppers at "value"), so give that control an aria-label.
 - *(practice)* Typing a date always works, in the product's date format. Arrows move by day, and
   Page Up and Page Down by month.
 
@@ -1374,6 +1411,7 @@ A quantity or an amount, with step buttons. Ops and consumer apps.
 
 - From TextInput: the right `inputMode`, and a prefix or suffix read with the field.
 - From IconButton: the step buttons are named by what they change ("Increase quantity").
+- From Touch: the step buttons and the field are the control's full height, over the group's edge.
 - From Field: a typed value is checked when the person leaves the field, never while they type.
 - *(practice)* Up and Down step the value.
 
@@ -1421,6 +1459,9 @@ The events for the signed-in person, opened from the header or the rail. Ops and
   nothing. Counts are read as words.
 - From Timeline: each line names who did what, and the assistant's lines carry the `ai` tone.
 - From Menu: a portal, and focus back to the trigger.
+- From colour and contrast: an unread line says Unread in a word on screen. The dot, the weight
+  and the colour step are extras: a brand dot can sit at 2:1, and forced colours keep only the
+  dot and the weight.
 
 #### Board · to build, not yet proven
 
@@ -1491,6 +1532,8 @@ A detail screen's top bar, with Back and the screen's title. Every surface, on p
 - From AppShell: under 1024px, list and detail become two screens with a back button, and a top bar
   holds the menu button and the lockup. This makes that bar a component.
 - From the focus model: after navigating, focus moves to the new screen's `main`.
+- Its actions and its focus take the rail's colours (the on-rail scope), so an icon reads on a dark
+  rail. In the page's ink one read at 1.6:1, and axe, which reads no icon, passed it.
 
 #### Workspace switcher · to build, not yet proven
 
@@ -1523,6 +1566,8 @@ The product's transactional emails: lockup, heading, body, button and footer. Ev
 
 - From ProductLockup: the lockup is meant for product emails.
 - From the principles: one primary action per email, labelled verb first.
+- The logo's own class rules are written onto its elements, because mail clients strip a
+  stylesheet, the brand export's included.
 - *(practice)* Inline styles and table layout for mail clients, a plain-text part, and a check in
   light and dark mail apps.
 

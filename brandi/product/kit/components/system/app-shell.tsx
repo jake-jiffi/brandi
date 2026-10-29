@@ -31,7 +31,10 @@ export function useShell() {
 export const drawerContext = React.createContext<{ onClose: () => void } | null>(null)
 
 // The drawer is the Sheet from the left, on the rail's own colours, never wider than a thumb's reach.
-const drawerClass = "max-w-80 overflow-hidden bg-rail text-rail-text [--focus:var(--rail-focus)]"
+// The drawer is the rail on a phone, lined as the rail is. As a sheet it already takes the shell's form; the still
+// picture of it, which is no sheet, takes the same inset.
+const drawerClass = "max-w-80 overflow-hidden border-rail-edge bg-rail text-rail-text [--focus:var(--rail-focus)] [border-width:var(--rail-outline,0px)_1px_var(--rail-outline,0px)_var(--rail-outline,0px)]"
+const drawerInset = "inset-y-[var(--shell-inset,0px)] left-[var(--shell-inset,0px)] w-[calc(100%-2*var(--shell-inset,0px))]"
 
 export interface AppShellProps {
   /** A Sidebar. It is the rail from 1024px, and the drawer's contents under that. Built in the board's script on a canvas. */
@@ -146,8 +149,9 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
         {sidebar ? (
           <div
             data-slot="app-shell-rail"
-            // Inset 8px from the screen's edges, as the sheet is. 72px of icons from 1024px, the full rail from 1280px.
-            className="hidden w-[calc(var(--rail-collapsed)+0.5rem)] shrink-0 py-2 pl-2 @min-[1024px]/shell:flex @min-[1280px]/shell:w-[calc(var(--rail-width)+0.5rem)]"
+            // The rail's form is the brand's (shell-inset): set in from the window edge when it floats, against the
+            // edge when it does not. 72px of icons from 1024px, the full rail from 1280px.
+            className="hidden w-[calc(var(--rail-collapsed)+var(--shell-inset,0px))] shrink-0 py-[var(--shell-inset,0px)] pl-[var(--shell-inset,0px)] @min-[1024px]/shell:flex @min-[1280px]/shell:w-[calc(var(--rail-width)+var(--shell-inset,0px))]"
           >
             {sidebar}
           </div>
@@ -222,7 +226,7 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
               data-slot="sheet-content"
               data-side="left"
               data-inline=""
-              className={cn(sheetPanelClass, drawerClass, "absolute inset-y-2 left-2 w-[calc(100%-1rem)]")}
+              className={cn(sheetPanelClass, drawerClass, "absolute", drawerInset)}
             >
               <drawerContext.Provider value={drawer}>{sidebar}</drawerContext.Provider>
             </div>

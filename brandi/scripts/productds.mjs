@@ -11,6 +11,7 @@
  */
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 
 const REFUSED = /(^|\/)(package\.json|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|bunfig\.toml|tsconfig\.json|deno\.json|CLAUDE\.md|AGENTS\.md)$/;
@@ -18,6 +19,9 @@ const SKIP_DIRS = new Set(['node_modules', '.next', 'dist', '.turbo', '.git']);
 const RENAME = { 'package.json': 'package.json.txt', 'tsconfig.json': 'tsconfig.json.txt' };
 const CALL_PATHS = 250;
 const CALL_BYTES = 15 * 1024 * 1024;
+// The publish infers a type from the extension, and has none for these: each goes as text/plain, through `files`,
+// because a call's file_path carries no type. Four calls were rewritten by hand, 189 files, before this.
+const PLAIN_TEXT = /\.(ts|tsx|mts|cts|py)$/i;
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
@@ -112,6 +116,8 @@ export function designSystemIndex({ live = null, system, title, by = 'Claude', n
   };
   index.namespace = system.global;
   index.libraries = [{ name: 'react', version: '18' }, { name: 'react-dom', version: '18' }];
+  // A live index from a system with no picture groups yet may carry no list of them.
+  if (!Array.isArray(index.groups)) index.groups = [];
   for (const [group, entry] of Object.entries(assetGroups)) {
     const was = index.assetGroups?.[group] ?? { name: group, tile: 'm', order: [], files: {} };
     index.assetGroups = { ...index.assetGroups, [group]: { ...was, ...entry, files: { ...was.files, ...entry.files }, order: [...new Set([...(was.order ?? []), ...(entry.order ?? [])])] } };
@@ -127,12 +133,21 @@ const assetKey = (name) => name.replace(/[^A-Za-z0-9_./-]/g, (c) => `~${c.charCo
  * Write the publish folder and return the calls. `blobs` maps an asset path ("Logos/mark.svg") to
  * the upload result ({ id, size, type }), from uploading each listed picture with asset: true.
  */
-export function assembleDesignSystem({ productDir, starter, outDir, title, live = null, blobs = {}, by, tagline }) {
+export function assembleDesignSystem({ productDir, starter, outDir, title, live = null, blobs = {}, by, tagline, all = false }) {
   const system = JSON.parse(readFileSync(path.join(starter, 'system', 'system.json'), 'utf8'));
   const tokens = JSON.parse(readFileSync(path.join(productDir, 'tokens.json'), 'utf8'));
   const docs = path.join(productDir, 'docs');
   if (!existsSync(path.join(docs, 'README.md'))) throw new Error('No product/docs/README.md. Write the README and the sections first (04-written-system.md): they are the brand book the Design System opens on.');
   const project = path.join(outDir, 'project');
+  // What the last staging held, file by file, so a republish against the live index sends only what changed.
+  const sha = (file) => createHash('sha256').update(readFileSync(file)).digest('hex');
+  const before = new Map();
+  if (existsSync(project)) {
+    for (const rel of readdirSync(project, { recursive: true })) {
+      const file = path.join(project, rel);
+      if (rel !== 'design-system.json' && statSync(file).isFile()) before.set(rel.split(path.sep).join('/'), sha(file));
+    }
+  }
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(project, { recursive: true });
   const files = [];
@@ -181,21 +196,44 @@ export function assembleDesignSystem({ productDir, starter, outDir, title, live 
   const index = designSystemIndex({ live, system, title, by, assetGroups });
   writeFileSync(path.join(project, 'design-system.json'), `${JSON.stringify(index, null, 2)}\n`);
 
+  // A republish (the live index given) sends what changed since the last staging, and null for what went: the type
+  // keeps every file it is not sent. 56 of 541 files changed in one round. `all` sends everything.
+  const republish = Boolean(live) && before.size > 0 && !all;
+  const unchanged = republish ? files.filter((rel) => before.get(rel) === sha(path.join(project, rel))) : [];
+  const gone = republish ? [...before.keys()].filter((rel) => !files.includes(rel)) : [];
+
   // Calls: up to 250 paths and 15 MB each, the index alone in the last.
   const calls = [];
   let current = null;
-  for (const rel of files) {
+  for (const rel of files.filter((r) => !unchanged.includes(r))) {
     const bytes = statSync(path.join(project, rel)).size;
-    if (!current || current.files.length >= CALL_PATHS || current.bytes + bytes > CALL_BYTES) { current = { files: [], bytes: 0 }; calls.push(current); }
+    // One path short of the limit, so a call can still take the plain file it may borrow below.
+    if (!current || current.files.length >= CALL_PATHS - 1 || current.bytes + bytes > CALL_BYTES) { current = { files: [], bytes: 0 }; calls.push(current); }
     current.files.push(rel);
     current.bytes += bytes;
   }
+  // A call leads with a file whose type the extension gives. One made only of typed-as-text files borrows a
+  // plain one from an earlier call that has two.
+  for (const c of calls) {
+    if (c.files.some((f) => !PLAIN_TEXT.test(f))) continue;
+    const donor = calls.find((d) => d !== c && d.files.filter((f) => !PLAIN_TEXT.test(f)).length > 1);
+    if (!donor) throw new Error(`A publish call holds only TypeScript or Python files (${c.files[0]} and others), and no other call has a file to lead it.`);
+    const size = (f) => statSync(path.join(project, f)).size;
+    const lent = donor.files.filter((f) => !PLAIN_TEXT.test(f)).sort((a, b) => size(a) - size(b))[0];
+    donor.files.splice(donor.files.indexOf(lent), 1);
+    c.files.unshift(lent);
+  }
+  const dataCalls = calls.length;
   calls.push({ files: ['design-system.json'], bytes: 0, index: true });
-  const publishCalls = calls.map((c) => {
-    const [first, ...rest] = c.files;
-    return { root: outDir, file_path: path.join(project, first), files: Object.fromEntries(rest.map((r) => [`project/${r}`, `project/${r}`])) };
+  const publishCalls = calls.map((c, i) => {
+    const first = c.files.find((f) => !PLAIN_TEXT.test(f));
+    const rest = c.files.filter((f) => f !== first);
+    const map = Object.fromEntries(rest.map((r) => [`project/${r}`, PLAIN_TEXT.test(r) ? { from: `project/${r}`, contentType: 'text/plain' } : `project/${r}`]));
+    // What went rides with the last call that carries files, or with the index when nothing else changed.
+    if (gone.length && i === Math.max(dataCalls - 1, 0) && (dataCalls > 0 || c.index)) for (const r of gone) map[`project/${r}`] = null;
+    return { root: outDir, file_path: path.join(project, first), files: map };
   });
-  return { system, files, calls: publishCalls, uploads, index };
+  return { system, files, calls: publishCalls, uploads, index, unchanged, gone };
 }
 
 export default { assembleDesignSystem, designSystemIndex, coverPage, starterFiles };

@@ -89,8 +89,13 @@ system records the same id, and that is how the drift check knows which version 
 - **Read before you write.** Re-read the live index (`project/design-system.json`) right before
   writing it. Keep its creation marker; change only the last-change record (who, via what, when, and
   a note). Send it last, after every other file.
-- **Send only what changed.** By the end of a round that is one call.
-- **Content types.** Send TypeScript and Python files with an explicit `text/plain` type.
+- **Send only what changed.** Pass the live index to `$A product ds` as `--live <file>`: its calls then
+  carry only the files that changed since the last staging, and `null` for a file that went, with the
+  index last (`--all` sends everything). Publish each staging before the next run, since the next one
+  compares against it. One round's re-shape changed 56 of 541 files.
+- **Content types.** Send TypeScript and Python files with an explicit `text/plain` type, as
+  `{ "from": ..., "contentType": "text/plain" }` in `files`. A call's `file_path` carries no type, so
+  it is never one of them. `$A product ds` writes every call that way.
 - **Images go to the asset store** and are named in the index; each group's README is a file.
 - **Ask first.** Publishing or changing a live artifact waits for the person's yes, every time.
 - **Beside a live system, never over it.** When the brand already has a Design System artifact in
@@ -100,8 +105,10 @@ system records the same id, and that is how the drift check knows which version 
 ## Installing it on a canvas
 
 The canvas installs the system by copying its files server side from the published Design System,
-not by uploading them again: `tokens.json`, `tokens.css`, the font files, `components/bundle.css` and
-`components/bundle.js` into the canvas's `ds/<namespace>/` folder. The canvas's index records which
+not by uploading them again: `tokens.json`, the font files, `components/bundle.css` and
+`components/bundle.js` into the canvas's `ds/<namespace>/` folder. `tokens.css` is the exception: the
+type never stores it (its page writes it in the browser), so there is nothing to copy, and the canvas
+folder's own `ds/<namespace>/tokens.css`, with its `@font-face` rules, goes as a local file instead. The canvas's index records which
 version of the system it came from and when it was copied. Copy the fonts once; copy the rest
 whenever the system changes, and check the copies' checksums against the source (`09-operate.md`).
 

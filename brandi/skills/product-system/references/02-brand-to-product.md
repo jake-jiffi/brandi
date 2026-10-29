@@ -27,6 +27,10 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `time` | How the brand writes a time, `{ "minutes": ":" or ".", "onTheHour": "keep" or "drop", "space": true or false }`. "11am to 10.30pm" is `{ ".", "drop", false }`. Every time the system writes follows it | 9:30 am: minutes kept, a space before am or pm |
 | `charts.avoid` | Colours the brand keeps off one theme's grounds, `{ "light": [...], "dark": [...] }`: no chart series takes them or their hue there | None |
 | `brandColours` | The brand book's named colours, emitted as `brand-*` | The primary and accents |
+| `shape.families` | Each family's radius, measured from the brand's own work, with its source: `press`, `control`, `card`, `pane`, `frame` (Shape, below) | Derived from the brand's scale, never rounder than the largest radius measured, and listed as the kit's |
+| `shape.action` | Whatever a person can press, when `press` is not measured: `"pill"`, `"control"` (buttons match the inputs) or a value | The pill, listed as the kit's |
+| `shape.shell` | The rail's form, `{ "form": "edge" or "floating", "source" }` | `edge`: the rail meets the window edge, square, listed as the kit's |
+| `shape.moves` | The brand's own shape moves the product carries, `[{ "name", "source", "where" }]` | None, and every round record says so |
 
 A decided role is used exactly as given. If it fails the audit, resolve it with the person (a
 different role, a darker variant, a different label) and record the outcome. Never move it silently.
@@ -72,8 +76,9 @@ comparisons grey and dashed, status colours reserved for status. The brand's own
 first slots (the brand colour, then its accents), so a chart reads as the brand's; Brandi's
 colour-vision-checked palette fills the rest, skipping hues already taken. Each series is then lifted
 or dropped until it clears 3:1 in both themes, which turns a pale accent (a yellow) into a usable
-darker series. The audit reports neighbours that collapse under a colour-vision deficiency: label
-those lines directly, or reorder.
+darker series. No two slots share a colour: in dark the colour-vision-safe set can come to four
+hues, and a sixth slot once wrapped round to the first. The audit reports neighbours that collapse
+under a colour-vision deficiency: label those lines directly, or reorder.
 
 **Two full themes.** Light is the default. Dark is a theme of its own, not an inversion and not a
 per-screen choice: in the last system's first build, dark mode lost its hierarchy (the rail sat at
@@ -94,7 +99,9 @@ pairs; the engine's default set checks more.
 title, a greeting or full-page headline, and the sign-in hero. One display moment per screen. Set
 `font-synthesis: none` so the browser never fakes a bold or italic the face does not have, and never
 use a face with old-style figures for numbers. If the display face cannot sit at 26px in a page
-header, set `displayForTitles: false` and titles use the body face, bold.
+header, set `displayForTitles: false` and titles use the body face, bold. Numerals stay out of a
+display face the brand never sets them in: a generated board's part number sits under its heading,
+in the body face.
 
 **The body face for everything else**, sized for density: body 14/20 at every width including
 phones, body-lg 16/24 for reading (answers, notes, help), labels at 500, headings at 700, tabular
@@ -114,18 +121,79 @@ respect the terms: a face licensed for the brand's own work only stays inside th
 
 ## Shape, space and marks
 
+**Measure the brand's shapes before choosing any.** A product drifts towards the kit's look unless its
+shapes come from the brand. Measure each family from the brand's own work and record where: the
+guidelines first, then its live work (website, app, signage) where the guidelines say nothing. Measure a
+drawn shape in a PDF from its path, and a live site from its computed style: `$A product measure --url
+<site>` reads the site in the installed Chrome and suggests each family and the shell with its source,
+counting only the brand's own text buttons (not app-store badges or icons). Keep what the guidelines
+settle and take the rest. Never take a shape from another brand, however good it looks.
+
+| Family | Sets | Measure |
+| --- | --- | --- |
+| `press` | `radius-action` | The brand's buttons and calls to action |
+| `control` | `radius-control` | Its form fields. With none to measure, `"action": "control"` gives the inputs the buttons' radius |
+| `card` | `radius-md` | Content cards and panels |
+| `pane` | `radius-lg` | Dialogs and panels that sit over a page |
+| `frame` | `radius-frame` | Photos and the frames round them |
+
+```json
+"shape": {
+  "action": "control",
+  "families": {
+    "press": { "px": 4, "source": "the website's buttons, computed style, on the date measured" },
+    "card": { "px": 12, "source": "the cards on p12, 9 pt corners measured from the PDF" },
+    "frame": { "px": 0, "source": "every photo in the guidelines is square" }
+  },
+  "shell": { "form": "edge", "source": "the website's navigation: a full-width bar, square" },
+  "moves": [{ "name": "The paper ground", "source": "the guidelines' page grounds, the brand's texture file", "where": ["the website hero", "the app welcome"] }]
+}
+```
+
+**What nobody measured is derived, and held.** A family with no measurement comes from the brand's
+scale, never rounder than the largest radius measured: a pane is never rounder than a card, a badge
+never rounder than a control. A scale that steps up by half again from a 10px control reaches 23px
+panes, rounder than anything the brand draws. That is how two different brands came out looking alike.
+
 **Radius as a signal.** Decide what the radii mean and write it down. One proven rule: "if it is a
 pill, you can press it", so only buttons, chips, segmented controls and switches are pills, and
-people learn the shape. Radii come from the brand's shape stance, renamed for product jobs (`radius-sm`
-for badges, `radius-control` for inputs, `radius-md` for cards, `radius-lg` for panes and dialogs).
-Whatever a person can press takes `radius-action`: the pill unless product.json says otherwise,
-`"shape": { "action": "control" }` for buttons that match the inputs, or a value of its own. Record
-the choice in the brand-to-product section either way.
+people learn the shape. It is the default for `radius-action` when `press` is not measured, and a
+measured press wins over it.
+
+**The shell's form is the brand's.** By default the rail meets the window edge, square, with a line
+on its inner side only. It floats (8px in from the edges, rounded with the pane radius, lined all
+round, the drawer the same) only when the brand's own product or site draws floating panels.
+Its edge takes `rail-edge`: the rail's own line where the rail stands well apart from the page, the
+page's hairline where the two sit close (a black rail on a near-black dark canvas). Sheets are attached
+to a window edge too, so they take the same form; dialogs, popovers and menus
+float over the page and keep their own corners. `shape.shell` records which, with its source.
+
+**Lists sit concentric.** A menu, select or listbox holds its items 4px in, so its corner
+(`radius-list`) is the control's plus 4px, never rounder than a card. A 16px panel round 6px items
+reads as a pill under a field.
+
+**Carry one of the brand's own shape moves.** Name the shapes only this brand makes (a texture, an
+edge, a mark it repeats) and carry at least one into the product where it suits: a website hero, an
+app welcome, an email header. Never behind a list, a form or a table, where it is noise. Use the
+brand's own file. A move that has no file in the brand's material is a question for the brand's team,
+not something to draw. Lay a texture on a layer behind the words (a `::before` multiplied over the band's
+own colour), never as the band's background image: the detector reads past a background image to the
+page behind it, and reported black words on a green band as 1.1:1 in dark when they were 8:1. Set its
+strength so the darkest mark under the words still clears 4.5:1: a full-strength fleck beside a full stop
+reads as punctuation.
+
+**The kit's choices are listed.** `$A product audit` and every round record list each shape and shell
+choice the brand did not make, with how the kit made it. Measure what you can; never present the
+rest as the brand's.
 
 **Spacing aligned to the code.** A 4px scale whose names match Tailwind's, so `p-5` in code is
 `space-5` in a design. A brand scale where `space-5` means 24px makes every handover a translation.
 
 **Controls:** 32, 36 and 44px, growing to 40, 44 and 48 on touch.
+
+**A mark for narrow places.** The icons-only rail is 72px wide, too narrow for most full logos at their
+minimum. With a symbol, it shows the symbol in the rail's rendition; without one, a plain Home control,
+never a full logo cut by the edge. Ask the brand for a symbol ("Worth fixing in the brand repo").
 
 **The wordmark at small sizes.** Brand logo files carry clear space inside the viewBox, so at 20px
 tall the letters can end up 9px tall. The product uses tight-viewBox copies, and the clear-space rule

@@ -233,7 +233,7 @@ function PanelPicture({ className, children }: { className?: string; children?: 
     <div
       data-slot="combobox-panel"
       data-state="open"
-      className={cn("absolute top-full left-0 z-(--z-popover) mt-1 flex max-h-80 w-full min-w-48 flex-col overflow-hidden rounded-md border border-line bg-surface-raised p-1 type-body text-text shadow-md", className)}
+      className={cn("absolute top-full left-0 z-(--z-popover) mt-1 flex max-h-80 w-full min-w-48 flex-col overflow-hidden rounded-list border border-line bg-surface-raised p-1 type-body text-text shadow-md", className)}
     >
       {children}
     </div>
@@ -258,8 +258,10 @@ const Toggle = React.forwardRef<
       // Keeps the caret in the field.
       onMouseDown={(event) => event.preventDefault()}
       onClick={onToggle}
+      // It reaches over the box's 1px edge, top and bottom, so it is the field's full height (40px at sm on touch,
+      // not 38): a clear border there keeps the edge showing, and the hover tint stays inside it.
       className={cn(
-        "grid h-full w-9 shrink-0 place-items-center rounded-r-[calc(var(--radius-control)-1px)] text-text-muted transition-colors hover:bg-hover hover:text-text-strong disabled:pointer-events-none pointer-coarse:w-11",
+        "-my-px grid h-[calc(100%+2px)] border-y border-transparent bg-clip-padding w-9 shrink-0 place-items-center rounded-r-[calc(var(--radius-control)-1px)] text-text-muted transition-colors hover:bg-hover hover:text-text-strong disabled:pointer-events-none pointer-coarse:w-11",
         className
       )}
     >
@@ -366,6 +368,8 @@ export const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(functi
   const label = ariaLabelProp ?? ariaLabel
   const labelledBy = ariaLabelledbyProp ?? ariaLabelledby
   const listLabelledBy = labelledBy ?? (label ? undefined : control.field?.labelId)
+  // The toggle is named after its field, as NumberInput names its steppers: every list on a form read "Show options".
+  const what = label ?? control.field?.labelText
   const base = React.useId()
   const listId = `${base}-list`
   const index = React.useMemo(() => new Map(items.map((o, i) => [o.value, i])), [items])
@@ -566,7 +570,7 @@ export const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(functi
       <Toggle
         open={isOpen}
         controls={listId}
-        label={shown ? "Hide options" : "Show options"}
+        label={`${shown ? "Hide" : "Show"} options${what ? ` for ${what}` : ""}`}
         disabled={disabled}
         onToggle={() => {
           if (design) return

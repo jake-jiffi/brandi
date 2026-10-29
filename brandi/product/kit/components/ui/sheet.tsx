@@ -57,7 +57,11 @@ const SheetOverlay = React.forwardRef(function SheetOverlay({
 
 // Patched (07-starter.md, sheet): the system's material (raised surface, radius-lg, shadow-xl), shared
 // with a sheet drawn in place on a canvas.
-const sheetPanelClass = "flex w-full max-w-[440px] flex-col rounded-lg bg-surface-raised text-text shadow-xl"
+// A sheet is attached to an edge of the window, as the rail is, so it takes the shell's form: square against the edge,
+// or set in by shell-inset with the rail's corner when the brand's rail floats. Like the rail it is lined on its inner
+// side (all round when it floats), so forced colours still draw its edge.
+const sheetPanelClass =
+  "flex w-full max-w-[440px] flex-col rounded-rail border-line bg-surface-raised text-text shadow-xl data-[side=right]:[border-width:var(--rail-outline,0px)_var(--rail-outline,0px)_var(--rail-outline,0px)_1px] data-[side=left]:[border-width:var(--rail-outline,0px)_1px_var(--rail-outline,0px)_var(--rail-outline,0px)] data-[side=bottom]:[border-width:1px_var(--rail-outline,0px)_var(--rail-outline,0px)_var(--rail-outline,0px)] data-[side=top]:[border-width:var(--rail-outline,0px)_var(--rail-outline,0px)_1px_var(--rail-outline,0px)]"
 
 // Patched (07-starter.md, sheet): inset 8px from the screen's edges like the rail, never wider than the
 // screen less that inset, sliding in only under motion-safe. overlayProps lets the scrim carry the
@@ -84,7 +88,7 @@ const SheetContent = React.forwardRef(function SheetContent({
         data-side={side}
         className={cn(
           sheetPanelClass,
-          "fixed z-(--z-sheet) animation-duration-(--duration-slow) ease-standard data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:max-w-none data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:w-[calc(100%-1rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:w-[calc(100%-1rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:max-w-none data-open:animate-in data-open:fade-in-0 data-[side=bottom]:motion-safe:data-open:slide-in-from-bottom-10 data-[side=left]:motion-safe:data-open:slide-in-from-left-10 data-[side=right]:motion-safe:data-open:slide-in-from-right-10 data-[side=top]:motion-safe:data-open:slide-in-from-top-10",
+          "fixed z-(--z-sheet) animation-duration-(--duration-slow) ease-standard data-[side=bottom]:inset-x-[var(--shell-inset,0px)] data-[side=bottom]:bottom-[var(--shell-inset,0px)] data-[side=bottom]:max-w-none data-[side=left]:inset-y-[var(--shell-inset,0px)] data-[side=left]:left-[var(--shell-inset,0px)] data-[side=left]:w-[calc(100%-2*var(--shell-inset,0px))] data-[side=right]:inset-y-[var(--shell-inset,0px)] data-[side=right]:right-[var(--shell-inset,0px)] data-[side=right]:w-[calc(100%-2*var(--shell-inset,0px))] data-[side=top]:inset-x-[var(--shell-inset,0px)] data-[side=top]:top-[var(--shell-inset,0px)] data-[side=top]:max-w-none data-open:animate-in data-open:fade-in-0 data-[side=bottom]:motion-safe:data-open:slide-in-from-bottom-10 data-[side=left]:motion-safe:data-open:slide-in-from-left-10 data-[side=right]:motion-safe:data-open:slide-in-from-right-10 data-[side=top]:motion-safe:data-open:slide-in-from-top-10",
           className
         )}
         {...props}

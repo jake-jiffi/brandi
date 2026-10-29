@@ -1,0 +1,1181 @@
+{
+ "about": "What testing on real brands has taught the product layer. Each lesson names what broke, the brand trait that exposed it (an id in product/traits, or null), the checks and tests that now fail without its fix, and the reference section that teaches its rule. A detector guard is the pinned detector, run on that component by tools/traits.mjs under the lesson's trait; a starter guard is a check in kit/tools/check-starter.mjs, run on the starter's routes. tests/productlessons.test.mjs holds every entry to the code. references/09-operate.md, After every round, says when to add one.",
+ "lessons": [
+  {
+   "id": "L1",
+   "broke": "The Schedule and TimePicker checks expected the kit's own \"9:30 am\", so they failed on a brand that writes \"9.30am\" though the components wrote it correctly.",
+   "trait": "time-dot",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "TimePicker",
+     "name": "Typing moves the list to the time it reads as, and Enter takes what was typed, written in the locale's way"
+    },
+    {
+     "kind": "check",
+     "component": "Schedule",
+     "name": "Every event reads its title and time, and a slot inside a longer event says what continues"
+    }
+   ],
+   "teaches": {
+    "file": "product/kit/CONVENTIONS.md",
+    "heading": "The definition"
+   }
+  },
+  {
+   "id": "L2",
+   "broke": "A brand that writes its times its own way had nowhere to say so, so every time on screen read the kit's way.",
+   "trait": "time-dot",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productformat.test.mjs",
+     "name": "a brand's own way reaches every time: 11am to 10.30pm"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Where the decisions live"
+   }
+  },
+  {
+   "id": "L3",
+   "broke": "A long page title set in a display face the brand sets in capitals became a line of capitals, which the detector reads as all-caps body text.",
+   "trait": "condensed-caps",
+   "guards": [
+    {
+     "kind": "detector",
+     "component": "PageHeader"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "PageHeader"
+   }
+  },
+  {
+   "id": "L4",
+   "broke": "A display face the brand only sets in capitals had nowhere to say so, so the product set it in the face's own case.",
+   "trait": "condensed-caps",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a display face set only in capitals takes them in the title styles, and nowhere else"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Where the decisions live"
+   }
+  },
+  {
+   "id": "L5",
+   "broke": "A condensed display face fell back to a serif, and the condensed fallback's double-quoted names then closed every style attribute they sat in, so the book's specimen and display steps printed at body size.",
+   "trait": "condensed-caps",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/type.test.mjs",
+     "name": "a condensed face falls back to a condensed sans, a sans to a sans, and anything else to a serif"
+    },
+    {
+     "kind": "test",
+     "file": "tests/branddeck.test.mjs",
+     "name": "a condensed display face keeps every style attribute whole in the book, the A4 book and the sheets"
+    }
+   ],
+   "teaches": {
+    "file": "skills/brand-system/references/06-brand-book-outline.md",
+    "heading": "Typography"
+   }
+  },
+  {
+   "id": "L6",
+   "broke": "Avatar initials on a dark rail turned white on a pale tint, about 1.2:1, and no gate measured them, because they were drawn content.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Avatar",
+     "name": "Initials hold 4.5:1 on their tint, on a rail that turns its text light too, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Avatar"
+   }
+  },
+  {
+   "id": "L7",
+   "broke": "The current rail item and tab-bar place were marked by their fill alone, 1.32:1 on a dark rail.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "NavItem",
+     "name": "The current page is marked at 3:1 or more, against the rail and against its own fill, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "PhoneTabBar",
+     "name": "The current place is marked at 3:1 or more against the bar and the icon's fill, and a grey count's chip edge shows, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "NavItem"
+   }
+  },
+  {
+   "id": "L8",
+   "broke": "A pure black rail got a selected row and a hairline nobody could see, and a black primary had no hover or press, because a fixed step of lightness from black rounds back to black.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a pure black rail and primary still get a hover, a selected row, a hairline and a press"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.1 Tokens, shape, status and the shared states"
+   }
+  },
+  {
+   "id": "L9",
+   "broke": "A dark navy primary darkened on hover and lightened on press, so one button looked like two.",
+   "trait": "navy-primary",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "stateOf: one fill's states all move the same way, each further than the last"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.1 Tokens, shape, status and the shared states"
+   }
+  },
+  {
+   "id": "L10",
+   "broke": "A quiet control put on the rail, such as a bell or a footer button, drew in the page's ink, close to invisible on a dark rail.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Sidebar",
+     "name": "A control put on the rail draws in the rail's colours, so it reads on a dark rail, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Sidebar"
+   }
+  },
+  {
+   "id": "L11",
+   "broke": "The phone top bar's actions drew in the page's ink, 1.6:1 on a dark rail, and axe passed them because it reads no icon.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "PhoneTopBar",
+     "name": "An action passed in reads on the bar, on any rail, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Phone top bar · to build, not yet proven"
+   }
+  },
+  {
+   "id": "L12",
+   "broke": "The lockup's product name took the page's strong text on a dark rail, navy on navy, and the rail drew the mark made for light grounds.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "the rail's tone comes from the tokens, aliases followed"
+    },
+    {
+     "kind": "detector",
+     "component": "ProductLockup"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "ProductLockup"
+   }
+  },
+  {
+   "id": "L13",
+   "broke": "Focus rings on a dark rail faded in from the page's focus colour, which the rail swallows.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "NavItem",
+     "name": "Focus is drawn inside the item in rail-focus, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "Sidebar",
+     "name": "Focus on the rail is drawn in rail-focus, in both themes"
+    },
+    {
+     "kind": "check",
+     "component": "PhoneTopBar",
+     "name": "Focus on the bar is drawn in rail-focus, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Sidebar"
+   }
+  },
+  {
+   "id": "L14",
+   "broke": "Progress drew its default tone in the brand fill, and a light brand colour reached 2.17:1 on a light track.",
+   "trait": "pale-primary",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Progress",
+     "name": "Every tone's fill holds 3:1 against the track, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Progress"
+   }
+  },
+  {
+   "id": "L15",
+   "broke": "Badge's check held needs-you and heads-up apart by lightness alone, and failed a highlighter yellow that reads as plainly different from a pale warning tint.",
+   "trait": "pale-primary",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Badge",
+     "name": "Highlight is solid and warning is a tint, so needs you never blurs with heads up, in both themes (2:1 apart or plainly different in colour)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Badge"
+   }
+  },
+  {
+   "id": "L16",
+   "broke": "Skeleton shapes sat at 1.15:1 on a tinted canvas, because they took the hairline colour.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Skeleton",
+     "name": "The shapes sit a step from their ground in both themes: darker in light, lighter in dark, never a black hole"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Skeleton"
+   }
+  },
+  {
+   "id": "L17",
+   "broke": "A colour the brand keeps off dark grounds still took a dark chart series.",
+   "trait": "charts-avoid",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a colour the brand bars from dark grounds takes no chart series there, nor does its hue"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Where the decisions live"
+   }
+  },
+  {
+   "id": "L18",
+   "broke": "A colour kept off the charts still reached avatars, through the tint a name's hash hands out.",
+   "trait": "charts-avoid",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a tag on a barred hue is kept out of a name's hash in both themes, because a person cannot choose their name"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "the tags the tokens keep out of a name's hash reach lib/product.ts, where Avatar reads them"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Avatar"
+   }
+  },
+  {
+   "id": "L19",
+   "broke": "A product named the same as its brand showed the name twice in its lockup and its emails, and a screen reader read it twice.",
+   "trait": "same-name",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "ProductLockup",
+     "name": "A product named for the brand shows the name once and is named once"
+    },
+    {
+     "kind": "check",
+     "component": "Email",
+     "name": "A product named for the brand is the mark alone, in the email and its plain text; another product keeps its name"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "ProductLockup"
+   }
+  },
+  {
+   "id": "L20",
+   "broke": "Checks expected the kit's placeholder names as literals, so they failed on any real brand.",
+   "trait": "own-name",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Email",
+     "name": "The lockup leads, named as ProductLockup names it, then the heading, the body, the action and the footer, in reading order"
+    },
+    {
+     "kind": "check",
+     "component": "ProductLockup",
+     "name": "With href it is one link, named for the brand and the product"
+    },
+    {
+     "kind": "check",
+     "component": "Logo",
+     "name": "It is an image named for the brand, drawn from the artwork and never set in type"
+    }
+   ],
+   "teaches": {
+    "file": "product/kit/CONVENTIONS.md",
+    "heading": "The definition"
+   }
+  },
+  {
+   "id": "L21",
+   "broke": "The generated lib/product.ts was typed as const, so its values narrowed to literals and the rail components stopped compiling.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "the generated file is the kit's own, with the product's values in it, so its types are the ones the components compile against"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "In the generator"
+   }
+  },
+  {
+   "id": "L22",
+   "broke": "Logo's check expected the placeholder's 16px minimum rather than the brand's own.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Logo",
+     "name": "A height under the logo system's minimum is raised to it"
+    }
+   ],
+   "teaches": {
+    "file": "product/kit/CONVENTIONS.md",
+    "heading": "The definition"
+   }
+  },
+  {
+   "id": "L23",
+   "broke": "A character pose given as a still was a path from the page root, so every board on the canvas drew a broken image and no gate saw it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a large still is drawn down into the bundle, so a board on the canvas shows it"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a still Chrome could not draw down goes in whole, never as a path from the page root a board cannot reach"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L24",
+   "broke": "A brand's logo files styled their paths through shared class rules, so two renditions drawn side by side painted each other and the wordmark vanished on light grounds.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a file keeps its class names to itself, so two renditions side by side keep their colours"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "the one-ink rendition rewrites colours inside a style block without swallowing the next rule"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L25",
+   "broke": "Brand logo files carry their clear space inside the viewBox, so a logo sized to 20px drew letters 9px tall.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "the viewBox is cut to the ink, so clear space inside a brand file does not shrink the letters"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Logo"
+   }
+  },
+  {
+   "id": "L26",
+   "broke": "A logo supplied only as a PNG could not be a mark.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "a PNG logo becomes a mark drawn in a viewBox of its own size; an ink rendition has to stay an SVG"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L27",
+   "broke": "An email's logo carried the brand export's stylesheet into the body, which mail clients strip.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productbrand.test.mjs",
+     "name": "simple class styles become attributes, so a mark carries no stylesheet into an email or a page"
+    },
+    {
+     "kind": "check",
+     "component": "Email",
+     "name": "Layout tables carry no table meaning, and every style is inline: no stylesheet, no class style, no custom property"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Email kit · to build, not yet proven"
+   }
+  },
+  {
+   "id": "L28",
+   "broke": "Generated component boards stacked a whole group on one board, up to 20,251px tall, past the canvas's 8000px frame, and nothing said so until the publish.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "a group too tall for the canvas packs into parts in order, each under the limit, and a giant is reported"
+    },
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "validate refuses a frame past 8000px, naming the limit and the board"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "What scripts miss, and the checks that cover it"
+   }
+  },
+  {
+   "id": "L29",
+   "broke": "The gates drew each fluid board once at its frame's width, so every fluid 1440 board scrolled sideways at 390 and 820.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a fluid board is drawn at each width it is scanned at, and a fixed one only at its own"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L30",
+   "broke": "A route that answered 404 was counted detector-clean, because the detector scans nothing there and reports nothing.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a route that answers 404 is listed as not scanned rather than counted clean, and the record says so"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "6. The tests it carries"
+   }
+  },
+  {
+   "id": "L31",
+   "broke": "The drift check reported the props a component passes straight to its element (placeholder, autocomplete) as drift on every board.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productdrift.test.mjs",
+     "name": "a component that passes native props through may take them on a board; one that does not may not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/09-operate.md",
+    "heading": "drift: canvas against system against code"
+   }
+  },
+  {
+   "id": "L32",
+   "broke": "Refreshing a starter from the kit kept a file the kit had dropped, so the old placeholder page shadowed the worked example's home page.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "a file the last kit wrote and the new kit lacks goes, unless someone changed it"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productstarter.test.mjs",
+     "name": "a starter older than the manifest loses the kit's old placeholder home page, and only that exact file"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "2. Starting a product"
+   }
+  },
+  {
+   "id": "L33",
+   "broke": "A phone board on the canvas is viewed with a mouse, so it drew the kit's mouse sizes where a phone has touch sizes.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "AppShell",
+     "name": "In the phone layout controls take the touch sizes with a mouse too, and a wide shell keeps the desktop sizes"
+    },
+    {
+     "kind": "check",
+     "component": "Root",
+     "name": "touch draws what is inside at the touch sizes, with a mouse"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.5 Touch"
+   }
+  },
+  {
+   "id": "L34",
+   "broke": "DataTable's phone list joined every column into one unlabelled meta line, so a row with two figures could not tell them apart.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "DataTable",
+     "name": "At 390px of its own width the rows are a list, and nothing scrolls sideways"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "DataTable"
+   }
+  },
+  {
+   "id": "L35",
+   "broke": "A tag name cut by a single pixel got an ellipsis and no tooltip, so its full name was out of reach.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Tag",
+     "name": "A name cut short shows in full on keyboard focus"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.11 Long text"
+   }
+  },
+  {
+   "id": "L36",
+   "broke": "In a dark theme the sixth chart series took the first's colour, so a six-series chart could not tell its first and last apart.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "six series are six colours in both themes, whatever the brand hue"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
+   }
+  },
+  {
+   "id": "L37",
+   "broke": "DescriptionList dropped an item's value when the item also had a badge.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "DescriptionList",
+     "name": "An item with a value and a badge shows both, the value first"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "DescriptionList"
+   }
+  },
+  {
+   "id": "L38",
+   "broke": "The phone action bar sat outside every landmark, so axe flagged the primary it carried.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "AppShell",
+     "name": "On a phone the primary moves to the bar at the foot, and nothing that takes focus in main hides behind it (round 3)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "AppShell"
+   }
+  },
+  {
+   "id": "L39",
+   "broke": "At 200% zoom the sticky toolbar hid the focused row under it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Toolbar",
+     "name": "On a screen under 560px tall it stops sticking, and keeps nothing clear for itself"
+    },
+    {
+     "kind": "check",
+     "component": "Toolbar",
+     "name": "While it sticks, Shift+Tab up the list never leaves the focused row under it"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Toolbar"
+   }
+  },
+  {
+   "id": "L40",
+   "broke": "Delta showed better or worse only in colour outside forced colours, and whether up is good depends on a prop no arrow shows.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Delta",
+     "name": "Better or worse shows as a word in every mode, not only in colour, and is never read twice"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Delta"
+   }
+  },
+  {
+   "id": "L41",
+   "broke": "A long book's register stopped at its first few decisions and open questions, and the rows it kept ran under the footer.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/branddeck.test.mjs",
+     "name": "decisions, open questions and applications run onto as many pages as they need, none cut"
+    },
+    {
+     "kind": "test",
+     "file": "tests/branddeck.test.mjs",
+     "name": "long rows are packed by height: no page holds more than the canvas, and the rail counts the rows it shows"
+    }
+   ],
+   "teaches": {
+    "file": "skills/brand-system/references/06-brand-book-outline.md",
+    "heading": "Rules and decisions"
+   }
+  },
+  {
+   "id": "L42",
+   "broke": "A real brand's book came to 20MB with its images inlined, past the 16MB a published page takes.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/brandinuse.test.mjs",
+     "name": "book --publish writes the deck as a page with every image beside it, and the call that sends them"
+    }
+   ],
+   "teaches": {
+    "file": "skills/brand-system/references/06-brand-book-outline.md",
+    "heading": "Two forms"
+   }
+  },
+  {
+   "id": "L43",
+   "broke": "The book reversed and flattened a multi-colour logo by CSS filter, so a mark in two inks drew as a blank shape on its own colour and as a blob in one colour.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/branddeck.test.mjs",
+     "name": "a logo in several inks is never reversed or flattened by filter: it is drawn as supplied, and one colour names the artwork"
+    }
+   ],
+   "teaches": {
+    "file": "skills/brand-system/references/08-logo-system.md",
+    "heading": "4.1 The required renditions"
+   }
+  },
+  {
+   "id": "L44",
+   "broke": "The gates' axe pass knew a route only from its --routes flag, so on a round's own routes it never waited for the heading and scanned pages still streaming in.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a route listed by its kind alone waits for its h1, and a board is loaded once, never waited on or retried"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L45",
+   "broke": "A route slow to show its heading was loaded once more, and the slow first load left no trace in the round's record.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a route with no h1 after ten seconds is loaded once more before axe runs, and the record keeps that it was slow"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a route axe loaded twice for a slow h1 stays in the round and is named in the record, whether it then passed or not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L46",
+   "broke": "A form with required fields and no noValidate let the browser's own bubble replace the system's errors, and axe and the detector both passed it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a form with a required or aria-required field and no noValidate fails, naming the form and its fields"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Field"
+   }
+  },
+  {
+   "id": "L47",
+   "broke": "Pickers and comboboxes gave the button that opens their list the same name on every field, so several on one screen read alike.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "TimePicker",
+     "name": "Each clock is named after its field, so two pickers on a page never share a name"
+    },
+    {
+     "kind": "check",
+     "component": "Combobox",
+     "name": "Each list button is named after its field, so two Comboboxes on a page never share a name"
+    },
+    {
+     "kind": "check",
+     "component": "MultiSelect",
+     "name": "Each list button is named after its field, so two MultiSelects on a page never share a name"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Date, time and range pickers · to build, not yet proven"
+   }
+  },
+  {
+   "id": "L48",
+   "broke": "An unread notification was marked by its dot, weight and colour alone, and a brand's dot can sit at 2:1.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "NotificationCentre",
+     "name": "An unread notification says Unread in visible words, not by the dot, the weight and the colour alone, and a read one does not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Notification centre · to build, not yet proven"
+   }
+  },
+  {
+   "id": "L49",
+   "broke": "Leaving Settings threw away a change typed and not yet saved, without asking, and Back lost it too.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "starter",
+     "name": "Leaving Settings with unsaved changes asks first: a link or a command waits, Keep editing keeps the change, Leave drops it, and Back keeps it as a draft that Forward brings back"
+    },
+    {
+     "kind": "starter",
+     "name": "Saved settings leave freely, and a reload with unsaved changes gets the browser's own prompt, then brings them back as a draft"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/07-starter.md",
+    "heading": "Generated, hand-written and example"
+   }
+  },
+  {
+   "id": "L50",
+   "broke": "A split board's heading set its part number in the display face, which a brand may never set numerals in.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "a part's heading keeps numerals out of the display face, which a brand may never set them in: the part number sits under it in the body face"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Type"
+   }
+  },
+  {
+   "id": "L51",
+   "broke": "An example wider than its board was clipped at the board's edge, and nothing said so.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productboards.test.mjs",
+     "name": "an example wider than the board is drawn down to fit, layout box and all, and says so; one that fits is left alone"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "What scripts miss, and the checks that cover it"
+   }
+  },
+  {
+   "id": "L52",
+   "broke": "A handler written camelCase on a mounted component, or in lower case on a plain element, did nothing on a board, and validate passed it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "validate fails a lowercase or kebab handler on an element, a camelCase one on an x-import, and novalidate, read from the source"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "The mount"
+   }
+  },
+  {
+   "id": "L53",
+   "broke": "Nothing marked a board interactive, so a published board's mounted controls sat dead on the canvas.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "a board that mounts a component or wires a handler in its DCLogic is marked interactive from its source, unless its entry says false"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "6. Sizes"
+   }
+  },
+  {
+   "id": "L54",
+   "broke": "A control inside a bordered group lost the group's 2px of border from its height, so a small field's step buttons drew 38px on touch against a 40px floor.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "NumberInput",
+     "name": "Touch: the step buttons and the field are the control's full height at sm, md and lg, and the group keeps its edge"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.5 Touch"
+   }
+  },
+  {
+   "id": "L55",
+   "broke": "Board logic found the bundle by walking window's properties. On the canvas a board's parent frame is another origin, so the walk threw, a menu got no items and the board showed an error there and nowhere a preview or gate runs.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "validate fails a script that walks window to find a bundle, and passes the namespace named outright"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "What scripts miss, and the checks that cover it"
+   }
+  },
+  {
+   "id": "L56",
+   "broke": "A second brand's product came out with the pilots' look: the radius scale stretched to panes rounder than anything the brand drew, and the kit drew every brand's rail as a floating rounded panel. The brand's own work was mostly square.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a measured family sets its role with its source, and nothing derived goes rounder than the largest measured radius"
+    },
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "the shell's form: the rail meets the window edge, square, unless the brand draws floating panels"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "the record lists every shape and shell choice the kit made, not the brand, and says so when there are none"
+    },
+    {
+     "kind": "check",
+     "component": "AppShell",
+     "name": "Four layouts by the shell's own width: the full rail at 1440, icons at 1100, a drawer behind a top bar at 820, the phone at 390 (round 1)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L57",
+   "broke": "After a shape change the tokens, the canvas and the brand-to-product section moved, but the written system still gave the old radii and an 8px-inset rail, and the drift gate said the system agreed: it never read the docs.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productdrift.test.mjs",
+     "name": "a written value beside a token name must be the token's: the docs once kept a radius the tokens had moved on from"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/09-operate.md",
+    "heading": "drift: canvas against system against code"
+   }
+  },
+  {
+   "id": "L58",
+   "broke": "A brand with no symbol showed its full logo, 76px wide at its minimum, in the 72px icons rail; the floating rail's 8px gutter had hidden the overflow, and the edge rail cut it at the window. It also skipped the rail's rendition, so a dark logo vanished on a black rail.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Sidebar",
+     "name": "Icons only, it is 72px wide: the symbol, a search icon, 40px items and the avatar"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L59",
+   "broke": "The class merger did not know the system's own radius and shadow names, so `rounded-md rounded-action` kept both and the cascade picked 16px: a segmented control on a 6px brand came out a pill.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "SegmentedControl",
+     "name": "Its corners are radius-action at every size, and its options sit 2px inside them"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.1 Tokens, shape, status and the shared states"
+   }
+  },
+  {
+   "id": "L60",
+   "broke": "On a black rail against a near-black dark canvas, the rail's one line was 1.06:1 against the page and the phone drawer had none, so in dark the rail had no visible edge.",
+   "trait": "black-rail",
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "the rail's edge shows against the page: its own line on a light canvas, the page's hairline where rail and canvas sit close"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L61",
+   "broke": "Sheets stayed 8px in from the window with the pane's corners after the brand's rail moved against the edge, so the window's own panels disagreed with each other.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Sheet",
+     "name": "It sits at the shell's inset from the screen's edges with the rail's corners, and the actions stay on screen while the body scrolls"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L62",
+   "broke": "A quantity field squeezed between its step buttons on a full-width menu at phone width was 22px wide and clipped a three-digit value.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "NumberInput",
+     "name": "The field holds its largest value without clipping, however narrow its row (round 5)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "2.1 Tokens, shape, status and the shared states"
+   }
+  },
+  {
+   "id": "L63",
+   "broke": "Every gate passed while a board errored on the canvas: the previews draw a board as the top page through a shim, and the canvas draws it in a cross-origin frame under its own runtime. A harness outside the tool found it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "every board must render under the canvas runtime: an error fails the round, and a round that could not run it says why"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "The bar"
+   }
+  },
+  {
+   "id": "L64",
+   "broke": "Republishing a canvas and a Design System sent every file (166 boards for an 18-file change, 541 for 56), and a live republish put boards a person had moved back where the layout had them. Both were worked around by hand.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "a board or title a person moved stays where they put it, shifted only by what the layout itself moved"
+    },
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "a republish with --live sends the index and only what changed since the last publish, unless --all"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productds.test.mjs",
+     "name": "a republish against the live index sends what changed since the last staging, drops what went, and the index last"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "8. Publishing"
+   }
+  },
+  {
+   "id": "L65",
+   "broke": "A brand's live shapes were read by hand from computed styles in a browser, and a first automatic reading took app-store badges and social icons for the brand's buttons.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "each family takes the radius most of its elements share, with a source naming the count and the rest"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productmeasure.test.mjs",
+     "name": "measures a real page in the installed Chrome, over the DevTools protocol"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  }
+ ]
+}

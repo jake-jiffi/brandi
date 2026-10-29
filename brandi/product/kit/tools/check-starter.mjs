@@ -269,6 +269,34 @@ const checks = [
     },
   },
   {
+    name: "Loading a filtered address leaves it exactly as typed, and adds nothing to the history",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      const typed = `${base}/jobs?status=needs-you,overdue`
+      // Every write that changes the address is counted, from before the page's first script.
+      await page.addInitScript(() => {
+        window.__writes = []
+        for (const m of ["pushState", "replaceState"]) {
+          const was = history[m].bind(history)
+          history[m] = (state, title, url) => {
+            if (url !== undefined && url !== null && new URL(url, location.href).href !== location.href) window.__writes.push(String(url))
+            return was(state, title, url)
+          }
+        }
+      })
+      await page.goto(typed, { waitUntil: "commit" })
+      const length = await page.evaluate(() => history.length)
+      await hydrated(page, "the filtered list")
+      await page.waitForLoadState("networkidle")
+      await page.evaluate(() => new Promise((r) => setTimeout(r, 500)))
+      expect.equal(page.url(), typed, "the address is exactly as typed")
+      expect.equal(await page.evaluate(() => history.length), length, "the history is the same length")
+      expect.equal((await page.evaluate(() => window.__writes)).join(" "), "", "the page wrote nothing new to its address")
+      expect.equal(await page.getByRole("button", { name: /^Needs you, / }).getAttribute("aria-pressed"), "true", "and the filters are on")
+      expect(await page.getByRole("heading", { level: 1, name: "Jobs" }).isVisible(), "the page has its heading")
+    },
+  },
+  {
     name: "A link to the list from a filtered view starts it afresh, in the address and on screen",
     viewport: DESKTOP,
     async run({ page, expect }) {
@@ -417,6 +445,104 @@ const checks = [
       await page.locator("main").focus()
       await page.keyboard.press("/")
       expect.equal((await focused(page)).tag, "input", "turned back on, / moves focus to the search again")
+    },
+  },
+  {
+    name: "Leaving Settings with unsaved changes asks first: a link or a command waits, Keep editing keeps the change, Leave drops it, and Back keeps it as a draft that Forward brings back",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/settings")
+      const name = page.getByRole("textbox", { name: "Name" })
+      const saved = await name.inputValue()
+      await name.focus()
+      await page.keyboard.type("s")
+      const typed = await name.inputValue()
+      const unsaved = page.getByText("Unsaved changes", { exact: true })
+      await until(() => unsaved.isVisible(), "the Profile section never said it had unsaved changes")
+      const help = page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Help" })
+      const ask = page.getByRole("dialog", { name: "Leave without saving?" })
+      const notice = page.getByRole("status").filter({ hasText: "Your unsaved changes to Profile are back." })
+      const keep = () => until(async () => (await focused(page)).name === "Keep editing", "Keep editing never took focus")
+      await press(page, help)
+      await until(() => ask.isVisible(), "the rail's link left the unsaved changes without asking")
+      expect.equal(new URL(page.url()).pathname, "/settings", "nothing navigated while it asks")
+      expect((await ask.textContent()).includes("Your changes to Profile will be lost."), "it names the section with the changes")
+      await keep()
+      await page.keyboard.press("Enter")
+      await until(async () => !(await ask.isVisible()), "Keep editing did not close it")
+      expect.equal(new URL(page.url()).pathname, "/settings", "Keep editing stays on the page")
+      expect.equal(await name.inputValue(), typed, "and the change is still there")
+      expect.equal((await focused(page)).name, "Help", "focus went back to the link")
+      await page.keyboard.press("ControlOrMeta+KeyK")
+      await until(() => page.getByRole("dialog", { name: "Search" }).isVisible(), "the shortcut did not open the command menu")
+      await page.keyboard.type("Help")
+      await page.keyboard.press("Enter")
+      await until(() => ask.isVisible(), "the command menu left the unsaved changes without asking")
+      await keep()
+      await page.keyboard.press("Escape")
+      await until(async () => !(await ask.isVisible()), "Escape did not close it")
+      expect.equal(new URL(page.url()).pathname, "/settings", "Escape stays on the page")
+      await expectFocusOff(page, expect, "Escape on the question")
+      await press(page, help)
+      await until(() => ask.isVisible(), "the link did not ask a second time")
+      await press(page, ask.getByRole("button", { name: "Leave", exact: true }))
+      await landed(page, "/help")
+      // Leave meant losing the change: coming back finds what was saved, and no draft.
+      await press(page, page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Settings" }))
+      await landed(page, "/settings")
+      expect.equal(await name.inputValue(), saved, "after Leave, the field holds what was saved")
+      expect.equal(await notice.count(), 0, "and no draft came back")
+      // Back while it asks: the question goes with the page, and focus lands on the new page's main as after any route change.
+      await name.focus()
+      await page.keyboard.type("s")
+      const kept = await name.inputValue()
+      await press(page, help)
+      await until(() => ask.isVisible(), "the link did not ask on the way back in")
+      await page.goBack()
+      await landed(page, "/help")
+      expect(!(await ask.isVisible()), "Back took the question away with the page")
+      // Back kept the change as a draft: Forward brings it back, says so, and the page is guarded again.
+      await page.goForward()
+      await landed(page, "/settings")
+      await until(async () => (await name.inputValue()) === kept, "Forward did not bring the change back")
+      expect(await notice.isVisible(), "the section says the changes are back")
+      expect(await unsaved.isVisible(), "and shows them as unsaved")
+      await press(page, notice.getByRole("button", { name: "Discard changes" }))
+      await until(async () => (await name.inputValue()) === saved, "Discard changes did not go back to what was saved")
+      expect(!(await notice.isVisible()) && !(await unsaved.isVisible()), "the notice and the warning went with the draft")
+      expect.equal((await focused(page)).tag, "input", "focus moved to the first field, not the page body")
+      expect.equal(await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith("draft:")).length), 0, "no draft is left in the tab")
+    },
+  },
+  {
+    name: "Saved settings leave freely, and a reload with unsaved changes gets the browser's own prompt, then brings them back as a draft",
+    viewport: DESKTOP,
+    async run({ page, expect }) {
+      await open(page, "/settings")
+      const name = page.getByRole("textbox", { name: "Name" })
+      const unsaved = page.getByText("Unsaved changes", { exact: true })
+      await name.focus()
+      await page.keyboard.type("s")
+      await press(page, page.getByRole("button", { name: "Save profile" }))
+      await until(async () => !(await unsaved.isVisible()), "saving never cleared the unsaved changes")
+      await press(page, page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Help" }))
+      await landed(page, "/help")
+      await open(page, "/settings")
+      await name.focus()
+      await page.keyboard.type("s")
+      await until(() => unsaved.isVisible(), "the Profile section never said it had unsaved changes")
+      const prompt = new Promise((resolve) =>
+        page.once("dialog", (dialog) => {
+          resolve(dialog.type())
+          dialog.accept()
+        })
+      )
+      const typed = await name.inputValue()
+      await page.reload()
+      expect.equal(await Promise.race([prompt, new Promise((resolve) => setTimeout(() => resolve("no prompt"), 3000))]), "beforeunload", "a reload with unsaved changes asks")
+      await hydrated(page, "the reloaded settings")
+      await until(async () => (await name.inputValue()) === typed, "the reload lost the change")
+      expect(await page.getByRole("status").filter({ hasText: "Your unsaved changes to Profile are back." }).isVisible(), "and says it is back")
     },
   },
   {

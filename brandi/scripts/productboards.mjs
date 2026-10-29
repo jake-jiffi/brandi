@@ -25,6 +25,8 @@ import { previewArtboard } from './preview.mjs';
 
 export const MARKER = 'generated from the resolved system by brandi product boards';
 const W = 1440;
+// A board's padding, so its content box is W less twice this: 1328px at 1440.
+const PAD = 56;
 const ROW_GAP_X = 120;
 const NOTE_GAP = 300;
 const ROW_GAP_Y = 420;
@@ -32,6 +34,8 @@ const ROW_GAP_Y = 420;
 const MEASURE_MARGIN = 400;
 // The shell's gap between its sections, which a section's own measured height leaves out.
 const SECTION_GAP = 40;
+// Prose on a board is capped at the system's measure, about 70 characters at the text's own size. A cap in ch
+// is the width of a zero, which ran a contents line to about 98 characters at 1440.
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const pascal = (s) => String(s).split(/[^A-Za-z0-9]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join('');
@@ -47,13 +51,15 @@ const COLOUR_GROUPS = [
   ['Tags', /^tag-/],
 ];
 
-function shell(system, title, body, { props = true } = {}) {
+function shell(system, title, body, { props = true, note = '' } = {}) {
+  const h1 = `<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 42px; font-weight: 400; color: var(--text-strong);">${esc(title)}</h1>`;
   return [
     `<x-import component-from-global-scope="${system.global}.Root" theme="{{theme}}">`,
-    `<main style="box-sizing: border-box; width: ${W}px; padding: 56px; display: flex; flex-direction: column; gap: 40px; background: var(--canvas); color: var(--text); font-family: var(--font-sans);">`,
+    `<main style="box-sizing: border-box; width: ${W}px; padding: ${PAD}px; display: flex; flex-direction: column; gap: 40px; background: var(--canvas); color: var(--text); font-family: var(--font-sans);">`,
     // No eyebrow over the heading: a label stacked above a title is a template tell. The board's name
-    // strip on the canvas already says which system it belongs to.
-    `<h1 style="margin: 0; font-family: var(--font-display); font-size: 36px; line-height: 42px; font-weight: 400; color: var(--text-strong);">${esc(title)}</h1>`,
+    // strip on the canvas already says which system it belongs to. A note (a part's "Part 2 of 4") sits
+    // under it in the body face, since a brand's display face may never set numerals.
+    note ? `<header style="display: flex; flex-direction: column; gap: 8px;">${h1}<p style="margin: 0; font-size: 16px; line-height: 24px; color: var(--text-muted);">${esc(note)}</p></header>` : h1,
     body,
     '</main>',
     '</x-import>',
@@ -62,7 +68,7 @@ function shell(system, title, body, { props = true } = {}) {
 
 const boardLogic = (extra = '') => `renderVals() {\n  return Object.assign({ theme: this.props.dark ? "dark" : "light" }${extra ? `, ${extra}` : ''});\n}`;
 
-function board(system, name, title, body, { height = 900, logic } = {}) {
+function board(system, name, title, body, { height = 900, logic, heading = title, note = '' } = {}) {
   return {
     file: `${name}.dc.html`,
     name,
@@ -74,7 +80,7 @@ function board(system, name, title, body, { height = 900, logic } = {}) {
       system: system.namespace,
       ...(system.fontsUrl ? { fonts: system.fontsUrl } : {}),
       systemNote: `${MARKER}. Change the tokens or the definitions, then run brandi product boards again.`,
-      body: shell(system, title, body),
+      body: shell(system, heading, body, { note }),
       props: { dark: { editor: 'boolean', default: false } },
       preview: { width: W, height },
       logic: logic ?? boardLogic(),
@@ -106,8 +112,8 @@ export function colourBoard(tokens, system) {
   const rest = roles.filter((t) => !used.has(t.name));
   if (rest.length) sections.push(section('Other roles', `<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">\n${rest.map((t) => tile(t.name, value(t), t.usage, ratios(t.name))).join('\n')}\n</div>`));
   const brand = tokens.color.tokens.filter((t) => t.brand === true || (t.brand === undefined && t.name.startsWith('brand-') && t.name !== 'brand-hover'));
-  if (brand.length) sections.push(section('Brand values', `<p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">The brand's own colours. Screens never use them directly: every surface, text and action takes a role above, which is solved for contrast in both themes.</p>\n<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">\n${brand.map((t) => tile(t.name, value(t), t.usage, '')).join('\n')}\n</div>`));
-  return board(system, 'FoundationsColour1440', 'Colour', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">Every role a screen uses, in its group, with its value in both themes and the lowest contrast the audit measured for it. ${audit.pairs} pairs checked, ${audit.fails.length} below their floor.</p>\n${sections.filter(Boolean).join('\n')}`);
+  if (brand.length) sections.push(section('Brand values', `<p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: var(--measure, 30em);">The brand's own colours. Screens never use them directly: every surface, text and action takes a role above, which is solved for contrast in both themes.</p>\n<div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px;">\n${brand.map((t) => tile(t.name, value(t), t.usage, '')).join('\n')}\n</div>`));
+  return board(system, 'FoundationsColour1440', 'Colour', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: var(--measure, 30em);">Every role a screen uses, in its group, with its value in both themes and the lowest contrast the audit measured for it. ${audit.pairs} pairs checked, ${audit.fails.length} below their floor.</p>\n${sections.filter(Boolean).join('\n')}`);
 }
 
 function section(label, inner) {
@@ -146,12 +152,23 @@ export function typeBoard(tokens, system) {
 /** The shape board: spacing, corners, shadows and sizes, drawn at their values. */
 export function shapeBoard(tokens, system) {
   const spacing = (tokens.spacing?.tokens ?? []).map((t) => `<div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 16px; align-items: center;"><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p><div style="height: 12px; width: ${esc(t.value)}; background: var(--primary); border-radius: var(--radius-xs);"></div></div>`).join('\n');
-  const radii = (tokens.radius?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start;"><div style="width: 120px; height: 72px; background: var(--surface); border: 1px solid var(--line-control); border-radius: ${esc(t.value)};"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p></div>`).join('\n');
-  const shadows = (tokens.shadow?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;"><div style="width: 160px; height: 96px; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--${t.name});"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)}</p></div>`).join('\n');
+  // Each corner says whose it is: the brand's, with where it was measured, or the kit's, with how it chose.
+  const whose = (t) => (t.source ? `The brand's: ${t.source}` : t.derived ? `The kit's: ${t.derived}` : t.name === 'radius-pill' ? "The kit's: the full round, the same for every brand" : '');
+  const note = 'margin: 0; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted);';
+  const radii = (tokens.radius?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 200px;"><div style="width: 120px; height: 72px; background: var(--surface); border: 1px solid var(--line-control); border-radius: ${esc(t.value)};"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)} · ${esc(t.value)}</p>${t.usage ? `<p style="margin: 0; text-wrap: pretty; font-size: 13px; line-height: 18px; color: var(--text);">${esc(t.usage)}</p>` : ''}${whose(t) ? `<p style="${note}">${esc(whose(t))}</p>` : ''}</div>`).join('\n');
+  const shell = tokens.radius?.shell;
+  const moves = tokens.radius?.moves ?? [];
+  const form = shell
+    ? `The rail ${shell.form === 'floating' ? 'floats, 8px in from the window edge' : 'meets the window edge, square'}. The brand's: ${shell.source}`
+    : "The rail meets the window edge, square. The kit's: the plainest form, with no shell named";
+  const carried = moves.length ? moves.map((m) => `${m.name}, on ${m.where.join(' and ')}. The brand's: ${m.source}`) : ["No shape move of the brand's own is carried yet."];
+  const shellNotes = [form, ...carried].map((line) => `<p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text); max-width: var(--measure, 40em);">${esc(line)}</p>`).join('\n');
+  const shadows = (tokens.shadow?.tokens ?? []).map((t) => `<div style="display: flex; flex-direction: column; gap: 12px; align-items: flex-start;"><div style="width: 160px; height: 96px; background: var(--surface); border-radius: var(--radius-md); box-shadow: var(--${t.name});"></div><p style="margin: 0; text-wrap: pretty; font-family: var(--font-mono); font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.name)}</p>${t.usage ? `<p style="margin: 0; max-width: 200px; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted);">${esc(t.usage)}</p>` : ''}</div>`).join('\n');
   const sizes = (tokens.size?.tokens ?? []).map((t) => `<li style="font-size: 13px; line-height: 20px;"><span style="font-family: var(--font-mono);">${esc(t.name)}</span> · ${esc(t.value)}${t.usage ? `: ${esc(t.usage)}` : ''}</li>`).join('\n');
   return board(system, 'FoundationsShape1440', 'Space, corners and depth', [
     section('Spacing', `<div style="display: flex; flex-direction: column; gap: 10px;">\n${spacing}\n</div>`),
     section('Corners', `<div style="display: flex; flex-wrap: wrap; gap: 24px;">\n${radii}\n</div>`),
+    section('The shell and the brand\'s own shapes', `<div style="display: flex; flex-direction: column; gap: 8px;">\n${shellNotes}\n</div>`),
     section('Shadows', `<div style="display: flex; flex-wrap: wrap; gap: 40px; padding: 8px;">\n${shadows}\n</div>`),
     section('Sizes', `<ul style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 2px; color: var(--text);">\n${sizes}\n</ul>`),
   ].join('\n'));
@@ -159,7 +176,7 @@ export function shapeBoard(tokens, system) {
 
 /** The icon board: the whole vocabulary, mounted from the bundle by name. */
 export function iconBoard(system) {
-  const body = `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">One set, by name, in the colour of the text beside it. A board or a product names an icon from this list and nothing else.</p>
+  const body = `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: var(--measure, 30em);">One set, by name, in the colour of the text beside it. A board or a product names an icon from this list and nothing else.</p>
 <div style="display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 16px;">
 <sc-for list="{{icons}}" as="icon" hint-placeholder-count="24"><div style="display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 16px 8px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface);"><x-import component-from-global-scope="${system.global}.Icon" name="{{icon.name}}" size="{{icon.size}}"></x-import><p style="margin: 0; text-wrap: pretty; font-size: 12px; line-height: 16px; color: var(--text-muted); text-align: center; overflow-wrap: anywhere;">{{icon.name}}</p></div></sc-for>
 </div>`;
@@ -188,6 +205,19 @@ export function componentBoards(defs, system) {
 const groupWord = (group) => (group === 'The assistant' ? 'Assistant' : group);
 
 /**
+ * How far an example is drawn down to fit the board: the board's content box over the width its own root
+ * declares (`style="width: 1440px"`), or null when it fits or sizes to the board. Zoom, not a transform,
+ * so its layout box shrinks with it: nothing is clipped, and the example still lays out at its own width,
+ * so a shell drawn at 1440 keeps its 1440 layout.
+ */
+function fitOf(markup) {
+  const root = /^\s*<[a-z][\w-]*\b[^>]*>/i.exec(markup)?.[0] ?? '';
+  const width = Number(/(?:^|;)\s*width:\s*(\d+(?:\.\d+)?)px/.exec(/\sstyle="([^"]*)"/.exec(root)?.[1] ?? '')?.[1]);
+  const room = W - 2 * PAD;
+  return width > room ? Math.floor((room / width) * 10000) / 10000 : null;
+}
+
+/**
  * One group's board, or one part of it (`part`: { index, count }). The first part keeps the group's own name,
  * so links to it hold; each later part is named for its first component, and every part's title says which of
  * how many it is.
@@ -204,13 +234,22 @@ function groupBoard(system, group, members, part = null) {
     if (d.logic) scopes.push(`scoped(${JSON.stringify(prefix)}, (self) => ({ ${resolveLogicNs(d.logic, system.global)} }));`);
     return [
       `<section data-board-section="${esc(d.name)}" style="display: flex; flex-direction: column; gap: 20px; padding-top: 32px; border-top: 1px solid var(--line);">`,
-      `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: 70ch;">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
-      ...d.examples.map((ex) => `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}">${scopeHoles(resolveNs(ex.markup, system.global).trim(), prefix)}</div></div>`),
+      `<header style="display: flex; flex-direction: column; gap: 4px;"><h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; color: var(--text-strong);">${esc(d.name)}</h2><p style="margin: 0; text-wrap: pretty; font-size: 14px; line-height: 20px; color: var(--text-muted); max-width: var(--measure, 30em);">${esc(d.job)}${d.status === 'to build' ? ' To build, not yet proven.' : ''}</p></header>`,
+      ...d.examples.map((ex) => {
+        const markup = resolveNs(ex.markup, system.global).trim();
+        // An example wider than the board is drawn smaller, and its title says so: clipped, it lost its right edge.
+        const fit = fitOf(markup);
+        return `<div style="display: flex; flex-direction: column; gap: 10px;"><h3 style="margin: 0; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--text-muted);">${esc(ex.title)}${fit ? `, drawn at ${Math.floor(fit * 100)}% to fit` : ''}</h3><div style="${ex.layout === 'stack' ? 'display: flex; flex-direction: column; gap: 12px; align-items: flex-start;' : ex.layout === 'block' ? 'display: block;' : 'display: flex; flex-wrap: wrap; gap: 12px; align-items: center;'}${fit ? ` zoom: ${fit};` : ''}">${scopeHoles(markup, prefix)}</div></div>`;
+      }),
       '</section>',
     ].join('\n');
   }).join('\n');
   const name = `Components${pascal(groupWord(group))}${part && part.index > 1 ? pascal(members[0].name) : ''}1440`;
-  const title = `Components: ${group === 'The assistant' ? 'the assistant' : group.toLowerCase()}${part && part.count > 1 ? `, ${part.index} of ${part.count}` : ''}`;
+  // The canvas label keeps "2 of 4"; the heading, set in the display face, does not, because a brand's display
+  // face may never set numerals. The part number goes under it in the body face.
+  const heading = `Components: ${group === 'The assistant' ? 'the assistant' : group.toLowerCase()}`;
+  const split = part && part.count > 1;
+  const title = `${heading}${split ? `, ${part.index} of ${part.count}` : ''}`;
   const logic = [
     `state = ${JSON.stringify(state)};`,
     'renderVals() {',
@@ -225,7 +264,7 @@ function groupBoard(system, group, members, part = null) {
     '  return vals;',
     '}',
   ].join('\n');
-  return { ...board(system, name, title, body, { logic }), group, members: members.map((d) => d.name) };
+  return { ...board(system, name, title, body, { logic, heading, note: split ? `Part ${part.index} of ${part.count}` : '' }), group, members: members.map((d) => d.name) };
 }
 
 /**
@@ -288,7 +327,7 @@ export function twin(light, system, height) {
 /** The contents board: the system's sections, each linking to its first board. */
 export function contentsBoard(system, sections) {
   const body = sections.map((s) => `<li style="display: flex; flex-direction: column; gap: 4px; padding-block: 16px; border-top: 1px solid var(--line);"><a href="${esc(s.first)}" style="font-size: 20px; line-height: 28px; font-weight: 600; color: var(--link);">${esc(s.label)}</a><span style="font-size: 14px; line-height: 20px; color: var(--text-muted);">${esc(s.note)}</span></li>`).join('\n');
-  return board(system, 'Main', 'Contents', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: 70ch;">The ${esc(system.name)} product system on one canvas: the foundations, every component mounted live, then each product's screens, states and options. Light boards with their dark twins beside them.</p>\n<ol style="margin: 0; padding: 0; list-style: none;">\n${body}\n</ol>`);
+  return board(system, 'Main', 'Contents', `<p style="margin: 0; text-wrap: pretty; font-size: 16px; line-height: 24px; color: var(--text-muted); max-width: var(--measure, 30em);">The ${esc(system.name)} product system on one canvas: the foundations, every component mounted live, then each product's screens, states and options. Light boards with their dark twins beside them.</p>\n<ol style="margin: 0; padding: 0; list-style: none;">\n${body}\n</ol>`);
 }
 
 function isGenerated(file) {

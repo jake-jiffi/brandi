@@ -70,9 +70,9 @@ export default {
       "Icons only, the labels stay for screen readers and show as tooltips on hover, keyboard focus and a long press. The tooltips mount only then: a tooltip left mounted while hidden holds the next Escape.",
     ],
     Layout: [
-      "Inset from the screen's edges with the rail's corners and a hairline, which keeps it apart from the canvas in dark, where the two surfaces sit close.",
+      "In the brand's shell form: against the window edge, square, with a hairline on its inner side, or floating 8px in with the rail's corners and a hairline all round when the brand floats its panels.",
       "The groups scroll between the top and the foot, and focus is drawn inside the items there. The footer and the account stay put.",
-      "Icons only, it is 72px wide: the lockup becomes the brand's symbol, search an icon button, the items 40px squares and the account its avatar. It switches by its own width, so the server and a canvas draw it right before any script runs.",
+      "Icons only, it is 72px wide: the lockup becomes the brand's symbol in the rail's rendition (a Home control for a brand with no symbol, whose full logo is too wide at its minimum), search an icon button, the items 40px squares and the account its avatar. It switches by its own width, so the server and a canvas draw it right before any script runs.",
     ],
     Rules: [
       "Eight top-level items at most, in groups under short uppercase labels, with settings and help in the footer.",
@@ -203,7 +203,20 @@ export default {
         expect.equal(Math.round((await nav.boundingBox()).width), 72, "72px wide")
         expect.equal(await nav.getAttribute("data-collapsed"), "true", "it says it is collapsed")
         expect.equal(await nav.locator('[data-slot="product-lockup"]').isVisible(), false, "the lockup gives way")
-        expect(await nav.getByRole("link", { name: `${brand.name} [Front desk]` }).isVisible(), "to the symbol, still one link with the same name")
+        const homeLink = nav.getByRole("link", { name: `${brand.name} [Front desk]` })
+        if (brand.symbol) {
+          expect(await homeLink.isVisible(), "to the symbol, still one link with the same name")
+          // A full logo has a minimum width, and a brand with no symbol once had it cut by the window edge here.
+          const home = await homeLink.evaluate((el) => {
+            const box = el.getBoundingClientRect(), mark = el.firstElementChild.getBoundingClientRect(), rail = el.closest('[data-slot="sidebar"]').getBoundingClientRect()
+            return { link: [box.width, box.height].map(Math.round).join("x"), inside: mark.left >= rail.left - 0.5 && mark.right <= rail.right + 0.5 && mark.left >= box.left - 0.5 && mark.right <= box.right + 0.5 }
+          })
+          expect.equal(home.link, "40x40", "home is a 40px square, so its focus ring goes round what it holds")
+          expect(home.inside, "what home holds fits inside it and inside the rail")
+        } else {
+          // No symbol, and the navigation already goes Home: a second house above it would only repeat it.
+          expect.equal(await homeLink.count(), 0, "no logo cut by the edge, and no second Home")
+        }
         const search = await nav.getByRole("button", { name: "Search or ask", exact: true }).boundingBox()
         expect.equal(`${Math.round(search.width)}x${Math.round(search.height)}`, "40x40", "search is a 40px icon button")
         for (const link of await nav.getByRole("list").getByRole("link").all()) {

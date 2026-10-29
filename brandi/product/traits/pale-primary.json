@@ -1,0 +1,5 @@
+{
+  "trait": "A pale brand colour with a pale yellow accent, the pair a light brand brings: the primary is derived from the brand colour, and the accent becomes the highlight.",
+  "input": {"primary": "#A9D8C3", "accents": ["#F3E37A"]},
+  "proven": {"lessons": ["L14"], "how": "With Progress's default tone back on the brand fill, its 3:1 check failed under this trait at 1.15:1 and passed on the baseline."}
+}

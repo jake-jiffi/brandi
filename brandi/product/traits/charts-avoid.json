@@ -1,0 +1,4 @@
+{
+  "trait": "A colour the brand keeps off dark grounds: the fixture's own orange accent, barred from the dark theme's charts.",
+  "product": { "charts": { "avoid": { "dark": ["#D4823A"] } } }
+}

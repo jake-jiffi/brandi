@@ -102,6 +102,7 @@ export function KitControls() {
     { id: "a", name: "[site-photos].zip", size: 18_400_000, status: "uploading", progress: 64 },
     { id: "b", name: "[quote-J-1042].pdf", size: 220_000, status: "done" },
   ])
+  const [signIn, setSignIn] = React.useState<{ email?: string; password?: string }>({})
 
   return (
     <div className="@container">
@@ -301,9 +302,25 @@ export function KitControls() {
           </Section>
 
           <Section title="Sign in">
-            {/* The fields bring no form of their own: the page wraps them with its button. The example signs nobody in. */}
-            <form className="flex max-w-measure flex-col gap-5" onSubmit={(event) => event.preventDefault()}>
-              <SignInFields defaultEmail="owner@example.com" forgotHref="/help" />
+            {/* The fields bring no form of their own: the page wraps them with its button. The example signs nobody in.
+                Its fields are required, so the form is noValidate and says what is missing itself: without it, the
+                browser's bubble stopped the submit before these errors could show. */}
+            <form
+              noValidate
+              className="flex max-w-measure flex-col gap-5"
+              onSubmit={(event) => {
+                event.preventDefault()
+                const form = event.currentTarget
+                const data = new FormData(form)
+                const found = {
+                  email: String(data.get("email") ?? "").trim() ? undefined : "Enter an email address, such as owner@example.com.",
+                  password: String(data.get("password") ?? "") ? undefined : "Enter your password.",
+                }
+                setSignIn(found)
+                if (found.email || found.password) requestAnimationFrame(() => form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus())
+              }}
+            >
+              <SignInFields defaultEmail="owner@example.com" forgotHref="/help" emailError={signIn.email} passwordError={signIn.password} />
               <Button variant="primary" type="submit" block>
                 Sign in
               </Button>

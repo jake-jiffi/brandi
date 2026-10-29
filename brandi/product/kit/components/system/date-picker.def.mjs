@@ -15,6 +15,16 @@ const settled = (page) =>
     return panel && panel.getAnimations({ subtree: true }).every((a) => a.playState !== "running")
   }, null, { timeout: 3000 })
 
+const rgb = (s) => (String(s).match(/[\d.]+/g) ?? []).slice(0, 3).map(Number)
+const luminance = ([r, g, b]) => {
+  const f = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b)
+}
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(rgb(a)), luminance(rgb(b))].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
+}
+
 export default {
   name: "DatePicker",
   group: "Inputs",
@@ -112,6 +122,31 @@ ${field("Visit date", 'open="{{yes}}" default-value="2026-10-21"')}
         expect(described.length > short.length && described.toLowerCase().startsWith(short.toLowerCase().replace(/\.$/, "")), `the weekday in full in its description (${described})`)
         expect.equal(await page.getByRole("textbox", { name: "Due date" }).evaluate((el) => el.closest('[data-slot="date-picker"]').querySelectorAll('[data-slot="date-picker-day"]').length), 0, "no weekday before a date is chosen")
         expect.equal(await page.getByRole("button", { name: "Open calendar, Due date" }).count(), 1, "the button names the field as it is written")
+      },
+    },
+    {
+      name: "The day of the week holds 4.5:1 on the field, in both themes, and a disabled field shows none",
+      themes: ["light", "dark"],
+      async run({ page, expect, theme }) {
+        const days = await page.locator('[data-slot="date-picker-day"]').evaluateAll((all) =>
+          all.map((el) => {
+            // The ground is the nearest box with a fill, and anything faded on the way is faded with it.
+            let ground = "rgba(0, 0, 0, 0)"
+            let opacity = 1
+            for (let at = el; at; at = at.parentElement) {
+              opacity *= Number(getComputedStyle(at).opacity)
+              const bg = getComputedStyle(at).backgroundColor
+              if (ground === "rgba(0, 0, 0, 0)" && !/rgba\(0, 0, 0, 0\)|transparent/.test(bg)) ground = bg
+            }
+            return { ink: getComputedStyle(el).color, ground, opacity }
+          })
+        )
+        expect.atLeast(days.length, 3, "the chosen dates show their day")
+        for (const d of days) {
+          expect.equal(d.opacity, 1, "never faded")
+          expect.atLeast(Math.round(contrast(d.ink, d.ground) * 100) / 100, 4.5, `${theme}: the day on its field`)
+        }
+        expect.equal(await page.getByRole("textbox", { name: "Payment date" }).evaluate((el) => el.closest('[data-slot="date-picker"]').querySelectorAll('[data-slot="date-picker-day"]').length), 0, "a disabled field shows no day")
       },
     },
     {

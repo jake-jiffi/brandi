@@ -84,7 +84,7 @@ export default {
     {
       id: "open",
       title: "Open, drawn for a design, below the button where nothing is under it",
-      markup: `<div style="padding-bottom: 300px;"><div style="box-sizing: border-box; width: 256px;" class="@container/rail rounded-lg border border-rail-line bg-rail p-2"><x-import component-from-global-scope="NS.WorkspaceSwitcher" open="{{yes}}" user="{{user}}" workspaces="{{workspaces}}" value="bark-avenue" items="{{accountItems}}"></x-import></div></div>`,
+      markup: `<div style="padding-bottom: 300px;"><div style="box-sizing: border-box; width: 256px;" class="@container/rail rounded-rail border border-rail-line bg-rail p-2"><x-import component-from-global-scope="NS.WorkspaceSwitcher" open="{{yes}}" user="{{user}}" workspaces="{{workspaces}}" value="bark-avenue" items="{{accountItems}}"></x-import></div></div>`,
       layout: "block",
       vals: { user, workspaces, accountItems: [{ label: "Account settings", icon: "Settings" }, { label: "Sign out", icon: "LogOut" }] },
     },

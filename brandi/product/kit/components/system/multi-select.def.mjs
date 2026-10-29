@@ -62,7 +62,7 @@ export default {
     Behaviour: [
       "Everything a Combobox does: typing filters with the first match in hand, Up and Down move, Escape closes and keeps focus on the input, and the list opens in a portal, named like its field.",
       "Enter adds the option in hand, or takes it away if it is already chosen. The list stays open, the typed text clears, and the whole list shows again, so the next one is a few keys away. A press on an option does the same.",
-      "Backspace in the empty input removes the last token. A press on the field opens the list; a press on the Field's label only focuses it.",
+      "Backspace in the empty input removes the last token. A press on the field opens the list; a press on the Field's label only focuses it. The chevron is named after its field (Show options for Assignees), so lists on one page never share a name.",
       "Each token is a Tag with a remove button named Remove [value]. Removing one moves focus to the next token's button, or to the input after the last.",
       "The listbox says several can be chosen, and each option says whether it is chosen. A box at the start of each option is ticked when it is.",
       "A screen reader hears what is chosen with the input (2 chosen: [Amira Haddad], [Harriet Lee]), and hears each add or removal as it happens, with the new count.",
@@ -125,6 +125,38 @@ ${field("Watchers", 'open="{{yes}}" query="ha" default-value="{{watching}}" opti
   ],
   frame: { width: 960, height: 872 },
   checks: [
+    {
+      name: "Touch: the list button is a 40px square at least at sm, md and lg, inside the box's edge with no clear border taking its tint",
+      example: "states",
+      touch: true,
+      async run({ scope, expect }) {
+        const rows = await scope.locator('[data-slot="combobox-toggle"]').evaluateAll((els) =>
+          els.map((button) => {
+            const r = button.getBoundingClientRect()
+            const box = button.closest("[data-size]").getBoundingClientRect()
+            return { size: button.closest("[data-size]").dataset.size, w: Math.round(r.width), h: Math.round(r.height), inside: r.top >= box.top + 1 && r.bottom <= box.bottom - 1, border: getComputedStyle(button).borderTopWidth }
+          })
+        )
+        expect.equal([...new Set(rows.map((r) => r.size))].sort().join(" "), "lg md sm", "every size is measured")
+        for (const r of rows) {
+          expect(r.w >= 40 && r.h >= 40, `${r.size}: ${r.w}x${r.h}, a 40px square at least`)
+          expect(r.inside, `${r.size}: the button sits inside the box's edge`)
+          expect.equal(r.border, "0px", `${r.size}: no clear border shrinks the button's tint`)
+        }
+      },
+    },
+    {
+      name: "Each list button is named after its field, so two MultiSelects on a page never share a name",
+      example: "basics",
+      async run({ page, scope, expect }) {
+        const names = await scope.locator('[data-slot="combobox-toggle"]').evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")))
+        expect.equal(names.join(" | "), "Show options for Assignees | Show options for Categories | Show options for Invite", "each button names its field")
+        expect.equal(new Set(names).size, names.length, "no two buttons share a name")
+        await scope.getByRole("button", { name: "Show options for Assignees", exact: true }).click()
+        await page.getByRole("listbox", { name: "Assignees" }).waitFor()
+        expect.equal(await scope.getByRole("button", { name: "Hide options for Assignees", exact: true }).count(), 1, "open, the Assignees button hides the Assignees options")
+      },
+    },
     {
       name: "Typing filters, Enter adds the option in hand, the list stays open, and the text clears for the next one",
       example: "basics",

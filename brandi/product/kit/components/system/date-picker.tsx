@@ -334,7 +334,8 @@ export const DatePicker = React.forwardRef<HTMLInputElement, DatePickerProps>(fu
   const [text, setText] = React.useState(() => (date ? numeric.format(date) : ""))
   const [shown, setShown] = React.useState(false)
   // The day of the week shows beside a chosen date, and is read with it: 29/10/2026 alone leaves people counting.
-  const settled = date && text === numeric.format(date) ? date : undefined
+  // Not on a disabled field: the box fades to half, and the faded day measured under 4.5:1 with nothing to act on.
+  const settled = date && !disabled && text === numeric.format(date) ? date : undefined
   const control = useFieldControl({ id, invalid: invalid || wrong, required, describedBy: settled ? dayId : undefined })
   const field = control.field
   // Named so it reads with any label, as it is written: "Open calendar, Starts", never "Choose starts".

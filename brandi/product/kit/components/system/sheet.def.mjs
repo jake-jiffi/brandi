@@ -9,7 +9,9 @@ const ready = async (locator) => {
   await locator.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
 
-const ns = `Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)`
+// NS. names the bundle's own global. Never walk window's properties to find it: on the canvas a board
+// runs in a frame whose parent is another origin, and reading a property of that parent throws.
+const ns = `{ Button: NS.Button }`
 
 const settled = (locator) => locator.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => null))))
 const focusOn = (page, name) => page.waitForFunction((want) => document.activeElement?.textContent?.trim() === want, name, { timeout: 5000 }).then(() => true, () => false)
@@ -31,7 +33,7 @@ const details = `<dl style="margin: 0; display: grid; grid-template-columns: max
 export default {
   name: "Sheet",
   group: "Overlays",
-  job: "A panel from the right, inset like the rail, for a record or a longer edit without leaving the list.",
+  job: "A panel from the right, in the shell's form like the rail, for a record or a longer edit without leaving the list.",
   status: "proven",
   props: [
     { name: "open", type: "boolean", default: "false", doc: "Shows it. The page owns the state and closes it in onClose." },
@@ -40,7 +42,7 @@ export default {
     { name: "description", type: "ReactNode", doc: "One line under the title." },
     { name: "footer", type: "ReactNode", doc: "The buttons, secondary then primary, under a hairline at the foot. On a canvas, built in the board's script." },
     { name: "onClose", type: "() => void", doc: "Escape, the close button and a click on the scrim call it." },
-    { name: "width", type: "number", default: "440", doc: "Its widest, in pixels. Never wider than the screen less 8px each side." },
+    { name: "width", type: "number", default: "440", doc: "Its widest, in pixels. Never wider than the screen less the shell's inset each side." },
     { name: "headingLevel", type: "2 | 3 | 4", default: "2", doc: "The title's heading level, so no page or board skips one." },
     { name: "returnFocus", type: "RefObject<HTMLElement>", doc: "Where focus goes on close when nothing had focus as it opened." },
     { name: "children", type: "ReactNode", doc: "The body. It scrolls between the header and the footer." },
@@ -54,7 +56,7 @@ export default {
       "It opens in a portal and copies the theme of the place it opened from.",
     ],
     Layout: [
-      "Inset 8px from the top, right and bottom of the screen, like the rail, with the rail's corners. Never wider than the screen less that inset, so on a phone it fills the width inside it.",
+      "In the shell's form, as the rail is: against the top, right and bottom of the screen and square when the rail meets the window edge, or 8px in with the rail's corners when it floats. Never wider than the screen less that inset, so on a phone it fills the width.",
       "The header and the footer stay put while the body scrolls, so the actions never leave the screen.",
     ],
     Rules: [
@@ -67,9 +69,10 @@ export default {
     {
       id: "record",
       title: "A record",
-      markup: `<x-import component-from-global-scope="NS.Sheet" style="display: block; width: 440px; height: 520px;" inline="{{yes}}" heading-level="{{h3}}" title="[Invoice 1039]" description="Sent to [Muddy Paws Grooming] on [3 October]" footer="{{ui.recordFooter}}">
+      // Drawn against the right edge of a page, as it opens: a sheet is attached to the window, never loose on a board.
+      markup: `<div style="position: relative; box-sizing: border-box; width: 760px; height: 520px; overflow: hidden; background: var(--canvas); border: 1px solid var(--line);"><x-import component-from-global-scope="NS.Sheet" style="position: absolute; top: var(--shell-inset, 0px); right: var(--shell-inset, 0px); bottom: var(--shell-inset, 0px); width: 440px;" inline="{{yes}}" heading-level="{{h3}}" title="[Invoice 1039]" description="Sent to [Muddy Paws Grooming] on [3 October]" footer="{{ui.recordFooter}}">
 ${details}
-</x-import>`,
+</x-import></div>`,
       vals: { yes: true, h3: 3 },
     },
     {
@@ -208,7 +211,7 @@ ${details}
       },
     },
     {
-      name: "It is inset 8px from the screen's edges, and the actions stay on screen while the body scrolls",
+      name: "It sits at the shell's inset from the screen's edges with the rail's corners, and the actions stay on screen while the body scrolls",
       example: "live",
       viewport: { width: 1280, height: 440 },
       async run({ scope, page, expect }) {
@@ -217,16 +220,19 @@ ${details}
         await ready(sheet)
         await settled(sheet)
         const box = await sheet.boundingBox()
-        expect(Math.abs(box.y - 8) <= 1 && Math.abs(1280 - (box.x + box.width) - 8) <= 1 && Math.abs(440 - (box.y + box.height) - 8) <= 1, `inset 8px (top ${box.y}, right ${1280 - box.x - box.width}, bottom ${440 - box.y - box.height})`)
+        const form = await sheet.evaluate((el) => { const s = getComputedStyle(el); return { inset: parseFloat(s.getPropertyValue("--shell-inset")) || 0, radius: parseFloat(s.borderTopLeftRadius) || 0, want: parseFloat(s.getPropertyValue("--radius-rail")) || 0 } })
+        const i = form.inset
+        expect(Math.abs(box.y - i) <= 1 && Math.abs(1280 - (box.x + box.width) - i) <= 1 && Math.abs(440 - (box.y + box.height) - i) <= 1, `${i}px in (top ${box.y}, right ${1280 - box.x - box.width}, bottom ${440 - box.y - box.height})`)
+        expect.equal(form.radius, form.want, "its corners are the rail's")
         expect.equal(Math.round(box.width), 440, "its width")
         const body = sheet.locator("[data-slot=sheet-body]")
         expect(await body.evaluate((el) => el.scrollHeight > el.clientHeight), "the body scrolls")
         const foot = await sheet.locator("[data-slot=sheet-footer]").boundingBox()
-        expect(foot.y + foot.height <= 440 - 8 + 1, "the footer is on screen")
+        expect(foot.y + foot.height <= 440 - i + 1, "the footer is on screen")
       },
     },
     {
-      name: "On a phone it fills the width inside the same 8px inset",
+      name: "On a phone it fills the width inside the same inset",
       example: "live",
       touch: true,
       viewport: { width: 390, height: 844 },
@@ -236,7 +242,8 @@ ${details}
         await ready(sheet)
         await settled(sheet)
         const box = await sheet.boundingBox()
-        expect(Math.abs(box.x - 8) <= 1 && Math.abs(box.width - (390 - 16)) <= 1, `inset 8px each side (left ${box.x}, width ${box.width})`)
+        const i = await sheet.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue("--shell-inset")) || 0)
+        expect(Math.abs(box.x - i) <= 1 && Math.abs(box.width - (390 - 2 * i)) <= 1, `${i}px in each side (left ${box.x}, width ${box.width})`)
         expect.equal(Math.round((await sheet.getByRole("button", { name: "Close" }).boundingBox()).height), 40, "close button height on touch")
       },
     },

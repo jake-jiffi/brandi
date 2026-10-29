@@ -20,6 +20,7 @@ import { PRODUCT } from "@/lib/product"
 import { NOTIFICATIONS, PERSON, WORKSPACES } from "@/lib/sample"
 
 import { markRead, requestNewJob, useExample } from "./example-store"
+import { holdLeaving } from "./unsaved-changes"
 
 /** The product's places, as the rail and the command menu list them. Eight top-level places at most. */
 const PLACES: NavItemProps[] = [
@@ -50,6 +51,10 @@ function RailAccount() {
   const router = useRouter()
   const notifications = useNotifications()
   const [workspace, setWorkspace] = React.useState(WORKSPACES[0].value)
+  const go = (href: string) => () => {
+    const push = () => router.push(href)
+    if (!holdLeaving(href, push)) push()
+  }
   return (
     <div className="flex min-w-0 items-center gap-1 @max-[160px]/rail:flex-col-reverse @max-[160px]/rail:gap-2">
       <div className="min-w-0 flex-1">
@@ -59,8 +64,8 @@ function RailAccount() {
           value={workspace}
           onChange={setWorkspace}
           items={[
-            { label: "Settings", icon: "Settings", onSelect: () => router.push("/settings") },
-            { label: "Help", icon: "CircleHelp", onSelect: () => router.push("/help") },
+            { label: "Settings", icon: "Settings", onSelect: go("/settings") },
+            { label: "Help", icon: "CircleHelp", onSelect: go("/help") },
           ]}
         />
       </div>
@@ -117,10 +122,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   // Cmd or Ctrl K opens it and closes it again; so does the rail's search button.
   const openCommand = React.useCallback(() => setCommandOpen((open) => !open), [])
+  // A command that leaves a page with unsaved changes asks first, as a link does. `first` runs only once it goes.
   const go = React.useCallback(
-    (href: string) => () => {
+    (href: string, first?: () => void) => () => {
       setNavOpen(false)
-      router.push(href)
+      const push = () => {
+        first?.()
+        router.push(href)
+      }
+      if (!holdLeaving(href, push)) push()
     },
     [router]
   )
@@ -141,10 +151,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
           icon: "Plus",
           keywords: ["add", "create", "book"],
           onSelect: () => {
-            requestNewJob()
             // On the jobs page already, the form opens over the view as it is.
-            if (window.location.pathname !== "/jobs") go("/jobs")()
-            else setNavOpen(false)
+            if (window.location.pathname !== "/jobs") go("/jobs", requestNewJob)()
+            else {
+              requestNewJob()
+              setNavOpen(false)
+            }
           },
         },
         { label: dark ? "Use the light theme" : "Use the dark theme", icon: dark ? "Sun" : "Moon", keywords: ["theme", "dark", "light"], onSelect: () => setTheme(dark ? "light" : "dark") },

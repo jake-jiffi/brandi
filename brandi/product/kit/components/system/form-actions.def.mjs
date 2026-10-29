@@ -35,15 +35,8 @@ export default {
     Review: ["A settings page showed two primary Saves, both live with nothing changed (a pilot's round 1)."],
   },
   frame: { width: 960, height: 700 },
-  logic: `els: (() => {
-  for (const key of Object.keys(window)) {
-    try {
-      const ns = window[key]
-      if (ns && typeof ns.Root === "function" && ns.Button) return { remove: window.React.createElement(ns.Button, { variant: "danger" }, "Delete client") }
-    } catch (e) {}
-  }
-  return {}
-})()`,
+  // NS. names the bundle's own global: walking window's properties reads the canvas's parent frame.
+  logic: `els: { remove: window.React.createElement(NS.Button, { variant: "danger" }, "Delete client") }`,
   examples: [
     {
       id: "end",

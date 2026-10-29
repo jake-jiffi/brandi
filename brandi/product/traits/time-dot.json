@@ -1,0 +1,5 @@
+{
+  "trait": "Times written the brand's own way: \"9.30am\", \"11am to 10.30pm\", minutes after a point, no space, minutes on the hour dropped.",
+  "product": {"time": {"minutes": ".", "onTheHour": "drop", "space": false}},
+  "proven": {"lessons": ["L1"], "how": "With the TimePicker check expecting a written \"9:30 am\" again, it failed under this trait (\"9.30am\") and passed on the baseline."}
+}

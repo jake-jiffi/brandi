@@ -122,6 +122,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
   const places = Math.max(2, decimals(step))
   const show = (n: number | null) => (n === null ? "" : formatNumber(n, "number", { digits: places }))
   const [text, setText] = React.useState(() => show(current))
+  // Never narrower than its longest bound as it shows, so a tight row cannot clip a value: three digits once sat in 22px.
+  const longest = Math.max(2, ...[min, max].filter((n): n is number => n !== undefined).map((n) => show(n).length))
   const [spoken, setSpoken] = React.useState("")
 
   // A value set from outside shows at once, unless the person is typing in the field.
@@ -193,9 +195,11 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       }}
       data-slot="number-input-step"
       // Decrease at the start and Increase at the end, on every screen, so it reads minus, value, plus, and on
-      // touch the two targets sit apart.
+      // touch the two targets sit apart. Each reaches over the group's 1px edge, top and bottom, so it is the
+      // field's full height (40px at sm on touch, not 38): a clear border there keeps the edge showing, and the
+      // hover tint stays inside it.
       className={cn(
-        "grid h-full w-9 shrink-0 place-items-center border-line text-text-muted transition-colors hover:bg-hover hover:text-text-strong active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent pointer-coarse:w-11",
+        "-my-px grid h-[calc(100%+2px)] w-9 shrink-0 place-items-center border-y border-line border-y-transparent bg-clip-padding text-text-muted transition-colors hover:bg-hover hover:text-text-strong active:bg-pressed disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent pointer-coarse:w-11",
         direction > 0 ? "rounded-r-[calc(var(--radius-control)-1px)] border-l" : "rounded-l-[calc(var(--radius-control)-1px)] border-r"
       )}
     >
@@ -234,7 +238,9 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         aria-valuenow={current ?? undefined}
         aria-valuemin={min}
         aria-valuemax={max}
-        className={cn(inputBare, "tabular-nums")}
+        // Over the group's edge as the step buttons are, so the field is the control's full height too.
+        className={cn(inputBare, "-my-px h-[calc(100%+2px)] tabular-nums")}
+        style={{ minWidth: `${longest + 1}ch` }}
         {...rest}
         {...control.props}
         required={control.required || undefined}

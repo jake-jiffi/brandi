@@ -14,7 +14,7 @@
  *   brandi system                     resolve and audit the design system
  *   brandi tokens [--out brand/tokens] [--prefix acme] [--strict-dimensions]
  *   brandi sheets [--out <dir>]       write the specification artboards
- *   brandi canvas --dir <dir> --title "Acme brand" [--live <canvas.json>] [--json]   the files and calls for a Design canvas
+ *   brandi canvas --dir <dir> --title "Acme brand" [--live <canvas.json>] [--all] [--json]   the files and calls for a Design canvas (with --live, only what changed)
  *   brandi validate --dir <dir>       check artboards before they are published
  *   brandi book [--pdf] [--print] [--publish]  the brand book: a 16:9 deck, or the A4 print book with --print;
  *                                     --publish writes it as a page to publish, its images beside it
@@ -36,6 +36,7 @@
  *   brandi product tokens [--input <file>] [--out product]
  *                                     the product layer: every role a working screen needs,
  *                                     in both themes, solved for contrast and audited
+ *   brandi product measure --url <site>          the brand's live shapes, for where the guidelines are silent
  *   brandi product audit [--tokens product/tokens.json]
  *                                     measure every declared pair in both themes
  *   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
@@ -61,6 +62,7 @@
 import { readFile, writeFile, mkdir, mkdtemp, readdir, rm, stat, copyFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -70,10 +72,11 @@ import {
   systemInputFromBrand, addDecision, addEvidence, addOpenQuestion, slugify, PHASES, PROVENANCE,
 } from './brandfile.mjs';
 import { buildSystem, assertPublishable } from './system.mjs';
-import { buildProductTokens, auditProductTokens, auditSummary, toProductCss } from './producttokens.mjs';
+import { buildProductTokens, auditProductTokens, auditSummary, toProductCss, shapeKitDefaults } from './producttokens.mjs';
+import { measureSite, summarise as summariseShapes } from './productmeasure.mjs';
 import { toStarterGlobals } from './productglobals.mjs';
 import { systemIdentity, writeStarter, buildBundle } from './productstarter.mjs';
-import { runGates, judgeRound, roundMarkdown, serveStarter, starterRoutes, WIDTHS } from './productgates.mjs';
+import { runGates, judgeRound, roundMarkdown, publishedSection, serveStarter, starterRoutes, WIDTHS } from './productgates.mjs';
 import { loadSpecs, checkSpec, coverage, compareMarkers, standardsReport, fetchMarker, writeStale, loadSources, PLATFORMS } from './productspecs.mjs';
 import { loadDefinitions } from './productdocs.mjs';
 import { driftCheck, driftReport } from './productdrift.mjs';
@@ -1143,7 +1146,8 @@ async function cmdCanvas(flags) {
   const installedFile = (r) => { const m = /^(?:\.\.\/)*ds\/([^/]+)\//.exec(r); return Boolean(m && systems.has(m[1])); };
   const localRefs = (source) => [...source.matchAll(/(?:src\s*=\s*"|url\(\s*['"]?)([^"')\s]+)/g)]
     .map((m) => m[1].replace(/^\.\//, ''))
-    .filter((r) => !/^(https?:|data:|\/_blob\/|#|support\.js$)/.test(r) && !r.includes('{{') && !installedFile(r));
+    // %23 is a # as a data URI writes it: url(%23g) inside an inline SVG names its own gradient, not a file.
+    .filter((r) => !/^(https?:|data:|\/_blob\/|#|%23|support\.js$)/i.test(r) && !r.includes('{{') && !installedFile(r));
   const missing = [...new Set(artboards.flatMap((a) => localRefs(a.source).filter((r) => !images.includes(r)).map((r) => `${a.file} names ${r}`)))];
   if (missing.length && !flags.force) {
     return fail(`Images the artboards name that are not in ${path.relative(process.cwd(), dir) || '.'}:\n  ${missing.join('\n  ')}\nPut each file beside the artboards, or fix the name.`);
@@ -1170,9 +1174,13 @@ async function cmdCanvas(flags) {
   // the canvas explicitly, because a publish keeps every file it is not sent.
   let lastIndex = null;
   let previous = [];
+  // What each file held at the last publish from this folder, so a republish sends only what changed.
+  const sha = (buf) => createHash('sha256').update(buf).digest('hex');
+  const before = new Map();
   try {
     lastIndex = JSON.parse(await readFile(indexPath, 'utf8'));
     previous = (await readdir(project)).filter((f) => f !== 'canvas.json');
+    for (const f of previous) if ((await stat(path.join(project, f))).isFile()) before.set(f, sha(await readFile(path.join(project, f))));
   } catch { /* a first publish from this folder */ }
   await rm(project, { recursive: true, force: true });
   await mkdir(project, { recursive: true });
@@ -1180,7 +1188,7 @@ async function cmdCanvas(flags) {
   const removed = previous.filter((f) => !files.includes(f) && !images.includes(f));
   let index;
   try {
-    index = designIndex({ manifest, title, base: live ?? lastIndex, removed: removed.filter((f) => f.endsWith('.dc.html')) });
+    index = designIndex({ manifest, title, base: live ?? lastIndex, previous: live ? lastIndex : null, removed: removed.filter((f) => f.endsWith('.dc.html')), sources: new Map(artboards.map((a) => [a.file, a.source])) });
   } catch (e) {
     return fail(e.message);
   }
@@ -1191,6 +1199,12 @@ async function cmdCanvas(flags) {
     bytes.set(a.file, Buffer.byteLength(source));
   }
   for (const f of images) await copyFile(path.join(dir, f), path.join(project, f));
+  // A republish to a live canvas sends the index and what changed since the last publish from this folder. The rest
+  // is on the canvas already, and resending it all was 166 files for an 18-file change. --all sends everything.
+  const unchanged = [];
+  if (live && lastIndex && !flags.all) {
+    for (const f of [...files, ...images]) if (before.get(f) === sha(await readFile(path.join(project, f)))) unchanged.push(f);
+  }
   // Boards on the canvas that this folder never wrote: a person's work, kept.
   const theirs = Object.keys(index.boards).filter((f) => !files.includes(f));
   const clashes = findOverlaps({ artboards: Object.entries(index.boards).map(([file, b]) => ({ file, ...b })) })
@@ -1202,7 +1216,7 @@ async function cmdCanvas(flags) {
   const imagesOf = (source) => images.filter((f) => source.includes(`"${f}"`) || source.includes(`'${f}'`) || source.includes(`(${f})`));
   const entry = index.order[0];
   const groups = index.order.filter((f) => files.includes(f)).map((f) => [f, ...imagesOf(artboards.find((a) => a.file === f).source)]);
-  const sent = new Set();
+  const sent = new Set(unchanged);
   const calls = [];
   let current = null;
   const add = (group, { fresh = false } = {}) => {
@@ -1220,13 +1234,27 @@ async function cmdCanvas(flags) {
   };
   for (const g of groups) add(g, { fresh: g[0] === entry });
   add(images.filter((f) => !sent.has(f)));
+  // Everything unchanged still leaves a first call to carry the index.
+  if (!calls.length) calls.push({ files: [], bytes: 0 });
   const abs = (f) => path.join(project, f);
   const rel = (p) => path.relative(process.cwd(), p) || '.';
   // The install rides in the first call, with the index that records it: the
   // server copies each file from the published system, so nothing is uploaded.
   const install = {};
   for (const rec of manifest.designSystems ?? []) {
-    for (const f of rec.files ?? []) install[`project/ds/${rec.namespace}/${f}`] = { artifact: rec.artifact, path: `project/${f}` };
+    for (const f of rec.files ?? []) {
+      // The Design System type never stores tokens.css: its page writes it in the browser, so there is no file to
+      // copy. The canvas folder's own copy goes instead, which also carries the @font-face rules the boards need.
+      if (f === 'tokens.css') {
+        const own = path.join(dir, 'ds', rec.namespace, 'tokens.css');
+        if (!existsSync(own)) return fail(`The install lists tokens.css, which the Design System does not store, and ${rel(own)} is not there to send instead. Run \`brandi product bundle\`, which installs the system beside the boards.`);
+        await mkdir(path.join(project, 'ds', rec.namespace), { recursive: true });
+        await copyFile(own, path.join(project, 'ds', rec.namespace, 'tokens.css'));
+        install[`project/ds/${rec.namespace}/tokens.css`] = { from: `project/ds/${rec.namespace}/tokens.css`, contentType: 'text/css' };
+        continue;
+      }
+      install[`project/ds/${rec.namespace}/${f}`] = { artifact: rec.artifact, path: `project/${f}` };
+    }
   }
   const publishCalls = calls.map((c, i) => {
     const map = Object.fromEntries(c.files.map((f) => [`project/${f}`, `project/${f}`]));
@@ -1241,8 +1269,9 @@ async function cmdCanvas(flags) {
       `Wrote the "${title}" canvas to ${rel(root)}`,
       `  ${plural(files.length, 'artboard')}, ${plural(images.length, 'image')}, ${plural(publishCalls.length, 'publish call')}`,
       removed.length ? `  ${plural(removed.length, 'file')} gone since the last run, sent as null so the canvas drops them: ${removed.join(', ')}` : '',
+      unchanged.length ? `  ${plural(unchanged.length, 'file')} unchanged since the last publish from this folder, not sent (--all sends them)` : '',
       check.warnings.length ? `  ${check.warnings.length} craft warnings, see: brandi validate --dir ${rel(dir)}` : '',
-      Object.keys(install).length ? `  installs ${plural(Object.keys(install).length, 'file')} of ${(manifest.designSystems ?? []).filter((d) => d.files?.length).map((d) => d.namespace).join(', ')} in the first call, copied server side` : '',
+      Object.keys(install).length ? `  installs ${plural(Object.keys(install).length, 'file')} of ${(manifest.designSystems ?? []).filter((d) => d.files?.length).map((d) => d.namespace).join(', ')} in the first call, copied server side${Object.values(install).some((v) => v.from) ? ' except tokens.css, sent from the canvas folder because the Design System does not store it' : ''}` : '',
       live ? `  merged into the live index: ${plural(theirs.length, 'board')} and ${plural(Object.keys(live.notes ?? {}).length, 'note')} already on the canvas kept` : '',
       !live && lastIndex ? '  merged into the last local publish, not the live index: a change made on the canvas since then is overwritten. Read project/canvas.json from the canvas first and pass it as --live <file>.' : '',
       ...clashes.map((c) => `  warning: ${c.a} overlaps ${c.b}, which is already on the canvas. Move one in canvas.json.`),
@@ -1251,12 +1280,12 @@ async function cmdCanvas(flags) {
       `  0. A new canvas: publish with the Design type's type_url, title "${title}",`,
       '     auto_open "after_first_write" and nothing else. Keep the url it returns.',
       ...publishCalls.map((c, i) => `  ${i + 1}. url: that url, root: "${c.root}", file_path: "${c.file_path}", files: ${JSON.stringify(c.files)}`),
-      'Republishing to a canvas that exists: skip step 0, send only the artboards that changed,',
-      'and the index only when artboards were added, removed or moved.',
+      live ? 'Republishing: skip step 0. These calls already leave out what has not changed.' : 'Republishing to a canvas that exists: read its project/canvas.json first and run this again with --live <file>,',
+      live ? '' : 'which merges into it and sends only what changed.',
     ].filter(Boolean).join('\n'),
     {
       ok: true, title: index.title, root, calls: publishCalls,
-      artboards: files, images, removed, warnings: check.warnings,
+      artboards: files, images, removed, unchanged, warnings: check.warnings,
       kept: theirs, overlaps: clashes, merged: live ? 'live' : lastIndex ? 'last-publish' : null,
     },
   );
@@ -2864,8 +2893,14 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       product/product.json ("roles": { "primary": { "light", "dark" }, ... }).
       Writes tokens.json, tokens.css and contrast-audit.json.
 
+  brandi product measure --url <the brand's live site>
+      Read the site's computed styles in the installed Chrome and suggest the shape
+      families (press, control, card, frame) and the shell, each with its source.
+      The guidelines come first; these fill only what they leave unsaid.
+
   brandi product audit [--tokens product/tokens.json]
-      Measure every pair a tokens file declares, in both themes.
+      Measure every pair a tokens file declares, in both themes, and list every
+      shape and shell choice the kit made because the brand was not measured.
 
   brandi product globals [--tokens product/tokens.json] [--out product/globals.css]
       The starter's globals.css for Next.js, Tailwind CSS 4 and shadcn/ui, from
@@ -2891,13 +2926,15 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       contents Main, and canvas.json rows under title notes. Heights are
       measured in a browser. Authored boards are never touched.
 
-  brandi product ds --title "<name>" [--live <design-system.json>] [--blobs <file>] [--tagline "<line>"]
+  brandi product ds --title "<name>" [--live <design-system.json>] [--blobs <file>] [--tagline "<line>"] [--all]
       The Design System artifact, assembled under product/.publish/ds: the
       written system (product/docs), tokens.json, every component card, the
       bundle and types, the fonts, the starter (its package.json and
       tsconfig.json renamed, since the type refuses them), a cover, and
       design-system.json last. Prints the calls, and the pictures to upload
       as assets; run it again with --blobs to record them.
+      With --live it is a republish: only what changed since the last staging
+      is sent, and what went is sent as null; --all sends everything.
 
   brandi product gates [--round N] [--only Button,Dialog] [--serve] [--route <url> ...]
       The machine gates for a round: the token audit, the pinned detector at
@@ -2990,11 +3027,33 @@ async function cmdProduct(flags, positional) {
     if (!audit.ok) process.exitCode = 1;
     return;
   }
+  if (sub === 'measure') {
+    // The brand's own live work, read for its shape families: evidence for where the guidelines are silent.
+    if (typeof flags.url !== 'string' || !/^(https?|file):\/\//.test(flags.url)) return fail('measure needs --url, the brand\'s own live site (https://...).');
+    let raw;
+    try { raw = await measureSite(flags.url); } catch (e) { return fail(e.message); }
+    const s = summariseShapes(raw);
+    const shape = { families: s.families, ...(s.shell ? { shell: s.shell } : {}) };
+    emit([
+      `Measured ${flags.url} at 1440 wide:`,
+      ...Object.entries(s.families).map(([k, v]) => `  ${k.padEnd(8)}${String(v.px === 'pill' ? 'pill' : `${v.px}px`).padEnd(7)}${v.source}`),
+      s.shell ? `  shell   ${s.shell.form.padEnd(7)}${s.shell.source}` : '  shell   (no header or navigation found)',
+      '',
+      'Guidelines first: check each family against the brand\'s own guidelines, keep what they settle, and take these',
+      'only where they say nothing. Then write the ones you keep into product.json under "shape" (02-brand-to-product.md, Shape):',
+      JSON.stringify(shape, null, 2),
+    ].join('\n'), { ok: true, url: flags.url, shape, raw });
+    return;
+  }
   if (sub === 'audit') {
     const file = path.resolve(typeof flags.tokens === 'string' ? flags.tokens : path.join('product', 'tokens.json'));
     if (!existsSync(file)) return fail(`No tokens file at ${path.relative(process.cwd(), file)}. Run \`brandi product tokens\` first.`);
-    const audit = auditProductTokens(JSON.parse(await readFile(file, 'utf8')));
-    emit(productAuditLines(audit).join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes });
+    const tokens = JSON.parse(await readFile(file, 'utf8'));
+    const audit = auditProductTokens(tokens);
+    // Not a fail: a brand can lack the evidence. Listed so nobody mistakes the kit's choice for the brand's.
+    const kit = shapeKitDefaults(tokens);
+    const shape = kit.length ? ['', 'Shape the kit chose, not the brand (measure these, 02-brand-to-product.md):', ...kit.map((d) => `  ${d.choice}, ${d.value}: ${d.how}`)] : ['', "Every shape and shell choice is the brand's, each with its source."];
+    emit([...productAuditLines(audit), ...shape].join('\n'), { ok: audit.ok, summary: auditSummary(audit), fails: audit.fails, warnings: audit.warnings, notes: audit.notes, shapeKitDefaults: kit });
     if (!audit.ok) process.exitCode = 1;
     return;
   }
@@ -3080,17 +3139,18 @@ async function cmdProduct(flags, positional) {
     const readJson = async (k) => (typeof flags[k] === 'string' ? JSON.parse(await readFile(path.resolve(flags[k]), 'utf8')) : null);
     let res;
     try {
-      res = assembleDesignSystem({ productDir, starter, outDir: path.join(productDir, '.publish', 'ds'), title: flags.title, live: await readJson('live'), blobs: (await readJson('blobs')) ?? {}, by: typeof flags.by === 'string' ? flags.by : undefined, tagline: typeof flags.tagline === 'string' ? flags.tagline : undefined });
+      res = assembleDesignSystem({ productDir, starter, outDir: path.join(productDir, '.publish', 'ds'), title: flags.title, live: await readJson('live'), blobs: (await readJson('blobs')) ?? {}, by: typeof flags.by === 'string' ? flags.by : undefined, tagline: typeof flags.tagline === 'string' ? flags.tagline : undefined, all: Boolean(flags.all) });
     } catch (e) { return fail(e.message); }
     const rel = (p) => path.relative(process.cwd(), p);
     emit([
       `Assembled the ${flags.title} Design System: ${plural(res.files.length, 'file')} in ${plural(res.calls.length, 'publish call')}, the index last.`,
+      res.unchanged.length ? `A republish: ${plural(res.unchanged.length, 'file')} unchanged since the last staging are not sent${res.gone.length ? `, and ${plural(res.gone.length, 'file')} that went are sent as null` : ''} (--all sends everything). Publish each staging, or the next comparison is against files the system never got.` : '',
       res.uploads.length ? `Upload these first, each with asset: true to the system's url, then run this again with --blobs <file> mapping "<Group>/<file>" to { id, size, type }:\n${res.uploads.map((u) => `  ${u.group}/${u.file}  ${rel(u.path)}`).join('\n')}` : '',
       '',
       'A new system: publish with the Design System type\'s type_url, the title, auto_open "after_first_write" and nothing else. Keep the url.',
       ...res.calls.map((c, i) => `  ${i + 1}. url: that url, root: "${c.root}", file_path: "${c.file_path}", files: ${Object.keys(c.files).length} more`),
-      'An existing system: read project/design-system.json first and pass it as --live <file>.',
-    ].filter(Boolean).join('\n'), { ok: true, calls: res.calls, uploads: res.uploads, files: res.files });
+      'An existing system: read project/design-system.json first and pass it as --live <file>; the calls then carry only what changed.',
+    ].filter(Boolean).join('\n'), { ok: true, calls: res.calls, uploads: res.uploads, files: res.files, unchanged: res.unchanged, gone: res.gone });
     return;
   }
   if (sub === 'gates' || sub === 'round') {
@@ -3134,7 +3194,10 @@ async function cmdProduct(flags, positional) {
     let system = {};
     try { system = JSON.parse(await readFile(path.join(starter, 'system', 'system.json'), 'utf8')); } catch { /* no starter yet */ }
     const dir = path.dirname(gatesFile);
-    await writeFile(path.join(dir, 'record.md'), roundMarkdown(gates, judged, { system, critique, rules, signOff }));
+    // A Published section written after the round (version ids) survives the rewrite.
+    const recordFile = path.join(dir, 'record.md');
+    const published = existsSync(recordFile) ? publishedSection(await readFile(recordFile, 'utf8')) : '';
+    await writeFile(recordFile, `${roundMarkdown(gates, judged, { system, critique, rules, signOff })}${published ? `\n${published}` : ''}`);
     await writeFile(path.join(dir, 'record.json'), `${JSON.stringify({ round, system, met: judged.met, verdicts: judged.verdicts, critique, rules, signOff, versions: gates.versions }, null, 2)}\n`);
     emit([`Round ${round}: ${judged.met ? 'the bar is met' : 'the bar is not met yet'}.`, ...judged.verdicts.map((v) => `  ${v.pass ? 'pass' : 'FAIL'}  ${v.gate}: ${v.detail}`), '', `Record: ${path.relative(process.cwd(), path.join(dir, 'record.md'))}`].join('\n'), { ok: judged.met, round, verdicts: judged.verdicts });
     if (!judged.met) process.exitCode = 1;

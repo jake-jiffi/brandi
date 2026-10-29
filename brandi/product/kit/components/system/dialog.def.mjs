@@ -9,8 +9,10 @@ const ready = async (locator) => {
   await locator.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))))
 }
 
-// The board builds its footers in script, as a canvas board does, through the bundle's own exports.
-const ns = `Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)`
+// The board builds its footers in script, as a canvas board does, through the bundle's own exports,
+// named through NS.: on the canvas a board's parent frame is another origin, and walking window's
+// properties to find the bundle reads that parent and throws.
+const ns = `{ Button: NS.Button }`
 
 // Waits for an element's animations to finish, so a measurement sees where it comes to rest.
 const settled = (locator) => locator.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished.catch(() => null))))

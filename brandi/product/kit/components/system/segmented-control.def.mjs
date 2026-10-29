@@ -113,6 +113,23 @@ export default {
   logic: "span: self.state.span, spanWord: self.state.span.toLowerCase(), setSpan: (v) => self.setState({ span: v })",
   checks: [
     {
+      name: "Its corners are radius-action at every size, and its options sit 2px inside them",
+      example: "sizes",
+      async run({ scope, expect }) {
+        // A primitive's rounded-md once beat rounded-action in the cascade, and the control came out a pill.
+        for (const group of await scope.getByRole("radiogroup").all()) {
+          const r = await group.evaluate((el) => {
+            const s = getComputedStyle(el), want = parseFloat(s.getPropertyValue("--radius-action")) || 0
+            const option = el.querySelector('[role="radio"]')
+            return { track: parseFloat(s.borderTopLeftRadius), option: option ? parseFloat(getComputedStyle(option).borderTopLeftRadius) : null, want }
+          })
+          // Computed radii are not clamped to the box, so a pill brand's 9999px reads as 9999px here.
+          expect.equal(Math.round(r.track), Math.round(r.want), "the track takes radius-action")
+          if (r.option !== null) expect.equal(Math.round(r.option), Math.round(Math.max(r.want - 2, 0)), "each option is 2px inside it")
+        }
+      },
+    },
+    {
       name: "A radio group named by its label, each option a radio",
       example: "views",
       async run({ scope, expect }) {

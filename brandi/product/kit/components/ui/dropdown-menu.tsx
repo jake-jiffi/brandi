@@ -41,7 +41,7 @@ const DropdownMenuTrigger = React.forwardRef(function DropdownMenuTrigger({
 // moving only under motion-safe. It closes at once, because Radix keeps a layer live while an exit
 // animation plays and an Escape pressed during it would be swallowed. Shared with a menu drawn in place.
 const dropdownMenuPanelClass =
-  "min-w-[max(12rem,var(--radix-dropdown-menu-trigger-width,0px))] max-w-80 overflow-x-hidden overflow-y-auto rounded-md border border-line bg-surface-raised p-1 text-text shadow-md"
+  "min-w-[max(12rem,var(--radix-dropdown-menu-trigger-width,0px))] max-w-80 overflow-x-hidden overflow-y-auto rounded-list border border-line bg-surface-raised p-1 text-text shadow-md"
 
 const DropdownMenuContent = React.forwardRef(function DropdownMenuContent({
   className,

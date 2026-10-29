@@ -76,7 +76,7 @@ export const FilterChip = React.forwardRef<HTMLButtonElement, FilterChipProps>(f
           data-slot="filter-chip-count"
           className={cn(
             "tabular-nums",
-            needsYou ? "inline-flex h-5 min-w-5 items-center justify-center rounded-xs bg-highlight px-1.5 type-caption text-on-highlight" : "type-meta text-text-muted"
+            needsYou ? "inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-highlight px-1.5 type-caption text-on-highlight" : "type-meta text-text-muted"
           )}
         >
           {figure}

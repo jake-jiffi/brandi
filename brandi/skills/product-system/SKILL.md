@@ -49,6 +49,7 @@ reference writes `<brandi>`, it means the plugin root, `$(dirname "$A")/..`.
 ```bash
 $A product tokens                     # every product role in both themes, solved for contrast, then audited
 $A product tokens --input input.json  # the same, for a brand Brandi has never built
+$A product measure --url <site>       # the brand's live shapes, for where the guidelines are silent
 $A product audit                      # measure every pair a tokens file declares, in both themes
 $A product globals                    # the starter's globals.css, from the tokens
 $A product starter                    # the product kit as a Next.js starter, dressed in the tokens
@@ -165,11 +166,17 @@ different things from it, and every difference is a decision on record.
 1. Decide the roles: which colour is the primary action, which is the brand fill, what means "needs
    you", whether the brand gets a signature rail, whether the display face sets titles. Write them
    into `product/product.json`.
-2. `$A product tokens`, then read the audit. Fix every fail at its cause; record every warning you
-   accept and why.
-3. Write the brand-to-product section: every departure from the brand book, with its reason, so
+2. Measure the brand's shapes before the kit's stand in for them: each family's radius (what you
+   press, inputs, cards, panes, photos) from the guidelines, then from the brand's live work where
+   they are silent (`$A product measure --url <site>` reads a live site); the rail's form, against the
+   window edge unless the brand floats its panels; and
+   one shape move of the brand's own to carry. Each goes in `shape` in product.json with its source.
+   Without this, every brand's product comes out looking like the last one.
+3. `$A product tokens`, then read the audit. Fix every fail at its cause; record every warning you
+   accept and why. The audit also lists each shape choice the kit made: measure what you can.
+4. Write the brand-to-product section: every departure from the brand book, with its reason, so
    nobody fixes the product back to the brand.
-4. PRODUCT.md and DESIGN.md, Impeccable's context files, come from the system: `$A product starter`
+5. PRODUCT.md and DESIGN.md, Impeccable's context files, come from the system: `$A product starter`
    writes them from `product/product.json` and the tokens. Put purpose, positioning and evidence in
    product.json (`purpose`, `positioning`, `evidence`) rather than in the file, so the next run keeps
    them. A file whose generated marker is gone is the product's own, and the starter leaves it alone.
@@ -211,6 +218,12 @@ reviewer per judged gate (the craft critique, the rules review), each in its own
 only what it can back with evidence, and `$A product round` holds the round against the bar. Fix everything or record a decision, then verify the
 fixes in the next round: fixes break things, and a verification round is where you find out.
 `references/08-quality-gates.md` has the method, the reviewer brief and the record.
+
+After every round, classify each finding: kit, generator, gate, reference, or this brand only.
+Anything not brand only goes back into Brandi as a fix with a check that fails without it, a trait
+fixture when a brand trait exposed it, an entry in `<brandi>/product/lessons.json` and the reference
+text that teaches it. Then `<brandi>/product/tools/traits.mjs` runs the kit under every trait before
+the next round starts (`references/09-operate.md`, After every round).
 
 Without a subagent tool, run each review yourself, one gate at a time, starting each from the
 evidence rather than from your memory of the build, and say in the record that the isolation was
@@ -259,6 +272,8 @@ The system is never finished. Five modes, each a round of its own
 | Rules (ui-ux-pro-max) | No Critical, High or Medium open |
 | Accessibility | axe clean, and the scripted behaviour checks all pass |
 | Tokens | `$A product audit` reports no fails |
+| Drift | Canvas, system and code agree, the docs' written values included |
+| Canvas runtime | Every board renders under the Design canvas's own runtime, in a cross-origin frame |
 | Record | Every tool's version pinned and written down, every round |
 
 Impeccable is the craft gate. ui-ux-pro-max is the rules engine: its accessibility, forms,

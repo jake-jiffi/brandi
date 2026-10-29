@@ -46,7 +46,7 @@ export default {
       "A combobox whose list suggests and never filters: focus stays on the input, and the input points at the time in hand.",
       "Typing moves the list to the time it starts, or the one it reads as (930, 9.30, 21:30, 9pm), with that time in hand. Of the times that start the same way, the one nearest the chosen time is in hand, so 12 is noon and not midnight.",
       "Enter takes the time typed, even one between the list's steps (9:50 pm); after Up or Down, Enter takes the time in hand. Escape closes the list and keeps what was typed; a second Escape is left to the page.",
-      "Down or Up opens the list at the chosen time, or the nearest. Alt and Up closes it. The clock at the end of the field, or a press on the field, opens it; a press on the Field's label only focuses it.",
+      "Down or Up opens the list at the chosen time, or the nearest. Alt and Up closes it. The clock at the end of the field, or a press on the field, opens it; a press on the Field's label only focuses it. The clock is named after its field (Show times for Start), so pickers on one page never share a name.",
       "Times read in the market's locale: 9:30 pm in en-AU, 21:30 where the 24-hour clock is the norm. The value is always HH:mm.",
       "With a start time (from), the list begins after it, and each time says how long that is in hours, through the formatter's hours style, so what people type and what they read agree. A finish typed without am or pm reads as the one after the start: 5 after a start of 9 is 5 pm.",
       "A time that does not read, or falls outside min and max, is caught when the person leaves the field, never while they type, and says what to enter through the Field.",
@@ -135,6 +135,40 @@ ${field("End of shift", 'open="{{yes}}" from="09:00" default-value="17:30"')}
         await page.keyboard.press("Enter")
         expect.equal(await input.inputValue(), T(format, 9, 30), "Enter took the time in hand")
         expect.equal(await scope.locator('input[type="hidden"][name="start"]').inputValue(), "09:30", "as HH:mm")
+      },
+    },
+    {
+      name: "Touch: the clock is the control's full height, 40, 44 and 48px at sm, md and lg, and the box keeps its edge",
+      example: "states",
+      touch: true,
+      async run({ scope, expect }) {
+        const want = { sm: 40, md: 44, lg: 48 }
+        const rows = await scope.locator('[data-slot="combobox-toggle"]').evaluateAll((els) =>
+          els.map((button) => {
+            const box = button.closest("[data-size]")
+            const edge = getComputedStyle(box)
+            return { size: box.dataset.size, tall: Math.round(button.getBoundingClientRect().height), edge: `${edge.borderTopWidth} ${edge.borderTopStyle}`, clip: getComputedStyle(button).backgroundClip }
+          })
+        )
+        // The box's 1px edge used to come out of the button's height: 38px in a 40px small field on touch.
+        expect.equal(rows.map((r) => `${r.size} ${r.tall}`).join(", "), rows.map((r) => `${r.size} ${want[r.size]}`).join(", "), "size and button height, in px")
+        expect.equal([...new Set(rows.map((r) => r.size))].sort().join(" "), "lg md sm", "every size is measured")
+        for (const r of rows) {
+          expect.equal(r.edge, "1px solid", `${r.size} keeps the box's edge`)
+          expect.equal(r.clip, "padding-box", `${r.size}: the button's tint stays inside the edge`)
+        }
+      },
+    },
+    {
+      name: "Each clock is named after its field, so two pickers on a page never share a name",
+      example: "basics",
+      async run({ page, scope, expect }) {
+        const names = await scope.locator('[data-slot="combobox-toggle"]').evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")))
+        expect.equal(names.join(" | "), "Show times for Start | Show times for Finish | Show times for Reminder", "each clock names its field")
+        expect.equal(new Set(names).size, names.length, "no two clocks share a name")
+        await scope.getByRole("button", { name: "Show times for Start", exact: true }).click()
+        await page.getByRole("listbox", { name: "Start" }).waitFor()
+        expect.equal(await scope.getByRole("button", { name: "Hide times for Start", exact: true }).count(), 1, "open, the Start clock hides the Start times")
       },
     },
     {

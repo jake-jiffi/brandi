@@ -412,14 +412,17 @@ describe('the canvas fallback under attack', () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'brandi-hash-'));
     try {
       const src = artboard({ name: 'Settings', body: '<a id="go" href="#approvals">Approvals</a><div style="height: 2000px"></div><h2 id="approvals">Approvals</h2>' })
-        .replace('</body>', '<script>addEventListener("load",()=>{document.getElementById("go").click();setTimeout(()=>document.body.setAttribute("data-at",location.href.split("/").pop()+"|"+Math.round(document.getElementById("approvals").getBoundingClientRect().top)),300)})</script></body>');
+        .replace('</body>', '<script>let prevented="";addEventListener("click",(e)=>{prevented=String(e.defaultPrevented)});addEventListener("load",()=>{document.getElementById("go").click();setTimeout(()=>document.body.setAttribute("data-at",location.href.split("/").pop()+"|"+Math.round(document.getElementById("approvals").getBoundingClientRect().top)+"|"+prevented+"|"+document.querySelector("base").getAttribute("href").endsWith("elsewhere/")),300)})</script></body>');
       const file = path.join(dir, 'Settings.preview.html');
       await writeFile(file, P.toPreviewHtml(src, { width: 800, base: pathToFileURL(path.join(dir, 'elsewhere') + path.sep).href }));
       const { stdout } = await promisify(execFile)(P.findChrome(), ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--allow-file-access-from-files', '--virtual-time-budget=4000', '--window-size=800,600', '--dump-dom', pathToFileURL(file).href], { timeout: 45000, maxBuffer: 16 * 1024 * 1024 });
       const at = /data-at="([^"]+)"/.exec(stdout)?.[1] ?? '';
-      const [where, top] = at.split('|');
+      const [where, top, prevented, restored] = at.split('|');
       assert.equal(where, 'Settings.preview.html#approvals', `the page stayed on the board, at the section: ${at || 'it left the board'}`);
       assert.ok(Number(top) < 600, `the section scrolled into view (${top}px from the top)`);
+      // A board's own click handling, and a check that reads it, see the press as it was: nothing is prevented.
+      assert.equal(prevented, 'false', 'the press is not prevented');
+      assert.equal(restored, 'true', 'and the base points back at the source once the press is done');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

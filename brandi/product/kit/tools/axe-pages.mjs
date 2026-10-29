@@ -10,7 +10,7 @@
  * 1440, 820 and 390, light and dark, a dark render asking for it in the address (?theme=dark), each once the
  * page has settled. Every violation is reported with its impact; the gate counts any violation as a
  * failure, whatever its impact. An image that did not load is reported the same way (image-not-loaded),
- * because axe passes it.
+ * because axe passes it, and so is a form with a required field and no noValidate (form-without-novalidate).
  */
 
 import { chromium } from "playwright"
@@ -34,7 +34,6 @@ function routePages(file, base) {
         theme,
         label: r.label ?? r.path,
         kind: "route",
-        route: true,
       }))
     )
   )
@@ -55,15 +54,25 @@ const results = []
 for (const p of pages) {
   const context = await browser.newContext({ viewport: { width: p.width ?? 1440, height: p.height ?? 900 }, colorScheme: p.theme === "dark" ? "dark" : "light" })
   const page = await context.newPage()
+  // A route is known by its kind, as reflow-pages.mjs knows it: the gates' page list marks it no other way.
+  // Keyed on a flag that only --routes set, every route a round scanned went to axe at load, with no wait at all.
+  const route = p.kind === "route"
+  let retried
   try {
-    await page.goto(p.url, { waitUntil: p.route ? "networkidle" : "load", timeout: 60000 })
+    await page.goto(p.url, { waitUntil: route ? "networkidle" : "load", timeout: 60000 })
     if (await page.$("x-dc, [data-dc-root]")) await page.waitForSelector("html[data-dc-ready]", { timeout: 20000 })
     // A route is scanned as people meet it: hydrated, measured and settled, not as the server's first draft.
     // Every page has one h1, and a streamed page's loading skeleton has none, so wait for it. Under load a
     // record page was still streaming after network idle, and axe reported a page with no heading. A page
-    // that never shows one is scanned anyway after ten seconds, and fails for it.
-    if (p.route) {
-      await page.waitForSelector("h1", { timeout: 10000 }).catch(() => {})
+    // that shows none in ten seconds is loaded once more and waited for again, and its result says so, so a
+    // slow page stays on the record. One that still shows none is scanned anyway, and fails for it.
+    if (route) {
+      const heading = () => page.waitForSelector("h1", { timeout: 10000 }).then(() => true, () => false)
+      if (!(await heading())) {
+        retried = "no h1 after 10s on first load"
+        await page.goto(p.url, { waitUntil: "networkidle", timeout: 60000 })
+        await heading()
+      }
       await page.waitForTimeout(800)
     }
     await page.addScriptTag({ content: axeSource })
@@ -85,9 +94,23 @@ for (const p of pages) {
       return images.filter((img, i) => failed[i] && img.naturalWidth === 0).map((img) => (img.currentSrc || img.getAttribute("src") || "(no src)").slice(0, 120))
     })
     if (broken.length) r.push({ id: "image-not-loaded", impact: "serious", help: "Every image loads: one that failed passes axe and the detector unseen", nodes: broken.slice(0, 5) })
-    results.push({ ...p, violations: r })
+    // A form with a required field and no noValidate hands an empty field to the browser's own bubble: a submit
+    // (requestSubmit included) stops before the submit event, so the system's ErrorSummary and the Field's error
+    // never show. Board forms did that, and axe and the detector passed them.
+    const bubbling = await page.evaluate(() =>
+      [...document.forms]
+        .filter((form) => !form.noValidate)
+        .flatMap((form) => {
+          const required = [...new Set([...form.querySelectorAll("[required], [aria-required='true']"), ...[...form.elements].filter((el) => el.required || el.getAttribute("aria-required") === "true")])]
+          if (!required.length) return []
+          const names = required.slice(0, 3).map((el) => (el.labels?.[0]?.textContent || el.getAttribute("aria-label") || el.getAttribute("name") || el.tagName.toLowerCase()).trim())
+          return [`form${form.id ? `#${form.id}` : ""} (required: ${names.join(", ")})`.slice(0, 120)]
+        })
+    )
+    if (bubbling.length) r.push({ id: "form-without-novalidate", impact: "moderate", help: "A form with a required field sets noValidate, so the system's errors, not the browser's bubble, say what is missing", nodes: bubbling.slice(0, 5) })
+    results.push({ ...p, ...(retried && { retried }), violations: r })
   } catch (e) {
-    results.push({ ...p, violations: [], error: String(e.message ?? e).split("\n")[0] })
+    results.push({ ...p, ...(retried && { retried }), violations: [], error: String(e.message ?? e).split("\n")[0] })
   } finally {
     await context.close()
   }
@@ -95,7 +118,8 @@ for (const p of pages) {
 await browser.close()
 const violations = results.reduce((n, r) => n + r.violations.length, 0)
 const errors = results.filter((r) => r.error).length
-const out = { axe: axeVersion, pages: results.length, violations, errors, skipped: { kinds: SPECIMEN, rules: PAGE_RULES }, results }
+const retries = results.filter((r) => r.retried).length
+const out = { axe: axeVersion, pages: results.length, violations, errors, retried: retries, skipped: { kinds: SPECIMEN, rules: PAGE_RULES }, results }
 if (arg("--json")) writeFileSync(path.resolve(arg("--json")), `${JSON.stringify(out, null, 2)}\n`)
-process.stdout.write(`${JSON.stringify({ axe: axeVersion, pages: results.length, violations, errors })}\n`)
+process.stdout.write(`${JSON.stringify({ axe: axeVersion, pages: results.length, violations, errors, retried: retries })}\n`)
 if (violations || errors) process.exitCode = 1

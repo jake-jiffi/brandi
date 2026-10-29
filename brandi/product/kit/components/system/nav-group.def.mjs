@@ -1,6 +1,6 @@
 // NavGroup's one definition: its README, its preview board and its scripted checks all come from here.
 
-const rail = (inner) => `<div style="box-sizing: border-box; width: 256px;" class="rounded-lg border border-rail-line bg-rail p-3">${inner}</div>`
+const rail = (inner) => `<div style="box-sizing: border-box; width: 256px;" class="rounded-rail border border-rail-line bg-rail p-3">${inner}</div>`
 
 const work = [
   { label: "Approvals", href: "#approvals", icon: "ClipboardCheck", current: true, count: 3, attention: true },

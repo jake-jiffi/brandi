@@ -50,13 +50,18 @@ export function useAddressState<T>(initial: T, fromAddress: (params: URLSearchPa
   React.useEffect(() => {
     if (window.location.pathname !== home.current) return
     const search = toAddress(value)
-    const next = `${window.location.pathname}${search ? `?${search}` : ""}`
-    if (next !== `${window.location.pathname}${window.location.search}`) {
-      if (push.current) window.history.pushState(null, "", next)
-      else window.history.replaceState(null, "", next)
+    // An address that already says this state is left as typed: "?status=needs-you,overdue" and the written
+    // "status=needs-you%2Coverdue" are one state, and rewriting it on every load of a filtered list churned the
+    // history while the page drew.
+    if (toAddress(fromAddress(new URLSearchParams(window.location.search))) === search) {
+      push.current = false
+      return
     }
+    const next = `${window.location.pathname}${search ? `?${search}` : ""}`
+    if (push.current) window.history.pushState(null, "", next)
+    else window.history.replaceState(null, "", next)
     push.current = false
-  }, [value, toAddress])
+  }, [value, toAddress, fromAddress])
 
   const set = React.useCallback(
     (next: T, options?: { push?: boolean }) => {

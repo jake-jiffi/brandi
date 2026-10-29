@@ -330,7 +330,7 @@ export function canvasManifest(entries, {
         ...(e.expand ? { expand: e.expand } : {}),
         ...(e.print ? { print: e.print } : {}),
         ...(e.page ? { page: e.page } : {}),
-        ...(e.is_interactive ? { is_interactive: true } : {}),
+        ...(typeof e.is_interactive === 'boolean' ? { is_interactive: e.is_interactive } : {}),
       });
       if (!explicit) {
         x += e.w + gapX;
@@ -462,6 +462,19 @@ const artifactId = (url) => String(url).split('/').pop();
 const BOARD_KEYS = ['x', 'y', 'w', 'h', 'title', 'page', 'expand', 'print', 'is_interactive'];
 
 /**
+ * Whether a board's controls need to take clicks on the canvas: it mounts a component (an x-import, or
+ * h(Ns.Component) in its logic) or wires a handler to a hole (onClick="{{ item.pick }}"). A DCLogic class on its
+ * own says nothing: every board carries one, static ones included, because the canvas expects the block on all of
+ * them. Read from the source text; a comment that names an x-import mounts nothing.
+ */
+export function boardIsInteractive(source) {
+  const text = String(source ?? '').replace(/<!--[\s\S]*?-->/g, '');
+  const scripts = [...text.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n');
+  const markup = text.replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+  return /<x-import\b/i.test(markup) || /\son[\w-]*\s*=\s*(["'])\s*\{\{[^}]*\}\}\s*\1/i.test(markup) || /\bh\(\s*[A-Za-z_$][\w$]*\.[A-Z]/.test(scripts);
+}
+
+/**
  * Brandi's canvas.json, written as the Design canvas's own index (version 3).
  *
  * Brandi keeps its own manifest shape because the validator, the preview and
@@ -473,27 +486,38 @@ const BOARD_KEYS = ['x', 'y', 'w', 'h', 'title', 'page', 'expand', 'print', 'is_
  * Brandi's own keys change. Boards a person added on the canvas, their notes,
  * keys the editor set and the installed systems all survive, because a publish
  * that rebuilt the index from scratch dropped every one of them. `removed`
- * names boards an earlier publish from this folder sent and this one does not.
+ * names boards an earlier publish from this folder sent and this one does not. With `previous`, the index that
+ * publish wrote, a board or note a person moved on the canvas keeps their position, shifted only by what the
+ * layout itself moved since: a board that grew still pushes the ones below it down, and nothing jumps back.
+ *
+ * `sources` maps each board's file to its text. A board that mounts a component or wires a handler is marked
+ * is_interactive, so its controls take clicks on the canvas: nothing set it by hand, and a published board's
+ * mounted controls sat dead. An entry that says is_interactive: false keeps its word.
  */
-export function designIndex({ manifest, title, createdOnFiles = null, now = new Date(), base = null, removed = [] }) {
+export function designIndex({ manifest, title, createdOnFiles = null, now = new Date(), base = null, previous = null, removed = [], sources = null }) {
   if (!title) throw new TypeError('a canvas needs a title');
   if (!manifest?.artboards?.length) throw new TypeError('a canvas needs at least one artboard');
   const prev = base && typeof base === 'object' && !Array.isArray(base) ? structuredClone(base) : {};
   const gone = new Set(removed);
 
+  // Where a person put a thing, if they moved it since the last publish: theirs plus the layout's own shift.
+  const place = (now, was, there) => (was && there && (there.x !== was.x || there.y !== was.y)
+    ? { x: there.x + (now.x - was.x), y: there.y + (now.y - was.y) }
+    : { x: now.x, y: now.y });
   const boards = {};
   for (const [file, entry] of Object.entries(prev.boards ?? {})) if (!gone.has(file)) boards[file] = entry;
   for (const a of manifest.artboards) {
     const kept = { ...(boards[a.file] ?? {}) };
+    const at = place(a, previous?.boards?.[a.file], prev.boards?.[a.file]);
     for (const k of BOARD_KEYS) delete kept[k];
     boards[a.file] = {
       ...kept,
-      x: a.x, y: a.y, w: a.w, h: a.h,
+      x: at.x, y: at.y, w: a.w, h: a.h,
       ...(a.title ? { title: a.title } : {}),
       ...(a.page ? { page: a.page } : {}),
       ...(a.expand ? { expand: a.expand } : {}),
       ...(a.print ? { print: a.print } : {}),
-      ...(a.is_interactive ? { is_interactive: true } : {}),
+      ...(a.is_interactive === true || (a.is_interactive !== false && boardIsInteractive(sources?.get(a.file))) ? { is_interactive: true } : {}),
     };
   }
 
@@ -505,9 +529,10 @@ export function designIndex({ manifest, title, createdOnFiles = null, now = new 
 
   const notes = { ...(prev.notes ?? {}) };
   for (const n of manifest.annotations ?? []) {
+    const at = place(n, previous?.notes?.[n.id], prev.notes?.[n.id]);
     notes[n.id] = {
       ...(notes[n.id] ?? {}),
-      x: n.x, y: n.y, text: n.text,
+      x: at.x, y: at.y, text: n.text,
       ...(n.w !== undefined ? { w: n.w } : {}),
       ...(n.kind ? { kind: n.kind } : {}),
       ...(n.maxW !== undefined ? { maxW: n.maxW } : {}),
@@ -861,6 +886,35 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     );
   }
 
+  // A page drawn under a dialog's scrim sits in an inert, aria-hidden wrapper, and the detector then reports
+  // text-occlusion on every word the scrim covers. The wrapper says so with the detector's own ignore, which is
+  // narrow: one rule, on the one subtree covered on purpose (06-canvas.md, a dialog drawn over its page).
+  for (const at of inertWithoutIgnore(source)) {
+    warn(
+      `An inert element (${at}) has no data-impeccable-ignore="text-occlusion" on it or an element around it, in ${name}: the detector will report every word a dialog's scrim covers.`,
+      'Put the covered page in one wrapper: <div aria-hidden="true" inert="true" data-impeccable-ignore="text-occlusion" style="position: absolute; inset: 0; overflow: hidden;">.',
+    );
+  }
+
+  // A handler or noValidate in a case the canvas may not read. Brandi's shim takes any case, because the HTML parser
+  // lowercases names before it sees them, so no preview shows this; only the source does.
+  for (const m of miscasedAttributes(source)) {
+    err(
+      `<${m.tag} ${m.name}> in ${name} is written in a case the Design canvas may not read.`,
+      `Write ${m.want}: ${m.tag === 'x-import' || m.tag === 'dc-import' ? 'a prop on a mounted component is kebab-case (on-row-click)' : m.want === 'noValidate' ? 'attributes on an element are JSX (noValidate)' : 'an element\'s handler is JSX camelCase as a whole-value attribute (onClick="{{ item.pick }}")'}.`,
+    );
+  }
+
+  // On the canvas a board runs in a frame whose parent is another origin, and reading a property of that parent
+  // throws. A script that walks window's properties reads it, so it breaks there and nowhere a preview runs.
+  const scripts = [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1]).join('\n');
+  if (/\bObject\.(values|keys|entries)\(\s*window\s*\)/.test(scripts)) {
+    err(
+      `A script in ${name} walks window to find something, which throws on the Design canvas: a board's parent frame is another origin.`,
+      'Name the bundle outright, window.<Ns>.<Export> (window.Acme.Button); in a component definition\'s logic, write NS.<Export>.',
+    );
+  }
+
   const flexCount = (source.match(/display:\s*(flex|grid)/g) ?? []).length;
   const gapCount = (source.match(/\bgap:/g) ?? []).length;
   if (flexCount > 0 && gapCount === 0) {
@@ -871,6 +925,72 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
   }
 
   return { name, ok: errors.length === 0, errors, warnings };
+}
+
+const VOID_TAGS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+
+/**
+ * Each inert element in a board's markup with no text-occlusion ignore on it or an element around it, named by
+ * its tag and what comes first in its attributes. Scripts and styles are left out, so code that writes markup
+ * as text is never read as markup.
+ */
+export function inertWithoutIgnore(source) {
+  const markup = String(source).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '');
+  const open = [];
+  const found = [];
+  for (const [, close, tag, attrs] of markup.matchAll(/<(\/?)([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>/g)) {
+    const t = tag.toLowerCase();
+    if (close) {
+      const i = open.map((o) => o.tag).lastIndexOf(t);
+      if (i >= 0) open.length = i;
+      continue;
+    }
+    const ignores = /\bdata-impeccable-ignore\s*=\s*(["'])[^"']*\btext-occlusion\b[^"']*\1/.test(attrs);
+    // Read on the attribute names only, so a title that says "inert" is not an inert element.
+    const inert = /(^|\s)inert(\s|=|\/?$)/.test(attrs.replace(/"[^"]*"|'[^']*'/g, '""'));
+    if (inert && !ignores && !open.some((o) => o.ignores)) found.push(`<${t}${attrs.trim() ? ` ${attrs.trim().slice(0, 60)}` : ''}>`);
+    if (!VOID_TAGS.has(t) && !/\/\s*$/.test(attrs)) open.push({ tag: t, ignores });
+  }
+  return found;
+}
+
+// The DOM events whose JSX names are more than a capital letter away from their attribute names.
+const JSX_EVENTS = {
+  dblclick: 'DoubleClick', keydown: 'KeyDown', keyup: 'KeyUp', keypress: 'KeyPress', mousedown: 'MouseDown', mouseup: 'MouseUp',
+  mouseenter: 'MouseEnter', mouseleave: 'MouseLeave', mousemove: 'MouseMove', pointerdown: 'PointerDown', pointerup: 'PointerUp',
+  pointerenter: 'PointerEnter', pointerleave: 'PointerLeave', pointermove: 'PointerMove', contextmenu: 'ContextMenu',
+  focusin: 'FocusIn', focusout: 'FocusOut', touchstart: 'TouchStart', touchend: 'TouchEnd', touchmove: 'TouchMove',
+};
+
+/**
+ * Each handler attribute, and each novalidate, written in a case the Design canvas may not read, from the source
+ * text: the HTML parser lowercases every name, so the DOM cannot tell onClick from onclick, and Brandi's own shim
+ * accepts both. On an element a handler is JSX camelCase (onClick="{{ item.pick }}"); on an x-import or a
+ * dc-import, a prop is kebab-case (on-row-click). A handler is a whole {{hole}}: a literal never runs, so a prop
+ * that only starts with "on" is left alone. Scripts, styles and comments are not markup.
+ */
+export function miscasedAttributes(source) {
+  const markup = String(source).replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>|<!--[\s\S]*?-->/gi, '');
+  const found = [];
+  for (const [, tag, attrs] of markup.matchAll(/<([a-zA-Z][\w-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>/g)) {
+    const t = tag.toLowerCase();
+    const mounts = t === 'x-import' || t === 'dc-import';
+    for (const [, name, dq, sq, bare] of attrs.matchAll(/([^\s"'=<>/]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g)) {
+      const value = dq ?? sq ?? bare ?? '';
+      if (name.toLowerCase() === 'novalidate' && name !== 'noValidate' && !mounts) found.push({ tag: t, name, want: 'noValidate' });
+      if (!/^on/i.test(name) || !/^\s*\{\{[^}]*\}\}\s*$/.test(value)) continue;
+      // The words of the name, where its case or its hyphens mark them: RowClick, row-click, rowclick.
+      const rest = name.slice(2).replace(/^-/, '');
+      const words = (/[a-z]/.test(rest) ? rest.replace(/([a-z0-9])([A-Z])/g, '$1-$2') : rest).toLowerCase().split('-').filter(Boolean);
+      if (mounts) {
+        const want = `on-${words.join('-')}`;
+        if (name !== want) found.push({ tag: t, name, want });
+      } else if (!/^on[A-Z][A-Za-z]*$/.test(name)) {
+        found.push({ tag: t, name, want: `on${JSX_EVENTS[words.join('')] ?? words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')}` });
+      }
+    }
+  }
+  return found;
 }
 
 /** Validate a whole set at once, plus the manifest that lays them out. */
@@ -932,7 +1052,7 @@ export function validateCanvas({ artboards, manifest, brandFonts = [], systems =
 }
 
 export default {
-  artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding, FRAME_LIMIT,
+  artboard, canvasManifest, validateArtboard, validateCanvas, findOverlaps, findCrowding, FRAME_LIMIT, inertWithoutIgnore,
   forDesignCanvas, designIndex, encodeProps, decodeProps, FRAMES, BANNED_FONTS, DEFAULT_FONTS,
   systemHeadLines, checkSystemRecord, NAMESPACE_RE,
 };

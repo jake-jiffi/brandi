@@ -15,6 +15,7 @@ reviewers are briefed, and what goes in the record.
 | Accessibility | axe clean, every image loaded; nothing scrolls sideways at 320px wide on a fluid board or route; every scripted behaviour check passing |
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree (`09-operate.md`) |
+| Canvas runtime | Every board renders without an error under the Design canvas's own runtime, in a cross-origin frame (`06-canvas.md` step 3) |
 | Record | Every tool's version pinned and written down |
 
 The two review scales map onto one another, so "nothing Medium or above" means the same thing in
@@ -44,9 +45,14 @@ more, and do not lower the bar to finish.
 1. **Deterministic checks first.** `$A product gates` runs the token audit, the drift check, the
    detector on every preview and board (and a running starter's routes, with `--route`) at 1440, 820
    and 390, light and dark, axe on every one of those renders, and every scripted check. Fix what
-   they find before the reviewers start. A board can show a page frame more than once (a shell at
+   they find before the reviewers start. A fluid board is drawn afresh at each width it is scanned
+   at: drawn once at its frame's width, every fluid 1440 board scrolled sideways at 390 and 820. A board can show a page frame more than once (a shell at
    four widths, a flow of screens), so there axe skips the three rules about one page's landmarks.
-   The routes run every rule, and the round record names what was skipped. Every fluid board and
+   The routes run every rule, and the round record names what was skipped. axe scans a route once its
+   h1 shows; a route with none after ten seconds is loaded once more and waited for again, its result
+   marked `retried`, counted in the summary line and named in the round record, so a slow page stays on
+   the record even when its second load passes. One with no h1 on the second load is scanned anyway and
+   fails. Every fluid board and
    route is also opened at 320px wide (WCAG 1.4.10: 1280 at 400% zoom, and a small phone) and fails
    when the page scrolls sideways; no detector or axe there, just the overflow, with what sticks out
    named in the record.
@@ -61,7 +67,7 @@ more, and do not lower the bar to finish.
 5. **Write the fix plan before fixing.** `product/rounds/round-N/fix-plan.md`: every finding, fixed or
    recorded with a decision, before the next round starts.
 6. **Verify in the next round.** The next round checks the previous round's findings item by item:
-   fixed, partly fixed or not fixed, each with evidence. Fixes break things. In the last build, two of
+   fixed, still open (with what is left) or accepted, each with evidence. Fixes break things. In the last build, two of
    one round's three P1s were caused by the previous round's fixes, and a later round found a Medium
    introduced by a fix and a High that fix had only half solved.
 
@@ -87,7 +93,10 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
 - **The bar, and the system's own rules to judge against** (the README and the relevant sections).
 - **Where everything is:** component pages in both themes, the starter's routes and their port, the
   canvas boards and their port, the source folders, and which board widths are fluid and which fixed.
-- **The previous round's findings**, each to be marked fixed, partly fixed or not fixed, with evidence.
+- **The previous round's findings**, each marked `fixed`, `open` (with a note on what is left) or
+  `accepted` (with the recorded deviation), and the evidence.
+- **The three status words.** A finding's status is `open`, `fixed` or `accepted`, nothing else: a
+  reviewer's "closed" or "partly fixed" counts as open, and the gate names every finding that used one.
 - **What the scripts already verified**, so the reviewer does not repeat it.
 - **The accepted deviations**, so they are not reported again.
 - **What scripts miss:** real keyboard and touch use, forced colours, screen-reader output, and
@@ -108,8 +117,26 @@ Set guardrails and the bar, and leave room to think. Every brief carries:
   judge) and so does the detector. A character pose given as a path from the page root broke on
   every board that way. `axe-pages.mjs` reports every image that does not load and decode as
   `image-not-loaded`.
+- **A browser bubble instead of the system's errors.** A form with a required (or aria-required)
+  field and no `noValidate` passes axe and the detector, yet an empty submit stops at the
+  browser's own bubble, before the submit event, so the ErrorSummary and the Field errors never
+  show. Board forms did it. `axe-pages.mjs` reports such a form as `form-without-novalidate`, on
+  boards, component previews and routes alike. Limit: it counts every required control, so a form
+  whose only required field is disabled, or whose every submit button has `formnovalidate`, fails
+  too, though no bubble shows. Give that form `noValidate` as well.
+- **A board that works as a page and breaks in a frame.** On the canvas each board runs in a frame
+  whose parent is another origin, while Brandi's previews and the gates draw it as the top page. A
+  board script that walked `window`'s properties to find the bundle read that parent and threw, so a
+  menu got no items and the board showed an error, on the canvas only. `$A validate` refuses a script
+  that walks `window`: name the bundle outright, `NS.<Export>` in a definition's logic.
 - **State bleeding between checks.** A test page left with a modal open breaks every check after it.
   Run each stateful check on a fresh page.
+- **An example wider than its board.** A board clips what runs past its edge, and nothing reports
+  it. `$A product boards` draws a wide example down to fit, layout box and all, and says so.
+- **A frame the canvas cannot take.** The Design canvas takes a frame of 40 to 8000px each way. A
+  generated group board once ran to 20,251px, and nothing said so until the publish. `$A product
+  boards` splits a tall group into parts under 7,600px, and `$A validate` refuses a frame outside
+  the range.
 - **Copies that drift.** When the bundle CSS lives in three places (source, the system, the canvas),
   a missed copy makes a fix invisible in screenshots. Compare checksums of every copy after every build.
 
@@ -159,6 +186,8 @@ the bar is met. The record carries, with a summary row in the quality-gates sect
 - Detector findings by target, axe results, behaviour check counts, the token audit line.
 - Findings by severity, each with its status and evidence.
 - Accepted deviations, each with its reason.
+- Shape the kit chose: every radius, the shell and any missing shape move the brand did not set, each
+  with how the kit chose it (`$A product gates` writes them; 02-brand-to-product.md, Shape).
 - What changed this round.
 - Still open, each with an owner.
 - Sign-off: who, and when.

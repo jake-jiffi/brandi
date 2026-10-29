@@ -51,21 +51,11 @@ export default {
     Review: ["An uppercase kicker sat above card titles, which the craft gate bans (round 1)."],
   },
   frame: { width: 960, height: 1700 },
-  logic: `els: (() => {
-  for (const key of Object.keys(window)) {
-    try {
-      const ns = window[key]
-      if (ns && typeof ns.Root === "function" && ns.Button) {
-        const h = window.React.createElement
-        return {
-          exportAction: h(ns.Button, { size: "sm", variant: "ghost", icon: "Download" }, "Export"),
-          menuAction: h(ns.Button, { size: "sm", variant: "ghost", icon: "Pencil" }, "Edit"),
-        }
-      }
-    } catch (e) {}
-  }
-  return {}
-})()`,
+  // NS. names the bundle's own global: walking window's properties reads the canvas's parent frame.
+  logic: `els: {
+  exportAction: window.React.createElement(NS.Button, { size: "sm", variant: "ghost", icon: "Download" }, "Export"),
+  menuAction: window.React.createElement(NS.Button, { size: "sm", variant: "ghost", icon: "Pencil" }, "Edit"),
+}`,
   examples: [
     {
       id: "anatomy",

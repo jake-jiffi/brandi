@@ -530,6 +530,64 @@ describe('the frame the Design canvas takes', () => {
   });
 });
 
+describe('a dialog drawn over its page', () => {
+  test('validate warns about an inert page with no text-occlusion ignore, and is quiet with the documented wrapper', () => {
+    const page = '<div style="display: flex; flex-direction: column; gap: 12px;"><h1>Pay run</h1><p>Every line of the page.</p></div>';
+    const dialog = '<div role="dialog" aria-label="Approve" style="display: flex; gap: 8px;"><p>Approve the pay run?</p></div>';
+    const bare = K.artboard({ name: 'PayRunApprove1440', body: `<div aria-hidden="true" inert="true" style="position: absolute; inset: 0; overflow: hidden;">${page}</div>${dialog}` });
+    const r = K.validateArtboard(bare, { name: 'PayRunApprove1440.dc.html' });
+    const w = r.warnings.find((x) => /inert/.test(x.message));
+    assert.ok(w, JSON.stringify(r.warnings));
+    assert.match(w.message, /PayRunApprove1440\.dc\.html/, 'names the board');
+    assert.match(w.fix, /data-impeccable-ignore="text-occlusion"/, 'and gives the wrapper');
+    const done = K.artboard({ name: 'PayRunApprove1440', body: `<div aria-hidden="true" inert="true" data-impeccable-ignore="text-occlusion" style="position: absolute; inset: 0; overflow: hidden;"><section inert>${page}</section></div>${dialog}` });
+    assert.equal(K.validateArtboard(done, { name: 'PayRunApprove1440.dc.html' }).warnings.filter((x) => /inert/.test(x.message)).length, 0, 'the ignore covers the wrapper and everything in it');
+    assert.deepEqual(K.inertWithoutIgnore('<div data-impeccable-ignore="nested-cards"><div inert>x</div></div>').length, 1, 'another rule\'s ignore is not this one');
+    assert.deepEqual(K.inertWithoutIgnore('<p title="make it inert">x</p><script>const s = "<div inert>"</script>'), [], 'a word in a title or a script is not an inert element');
+  });
+});
+
+describe('handlers in a case the canvas may not read', () => {
+  test('validate fails a lowercase or kebab handler on an element, a camelCase one on an x-import, and novalidate, read from the source', () => {
+    const board = (body) => K.validateArtboard(K.artboard({ name: 'BookingForm1440', body }), { name: 'BookingForm1440.dc.html' });
+    const wrong = board([
+      '<form onsubmit="{{ save }}" novalidate style="display: flex; gap: 12px;"><button ondblclick="{{ pick }}" on-click="{{ pick }}">Book</button></form>',
+      '<x-import component-from-global-scope="Acme.DataTable" onRowClick="{{ open }}"></x-import>',
+    ].join(''));
+    const said = wrong.errors.filter((e) => /may not read/.test(e.message)).map((e) => `${e.message.match(/<[^>]+>/)[0]} ${e.fix.split(':')[0]}`);
+    assert.deepEqual(said, [
+      '<form onsubmit> Write onSubmit',
+      '<form novalidate> Write noValidate',
+      '<button ondblclick> Write onDoubleClick',
+      '<button on-click> Write onClick',
+      '<x-import onRowClick> Write on-row-click',
+    ]);
+    assert.match(wrong.errors.find((e) => /onsubmit/.test(e.message)).message, /BookingForm1440\.dc\.html/, 'names the board');
+    const right = board([
+      '<form onSubmit="{{ save }}" noValidate style="display: flex; gap: 12px;"><button onClick="{{ pick }}" title="onclick={{ pick }}">Book</button></form>',
+      '<x-import component-from-global-scope="Acme.DataTable" on-row-click="{{ open }}" heading-level="{{ h3 }}"></x-import>',
+      '<!-- <button onclick="{{ pick }}"> --><button onclick="alert(1)">A literal never runs</button>',
+    ].join(''));
+    assert.deepEqual(right.errors.filter((e) => /may not read/.test(e.message)), [], 'the documented forms, a comment and a literal pass');
+    assert.deepEqual(K.miscasedAttributes('<script type="text/x-dc">const t = \'<a onclick="{{ x }}">\';</script>'), [], 'a script is not markup');
+  });
+});
+
+describe('a board that walks window', () => {
+  test('validate fails a script that walks window to find a bundle, and passes the namespace named outright', () => {
+    // On the canvas a board runs in a frame whose parent is another origin: reading a property of that parent
+    // throws, so the lookup breaks there and only there. A board drawn as the top page never shows it.
+    const board = (logic) => K.validateArtboard(K.artboard({ name: 'Overlays1440', body: '<div style="display: flex; gap: 12px;"><p>Menus</p></div>', logic }), { name: 'Overlays1440.dc.html' });
+    const walked = board('renderVals() { const A = Object.values(window).find((v) => v && v.ICON_NAMES); return { trigger: A.Button }; }');
+    const e = walked.errors.find((x) => /walks window/.test(x.message));
+    assert.ok(e, JSON.stringify(walked.errors));
+    assert.match(e.message, /Overlays1440\.dc\.html/, 'names the board');
+    assert.match(e.fix, /window\.<Ns>/, 'and says what to write instead');
+    assert.ok(board('renderVals() { return { keys: Object.keys(window) }; }').errors.some((x) => /walks window/.test(x.message)), 'keys too');
+    assert.deepEqual(board('renderVals() { return { trigger: window.Acme.Button, rows: Object.values(this.rows) }; }').errors.filter((x) => /walks window/.test(x.message)), [], 'the namespace named outright passes');
+  });
+});
+
 describe('frames', () => {
   test('print frames are correct at 96 pixels per inch', () => {
     // A4 is 210 x 297 mm. 210mm = 8.268in x 96 = 794px. 297mm = 11.693in x 96 = 1123px.
@@ -693,6 +751,32 @@ describe('the Design canvas', () => {
     assert.deepEqual(K.designIndex({ manifest, title: 'T', createdOnFiles }).createdOnFiles, createdOnFiles);
   });
 
+  test('a board that mounts a component or wires a handler in its DCLogic is marked interactive from its source, unless its entry says false', () => {
+    const boards = {
+      'Main.dc.html': '<x-dc><!-- the rows use <x-import> --><h1>Contents</h1></x-dc>',
+      'Rosters1440.dc.html': '<x-dc><x-import component-from-global-scope="Acme.Button">Approve</x-import></x-dc>',
+      'Picker1440.dc.html': '<x-dc><button onClick="{{ pick }}">Wash</button></x-dc>\n<script type="text/x-dc" data-dc-script>class Component extends DCLogic { renderVals() { return {}; } }</script>',
+      'Poster1440.dc.html': '<x-dc><x-import component-from-global-scope="Acme.Avatar"></x-import></x-dc>',
+      'Rail1440.dc.html': '<x-dc><div>{{ rail }}</div></x-dc>\n<script type="text/x-dc" data-dc-script>class Component extends DCLogic { renderVals() { const h = React.createElement; return { rail: h(window.Acme.Sidebar, null) }; } }</script>',
+      'Specimen1440.dc.html': K.artboard({ name: 'Specimen1440', body: '<p>Every static board carries an empty DCLogic block.</p>' }),
+    };
+    const manifest = K.canvasManifest([
+      { file: 'Main.dc.html', w: 1440, h: 900 },
+      { file: 'Rosters1440.dc.html', w: 1440, h: 900 },
+      { file: 'Picker1440.dc.html', w: 1440, h: 900 },
+      { file: 'Poster1440.dc.html', w: 1440, h: 900, is_interactive: false },
+      { file: 'Rail1440.dc.html', w: 1440, h: 900 },
+      { file: 'Specimen1440.dc.html', w: 1440, h: 900 },
+    ]);
+    assert.equal(manifest.artboards.find((a) => a.file === 'Poster1440.dc.html').is_interactive, false, 'the manifest keeps an explicit false');
+    const index = K.designIndex({ manifest, title: 'T', sources: new Map(Object.entries(boards)) });
+    const marked = Object.entries(index.boards).filter(([, b]) => b.is_interactive === true).map(([f]) => f).sort();
+    assert.deepEqual(marked, ['Picker1440.dc.html', 'Rail1440.dc.html', 'Rosters1440.dc.html'], 'an x-import, a handler, a component made in the logic; not a comment, an explicit false or the empty DCLogic every board has');
+    assert.match(boards['Specimen1440.dc.html'], /class Component extends DCLogic/);
+    assert.equal('is_interactive' in index.boards['Poster1440.dc.html'], false);
+    assert.equal('is_interactive' in index.boards['Main.dc.html'], false);
+  });
+
   test('refuses an index with no title or no artboards', () => {
     const manifest = K.canvasManifest([{ file: 'Main.dc.html', w: 100, h: 100 }]);
     assert.throws(() => K.designIndex({ manifest, title: '' }), TypeError);
@@ -736,6 +820,31 @@ describe('the Design canvas', () => {
     assert.deepEqual(index.notes.console, { x: 0, y: -300, text: 'Ops console', kind: 'title1', maxW: 3000 });
     assert.deepEqual(index.designSystems, live().designSystems);
     assert.deepEqual(index.pages, [{ id: 'mine', name: 'Their page' }]);
+  });
+
+  test('a board or title a person moved stays where they put it, shifted only by what the layout itself moved', () => {
+    const at = (y, extra = {}) => K.canvasManifest([
+      { file: 'Main.dc.html', w: 1440, h: 1200 },
+      { file: 'Shape1440.dc.html', w: 1440, h: 1400 },
+      { file: 'Icons1440.dc.html', w: 1440, h: 600 },
+    ], { annotations: [{ id: 'icons', x: 0, y: y - 300, text: 'Icons', kind: 'title1', maxW: 3000 }], ...extra });
+    // The last publish from this folder, as the canvas held it, then a person's moves, then the shape board grows.
+    const before = at(0);
+    const previous = K.designIndex({ manifest: before, title: 'T' });
+    const live = structuredClone(previous);
+    live.boards['Icons1440.dc.html'].x += 2000;
+    live.notes.icons.x += 2000;
+    const grown = structuredClone(before);
+    grown.artboards[1].h += 806;
+    for (const a of grown.artboards.slice(2)) a.y += 806;
+    for (const n of grown.annotations) n.y += 806;
+    const index = K.designIndex({ manifest: grown, title: 'T', base: live, previous });
+    assert.equal(index.boards['Icons1440.dc.html'].x, live.boards['Icons1440.dc.html'].x, 'the person\'s move stays');
+    assert.equal(index.boards['Icons1440.dc.html'].y, live.boards['Icons1440.dc.html'].y + 806, 'and the board still clears the one that grew');
+    assert.equal(index.boards['Shape1440.dc.html'].h, before.artboards[1].h + 806, 'sizes come from the boards');
+    assert.equal(index.notes.icons.x, live.notes.icons.x);
+    assert.equal(index.notes.icons.y, live.notes.icons.y + 806);
+    assert.equal(K.designIndex({ manifest: grown, title: 'T', base: live }).boards['Icons1440.dc.html'].x, grown.artboards[2].x, 'without the last publish, the layout wins, as before');
   });
 
   test('a key Brandi used to write and no longer does is cleared from its own board', () => {
@@ -878,6 +987,15 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('a fragment inside an inline SVG image, written %23 as a data URI writes #, is not a missing image', async () => {
+    // A sample photo a component draws, carried as a prop the way a component board's logic carries it.
+    const svg = "data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Crect%20fill%3D'url(%23g)'%2F%3E%3C%2Fsvg%3E";
+    const dir = await fresh({ 'Main.dc.html': board('Main').replace('<p style="margin:0">', `<p data-photo="${svg}" style="margin:0">`) });
+    const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.equal(code, 0, out);
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('refuses a file name the canvas cannot take', async () => {
     const dir = await fresh({ 'Main.dc.html': board('Main') });
     await writeFile(path.join(dir, 'brand', 'canvas', 'my photo.png'), Buffer.alloc(8));
@@ -900,9 +1018,17 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
       designSystems: [{ title: 'Acme', namespace: 'acme', artifact: 'https://claude.ai/artifact/Sys1', version: 'v9', files: ['tokens.json', 'tokens.css', 'components/bundle.css', 'components/bundle.js'] }],
     });
     await writeFile(path.join(dir, 'brand', 'canvas', 'canvas.json'), JSON.stringify(manifest));
+    const refused = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme product']);
+    assert.notEqual(refused.code, 0, 'no tokens.css of its own to send');
+    assert.match(String(refused.out.error ?? refused.out), /tokens\.css, which the Design System does not store/);
+    await mkdir(path.join(dir, 'brand', 'canvas', 'ds', 'acme'), { recursive: true });
+    await writeFile(path.join(dir, 'brand', 'canvas', 'ds', 'acme', 'tokens.css'), '@font-face { font-family: "Acme Sans"; src: url("fonts/acme.woff2"); }\n:root { --text: #222; }\n');
     const { code, out } = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme product']);
     assert.equal(code, 0, String(out));
     assert.deepEqual(out.calls[0].files['project/ds/acme/components/bundle.js'], { artifact: 'https://claude.ai/artifact/Sys1', path: 'project/components/bundle.js' });
+    // The type never stores tokens.css, so the canvas folder's own copy goes, @font-face rules and all.
+    assert.deepEqual(out.calls[0].files['project/ds/acme/tokens.css'], { from: 'project/ds/acme/tokens.css', contentType: 'text/css' });
+    assert.match(await readFile(path.join(dir, 'brand', '.publish', 'acme-product', 'project', 'ds', 'acme', 'tokens.css'), 'utf8'), /@font-face/);
     assert.equal(Object.keys(out.calls[0].files).filter((k) => k.startsWith('project/ds/acme/')).length, 4);
     const index = JSON.parse(await readFile(path.join(dir, 'brand', '.publish', 'acme-product', 'project', 'canvas.json'), 'utf8'));
     assert.equal(index.designSystems.length, 1);
@@ -937,6 +1063,24 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     assert.equal(again.out.merged, 'last-publish');
     const bad = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', '--live', path.join(dir, 'missing.json')]);
     assert.notEqual(bad.code, 0);
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('a republish with --live sends the index and only what changed since the last publish, unless --all', async () => {
+    const dir = await fresh({ 'Main.dc.html': board('Main'), 'Second.dc.html': board('Second'), 'Third.dc.html': board('Third') });
+    const first = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme']);
+    assert.equal(first.code, 0, String(first.out));
+    const livePath = path.join(dir, 'live.json');
+    await writeFile(livePath, await readFile(path.join(dir, 'brand', '.publish', 'acme', 'project', 'canvas.json'), 'utf8'));
+    const second = path.join(dir, 'brand', 'canvas', 'Second.dc.html');
+    await writeFile(second, (await readFile(second, 'utf8')).replace('<p style="margin:0">', '<p style="margin:0" data-changed="1">'));
+    const sentIn = (out) => out.calls.flatMap((c) => [path.basename(c.file_path), ...Object.keys(c.files).map((f) => f.replace(/^project\//, ''))]);
+    const republish = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', '--live', livePath]);
+    assert.equal(republish.code, 0, String(republish.out));
+    assert.deepEqual(sentIn(republish.out).sort(), ['Second.dc.html', 'canvas.json']);
+    assert.deepEqual(republish.out.unchanged.sort(), ['Main.dc.html', 'Third.dc.html']);
+    const all = await canvas(dir, ['--dir', 'brand/canvas', '--title', 'Acme', '--live', livePath, '--all']);
+    assert.deepEqual(sentIn(all.out).sort(), ['Main.dc.html', 'Second.dc.html', 'Third.dc.html', 'canvas.json']);
     await rm(dir, { recursive: true, force: true });
   });
 });

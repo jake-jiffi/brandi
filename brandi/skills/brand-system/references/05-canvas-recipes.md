@@ -68,7 +68,10 @@ every publish.
 3. **A single-quoted image src.** `<img src='logo.png'>` is refused by the validator. Double quotes
    only, and the filename must match the file in the folder exactly.
 4. **A `data:` image.** The canvas takes images as files, not data URIs. Save the image in the
-   canvas folder and name it by filename.
+   canvas folder and name it by filename. The validator reads `src` attributes only, so a data URI
+   passed through a hole to a component is not caught. The product kit's Avatar sample photo is one,
+   kept on purpose: where the canvas refuses it, the Avatar shows initials, as it does for any photo
+   that fails.
 5. **Any external URL.** The canvas has no network egress. A CDN script, a remote image, a fetch, a
    stylesheet from anywhere except `fonts.googleapis.com`, all fail silently. Inline everything.
 6. **A double-quoted `data-props` attribute.** It must be single-quoted, and inside it `&` is
@@ -260,10 +263,14 @@ class Component extends DCLogic {
 
 Classic script only: no `import`, no `export`, no TypeScript, and the class must be
 `class Component extends DCLogic`. Events use JSX camelCase as whole-value attributes,
-`onClick="{{ item.pick }}"`. Always set `hint-placeholder-count` on `<sc-for>` and
-`hint-placeholder-val` on `<sc-if>` so something renders while values stream in.
+`onClick="{{ item.pick }}"`, and a form says `noValidate`. The HTML parser lowercases attribute
+names, so `onclick` or `on-click` renders in Brandi's preview and may not on the canvas:
+`brandi validate` reads the source and fails them. Always set `hint-placeholder-count` on
+`<sc-for>` and `hint-placeholder-val` on `<sc-if>` so something renders while values stream in.
 
-Mark the artboard `"is_interactive": true` in `canvas.json`.
+The artboard is marked `"is_interactive": true` for you: `brandi canvas` sets it on every board
+that wires a handler or mounts a component, though not for the empty DCLogic class every static
+board carries. Write `"is_interactive": false` in `canvas.json` to keep one still.
 
 **Tweaks are levers, not copy.** A `data-props` entry with an editor becomes a chip above the
 artboard. Declare few and deliberate ones: a theme toggle, a density switch, one accent colour that

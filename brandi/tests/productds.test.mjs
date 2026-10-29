@@ -73,6 +73,50 @@ describe('the Design System artifact, assembled', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('a republish against the live index sends what changed since the last staging, drops what went, and the index last', async () => {
+    const { dir, starter } = await product();
+    const out = path.join(dir, '.publish', 'ds');
+    const live = { v: 3, title: 'Acme product system', createdOnFiles: { v: 1, at: '2026-10-01T00:00:00.000Z' } };
+    assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system' });
+    await writeFile(path.join(dir, 'components', 'Button', 'README.md'), '# Button\n\nThe pressable action, now in the brand\'s shape.\n');
+    await rm(path.join(dir, 'docs', '1-writing.md'));
+    const sent = (res) => res.calls.flatMap((c) => [path.relative(path.join(out, 'project'), c.file_path), ...Object.keys(c.files).map((f) => f.replace(/^project\//, ''))]);
+    const res = assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system', live });
+    assert.deepEqual(sent(res).sort(), ['1-writing.md', 'components/Button/README.md', 'design-system.json']);
+    assert.equal(res.calls.flatMap((c) => Object.entries(c.files)).find(([k]) => k === 'project/1-writing.md')[1], null, 'a file that went is sent as null, so the system drops it');
+    assert.equal(res.calls.at(-1).file_path, path.join(out, 'project', 'design-system.json'), 'the index still goes alone, last');
+    assert.ok(res.unchanged.includes('components/bundle.js'));
+    const all = assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system', live, all: true });
+    assert.ok(sent(all).includes('components/bundle.js'), '--all sends everything');
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  test('TypeScript and Python go as text/plain through files, and no call leads with one, even a call of nothing else', async () => {
+    const { dir, starter } = await product();
+    // Enough typed files that a call is made of nothing else: the last one, after the plain files run out.
+    await mkdir(path.join(starter, 'components', 'many'), { recursive: true });
+    for (let i = 0; i < 600; i++) await writeFile(path.join(starter, 'components', 'many', `part-${String(i).padStart(3, '0')}.tsx`), 'export {}');
+    await mkdir(path.join(starter, 'scripts'), { recursive: true });
+    await writeFile(path.join(starter, 'scripts', 'gen.py'), 'print(1)');
+    const out = path.join(dir, '.publish', 'ds');
+    const res = assembleDesignSystem({ productDir: dir, starter, outDir: out, title: 'Acme product system' });
+    const typed = /\.(ts|tsx|py)$/;
+    assert.ok(res.calls.length >= 3, `${res.calls.length} calls`);
+    for (const [i, c] of res.calls.entries()) {
+      assert.equal(typed.test(c.file_path), false, `call ${i + 1} leads with ${path.basename(c.file_path)}, which file_path cannot type`);
+      assert.ok(Object.keys(c.files).length < 250, `call ${i + 1} holds ${Object.keys(c.files).length + 1} paths`);
+      for (const [to, from] of Object.entries(c.files)) {
+        if (typed.test(to)) assert.deepEqual(from, { from: to, contentType: 'text/plain' }, to);
+        else assert.equal(from, to, to);
+      }
+    }
+    const sent = res.calls.flatMap((c) => [path.relative(path.join(out, 'project'), c.file_path), ...Object.keys(c.files).map((k) => k.slice('project/'.length))]);
+    assert.equal(new Set(sent).size, sent.length, 'nothing is sent twice');
+    assert.deepEqual([...sent].sort(), [...res.files, 'design-system.json'].sort(), 'and nothing is left out');
+    for (const f of ['components/index.d.ts', 'starter/app/page.tsx', 'starter/scripts/gen.py']) assert.ok(sent.includes(f), f);
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('without the written system there is nothing to open on, and it says so', async () => {
     const { dir, starter } = await product();
     await rm(path.join(dir, 'docs'), { recursive: true });

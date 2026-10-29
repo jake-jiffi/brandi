@@ -49,12 +49,17 @@ Run it every round. It compares:
 | Copies of the bundle and its CSS | Each other, by checksum | A fix visible in one place and not another |
 | Components mounted on boards, with their props | The system's component manifest | A board mounting a component or a prop the system does not have |
 | Components in the starter | The system's catalogue | A product component with no system card, or the reverse |
+| A value written beside a size token's name in the docs and CONVENTIONS.md (`` `radius-md` (15px) ``, or a table row) | `product/tokens.json` | A README that still gives the radii from before a shape change |
 | Screens on the canvas | The pattern definitions in the docs, and the starter's routes | Settings drawn one way on the canvas, another in the docs, a third in code |
 
 The last system found the last row the hard way: its canvas, docs and starter gave three different
 answers for one settings page, and a review round scored Consistency at 2 out of 4 until Settings was
 rebuilt to match. Generating canvas screens from the same pattern definitions as the docs and the
 starter is what stops it recurring.
+
+A definition with a prop row typed `native` passes its element's own props through (placeholder,
+autocomplete, readonly), so a board may set them. Any other definition is held to the props it
+declares.
 
 Report each difference with both values and where each lives, and fix it at the source: the tokens,
 the component definition or the pattern. Never patch a copy.
@@ -69,6 +74,47 @@ The full method is in `08-quality-gates.md`. A round ends with:
 - a changelog entry saying what changed and why;
 - one publish batch per artifact, after the person approves. Publishing piecemeal through a round is
   slower and harder to reason about than one batch at the end.
+
+## After every round
+
+A round on a real brand tests Brandi as much as the brand. Most of what the pilot brands found was
+the kit, a generator or a gate, and it showed only because that brand had a trait the kit's fixture
+lacks. What is not the brand's own goes back into Brandi, so the next brand starts with it.
+
+1. **Classify every finding** as one of:
+   - **kit**: a component or its check, in `<brandi>/product/kit`.
+   - **generator**: what a command writes: the tokens, the starter, the boards, the book.
+   - **gate**: a check or scan that passed what it should have failed, or failed what was right.
+   - **reference**: the skill taught the wrong thing, or nothing.
+   - **brand only**: this brand's own decision or asset. It stays in the brand's record, and Brandi
+     does not change.
+
+   When in doubt, it is not brand only: a defect another brand could hit is Brandi's.
+2. **Take each of the others back into Brandi, with four things:**
+   - the fix, and a check or test that fails without it. Run it on the unfixed code and watch it
+     fail.
+   - a trait fixture in `<brandi>/product/traits` when a brand trait exposed it, failing on the
+     unfixed kit (its README says how).
+   - an entry in `<brandi>/product/lessons.json`: what broke, in one sentence with no client's name,
+     copy or colours; the trait; the guards by their exact names; and where the rule is taught.
+   - the reference text that teaches the rule, under the heading the entry names.
+
+   `<brandi>/tests/productlessons.test.mjs` holds every entry to the code, so a guard renamed or
+   dropped fails the suite. Brandi's repo is public: nothing taken back names a client or carries a
+   client's copy or colours, in the code, the fixtures or the commit message.
+3. **Run the traits before the next round**, and start it only when every row passes:
+
+   ```bash
+   node <brandi>/product/tools/traits.mjs --scratch <dir> --modules product/starter/node_modules
+   ```
+
+   It writes each trait's tokens, runs the kit loop on the components the lessons name, and prints
+   one row a trait. A failing row is a finding of its own, classified the same way.
+4. **Note it in the fix plan.** Each finding in `product/rounds/round-N/fix-plan.md` carries its
+   class, and its lesson id once it is in Brandi.
+
+Working where Brandi itself cannot be changed (the plugin installed, not its repo), write each
+finding up for Brandi's maintainers in the same four parts, and carry on with the round.
 
 ## standards: keep the platform layer current
 

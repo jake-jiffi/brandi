@@ -1,0 +1,5 @@
+{
+  "trait": "A pure black rail, in both themes.",
+  "product": {"roles": {"rail": {"light": "#000000", "dark": "#000000"}}},
+  "proven": {"lessons": ["L10", "L11", "L13"], "how": "With the on-rail scope taken off Sidebar and PhoneTopBar, seven checks failed under this trait (a bar action at 1.6:1, focus in the page's colour, text-strong in the page's ink) and none on the baseline."}
+}

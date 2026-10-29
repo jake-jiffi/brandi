@@ -88,12 +88,12 @@ export default {
       "Shown open for a design, it is the Popover's still picture: no layer, so the board keeps its keys and tab order.",
     ],
     Layout: [
-      "The popover is 384px, never wider than the screen less 16px, and its list scrolls past 384px. The sheet fills a phone inside its 8px inset, with Mark all as read at its foot.",
-      "Each line is its icon tile, by kind and tone as a Timeline's, then what happened, then when. Unread lines are in the label weight with a dot in the highlight; read lines are quieter.",
+      "The popover is 384px, never wider than the screen less 16px, and its list scrolls past 384px. The sheet fills a phone in the shell's form, against the edges or 8px in when the rail floats, with Mark all as read at its foot.",
+      "Each line is its icon tile, by kind and tone as a Timeline's, then what happened, then when. Unread lines are in the label weight, say Unread after the time, and carry a dot in the highlight; read lines are quieter.",
     ],
     States: [
       "A count in the highlight, and zero shows nothing. Unread, read. Loading shows skeleton rows and says Loading notifications once. Empty says so. An error names the system and keeps the items given.",
-      "Forced colours keep the count and the unread dots, as marked areas.",
+      "Forced colours keep the count and the unread dots, as marked areas, and the word Unread.",
     ],
     Copy: [
       "Each line names who did what, in the past tense or as a request: [Sam Lee] asked you to approve [14] timesheets. The assistant's lines name the assistant, so the ai tone is never the only clue.",
@@ -103,6 +103,7 @@ export default {
     Rules: [
       "For events that concern the person signed in. Something that went wrong while they were there is an Alert or a Toast, not a notification.",
       "A highlight count is waiting on the reader: unread notifications are. Zero shows nothing.",
+      "Unread is said in a word on screen, never by the dot, the weight or the colour alone: the dot can be a low-contrast brand colour, and forced colours keep only the dot and the weight.",
     ],
   },
   frame: { width: 960, height: 1720 },
@@ -212,6 +213,8 @@ export default {
         await page.keyboard.press("Enter")
         expect.equal(await said(scope, "2 unread."), "2 unread.", "the new count is said")
         expect.equal(await nameOf(page), "The assistant drafted the [June] pay run from the approved timesheets, Today, 9:12 am", "it is read, and focus stays on it")
+        const read = panel.getByRole("button", { name: "The assistant drafted the [June] pay run from the approved timesheets, Today, 9:12 am", exact: true })
+        expect.equal(await read.locator('[data-slot="notification-unread"]').count(), 0, "the word Unread went with it")
         expect.equal(await scope.getByRole("button", { name: "Notifications, 2 unread" }).count(), 1, "the bell's count dropped")
         expect(await panel.isVisible(), "with nowhere to go, the panel stays open")
       },
@@ -258,7 +261,8 @@ export default {
         expect.equal(await sheet.getAttribute("data-slot"), "sheet-content", "it is a sheet")
         expect.equal(await sheet.getByRole("heading", { name: "Notifications" }).count(), 1, "titled Notifications")
         const box = await sheet.boundingBox()
-        expect(Math.abs(box.x - 8) <= 1 && Math.abs(box.width - (390 - 16)) <= 1, `a sheet inside the 8px inset (left ${box.x}, width ${box.width})`)
+        const inset = await sheet.evaluate((el) => parseFloat(getComputedStyle(el).getPropertyValue("--shell-inset")) || 0)
+        expect(Math.abs(box.x - inset) <= 1 && Math.abs(box.width - (390 - 2 * inset)) <= 1, `a sheet ${inset}px in from the edges (left ${box.x}, width ${box.width})`)
         expect.equal(await sheet.getByRole("button", { name: "Mark all as read" }).count(), 1, "Mark all as read sits at its foot")
         const rows = await sheet.locator('[data-slot="notification-action"]').evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height))
         expect.atLeast(Math.round(Math.min(...rows)), 44, "every notification is 44px at least")
@@ -278,6 +282,24 @@ export default {
         const dots = await scope.locator('[data-unread] [data-slot="notification-dot"]').evaluateAll((els) => els.map((el) => getComputedStyle(el).backgroundColor))
         expect.equal(dots.length, 3, "three unread dots")
         expect(dots.every((c) => c !== "rgba(0, 0, 0, 0)"), "each dot is filled")
+      },
+    },
+    {
+      name: "An unread notification says Unread in visible words, not by the dot, the weight and the colour alone, and a read one does not",
+      example: "open",
+      async run({ scope, expect }) {
+        const rows = await scope.locator('[data-slot="notification"]').evaluateAll((els) =>
+          els.map((el) => {
+            const word = el.querySelector('[data-slot="notification-unread"]')
+            const box = word?.getBoundingClientRect()
+            return { unread: el.hasAttribute("data-unread"), word: word?.textContent.trim() ?? "", seen: Boolean(word?.checkVisibility() && box.width > 8 && box.height > 8) }
+          })
+        )
+        expect.equal(rows.filter((r) => r.unread).length, 3, "three unread lines")
+        for (const [i, r] of rows.entries()) {
+          if (r.unread) expect(r.word === "Unread" && r.seen, `unread line ${i + 1} shows the word Unread (${JSON.stringify(r)})`)
+          else expect.equal(r.word, "", `read line ${i + 1} says nothing of it`)
+        }
       },
     },
     {
@@ -302,7 +324,7 @@ export default {
       async run({ scope, expect, theme }) {
         const panel = scope.locator('[data-slot="popover-content"]')
         const ground = await panel.evaluate((el) => getComputedStyle(el).backgroundColor)
-        for (const slot of ["notification-text", "notification-time"]) {
+        for (const slot of ["notification-text", "notification-time", "notification-unread"]) {
           for (const colour of await panel.locator(`[data-slot="${slot}"]`).evaluateAll((els) => els.map((el) => getComputedStyle(el).color))) {
             expect.atLeast(Math.round(contrast(colour, ground) * 100) / 100, 4.5, `${theme} ${slot}`)
           }

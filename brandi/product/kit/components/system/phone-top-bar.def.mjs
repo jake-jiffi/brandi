@@ -67,10 +67,11 @@ export default {
     },
     {
       id: "task",
-      title: "A task screen: the title is the page's heading",
-      markup: phone(`<x-import component-from-global-scope="NS.PhoneTopBar" title="[Checkout]" heading-level="{{h1}}" back="{{back}}"></x-import>`),
+      title: "A task screen: the title is a heading",
+      // At level 2 here, under the board's own h1; the check below mounts one at level 1, as a task screen has it.
+      markup: phone(`<x-import component-from-global-scope="NS.PhoneTopBar" title="[Checkout]" heading-level="{{h2}}" back="{{back}}"></x-import>`),
       layout: "block",
-      vals: { h1: 1 },
+      vals: { h2: 2 },
     },
     {
       id: "long",
@@ -107,9 +108,26 @@ export default {
     {
       name: "On a task screen the title is a heading at the level asked, and a paragraph otherwise",
       async run({ page, expect }) {
-        const task = page.locator('[data-example="task"] [data-slot="phone-top-bar-title"]')
-        expect.equal(await task.evaluate((el) => el.tagName), "H1", "the task screen's title is its h1")
-        expect.equal(await page.locator('[data-example="task"]').getByRole("heading", { level: 1, name: "[Checkout]" }).count(), 1, "a screen reader finds it as the page's heading")
+        expect.equal(await page.locator('[data-example="task"] [data-slot="phone-top-bar-title"]').evaluate((el) => el.tagName), "H2", "the board's task screen takes the level it is given")
+        // Mounted here at level 1, as a task screen with no page header has it: the board's own examples sit under its h1.
+        await page.evaluate(() => {
+          const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+          const host = document.createElement("div")
+          host.id = "check-mount"
+          document.body.append(host)
+          window.ReactDOM.flushSync(() => window.ReactDOM.createRoot(host).render(window.React.createElement(kit.PhoneTopBar, { title: "[Checkout]", headingLevel: 1, back: { href: "#cart", label: "[Cart]" } })))
+        })
+        const title = page.locator("#check-mount").getByRole("heading", { level: 1, name: "[Checkout]" })
+        expect.equal(await title.count(), 1, "a task screen's title is its h1")
+        const [size, want] = await title.evaluate((el) => {
+          const probe = document.createElement("span")
+          probe.className = "type-heading-lg"
+          el.parentElement.append(probe)
+          const out = [getComputedStyle(el).fontSize, getComputedStyle(probe).fontSize]
+          probe.remove()
+          return out
+        })
+        expect.equal(size, want, "as the page's h1 it steps up to heading-lg")
         expect.equal(await page.locator('[data-example="detail"] [data-slot="phone-top-bar-title"]').evaluate((el) => el.tagName), "P", "a detail screen's title stays a paragraph, under its page header")
       },
     },

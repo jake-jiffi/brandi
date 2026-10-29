@@ -5,11 +5,14 @@
  * scripted checks in a real browser.
  *
  *   node brandi/product/tools/try.mjs --scratch <dir> --modules <node_modules> --tokens <tokens.json> \
- *     [--only Button,Dialog] [--no-checks] [--no-png]
+ *     [--product <product.json>] [--only Button,Dialog] [--no-checks] [--no-png]
  *
  * --modules is an installed node_modules for the kit (it is linked, never copied). --tokens is a
- * product tokens file (`brandi product tokens` writes one). Prints where the previews landed, the
- * typecheck result, the bundle's size and the checks' result. Exits 1 when anything failed.
+ * product tokens file (`brandi product tokens` writes one). --product is a product.json: its name,
+ * its time style, the rail's tone and the tags kept out of a name's hash reach lib/product.ts and
+ * lib/format-locale.js as `brandi product starter` writes them; without it they are the kit's own.
+ * Prints where the previews landed, the typecheck result, the bundle's size and the checks' result.
+ * Exits 1 when anything failed.
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -20,6 +23,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { loadDefinitions, checkDefinition, componentReadme, previewBoard, hostedFontsUrl } from '../../scripts/productdocs.mjs';
 import { previewArtboard } from '../../scripts/preview.mjs';
 import { toStarterGlobals } from '../../scripts/productglobals.mjs';
+import { systemIdentity, generatedFiles } from '../../scripts/productstarter.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const kit = path.resolve(here, '..', 'kit');
@@ -28,8 +32,9 @@ const scratch = path.resolve(arg('--scratch') ?? '');
 const modules = path.resolve(arg('--modules') ?? '');
 const tokensFile = path.resolve(arg('--tokens') ?? '');
 const only = arg('--only')?.split(',').map((s) => s.trim()).filter(Boolean);
-if (!arg('--scratch') || !existsSync(modules) || !existsSync(tokensFile)) {
-  process.stderr.write('usage: try.mjs --scratch <dir> --modules <node_modules> --tokens <tokens.json> [--only A,B] [--no-checks] [--no-png]\n');
+const productFile = arg('--product') && path.resolve(arg('--product'));
+if (!arg('--scratch') || !existsSync(modules) || !existsSync(tokensFile) || (productFile && !existsSync(productFile))) {
+  process.stderr.write('usage: try.mjs --scratch <dir> --modules <node_modules> --tokens <tokens.json> [--product <product.json>] [--only A,B] [--no-checks] [--no-png]\n');
   process.exit(2);
 }
 
@@ -48,6 +53,12 @@ writeFileSync(path.join(starter, 'system', 'tokens.json'), JSON.stringify(tokens
 const system = { name: tokens.name ?? 'Product', namespace: 'kit', global: 'Kit', version: '0.0.0-try', lang: 'en-AU', fontsUrl: hostedFontsUrl(tokens) };
 writeFileSync(path.join(starter, 'system', 'system.json'), JSON.stringify(system, null, 2));
 writeFileSync(path.join(starter, 'app', 'globals.css'), toStarterGlobals(tokens));
+if (productFile) {
+  // The brand is the kit's (lib/brand.ts), so its name stands in for the brand's, as the starter's own would.
+  const brandName = /export const BRAND\b[^=]*=\s*\{\s*name:\s*("(?:[^"\\]|\\.)*")/.exec(readFileSync(path.join(starter, 'lib', 'brand.ts'), 'utf8'))?.[1];
+  const generated = generatedFiles(tokens, systemIdentity(JSON.parse(readFileSync(productFile, 'utf8')), { brandName: brandName && JSON.parse(brandName) }));
+  for (const rel of ['lib/product.ts', 'lib/format-locale.js']) writeFileSync(path.join(starter, rel), generated.get(rel));
+}
 
 let failed = false;
 const step = (label, file, args, opts = {}) => {

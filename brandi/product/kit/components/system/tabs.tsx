@@ -100,7 +100,7 @@ export const Tabs = React.forwardRef<HTMLDivElement, TabsProps>(function Tabs(
                   aria-hidden="true"
                   data-slot="tabs-count"
                   className={cn(
-                    "inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1.5 type-caption tabular-nums",
+                    "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 type-caption tabular-nums",
                     t.attention ? "bg-highlight text-on-highlight" : "bg-tag-grey text-text-muted"
                   )}
                 >

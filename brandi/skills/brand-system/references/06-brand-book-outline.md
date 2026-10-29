@@ -93,6 +93,10 @@ named beside it and is omitted, with a reason in `--json`, when they are empty.
 | Type scale | `identity.type.basePx`, `ratio`, `baseMaxPx`, `ratioMax` as mobile, desktop and print columns |
 | Examples of use | `voice.boilerplate`, `voice.examples[]`, `strategy.messaging.primary` |
 
+A face's fallback follows its shape: a condensed sans behind a condensed display face, a sans behind
+a sans, a serif otherwise. Every name in a fallback stack is single-quoted, because the book sets
+stacks inside double-quoted style attributes, and a double-quoted name ended the attribute early.
+
 ### Brand assets
 
 | Page | Reads |
@@ -130,6 +134,10 @@ reporting success, so a bare photograph under a caption saying the mark is on it
 |---|---|
 | What not to do | `governance.antiPatterns[]` when recorded; otherwise the house rules, minus any typeface this brand itself uses. Plus `governance.nonGoals[]` |
 | Decisions and open questions | `governance.decisions[]`, `governance.openQuestions[]`, `evidence[]`, `governance.trademark` |
+
+Every decision and open question prints, on as many pages as they need, packed by each row's height
+so none runs under the footer. The register names its pages by record id, and says which ids it
+skips.
 
 ## What makes a page thin
 

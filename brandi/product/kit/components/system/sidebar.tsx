@@ -4,6 +4,7 @@ import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
 import { useLink } from "@/lib/link"
+import { BRAND } from "@/lib/brand"
 import { PRODUCT } from "@/lib/product"
 import { useMergedRef } from "@/lib/refs"
 import { cn } from "@/lib/utils"
@@ -98,6 +99,18 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
     return () => observer.disconnect()
   }, [])
   const isCollapsed = !drawer && (collapsed || narrow)
+  // The rail's tone picks the logo's rendition: on a dark rail, the one approved on dark grounds.
+  const railLogo = PRODUCT.railTone === "dark" ? "on-dark" : "auto"
+  const homeInNav = [...(groups ?? []).flatMap((g) => g.items ?? []), ...(Array.isArray(footer) ? (footer as NavItemProps[]) : [])].some((item) => item.href === home)
+  const homeLink = (
+    <Link
+      href={home ?? ""}
+      aria-label={lockupLabel(name)}
+      className="hidden size-10 items-center justify-center rounded-control text-rail-text-strong hover:bg-rail-hover focus-visible:outline-rail-focus @max-[160px]/rail:flex"
+    >
+      {BRAND.marks.symbol ? <Logo mark="symbol" title="" color={railLogo} /> : <Icon name="House" size={20} />}
+    </Link>
+  )
   const rail = React.useMemo(() => ({ inRail: true, collapsed: isCollapsed }), [isCollapsed])
 
   // Command K or Control K opens search from anywhere, while typing too. The rail binds it, never its copy in the
@@ -174,13 +187,17 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
           // on-rail: a control a product puts on the rail (a bell by the account, a button in the footer) is a
           // ghost button in the page's roles, which on a dark rail was close to invisible. The drawer is rail too.
           "on-rail @container/rail flex min-h-0 min-w-0 flex-col text-rail-text",
+          // The rail's form is the brand's (02-brand-to-product.md): a floating rail is rounded and lined all round
+          // (rail-outline 1px); one that meets the window edge is square, with a line on its inner side only.
           drawer
             ? "size-full"
-            : cn("rounded-lg border border-rail-line bg-rail shadow-xs", collapsed ? "w-(--rail-collapsed)" : "w-full", autoHeight ? "h-auto" : "h-full"),
+            : cn("rounded-rail border-rail-edge bg-rail shadow-rail [border-width:var(--rail-outline,0px)_1px_var(--rail-outline,0px)_var(--rail-outline,0px)]", collapsed ? "w-(--rail-collapsed)" : "w-full", autoHeight ? "h-auto" : "h-full"),
           className
         )}
       >
-        <div data-slot="sidebar-header" className="flex h-14 shrink-0 items-center gap-1 pr-3 pl-5 @max-[160px]/rail:justify-center @max-[160px]/rail:px-0">
+        {/* At least 56px, with 8px above and below the lockup: a logo raised to its minimum keeps its clear space from
+            the window edge, which the floating rail's inset once gave it. */}
+        <div data-slot="sidebar-header" className="flex min-h-14 shrink-0 items-center gap-1 py-2 pr-3 pl-5 @max-[160px]/rail:justify-center @max-[160px]/rail:px-0">
           {drawer ? (
             // No tooltip: focus lands here as the drawer opens, and a tooltip would hold the drawer's first Escape.
             <ButtonBase
@@ -194,20 +211,23 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
               <Icon name="X" size={20} />
             </ButtonBase>
           ) : null}
-          <ProductLockup tone="rail" color={PRODUCT.railTone === "dark" ? "on-dark" : "auto"} product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
-          {home ? (
-            <Link
-              href={home}
-              aria-label={lockupLabel(name)}
-              className="hidden size-10 items-center justify-center rounded-control focus-visible:outline-rail-focus @max-[160px]/rail:flex"
-            >
-              <Logo mark="symbol" title="" />
-            </Link>
-          ) : (
+          <ProductLockup tone="rail" color={railLogo} product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
+          {/* Icons only, the rail is 72px: the brand's symbol in the rail's rendition. A brand with no symbol has a full
+              logo too wide for it at its minimum, so its home is a plain Home control rather than a logo cut by the edge,
+              and none at all when the navigation already has the same destination. Like every icon there, it has a tooltip. */}
+          {home && (BRAND.marks.symbol || !homeInNav) ? (
+            isCollapsed ? (
+              <Tooltip content={lockupLabel(name)} placement="right">
+                {homeLink}
+              </Tooltip>
+            ) : (
+              homeLink
+            )
+          ) : !home && BRAND.marks.symbol ? (
             <span className="hidden @max-[160px]/rail:flex">
-              <Logo mark="symbol" title={lockupLabel(name)} />
+              <Logo mark="symbol" title={lockupLabel(name)} color={railLogo} />
             </span>
-          )}
+          ) : null}
         </div>
 
         {onSearch && searchLabel ? (

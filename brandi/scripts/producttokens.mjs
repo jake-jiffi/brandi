@@ -246,7 +246,7 @@ export const SERIES_COUNT = 6;
  */
 export const PRODUCT_ROLES = Object.freeze([
   'canvas', 'surface', 'surface-subtle', 'surface-sunken', 'surface-raised', 'surface-inverse', 'scrim',
-  'rail', 'rail-text', 'rail-text-strong', 'rail-muted', 'rail-hover', 'rail-selected', 'rail-line', 'rail-focus',
+  'rail', 'rail-text', 'rail-text-strong', 'rail-muted', 'rail-hover', 'rail-selected', 'rail-line', 'rail-edge', 'rail-focus',
   'text-strong', 'text', 'text-muted', 'text-subtle', 'text-inverse',
   'link', 'link-hover',
   'line', 'line-strong', 'line-control',
@@ -482,6 +482,9 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
     v['rail-hover'] = visibleShift(v.rail, 0.05 * step, STEP.hover);
     v['rail-selected'] = visibleShift(v.rail, 0.1 * step, STEP.selected);
     v['rail-line'] = visibleShift(v.rail, 0.07 * step, STEP.line);
+    // The rail's edge against the page. Where the two already stand apart (3:1) its own line will do; where they sit
+    // close, the page's hairline, which shows against both. A black rail on a near-black canvas had a 1.06:1 edge.
+    v['rail-edge'] = contrastRatio(v.rail, v.canvas) >= FLOORS['non-text'] ? v['rail-line'] : '{line}';
     const railGrounds = [v.rail, v['rail-hover'], v['rail-selected']];
     const tint = oklchToHex(gamutMapOklch({ L: darkRail ? 0.93 : 0.25, C: 0.04, h: safeHue(toOklch(B[8]).h) }));
     v['rail-text'] = solve('rail-text', tint, railGrounds, 7);
@@ -493,6 +496,7 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
     v['rail-hover'] = '{hover}';
     v['rail-selected'] = '{selected}';
     v['rail-line'] = '{line}';
+    v['rail-edge'] = '{line}';
     v['rail-text'] = '{text-muted}';
     v['rail-text-strong'] = '{text-strong}';
     v['rail-muted'] = '{text-subtle}';
@@ -517,6 +521,7 @@ const USAGE = {
   'rail-hover': 'A hovered rail item.',
   'rail-selected': 'The current rail item.',
   'rail-line': 'Dividers on the rail.',
+  'rail-edge': 'The rail\'s edge against the page: its own line where the rail stands well apart from the canvas, the page\'s hairline where the two sit close.',
   'rail-focus': 'The focus ring on the rail, which needs its own colour when the rail is dark.',
   'text-strong': 'Titles and figures.',
   text: 'Body text, and text on selected rows, hovered rows and tags.',
@@ -657,24 +662,109 @@ const FALLBACK = {
 };
 const quote = (family) => (/\s/.test(family) ? `"${family}"` : family);
 
+/** The families a brand's shapes are measured in, each the radius role it sets. */
+export const SHAPE_FAMILIES = Object.freeze({
+  press: 'radius-action',
+  control: 'radius-control',
+  card: 'radius-md',
+  pane: 'radius-lg',
+  frame: 'radius-frame',
+});
+
 /**
- * Radii from the brand's shape stance, renamed for the jobs a product gives them. `action` is the
- * shape of whatever a person can press: the pill by default ("if it is a pill, you can press it"),
- * the control radius when the brand's buttons match its inputs, or a value of its own.
+ * product.json's `shape`, checked. Each family is a radius in px (press may be "pill") and where it was
+ * measured: the guidelines first, the brand's own live work where they are silent. `shell` is the rail's
+ * form, and `moves` the brand's own shape moves the product carries. A shape with no source is a guess.
  */
-function productRadii(system, { action = 'pill' } = {}) {
-  const by = Object.fromEntries((system.radius ?? []).map((r) => [r.name, r.px]));
-  const r = (n) => `${Math.round(by[n] ?? 0)}px`;
+export function checkShape(shape = {}) {
+  const { families = {}, shell = null, moves = null } = shape ?? {};
+  if (!families || typeof families !== 'object' || Array.isArray(families)) throw new TypeError('shape.families is an object of { px, source }, one per family');
+  const named = (s) => typeof s === 'string' && s.trim() !== '';
+  for (const [family, f] of Object.entries(families)) {
+    if (!SHAPE_FAMILIES[family]) throw new TypeError(`shape.families.${family}: a family is one of ${Object.keys(SHAPE_FAMILIES).join(', ')}`);
+    const pill = family === 'press' && f?.px === 'pill';
+    if (!pill && !(typeof f?.px === 'number' && f.px >= 0)) throw new TypeError(`shape.families.${family}: px is a radius in pixels${family === 'press' ? ', or "pill"' : ''}`);
+    if (!named(f.source)) throw new TypeError(`shape.families.${family}: source says where it was measured`);
+  }
+  if (shell != null && (!['edge', 'floating'].includes(shell.form) || !named(shell.source))) throw new TypeError('shape.shell is { form: "edge" or "floating", source }');
+  if (moves != null && (!Array.isArray(moves) || moves.some((m) => !named(m?.name) || !named(m?.source) || !Array.isArray(m?.where) || !m.where.length))) {
+    throw new TypeError('shape.moves is a list of { name, source, where: [the surfaces that carry it] }');
+  }
+  return { ...shape, families, shell, moves };
+}
+
+/**
+ * Radii from the brand's measured shapes, renamed for the jobs a product gives them. A family the brand
+ * was measured for takes the measurement and its source. Anything else is derived from the brand's scale,
+ * never rounder than the largest radius measured, a pane never rounder than a card and a badge never
+ * rounder than a control. `action` is the shape of whatever a person can press when press is not
+ * measured: the pill by default ("if it is a pill, you can press it"), the control radius when the
+ * brand's buttons match its inputs, or a value of its own. Each token says where it came from: `source`
+ * for the brand's, `derived` for the kit's.
+ */
+function productRadii(system, shape = {}) {
+  const { action = null, families, shell } = checkShape(shape);
+  const step = Object.fromEntries((system.radius ?? []).map((r) => [r.name, r.px]));
+  const px = (v) => (v === 'pill' ? '9999px' : typeof v === 'string' ? v : `${Math.round(v)}px`);
+  // A square photo says nothing about a card, so frames are left out of the largest measured radius.
+  const lengths = Object.entries(families).filter(([family]) => family !== 'frame').map(([, f]) => f.px).filter((v) => typeof v === 'number');
+  const cap = lengths.length ? Math.max(...lengths) : Infinity;
+  const measured = (family) => (families[family] ? { v: families[family].px, source: families[family].source } : null);
+  const derive = (v, how, under = null) => {
+    let out = Math.min(v ?? 0, cap);
+    let said = out < (v ?? 0) ? `${how}, held to the largest measured radius (${px(cap)})` : how;
+    if (under && out > under.v) [out, said] = [under.v, `${how}, held to ${under.name} (${px(under.v)})`];
+    return { v: out, derived: said };
+  };
+
+  const press = measured('press');
+  const control = measured('control')
+    ?? (action === 'control' && press && press.v !== 'pill' ? { v: press.v, source: 'the measured press (radius-action), since buttons match the inputs (shape.action "control")' } : derive(step.md, `from the brand's scale, its md step (${px(step.md ?? 0)})`));
+  const actionR = press
+    ?? (action === 'control' ? { v: control.v, source: 'buttons match the inputs (shape.action "control")' }
+      : action && action !== 'pill' ? { v: String(action), source: `shape.action "${action}"` }
+        : action === 'pill' ? { v: 'pill', source: 'shape.action "pill"' }
+          : { v: 'pill', derived: 'the pill: if it is a pill, you can press it' });
+  const card = measured('card') ?? derive(step.lg, `from the brand's scale, its lg step (${px(step.lg ?? 0)})`);
+  const pane = measured('pane') ?? derive(step.xl, `from the brand's scale, its xl step (${px(step.xl ?? 0)})`, { name: 'the card radius', v: card.v });
+  const frame = measured('frame') ?? { v: 0, derived: 'square, the plainest form, with no photo measured' };
+  // A list's items sit 4px in from its edge, so its corner is theirs plus 4px: concentric, never rounder than a card.
+  const list = { v: Math.min(card.v, control.v + 4), derived: `the control radius plus the list's 4px padding${control.v + 4 > card.v ? ', held to the card radius' : ''}` };
+  const sm = derive(step.sm, `from the brand's scale, its sm step (${px(step.sm ?? 0)})`, { name: 'the control radius', v: control.v });
+  const xs = derive(step.xs, `from the brand's scale, its xs step (${px(step.xs ?? 0)})`, { name: 'radius-sm', v: sm.v });
+  const xl = derive(step['2xl'], `from the brand's scale, its 2xl step (${px(step['2xl'] ?? 0)})`, { name: 'the pane radius', v: pane.v });
+  const rail = shell
+    ? { v: shell.form === 'floating' ? pane.v : 0, source: shell.source }
+    : { v: 0, derived: 'square, meeting the window edge: the plainest form, with no shell named' };
+
+  const token = (name, r, usage) => ({ name, value: px(r.v), usage, ...(r.source ? { source: r.source } : { derived: r.derived }) });
   return [
-    { name: 'radius-xs', value: r('xs'), usage: 'Checkboxes, keyboard keys and tiny marks.' },
-    { name: 'radius-sm', value: r('sm'), usage: 'Badges, tags and tooltips.' },
-    { name: 'radius-control', value: r('md'), usage: 'Inputs, selects and menu items.' },
-    { name: 'radius-md', value: r('lg'), usage: 'Cards, menus and toasts.' },
-    { name: 'radius-lg', value: r('xl'), usage: 'Panes, dialogs, sheets and the rail.' },
-    { name: 'radius-xl', value: r('2xl'), usage: 'Sign-in and onboarding frames.' },
-    { name: 'radius-action', value: action === 'pill' ? '9999px' : action === 'control' ? r('md') : String(action), usage: action === 'pill' ? 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. If it is a pill, you can press it.' : 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. Record the rule in the brand-to-product section.' },
+    token('radius-xs', xs, 'Checkboxes, keyboard keys, tooltips and tiny marks.'),
+    token('radius-sm', sm, 'Badges and tags.'),
+    token('radius-control', control, 'Inputs, selects and menu items.'),
+    token('radius-md', card, 'Cards, popovers and toasts.'),
+    token('radius-list', list, 'Menus, selects and listboxes: their items sit 4px inside them.'),
+    token('radius-lg', pane, 'Panes and dialogs.'),
+    token('radius-xl', xl, 'Sign-in and onboarding frames.'),
+    token('radius-frame', frame, 'Photos and the frames around them.'),
+    token('radius-rail', rail, 'The rail, the drawer it becomes on a phone, and sheets: what is attached to the window.'),
+    token('radius-action', actionR, actionR.v === 'pill' ? 'Whatever a person can press: buttons, filter chips, segmented controls and the switch. If it is a pill, you can press it.' : 'Whatever a person can press: buttons, filter chips, segmented controls and the switch.'),
     { name: 'radius-pill', value: '9999px', usage: 'The full round, for avatars, dots and counts. Whatever a person can press takes radius-action.' },
   ];
+}
+
+/**
+ * Every shape and shell choice the brand did not make, each with how the kit made it: a radius role no
+ * family was measured for, the shell when the brand names none, and no shape move of the brand's own.
+ * The round record lists them, so a reviewer can see where the kit speaks instead of the brand.
+ */
+export function shapeKitDefaults(tokens) {
+  // The pill is the kit's rule for avatars and dots, not a brand choice. A token with no source is the kit's, old files' too.
+  const out = (tokens.radius?.tokens ?? []).filter((t) => !t.source && t.name !== 'radius-pill')
+    .map((t) => ({ choice: t.name, value: t.value, how: t.derived ?? 'no source recorded: written before shapes carried one' }));
+  if (!tokens.radius?.shell) out.push({ choice: 'shell', value: 'edge', how: 'the rail meets the window edge, the plainest form, with no shell named' });
+  if (!tokens.radius?.moves?.length) out.push({ choice: 'moves', value: 'none', how: 'no shape move of the brand\'s own is carried into the product' });
+  return out;
 }
 
 /**
@@ -772,12 +862,14 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   const ink = oklchToHex(gamutMapOklch({ L: 0.22, C: Math.min(0.04, base.C), h: safeHue(base.h) }));
   const a = (alpha) => withAlpha(ink, alpha);
   const k = (alpha) => withAlpha('#000000', alpha);
+  const checkedShape = checkShape(shape);
+  const floating = checkedShape.shell?.form === 'floating';
   const shadow = [
     ['shadow-xs', `0 1px 2px ${a(0.06)}`, `0 1px 2px ${k(0.4)}`, 'Small raised controls.'],
-    ['shadow-sm', `0 1px 2px ${a(0.04)}, 0 2px 6px ${a(0.06)}`, `0 1px 3px ${k(0.5)}`, 'Cards on the canvas. None inside a pane.'],
-    ['shadow-md', `0 1px 3px ${a(0.05)}, 0 8px 24px ${a(0.08)}`, `0 8px 24px ${k(0.5)}`, 'The rail, menus and popovers.'],
-    ['shadow-lg', `0 4px 12px ${a(0.08)}, 0 16px 40px ${a(0.14)}`, `0 16px 40px ${k(0.65)}`, 'Dialogs and sheets.'],
-    ['shadow-xl', `0 24px 64px ${a(0.2)}`, `0 24px 64px ${k(0.7)}`, 'One per screen at most.'],
+    ['shadow-sm', `0 1px 2px ${a(0.04)}, 0 2px 6px ${a(0.06)}`, `0 1px 3px ${k(0.5)}`, 'Cards on the canvas, and tooltips. None inside a pane.'],
+    ['shadow-md', `0 1px 3px ${a(0.05)}, 0 8px 24px ${a(0.08)}`, `0 8px 24px ${k(0.5)}`, 'Menus and toggletips.'],
+    ['shadow-lg', `0 4px 12px ${a(0.08)}, 0 16px 40px ${a(0.14)}`, `0 16px 40px ${k(0.65)}`, 'Popovers, toasts and a card being dragged.'],
+    ['shadow-xl', `0 24px 64px ${a(0.2)}`, `0 24px 64px ${k(0.7)}`, 'Dialogs and sheets: one per screen at most.'],
   ].map(([n, l, d, u]) => ({ name: n, value: { light: l, dark: d }, usage: u }));
 
   const fonts = system.type?.fonts ?? {};
@@ -814,8 +906,14 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
       tokens: [[0.5, 2], [1, 4], [1.5, 6], [2, 8], [3, 12], [4, 16], [5, 20], [6, 24], [8, 32], [10, 40], [12, 48], [16, 64]]
         .map(([n, px]) => ({ name: `space-${n}`, value: `${px}px` })),
     },
-    radius: { note: 'From the brand\'s shape stance, renamed for the jobs a product gives them.', tokens: productRadii(system, shape) },
-    shadow: { note: 'Ink-tinted and quiet in light; deeper and plain in dark.', tokens: shadow },
+    radius: {
+      note: 'From the brand\'s measured shapes, renamed for the jobs a product gives them: each token says where it came from (source) or how the kit derived it (derived).',
+      tokens: productRadii(system, shape),
+      shell: checkedShape.shell,
+      moves: checkedShape.moves ?? [],
+    },
+    // A floating rail lifts off the page as a small raised control does; one that meets the window edge casts nothing.
+    shadow: { note: 'Ink-tinted and quiet in light; deeper and plain in dark.', tokens: [...shadow, { name: 'shadow-rail', value: floating ? { ...shadow.find((t) => t.name === 'shadow-xs').value } : { light: '0 0 #0000', dark: '0 0 #0000' }, usage: 'The rail: lifted when it floats, none when it meets the window edge (transparent, as a shadow list cannot hold none).' }] },
     size: {
       note: 'Controls grow on touch screens: 40, 44 and 48, and nothing pressable is under 40px there.',
       tokens: [
@@ -826,6 +924,8 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
         ['row', '48px', 'The default table row.'],
         ['rail-width', '240px', 'The full rail.'],
         ['rail-collapsed', '72px', 'The rail as icons, from 1024 to 1279px.'],
+        ['shell-inset', floating ? '8px' : '0px', 'How far the rail and the drawer sit in from the window edge: 8px when the rail floats, none when it meets the edge.'],
+        ['rail-outline', floating ? '1px' : '0px', 'The line round a floating rail. A rail that meets the edge keeps only the line on its inner side.'],
         ['header-height', '64px', 'The workspace header.'],
         ['icon-sm', '14px', 'Chips and meta lines.'],
         ['icon-md', '16px', 'Buttons, inputs, menus and tables.'],
@@ -1020,7 +1120,7 @@ export function toProductCss(tokens) {
 }
 
 export default {
-  buildProductTokens, auditProductTokens, auditSummary, toProductCss, resolveColour,
+  buildProductTokens, auditProductTokens, auditSummary, toProductCss, resolveColour, checkShape, shapeKitDefaults, SHAPE_FAMILIES,
   solveForContrast, composite, mix, shiftL, withAlpha, pickText, isTranslucent,
   PRODUCT_ROLES, STATUS_FAMILIES, SERIES_COUNT, FLOORS, PRODUCT_TOKENS_VERSION,
 };

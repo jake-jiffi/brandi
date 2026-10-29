@@ -22,7 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { auditProductTokens, auditSummary } from './producttokens.mjs';
+import { auditProductTokens, auditSummary, shapeKitDefaults } from './producttokens.mjs';
 import { previewArtboard, manifestFrames, declaredFrame, findChrome } from './preview.mjs';
 import { driftCheck } from './productdrift.mjs';
 
@@ -195,6 +195,14 @@ async function httpStatus(url) {
   try { return (await fetch(url, { redirect: 'manual' })).status; } catch { return 0; }
 }
 
+/** The Design canvas's runtime, saved beside the product, or named by BRANDI_DC_RUNTIME; null when neither is there. */
+export function canvasRuntime(productDir, env = process.env) {
+  const named = env.BRANDI_DC_RUNTIME && path.resolve(env.BRANDI_DC_RUNTIME);
+  if (named && existsSync(named)) return named;
+  const saved = path.join(productDir, '.cache', 'dc-runtime.js');
+  return existsSync(saved) ? saved : null;
+}
+
 const nodeScript = (starter, script, args, timeout = 1800000) => {
   const r = spawnSync(process.execPath, [path.join('tools', script), ...args], { cwd: starter, encoding: 'utf8', timeout });
   return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
@@ -204,7 +212,7 @@ const freePort = () => new Promise((resolve, reject) => {
   const srv = net.createServer();
   srv.unref();
   srv.on('error', reject);
-  srv.listen(0, () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
+  srv.listen(0, '127.0.0.1', () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
 });
 
 /**
@@ -219,8 +227,9 @@ export async function serveStarter(starter, { log = () => {} } = {}) {
   const built = spawnSync(process.execPath, [next, 'build'], { cwd: starter, env, encoding: 'utf8', timeout: 900000 });
   if (built.status !== 0) throw new Error(`The starter did not build:\n${`${built.stdout}${built.stderr}`.trim().split('\n').slice(-15).join('\n')}`);
   const port = await freePort();
-  const child = spawn(process.execPath, [next, 'start', '-p', String(port)], { cwd: starter, env, stdio: 'ignore' });
-  const base = `http://localhost:${port}`;
+  // This machine only: a gates run has no reason to put the starter on the network.
+  const child = spawn(process.execPath, [next, 'start', '-p', String(port), '-H', '127.0.0.1'], { cwd: starter, env, stdio: 'ignore' });
+  const base = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 120; i++) {
     try {
       const res = await fetch(base, { redirect: 'manual' });
@@ -237,6 +246,16 @@ export function starterRoutes(starter, base) {
   const file = path.join(starter, 'tools', 'routes.json');
   const list = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : [{ path: '/', label: 'Home' }];
   return list.map((r) => ({ url: `${base}${r.path}`, label: r.label ?? r.path }));
+}
+
+/**
+ * What a round keeps of axe's record: its counts, every page that failed or was not scanned, and every route
+ * axe loaded a second time because no h1 showed in ten seconds. A route that passed on its second load is not
+ * a result, so it is listed apart, and a slow page stays on the record.
+ */
+export function axeGate(axe) {
+  const retriedRoutes = (axe.results ?? []).filter((r) => r.retried).map((r) => ({ label: r.label, width: r.width, theme: r.theme }));
+  return { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, skipped: axe.skipped ?? null, results: (axe.results ?? []).filter((r) => r.violations.length || r.error), retried: retriedRoutes.length, retriedRoutes };
 }
 
 /**
@@ -294,20 +313,51 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
   const checks = existsSync(path.join(outDir, 'checks.json')) ? JSON.parse(readFileSync(path.join(outDir, 'checks.json'), 'utf8')) : { passed: 0, failed: [{ check: 'runner', reason: checkRun.out.slice(-400) }] };
   log(`checks: ${checks.passed} passed, ${checks.failed.length} failed`);
 
+  // Every board under the Design canvas's own runtime, in a cross-origin frame as the canvas draws it: the previews
+  // use a shim as the top page, and a board that broke only on the canvas passed every other gate.
+  const runtimeFile = canvasRuntime(productDir);
+  let runtime;
+  if (!existsSync(path.join(productDir, 'canvas'))) runtime = { skipped: 'no canvas folder to render' };
+  else if (!runtimeFile) runtime = { skipped: `no canvas runtime at ${path.relative(process.cwd(), path.join(productDir, '.cache', 'dc-runtime.js'))}: read artifact-type/dc-runtime.js from any Design canvas and save it there (06-canvas.md)` };
+  else if (!existsSync(path.join(starter, 'tools', 'canvas-runtime.mjs'))) runtime = { skipped: 'the starter has no tools/canvas-runtime.mjs: refresh its kit with brandi product starter --kit' };
+  else {
+    const run = nodeScript(starter, 'canvas-runtime.mjs', ['--boards', path.join(productDir, 'canvas'), '--runtime', runtimeFile, '--json', path.join(outDir, 'runtime.json')]);
+    runtime = existsSync(path.join(outDir, 'runtime.json')) ? JSON.parse(readFileSync(path.join(outDir, 'runtime.json'), 'utf8')) : { skipped: `the runtime check did not finish: ${run.out.slice(-300)}` };
+  }
+  log(runtime.skipped ? `canvas runtime: not run (${runtime.skipped})` : `canvas runtime: ${runtime.failed.length} of ${runtime.boards} boards with errors`);
+
   const gates = {
     round,
     at: new Date().toISOString(),
     versions: toolVersions({ starter, detector }),
     widths,
     tokens: { summary: auditSummary(audit), fails: audit.fails.length, pairs: audit.pairs },
+    // Where the kit speaks instead of the brand: a radius nobody measured, a shell or shape move never named.
+    shape: { kitDefaults: shapeKitDefaults(tokens) },
     drift: { differences: drift.differences, unchecked: drift.unchecked },
     detector: { pages: pages.length, findings: detection.findings, errors: detection.errors, skipped: detection.skipped ?? null, unscanned: detection.unscanned ?? [] },
-    axe: { pages: axe.pages ?? 0, violations: axe.violations, errors: axe.errors, skipped: axe.skipped ?? null, results: (axe.results ?? []).filter((r) => r.violations.length || r.error) },
+    axe: axeGate(axe),
     reflow,
     checks: { passed: checks.passed, failed: checks.failed },
+    runtime,
   };
   writeFileSync(path.join(outDir, 'gates.json'), `${JSON.stringify(gates, null, 2)}\n`);
   return gates;
+}
+
+const STATUSES = ['open', 'fixed', 'accepted'];
+
+/**
+ * The findings whose status is a word outside open, fixed and accepted, named in a sentence, or ''. They still
+ * count as open: reviewers once wrote "closed" on every finding they had checked, and the gates listed 20 as open
+ * with nothing to say why. A finding with no status is open, and says nothing.
+ */
+function strayStatuses(findings) {
+  const stray = findings.filter((f) => f.status != null && f.status !== '' && !STATUSES.includes(f.status));
+  if (!stray.length) return '';
+  const by = new Map();
+  for (const f of stray) by.set(String(f.status), [...(by.get(String(f.status)) ?? []), f.id ?? f.title]);
+  return `${stray.length} finding${stray.length === 1 ? ' has' : 's have'} a status outside open, fixed or accepted: ${[...by].map(([status, names]) => `${status} (${names.join(', ')})`).join(', ')}, counted as open`;
 }
 
 /**
@@ -330,19 +380,26 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
   const unmeasured = gates.reflow?.errors?.length ?? 0;
   add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0 && overflow === 0 && unmeasured === 0,
     `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
+  // A round from before this gate has no line for it; one that could not run it has not passed it.
+  if (gates.runtime) {
+    add('Canvas runtime', !gates.runtime.skipped && gates.runtime.failed.length === 0,
+      gates.runtime.skipped ? `not run: ${gates.runtime.skipped}` : `${gates.runtime.failed.length} of ${gates.runtime.boards} boards with errors under the Design canvas's own runtime, in a cross-origin frame`);
+  }
   if (critique) {
     const scores = critique.heuristics ?? [];
     const total = scores.reduce((n, h) => n + h.score, 0);
     const low = scores.filter((h) => h.score < BAR.craftMinimum);
     const open = (critique.findings ?? []).filter((f) => BAR.critiqueOpen.includes(f.severity) && !['fixed', 'accepted'].includes(f.status));
+    const stray = strayStatuses(critique.findings ?? []);
     add('Craft', scores.length === 10 && total >= BAR.craftTotal && !low.length && !open.length,
-      `${total}/40 on ${scores.length} heuristics${low.length ? `; under ${BAR.craftMinimum}: ${low.map((h) => h.name).join(', ')}` : ''}${open.length ? `; open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : ''}`);
+      `${total}/40 on ${scores.length} heuristics${low.length ? `; under ${BAR.craftMinimum}: ${low.map((h) => h.name).join(', ')}` : ''}${open.length ? `; open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : ''}${stray ? `; ${stray}` : ''}`);
   } else {
     add('Craft', false, 'no critique recorded for this round');
   }
   if (rules) {
     const open = (rules.findings ?? []).filter((f) => BAR.rulesOpen.includes(f.severity) && !['fixed', 'accepted'].includes(f.status));
-    add('Rules', open.length === 0, open.length ? `open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : `no Critical, High or Medium open (${(rules.findings ?? []).length} findings in all)`);
+    const stray = strayStatuses(rules.findings ?? []);
+    add('Rules', open.length === 0, `${open.length ? `open: ${open.map((f) => `${f.severity} ${f.title}`).join('; ')}` : `no Critical, High or Medium open (${(rules.findings ?? []).length} findings in all)`}${stray ? `; ${stray}` : ''}`);
   } else {
     add('Rules', false, 'no rules review recorded for this round');
   }
@@ -350,11 +407,22 @@ export function judgeRound(gates, { critique = null, rules = null } = {}) {
   return { met: verdicts.every((v) => v.pass), verdicts };
 }
 
+/**
+ * The "## Published" section of a round record, to its next heading, or ''. It is written after the round (the
+ * system's and the canvas's version ids, 06-canvas.md step 10), so a rerun of the round keeps it.
+ */
+export function publishedSection(record) {
+  const m = /(?:^|\n)(## Published[^\n]*\n[\s\S]*?)(?=\n## |\s*$)/.exec(String(record ?? ''));
+  return m ? `${m[1].trimEnd()}\n` : '';
+}
+
 /** The round record as a person reads it. */
 export function roundMarkdown(gates, judged, { system = {}, critique = null, rules = null, signOff = null } = {}) {
   const lines = [`# Round ${gates.round}: ${system.name ?? 'product system'} ${system.version ?? ''}`.trimEnd(), '', `Run ${gates.at}. ${judged.met ? 'The bar is met.' : 'The bar is not met yet.'}`, '', '| Gate | Result | Detail |', '| --- | --- | --- |'];
   for (const v of judged.verdicts) lines.push(`| ${v.gate} | ${v.pass ? 'pass' : 'fail'} | ${String(v.detail).replace(/\|/g, '\\|')} |`);
   if (gates.axe.skipped?.rules?.length) lines.push('', `axe ran every rule on the routes. On ${gates.axe.skipped.kinds.map((k) => `${k} pages`).join(' and ')}, which show a page frame more than once, it skipped ${gates.axe.skipped.rules.join(', ')}.`);
+  const slow = gates.axe.retriedRoutes ?? [];
+  if (slow.length) lines.push('', `axe found no h1 after 10s on the first load of ${slow.length === 1 ? '1 route render' : `${slow.length} route renders`}, and loaded ${slow.length === 1 ? 'it' : 'each'} once more before scanning: ${slow.map((r) => `${r.label} at ${r.width}, ${r.theme}`).join('; ')}.`);
   lines.push('', '## Tool versions', '');
   for (const [k, v] of Object.entries(gates.versions)) lines.push(`- ${k}: ${typeof v === 'object' && v ? `${v.version ?? ''} (${v.path ?? ''})` : v ?? 'not found'}`);
   const unscanned = [...new Set((gates.detector.unscanned ?? []).map((u) => `${u.page} (${u.reason})`))];
@@ -371,6 +439,16 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
     lines.push('', `## Reflow at ${gates.reflow.width}px`, '');
     for (const r of gates.reflow.overflow) lines.push(`- ${r.page}: ${r.scrollWidth}px wide in a ${r.clientWidth}px window${r.worst ? `, furthest out ${r.worst.what} at ${r.worst.right}px` : ''}`);
     for (const r of gates.reflow.errors) lines.push(`- ${r.page}: not measured (${r.error})`);
+  }
+  if (gates.runtime?.skipped) lines.push('', '## Canvas runtime', '', `Not run: ${gates.runtime.skipped}`);
+  else if (gates.runtime?.failed?.length) {
+    lines.push('', '## Canvas runtime', '');
+    for (const f of gates.runtime.failed) lines.push(`- ${f.board}: ${f.errors.join('; ')}`);
+  }
+  if (gates.shape) {
+    lines.push('', '## Shape the kit chose', '');
+    if (!gates.shape.kitDefaults.length) lines.push("Every shape and shell choice is the brand's, each with its source.");
+    for (const d of gates.shape.kitDefaults) lines.push(`- ${d.choice}, ${d.value}: ${d.how}`);
   }
   if (gates.drift?.differences?.length) {
     lines.push('', '## Drift', '');
@@ -394,4 +472,4 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   return lines.join('\n');
 }
 
-export default { runGates, judgeRound, roundMarkdown, findDetector, toolVersions, collectPages, runDetector, reflowPages, WIDTHS, REFLOW_WIDTH, BAR };
+export default { runGates, axeGate, judgeRound, roundMarkdown, publishedSection, findDetector, toolVersions, collectPages, runDetector, reflowPages, canvasRuntime, WIDTHS, REFLOW_WIDTH, BAR };

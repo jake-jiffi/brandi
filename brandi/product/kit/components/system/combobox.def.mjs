@@ -129,7 +129,7 @@ export default {
     Behaviour: [
       "An editable combobox with a list (the APG pattern). Focus stays on the input throughout; the input points at the option in hand, so a screen reader follows it.",
       "Typing filters the options, ignoring case and accents, and opens the list with the first match in hand, so Enter takes it. Up and Down move through the options and stop at the ends; the option in hand scrolls into view.",
-      "Down or Up opens the list at the chosen option. Alt and Down opens it without moving; Alt and Up closes it. A press on the field or its chevron opens it too; a press on the Field's label only focuses it, as it does a Select. Home and End move the caret, as in any text field.",
+      "Down or Up opens the list at the chosen option. Alt and Down opens it without moving; Alt and Up closes it. A press on the field or its chevron opens it too; a press on the Field's label only focuses it, as it does a Select. The chevron is named after its field (Show options for Supplier), so lists on one page never share a name. Home and End move the caret, as in any text field.",
       "Enter chooses the option in hand and closes the list. Escape closes it without choosing and keeps what was typed; a second Escape is left to the page, so a dialog behind it can close. With the list closed, Enter settles the field first (as leaving it does) and lets the form send.",
       "It closes at once, with no fade, so no layer is left behind to swallow the next Escape.",
       "Leaving the field chooses an option whose name was typed in full. Anything else typed stays as typed, and the field stops claiming a choice its text no longer shows; the form's own check then asks for one. Clearing the text clears the choice.",
@@ -223,6 +223,40 @@ ${field("Customer", 'open="{{yes}}" query="mar" loading="{{yes}}" filter="{{no}}
   logic: `found: self.state.found, clearClients: () => self.setState({ found: [] }), findClients: (text) => setTimeout(() => self.setState({ found: text.trim() ? ${JSON.stringify(CLIENTS)}.filter((c) => c.toLowerCase().includes(text.trim().toLowerCase())).slice(0, 5) : [] }), 120)`,
   frame: { width: 960, height: 1104 },
   checks: [
+    {
+      name: "Touch: the list button is the control's full height, 40, 44 and 48px at sm, md and lg, and the box keeps its edge",
+      example: "states",
+      touch: true,
+      async run({ scope, expect }) {
+        const want = { sm: 40, md: 44, lg: 48 }
+        const rows = await scope.locator('[data-slot="combobox-toggle"]').evaluateAll((els) =>
+          els.map((button) => {
+            const box = button.closest("[data-size]")
+            const edge = getComputedStyle(box)
+            return { size: box.dataset.size, tall: Math.round(button.getBoundingClientRect().height), edge: `${edge.borderTopWidth} ${edge.borderTopStyle}`, clip: getComputedStyle(button).backgroundClip }
+          })
+        )
+        // The box's 1px edge used to come out of the button's height: 38px in a 40px small field on touch.
+        expect.equal(rows.map((r) => `${r.size} ${r.tall}`).join(", "), rows.map((r) => `${r.size} ${want[r.size]}`).join(", "), "size and button height, in px")
+        expect.equal([...new Set(rows.map((r) => r.size))].sort().join(" "), "lg md sm", "every size is measured")
+        for (const r of rows) {
+          expect.equal(r.edge, "1px solid", `${r.size} keeps the box's edge`)
+          expect.equal(r.clip, "padding-box", `${r.size}: the button's tint stays inside the edge`)
+        }
+      },
+    },
+    {
+      name: "Each list button is named after its field, so two Comboboxes on a page never share a name",
+      example: "basics",
+      async run({ page, scope, expect }) {
+        const names = await scope.locator('[data-slot="combobox-toggle"]').evaluateAll((els) => els.map((el) => el.getAttribute("aria-label")))
+        expect.equal(names.join(" | "), "Show options for Supplier | Show options for Category | Show options for Assign to", "each button names its field")
+        expect.equal(new Set(names).size, names.length, "no two buttons share a name")
+        await scope.getByRole("button", { name: "Show options for Supplier", exact: true }).click()
+        await page.getByRole("listbox", { name: "Supplier" }).waitFor()
+        expect.equal(await scope.getByRole("button", { name: "Hide options for Supplier", exact: true }).count(), 1, "open, the Supplier button hides the Supplier options")
+      },
+    },
     {
       name: "Options the product fetches as the person types are shown as they come, and the input never points at one that has gone",
       example: "fetched",

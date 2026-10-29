@@ -86,6 +86,17 @@ describe('the drift check', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('a written value beside a token name must be the token\'s: the docs once kept a radius the tokens had moved on from', async () => {
+    const { dir, starter } = await product();
+    const md = tokens.radius.tokens.find((t) => t.name === 'radius-md').value;
+    await mkdir(path.join(dir, 'docs'), { recursive: true });
+    await writeFile(path.join(dir, 'docs', 'README.md'), `Cards take \`radius-md\` (${md}).\n\n| \`radius-md\` | 99px | Cards |\n| \`radius-sm\` (3px) and \`space-4\` (16px) |\n`);
+    const docs = (await driftCheck({ productDir: dir, starter })).differences.filter((d) => d.area === 'docs');
+    assert.deepEqual(docs.map((d) => d.where), ['docs/README.md: radius-md 99px', ...(tokens.radius.tokens.find((t) => t.name === 'radius-sm').value === '3px' ? [] : ['docs/README.md: radius-sm 3px'])]);
+    assert.match(docs[0].expected, new RegExp(`product/tokens\\.json radius-md ${md}`));
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('every planted difference is found, with both values and where each lives', async () => {
     const { dir, starter } = await product({ drift: true });
     const { differences } = await driftCheck({ productDir: dir, starter });

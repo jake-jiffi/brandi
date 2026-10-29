@@ -105,6 +105,8 @@ export const MultiSelect = React.forwardRef<HTMLInputElement, MultiSelectProps>(
   const label = ariaLabelProp ?? ariaLabel
   const labelledBy = ariaLabelledbyProp ?? ariaLabelledby
   const listLabelledBy = labelledBy ?? (label ? undefined : control.field?.labelId)
+  // The toggle is named after its field, as NumberInput names its steppers: every list on a form read "Show options".
+  const what = label ?? control.field?.labelText
   const index = React.useMemo(() => new Map(items.map((o, i) => [o.value, i])), [items])
   const optionId = React.useCallback((v: string) => `${base}-option-${index.get(v) ?? "x"}`, [base, index])
 
@@ -306,9 +308,10 @@ export const MultiSelect = React.forwardRef<HTMLInputElement, MultiSelectProps>(
       <Toggle
         open={isOpen}
         controls={listId}
-        label={shown ? "Hide options" : "Show options"}
+        label={`${shown ? "Hide" : "Show"} options${what ? ` for ${what}` : ""}`}
         disabled={disabled}
-        className="h-7 w-7 self-center rounded-control pointer-coarse:size-10"
+        // A square inside the growing box, not the segment at a field's end: it keeps clear of the edge, at 40px on touch.
+        className="my-0 h-7 w-7 self-center rounded-control border-0 pointer-coarse:size-10"
         onToggle={() => {
           if (design) return
           if (shown) closeList()

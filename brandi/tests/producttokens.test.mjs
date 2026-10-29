@@ -381,6 +381,92 @@ describe('the shape of what a person can press', () => {
   });
 });
 
+describe("the brand's measured shapes", () => {
+  const system = buildSystem({ primary: '#1F6F4A', accentCount: 1 });
+  const build = (shape) => P.buildProductTokens(system, { shape });
+  const byName = (t) => Object.fromEntries(t.radius.tokens.map((x) => [x.name, x]));
+  const sized = (t) => Object.fromEntries(t.size.tokens.map((x) => [x.name, x.value]));
+  const measured = {
+    action: 'control',
+    families: { press: { px: 6, source: "the site's buttons" }, card: { px: 16, source: 'the cards on p11' }, frame: { px: 0, source: 'the photos on p48' } },
+  };
+
+  test('a measured family sets its role with its source, and nothing derived goes rounder than the largest measured radius', () => {
+    const r = byName(build(measured));
+    assert.equal(r['radius-action'].value, '6px');
+    assert.match(r['radius-action'].source, /site/);
+    assert.equal(r['radius-control'].value, '6px', 'buttons that match the inputs: the inputs take the measured press');
+    assert.equal(r['radius-md'].value, '16px');
+    assert.equal(r['radius-frame'].value, '0px');
+    assert.ok(parseFloat(r['radius-lg'].value) <= 16, 'a pane is never rounder than a card');
+    assert.match(r['radius-lg'].derived, /scale/, 'and says how the kit got it');
+    assert.ok(parseFloat(r['radius-sm'].value) <= 6, 'a badge is never rounder than a control');
+    for (const x of Object.values(r)) if (x.name !== 'radius-pill') assert.ok(parseFloat(x.value) <= 16, `${x.name} is ${x.value}`);
+    // Measured nothing, nothing is held: a pane takes the scale's xl step, no rounder than its card.
+    const xl = Math.round(system.radius.find((s) => s.name === 'xl').px);
+    const lg = Math.round(system.radius.find((s) => s.name === 'lg').px);
+    assert.equal(byName(build({}))['radius-lg'].value, `${Math.min(xl, lg)}px`);
+  });
+
+  test("the shell's form: the rail meets the window edge, square, unless the brand draws floating panels", () => {
+    const edge = build(measured);
+    assert.equal(byName(edge)['radius-rail'].value, '0px');
+    assert.equal(sized(edge)['shell-inset'], '0px');
+    assert.equal(sized(edge)['rail-outline'], '0px');
+    // Transparent, not none: Tailwind lists the rail's shadow with the ring shadows, where none is not a shadow.
+    assert.deepEqual(edge.shadow.tokens.find((s) => s.name === 'shadow-rail').value, { light: '0 0 #0000', dark: '0 0 #0000' });
+    const floating = build({ ...measured, shell: { form: 'floating', source: "the brand's own app" } });
+    assert.equal(byName(floating)['radius-rail'].value, byName(floating)['radius-lg'].value, 'a floating rail takes the pane radius');
+    assert.equal(sized(floating)['shell-inset'], '8px');
+    assert.equal(sized(floating)['rail-outline'], '1px');
+    assert.deepEqual(floating.shadow.tokens.find((s) => s.name === 'shadow-rail').value, floating.shadow.tokens.find((s) => s.name === 'shadow-xs').value);
+    assert.match(P.toProductCss(edge), /--shell-inset: 0px;/);
+  });
+
+  test("every choice nobody measured is listed as the kit's, and so are a shell and a shape move the brand never named", () => {
+    const bare = P.shapeKitDefaults(build({})).map((d) => d.choice);
+    for (const c of ['radius-action', 'radius-control', 'radius-md', 'radius-lg', 'radius-frame', 'radius-rail', 'shell', 'moves']) assert.ok(bare.includes(c), `${c} in ${bare}`);
+    const full = P.shapeKitDefaults(build({
+      ...measured,
+      families: { ...measured.families, pane: { px: 12, source: 'the panels on p20' } },
+      shell: { form: 'edge', source: "the site's nav bar" },
+      moves: [{ name: 'The paper ground', source: 'every page of the guidelines', where: ['the website hero'] }],
+    })).map((d) => d.choice);
+    for (const c of ['radius-action', 'radius-control', 'radius-md', 'radius-lg', 'radius-frame', 'radius-rail', 'shell', 'moves']) assert.ok(!full.includes(c), `${c} still listed: ${full}`);
+    assert.ok(P.shapeKitDefaults(build({})).every((d) => d.how), 'each says how the kit chose it');
+  });
+
+  test("the rail's edge shows against the page: its own line on a light canvas, the page's hairline where rail and canvas sit close", () => {
+    const sys = buildSystem({ primary: '#1F6F4A', accentCount: 1 });
+    // Near-neighbour colours: a pilot's exact values stay out of the public repo.
+    const t = P.buildProductTokens(sys, { roles: { rail: { light: '#050505', dark: '#050505' }, canvas: { light: '#F2F2F2', dark: '#141414' } } });
+    const role = (name, theme) => P.resolveColour(t, name, theme);
+    assert.equal(role('rail-edge', 'light'), role('rail-line', 'light'), 'a black rail on a light canvas: its own line');
+    assert.equal(role('rail-edge', 'dark'), role('line', 'dark'), 'on a near-black canvas: the page hairline');
+    assert.ok(contrastRatio(role('rail-edge', 'dark'), '#141414') > 1.2 && contrastRatio(role('rail-edge', 'dark'), '#050505') > 1.2, 'which shows against both');
+  });
+
+  test('a square photo holds nothing else: frames are left out of the largest measured radius', () => {
+    const r = byName(build({ families: { frame: { px: 0, source: 'every photo is square' } } }));
+    assert.equal(r['radius-frame'].value, '0px');
+    assert.equal(r['radius-md'].value, byName(build({}))['radius-md'].value, 'cards still come from the scale');
+  });
+
+  test('a tokens file written before shapes carried a source lists every radius as the kit\'s', () => {
+    const old = { radius: { tokens: [{ name: 'radius-control', value: '10px' }, { name: 'radius-pill', value: '9999px' }] } };
+    const listed = P.shapeKitDefaults(old);
+    assert.deepEqual(listed.map((d) => d.choice), ['radius-control', 'shell', 'moves'], 'the pill is the kit\'s rule, not a brand choice');
+    assert.match(listed[0].how, /no source/);
+  });
+
+  test('a family is refused without a source, outside the families, or a shell outside its two forms', () => {
+    for (const bad of [{ families: { card: { px: 12 } } }, { families: { corner: { px: 4, source: 'x' } } }, { families: { card: { px: 'pill', source: 'x' } } }, { shell: { form: 'round', source: 'x' } }, { shell: { form: 'edge' } }, { moves: [{ name: 'Paper' }] }]) {
+      assert.throws(() => build(bad), TypeError, JSON.stringify(bad));
+    }
+    assert.equal(byName(build({ families: { press: { px: 'pill', source: 'the chips on p9' } } }))['radius-action'].value, '9999px');
+  });
+});
+
 describe('the faces a system ships as files', () => {
   test('each @font-face names the format its file is in', () => {
     const tokens = P.buildProductTokens(buildSystem({ primary: '#1F6F4A', accentCount: 1 }), {

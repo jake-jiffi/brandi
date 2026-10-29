@@ -8,6 +8,7 @@ import { useShortcuts } from "@/hooks/use-shortcuts"
 import { PERSON, SUMMARY_TIME, WORKSPACES } from "@/lib/sample"
 
 import { setMorningSummary, useExample } from "./example-store"
+import { DraftNotice, useDraft } from "./unsaved-changes"
 
 const SETTINGS_SECTIONS = [
   { label: "Profile", href: "#profile" },
@@ -55,14 +56,22 @@ const PROFILE_RULES = {
  * again on Save, never while it is typed in, and its error goes as soon as the value is right.
  */
 export function ProfileSection() {
-  const [name, setName] = React.useState(PERSON.name)
-  const [email, setEmail] = React.useState(PERSON.email)
   // What was last saved, so Save stays quiet until something differs from it.
   const [saved, setSaved] = React.useState({ name: PERSON.name, email: PERSON.email })
-  const changed = name !== saved.name || email !== saved.email
+  // What is typed and not saved: a draft that Back or a reload brings back, and leaving the page asks about.
+  const draft = useDraft("Profile", saved)
+  const { name, email } = draft.values
+  const changed = draft.changed
   const [errors, setErrors] = React.useState<ProfileErrors>({})
   const [saving, setSaving] = React.useState(false)
   const form = React.useRef<HTMLFormElement | null>(null)
+
+  // Back to what was saved. The notice goes with its button, so focus moves to the first field.
+  const discard = () => {
+    draft.clear()
+    setErrors({})
+    form.current?.querySelector<HTMLElement>("input")?.focus()
+  }
 
   const leave = (key: keyof ProfileErrors, value: string) => setErrors((was) => ({ ...was, [key]: PROFILE_RULES[key](value) }))
   const settle = (key: keyof ProfileErrors, value: string) => {
@@ -88,12 +97,13 @@ export function ProfileSection() {
   return (
     <FormSection id="profile" title="Profile" description="How you appear to your team, and where the product writes to you." className="scroll-mt-6">
       <form ref={form} noValidate onSubmit={save} className="flex flex-col gap-5">
+        {draft.back ? <DraftNotice section="Profile" onDiscard={discard} /> : null}
         <Field label="Name" error={errors.name} required>
           <TextInput
             value={name}
             autoComplete="name"
             onChange={(event) => {
-              setName(event.target.value)
+              draft.set("name", event.target.value)
               settle("name", event.target.value)
             }}
             onBlur={(event) => leave("name", event.target.value)}
@@ -105,7 +115,7 @@ export function ProfileSection() {
             value={email}
             autoComplete="email"
             onChange={(event) => {
-              setEmail(event.target.value)
+              draft.set("email", event.target.value)
               settle("email", event.target.value)
             }}
             onBlur={(event) => leave("email", event.target.value)}

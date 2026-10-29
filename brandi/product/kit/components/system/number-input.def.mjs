@@ -43,7 +43,7 @@ export default {
       "A spin button: a screen reader hears the label, spin button, and the value, with the prefix and suffix read with the field.",
       "Up and Down step the value, within min and max.",
       "The step buttons are named by what they change (Increase quantity). They sit out of the tab order, because Up and Down do the same from the field, and a press keeps the caret in the field and says the new value politely.",
-      "Decrease sits at the start and Increase at the end, on every screen, so it reads minus, value, plus, in the source as on screen. On touch the two 44px targets sit apart with the value between them.",
+      "Decrease sits at the start and Increase at the end, on every screen, so it reads minus, value, plus, in the source as on screen. On touch the two 44px targets sit apart with the value between them. The step buttons and the field reach over the group's 1px edge, so each is the control's full height (40px at sm on touch), with the edge still drawn.",
       "A typed value is checked when the person leaves the field or presses Enter, never while they type. Not a number, or out of range, stays as typed, turns the field invalid, and the Field around it says what to enter (Enter a number from 1 to 99, or Enter a whole number from 1 to 99 for a count).",
       "Numbers show through the system's formatter, and what people type is read with the market's separators, so 1,250.5 and 1250.5 are the same.",
     ],
@@ -100,6 +100,26 @@ export default {
   ],
   frame: { width: 960, height: 548 },
   checks: [
+    {
+      name: "The field holds its largest value without clipping, however narrow its row (round 5)",
+      example: "basics",
+      async run({ scope, expect }) {
+        const fields = await scope.locator('[role="spinbutton"][aria-valuemax]').evaluateAll((els) =>
+          els.map((el) => {
+            const group = el.closest('[data-slot="number-input"]')
+            const was = el.value
+            group.style.width = "0px"
+            el.value = String(el.getAttribute("aria-valuemax"))
+            const out = { max: el.value, fits: el.scrollWidth <= el.clientWidth + 1, width: el.clientWidth }
+            el.value = was
+            group.style.width = ""
+            return out
+          })
+        )
+        expect(fields.length > 0, "fields with a maximum")
+        for (const f of fields) expect(f.fits, `${f.max} fits its ${f.width}px field with the row squeezed to nothing`)
+      },
+    },
     {
       name: "A whole-number count refuses a typed decimal and says so",
       example: "basics",
@@ -244,6 +264,31 @@ export default {
         const down = await scope.getByRole("button", { name: "Decrease boxes" }).boundingBox()
         const up = await scope.getByRole("button", { name: "Increase boxes" }).boundingBox()
         expect.atLeast(Math.round(up.x - (down.x + down.width)), 8, "the two step buttons sit at least 8px apart on touch")
+      },
+    },
+    {
+      name: "Touch: the step buttons and the field are the control's full height at sm, md and lg, and the group keeps its edge",
+      example: "sizes",
+      touch: true,
+      async run({ scope, expect }) {
+        const rows = await scope.locator('[data-slot="number-input"]').evaluateAll((els) =>
+          els.map((box) => {
+            const tall = (el) => Math.round(el.getBoundingClientRect().height)
+            const steps = [...box.querySelectorAll('[data-slot="number-input-step"]')]
+            const edge = getComputedStyle(box)
+            return {
+              line: `${box.dataset.size} ${tall(box)} ${tall(box.querySelector('[role="spinbutton"]'))} ${steps.map(tall).join("/")}`,
+              edge: `${edge.borderTopWidth} ${edge.borderTopStyle} ${edge.borderBottomWidth} ${edge.borderBottomStyle}`,
+              clip: steps.map((b) => getComputedStyle(b).backgroundClip),
+            }
+          })
+        )
+        // The 1px edge used to come out of the 40: the buttons were 38px tall at sm, the field 38.
+        expect.equal(rows.map((r) => r.line).join(", "), "sm 40 40 40/40, md 44 44 44/44, lg 48 48 48/48", "size, group, field and step buttons, in px")
+        for (const r of rows) {
+          expect.equal(r.edge, "1px solid 1px solid", `${r.line.split(" ")[0]} keeps the group's edge`)
+          expect(r.clip.every((c) => c === "padding-box"), `${r.line.split(" ")[0]}: a step button's tint stays inside the edge (${r.clip.join(", ")})`)
+        }
       },
     },
   ],

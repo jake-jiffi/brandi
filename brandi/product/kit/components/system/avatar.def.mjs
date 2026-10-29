@@ -1,6 +1,9 @@
 // Avatar's one definition: its README, its preview board and its scripted checks all come from here.
 
-// A sample photo, drawn here so the preview needs nothing from the network.
+// A sample photo, drawn here so the preview needs nothing from the network. It stays a data: URI on purpose: the
+// Design canvas takes images as files, and a board that names a file needs that file copied beside it in the canvas
+// folder, the component previews and the Design System, three places for one sample. Where a canvas refuses it, the
+// Avatar shows the person's initials, which is what it does for any photo that fails (the check below holds that).
 const PHOTO = `data:image/svg+xml,${encodeURIComponent(
   "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#c8a17c'/><stop offset='1' stop-color='#5f4536'/></linearGradient></defs><rect width='80' height='80' fill='url(#g)'/><circle cx='40' cy='33' r='15' fill='#efd2b6'/><path d='M13 80c2-17 13-26 27-26s25 9 27 26z' fill='#2e4a5b'/></svg>"
 )}`
@@ -72,7 +75,7 @@ export default {
     {
       id: "rail",
       title: "On a rail that turns its text light",
-      markup: `<div class="on-rail flex flex-wrap items-center gap-3 rounded-lg bg-rail p-3" style="--rail-text-strong: var(--text-inverse); --rail-text: var(--text-inverse);">
+      markup: `<div class="on-rail flex flex-wrap items-center gap-3 rounded-rail bg-rail p-3" style="--rail-text-strong: var(--text-inverse); --rail-text: var(--text-inverse);">
 ${["[Tom Okafor]", "[Ada Lovelace]", "[Mia Chen]", "[Sam Patel]", "[Lena Brooks]", "[Priya Raman]", "[Jo Ellis]", "[Kai Moana]"].map((n) => `<x-import component-from-global-scope="NS.Avatar" name="${n}"></x-import>`).join("\n")}
 </div>`,
     },
@@ -99,6 +102,25 @@ ${["[Tom Okafor]", "[Ada Lovelace]", "[Mia Chen]", "[Sam Patel]", "[Lena Brooks]
         await photo.locator("img").waitFor({ state: "visible", timeout: 3000 })
         expect.equal(await photo.locator("img").getAttribute("alt"), "", "the photo has an empty alt")
         expect.equal(await page.getByRole("img", { name: "Assistant" }).count(), 1, "the assistant is named")
+      },
+    },
+    {
+      name: "A photo that fails to load shows the person's initials, never a broken image, so a canvas that refuses the sample still shows a true Avatar",
+      async run({ page, expect }) {
+        await page.evaluate(() => {
+          const kit = Object.values(window).find((v) => v && typeof v === "object" && v.ICON_NAMES && v.Root)
+          const host = document.createElement("div")
+          host.id = "check-mount"
+          document.body.append(host)
+          window.ReactDOM.flushSync(() => window.ReactDOM.createRoot(host).render(window.React.createElement(kit.Avatar, { name: "[Priya Raman]", src: "no-such-photo.png" })))
+        })
+        const avatar = page.locator("#check-mount").getByRole("img", { name: "[Priya Raman]" })
+        await page.waitForFunction(() => document.querySelector('#check-mount [data-slot="avatar-fallback"]'), null, { timeout: 3000 })
+        await page.waitForTimeout(300)
+        // The initials are drawn from data-initials, never written as text.
+        const shown = await avatar.locator("[data-initials]").evaluate((el) => [el.dataset.initials, getComputedStyle(el, "::before").content, el.getBoundingClientRect().width > 0])
+        expect.equal(shown.join(" "), 'PR "PR" true', "the initials show")
+        expect.equal(await avatar.locator("img").count(), 0, "and no broken image")
       },
     },
     {

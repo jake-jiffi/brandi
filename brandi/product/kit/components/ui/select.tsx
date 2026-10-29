@@ -130,7 +130,7 @@ const SelectTrigger = React.forwardRef(function SelectTrigger({
 // with no exit animation (see Select above). Exported so a list drawn open in place for a design (Select's open
 // prop) matches the live one.
 export const selectContentClassName =
-  "relative z-(--z-popover) max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-line bg-surface-raised p-1 text-text shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95"
+  "relative z-(--z-popover) max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) origin-(--radix-select-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-list border border-line bg-surface-raised p-1 text-text shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95"
 
 const SelectContent = React.forwardRef(function SelectContent({
   className,

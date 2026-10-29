@@ -138,9 +138,10 @@ export function toPreviewHtml(source, { width, height, label, base, runtime, boa
   // wins, so injecting ours ahead of it would silently redirect its images.
   if (base && !/<base\s[^>]*href=/i.test(out)) {
     // With a base, a link to "#section" resolves to the source directory and leaves the board: a settings
-    // board emptied on any click in its section list. The canvas scrolls within the board, so the preview
-    // does the same, for a press nothing else has handled.
-    const hashLinks = '<script>document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href^=\'#\']");if(!a||e.defaultPrevented||e.button||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();location.hash=a.getAttribute("href");});</script>';
+    // board emptied on any click in its section list. The canvas scrolls within the board, so for the moment of a
+    // press on such a link the base points at the page itself, and the link goes to its section there. Nothing
+    // is prevented, so a board's own handling of the press (and a check that reads it) is left as it was.
+    const hashLinks = '<script>document.addEventListener("click",function(e){var a=e.target&&e.target.closest&&e.target.closest("a[href^=\'#\']");var b=document.querySelector("base[href]");if(!a||!b)return;var was=b.getAttribute("href");b.setAttribute("href",location.href.split("#")[0]);setTimeout(function(){b.setAttribute("href",was);},0);},true);</script>';
     const tag = `<base href="${base}">${hashLinks}`;
     out = /<head[^>]*>/i.test(out) ? out.replace(/<head[^>]*>/i, (m) => `${m}${tag}`) : `${tag}${out}`;
   }
