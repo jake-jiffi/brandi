@@ -47,6 +47,8 @@ export interface MetricCardProps extends Omit<React.HTMLAttributes<HTMLElement>,
   state?: MetricCardState
   /** When unavailable: which source is down and when it last answered. */
   unavailableText?: React.ReactNode
+  /** When unavailable: the brand's own word for the state, from its status words ("Not synced"). Default "Unavailable". */
+  unavailableLabel?: string
   /** The label's heading level. */
   headingLevel?: 2 | 3 | 4 | 5 | 6
 }
@@ -73,6 +75,7 @@ export const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(functio
     hero = false,
     state = "ready",
     unavailableText,
+    unavailableLabel = "Unavailable",
     headingLevel = 3,
     className,
     ...rest
@@ -117,7 +120,7 @@ export const MetricCard = React.forwardRef<HTMLElement, MetricCardProps>(functio
           <div data-slot="metric-card-unavailable" className="mt-2 flex flex-col gap-1">
             <p className="flex items-center gap-2 type-heading text-text-muted">
               <Icon name="CloudOff" size={18} />
-              Unavailable
+              {unavailableLabel}
             </p>
             <p className="max-w-measure type-meta text-text-muted">{unavailableText ?? "Its source is not responding."}</p>
           </div>

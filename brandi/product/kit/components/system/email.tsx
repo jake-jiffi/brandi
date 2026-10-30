@@ -175,7 +175,8 @@ function bodyHtml({ props, scheme, level, bothMarks }: Built) {
         typeof line === "string"
           ? esc(line)
           : `<a class="em-link" href="${safeHref(line.href)}" style="${css({ color: c("link"), "text-decoration": "underline" })}">${esc(line.label)}</a>`
-      return `<p class="em-muted" style="${css({ margin: i === all.length - 1 ? "0" : "0 0 8px", ...type("meta"), color: c("text-muted"), "text-wrap": "pretty" })}">${text}</p>`
+      // A measure for small print set in full (an address, an acknowledgement): across 600px it ran about 100 characters a line (a pilot's round 4).
+      return `<p class="em-muted" style="${css({ margin: i === all.length - 1 ? "0" : "0 0 8px", "max-width": "480px", ...type("meta"), color: c("text-muted"), "text-wrap": "pretty" })}">${text}</p>`
     })
     .join("")
   const preheader = props.preheader

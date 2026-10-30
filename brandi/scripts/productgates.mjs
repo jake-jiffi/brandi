@@ -392,10 +392,10 @@ export async function runGates({ productDir, starter, round, widths = WIDTHS, on
     const reflowRun = nodeScript(starter, 'reflow-pages.mjs', ['--pages', path.join(outDir, 'reflow-pages.json'), '--json', path.join(outDir, 'reflow.json')]);
     const measured = existsSync(path.join(outDir, 'reflow.json')) ? JSON.parse(readFileSync(path.join(outDir, 'reflow.json'), 'utf8')) : null;
     reflow = measured
-      ? { width: REFLOW_WIDTH, pages: measured.pages, overflow: measured.results.filter((r) => r.overflow).map((r) => ({ page: r.label, kind: r.kind, scrollWidth: r.scrollWidth, clientWidth: r.clientWidth, worst: r.worst })), errors: measured.results.filter((r) => r.error).map((r) => ({ page: r.label, error: r.error })) }
+      ? { width: REFLOW_WIDTH, pages: measured.pages, overflow: measured.results.filter((r) => r.overflow).map((r) => ({ page: r.label, kind: r.kind, scrollWidth: r.scrollWidth, clientWidth: r.clientWidth, worst: r.worst, ...(r.cut ? { cut: r.cut } : {}) })), errors: measured.results.filter((r) => r.error).map((r) => ({ page: r.label, error: r.error })) }
       : { width: REFLOW_WIDTH, pages: 0, overflow: [], errors: [{ page: 'runner', error: reflowRun.out.slice(-400) }] };
   }
-  log(`reflow: ${reflow.overflow.length} of ${reflow.pages} pages scroll sideways at ${REFLOW_WIDTH}px${reflow.errors.length ? `, ${reflow.errors.length} not measured` : ''}`);
+  log(`reflow: ${reflow.overflow.length} of ${reflow.pages} pages scroll sideways or cut content off at ${REFLOW_WIDTH}px${reflow.errors.length ? `, ${reflow.errors.length} not measured` : ''}`);
 
   const previews = path.join(productDir, 'components', 'previews');
   const checkRun = existsSync(previews)
@@ -499,7 +499,9 @@ export function acceptFindings(findings, accepted = []) {
   const text = (v) => typeof v === 'string' && v.trim() !== '';
   const valid = (a) => text(a?.rule) && text(a?.page) && text(a?.reason) && (a.selector == null || typeof a.selector === 'string');
   const entries = (accepted ?? []).filter(valid).map((entry) => ({ entry, findings: [] }));
-  const matches = (a, f) => f.rule === a.rule && String(f.page ?? '').startsWith(a.page) && (!a.selector || String(f.selector ?? '').includes(a.selector));
+  // A page of "*" is every page: a rule the brand decided against everywhere (a one-family brand's overused-font) took
+  // one entry per board family and component page, 69 on one run, before it could be said once.
+  const matches = (a, f) => f.rule === a.rule && (a.page === '*' || String(f.page ?? '').startsWith(a.page)) && (!a.selector || String(f.selector ?? '').includes(a.selector));
   const open = [];
   for (const f of findings) {
     const hit = entries.find((e) => matches(e.entry, f));
@@ -538,7 +540,7 @@ export function judgeRound(gates, { critique = null, rules = null, accepted = nu
   const unmeasured = gates.reflow?.errors?.length ?? 0;
   // A page axe could not scan is not a clean page: the line says how many, so a board that never loads is not missed.
   add('Accessibility', gates.axe.violations === 0 && !gates.axe.errors && gates.checks.failed.length === 0 && overflow === 0 && unmeasured === 0,
-    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages${gates.axe.errors ? `, ${gates.axe.errors} not scanned` : ''}; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.checks.retried?.length ? `, ${gates.checks.retried.length} of them only when run again` : ''}${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
+    `axe ${gates.axe.violations} violations on ${gates.axe.pages} pages${gates.axe.errors ? `, ${gates.axe.errors} not scanned` : ''}; ${gates.checks.passed} scripted checks passed, ${gates.checks.failed.length} failed${gates.checks.retried?.length ? `, ${gates.checks.retried.length} of them only when run again` : ''}${gates.reflow ? `; at ${gates.reflow.width}px ${overflow} of ${gates.reflow.pages} pages scroll sideways or cut content off${unmeasured ? `, ${unmeasured} not measured` : ''}` : ''}`);
   // A round from before this gate has no line for it; one that could not run it has not passed it.
   if (gates.runtime) {
     add('Canvas runtime', !gates.runtime.skipped && gates.runtime.failed.length === 0,
@@ -635,7 +637,7 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   }
   if (gates.reflow?.overflow?.length || gates.reflow?.errors?.length) {
     lines.push('', `## Reflow at ${gates.reflow.width}px`, '');
-    for (const r of gates.reflow.overflow) lines.push(`- ${r.page}: ${r.scrollWidth}px wide in a ${r.clientWidth}px window${r.worst ? `, furthest out ${r.worst.what} at ${r.worst.right}px` : ''}`);
+    for (const r of gates.reflow.overflow) lines.push(r.cut ? `- ${r.page}: content cut off in a ${r.clientWidth}px window, furthest out ${r.cut.what} at ${r.cut.right}px` : `- ${r.page}: ${r.scrollWidth}px wide in a ${r.clientWidth}px window${r.worst ? `, furthest out ${r.worst.what} at ${r.worst.right}px` : ''}`);
     for (const r of gates.reflow.errors) lines.push(`- ${r.page}: not measured (${r.error})`);
   }
   if (gates.runtime?.skipped) lines.push('', '## Canvas runtime', '', `Not run: ${gates.runtime.skipped}`);

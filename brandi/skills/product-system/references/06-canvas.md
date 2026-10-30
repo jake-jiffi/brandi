@@ -344,6 +344,10 @@ dialog's scrim. The page goes in one wrapper, and nothing else does:
 `brandi validate` warns about an inert element with no text-occlusion ignore on it or around it,
 naming the board.
 
+The dialog's `footer` (and a Sheet's) is a fragment of Buttons, `h(React.Fragment, null, cancel,
+confirm)`, never a ButtonGroup: the Dialog lays its own footer out, and stacks the buttons full width
+on a phone. Wrapped in a ButtonGroup they stayed in one row at 390 on every confirmation a run drew.
+
 ### A phone frame
 
 A phone screen that is not a page in the system's shell (a consumer app's screen, or a frame in a
@@ -845,6 +849,25 @@ Through the Design type, in this order.
 10. **Report it.** Give the link and a sentence on what changed. Write the canvas's version id, and
     the system version it carries, into the round record under a `## Published` heading in
     `record.md`. `$A product round` keeps that section when it rewrites the record.
+11. **A change after publish.** It is done when it shows on the live canvas, not when the tokens say
+    so. Westhaven's dark rail took three tries: the first value was too small a step to see, it was
+    reported from the token values, and the restage tripped over its own staging.
+    - Change the source (`product.json`, a board script), then run `$A product tokens`,
+      `$A product starter` (no `--kit` unless the kit is part of the change), `$A product bundle` and
+      `$A product boards`.
+    - Render the boards the change touches before and after, light beside dark. If you cannot see
+      the change in that render, the person will not either. Make it bigger before you publish.
+    - Read before each publish. Both pages save versions of themselves while someone has them open.
+      Read the system's `project/design-system.json` and pass it to `$A product ds --live`. Read the
+      canvas's `project/canvas.json` and pass it to `$A canvas --live`, and list the canvas's files
+      (`scope: "files"`) so the install paths copied from the system count as seen.
+    - Publish the system first, its index last. Then publish the canvas pinned to the system's new
+      version (`--system-version`), with the same `--title` as its first publish: the staging folder
+      is named from the title, and a new title stages every board again.
+    - Look at the live result before you report it. Read back the canvas's
+      `ds/<namespace>/tokens.css`, `ds/<namespace>/components/bundle.css` and one changed board,
+      render them with `preview.mjs`, and compare them with your after render. Report what you
+      rendered and the values you measured, with both version ids.
 
 No `Artifact` tool: stop after step 3, and hand over the board files with the system installed
 beside them instead of a link, with the previews `preview.mjs` renders through the runtime shim.

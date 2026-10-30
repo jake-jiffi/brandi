@@ -674,9 +674,11 @@ function contrastFor(name, { railDecided }) {
 }
 
 /** The type styles a working screen needs, sized for density rather than reading. */
-function typeGroups({ displayForTitles, displayCase = null }) {
+function typeGroups({ displayForTitles, displayCase = null, oneFamily = false }) {
+  // A display face sets titles at its own 400. A brand whose display face is its body face has no display
+  // weight to keep, so its titles take the headings' 700: at 400 Westhaven's every title read Regular.
   const display = displayForTitles
-    ? { family: 'display', fontWeight: 400 }
+    ? { family: 'display', fontWeight: oneFamily ? 700 : 400 }
     : { family: 'sans', fontWeight: 700 };
   // A display face the brand only ever sets in capitals is set in capitals here too, opened up a little,
   // because capitals set at a lower-case face's tight tracking crowd.
@@ -1165,7 +1167,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
     type: {
       fonts: checkFonts(fontFiles),
       families,
-      groups: typeGroups({ displayForTitles, displayCase }),
+      groups: typeGroups({ displayForTitles, displayCase, oneFamily: Boolean(fonts.display && fonts.body && fonts.display.trim().toLowerCase() === fonts.body.trim().toLowerCase()) }),
     },
     spacing: {
       note: '4px base, aligned with Tailwind, so p-5 in code is space-5 in a design. Use the steps; never invent a gap.',
@@ -1353,6 +1355,19 @@ export function auditProductTokens(tokens) {
     }
     if (has('success-solid') && has('danger-solid') && !cvdSafePair(at('success-solid'), at('danger-solid')).safe) {
       warnings.push({ theme, area: 'colour-vision', message: 'Success and danger are hard to tell apart with a red-green colour vision deficiency. Expected for these hues: never carry a status in colour alone.' });
+    }
+    // A coloured rail that stands above the dark page is the brightest large surface on every dark screen: Westhaven's
+    // WH Blue, decided once for both themes, on #111111, and then its first dark value, #002E4D, a step darker that
+    // still stood 1.26:1 above the surface and read as unchanged. The rail is decided, so the audit says so and the
+    // person decides its dark value; a rail at the surfaces' lightness, or a black one darker than them, is left alone.
+    if (theme === 'dark' && has('rail') && has('surface')) {
+      const rail = at('rail');
+      const surface = at('surface');
+      const above = contrastRatio(rail, surface);
+      if (carriesColour(rail) && toOklch(rail).L > toOklch(surface).L && above >= 1.2) {
+        const same = rail.toLowerCase() === resolveColour(tokens, 'rail', 'light').toLowerCase();
+        warnings.push({ theme, area: 'rail', message: `The dark rail (${rail}${same ? ', the same as light' : ''}) stands ${Math.round(above * 100) / 100}:1 above the dark surface (${surface}), so it is the brightest large surface on the screen. Decide a dark value in its hue at the surfaces' lightness, under 1.2:1 from ${surface}, in roles.rail: { "light": "…", "dark": "…" }.` });
+      }
     }
     for (let i = 1; i < SERIES_COUNT; i += 1) {
       const p = `series-${i}`;

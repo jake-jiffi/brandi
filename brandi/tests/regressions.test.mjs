@@ -1899,6 +1899,12 @@ describe('R3-N-01: the documented mockup workflow, end to end', () => {
     assert.ok(existsSync(path.join(p, 'brand', 'canvas', 'shopfront-shopfront.jpg')));
   });
 
+  test('`mockup build --dir` writes into that canvas and still finds the brand where it is', async () => {
+    const r = await cli(['mockup', 'build', '--dir', 'elsewhere/canvas'], p);
+    assert.equal(r.ok, true, JSON.stringify(r));
+    assert.ok(existsSync(path.join(p, 'elsewhere', 'canvas', 'MockupShopfront.dc.html')), 'the board is in the named canvas');
+  });
+
   test('inline markup is accepted as artwork and used as it stands', async () => {
     await cli(['set', 'identity.mockups.0.surfaces.0.artwork', '<div id="typed">Muddy Paws</div>'], p);
     const r = await cli(['mockup', 'build'], p);

@@ -61,6 +61,7 @@ export default {
     { name: "hero", type: "boolean", default: "false", doc: "The headline figure of its row: a bolder label in text-strong and a wider trend. One per row at most." },
     { name: "state", type: '"ready" | "loading" | "unavailable"', default: '"ready"', doc: "Design mode as well as live: loading keeps the label and waits as a skeleton; unavailable says its source is down." },
     { name: "unavailableText", type: "ReactNode", default: '"Its source is not responding."', doc: "When unavailable: which source is down, and when it last answered." },
+    { name: "unavailableLabel", type: "string", default: '"Unavailable"', doc: "When unavailable: the brand's own status word for it, so the card never says two words for one state." },
     { name: "headingLevel", type: "2 | 3 | 4 | 5 | 6", default: "3", doc: "The label's heading level: a row of figures usually sits under a section heading." },
   ],
   notes: {
@@ -127,6 +128,7 @@ export default {
         "repeat(3, minmax(0, 1fr))",
         `<x-import component-from-global-scope="NS.MetricCard" label="Net revenue" state="loading" format="compact-currency"></x-import>
 <x-import component-from-global-scope="NS.MetricCard" label="Cash in the bank" state="unavailable" unavailable-text="[Bank feed] is not responding. Last answered at 9:42 am."></x-import>
+<x-import component-from-global-scope="NS.MetricCard" label="Jobs this week" state="unavailable" unavailable-label="Not synced" unavailable-text="[Scheduling system] has not answered since 9:15 am."></x-import>
 <x-import component-from-global-scope="NS.MetricCard" label="Refunds this month" value="{{nothing}}" format="currency" footnote="No refunds have synced from [the payments system] yet."></x-import>`
       ),
       vals: { nothing: null },
@@ -248,6 +250,8 @@ export default {
         expect(text.includes("Unavailable"), "it says unavailable")
         expect(text.includes("[Bank feed] is not responding. Last answered at 9:42 am."), "which source, and when it last answered")
         expect.equal(await down.locator('[data-slot="metric-card-value"]').count(), 0, "no figure")
+        const own = await card(scope, "Jobs this week").innerText()
+        expect(own.includes("Not synced") && !own.includes("Unavailable"), "the brand's own word replaces Unavailable, never beside it")
       },
     },
     {

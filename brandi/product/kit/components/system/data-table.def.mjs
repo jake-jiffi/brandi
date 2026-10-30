@@ -55,6 +55,14 @@ const invoices = [
   { id: "1047", client: { title: "[Riverside Cafe]", sub: "Invoice [1047]" }, status: { label: "Paid", tone: "success" }, due: "[30 May]", owner: "[Sam Lee]", amount: 486.2 },
 ]
 
+// A report's totals: the client column names the row, and Due, with no total, stays blank.
+const totalColumns = [
+  { key: "client", label: "Client", type: "stack" },
+  { key: "due", label: "Due", empty: "Not sent" },
+  { key: "amount", label: "Amount", type: "currency", sortable: true },
+]
+const invoiceTotals = { client: "Total, 6 invoices", amount: 22529.45 }
+
 const teamColumns = [
   { key: "person", label: "Person", type: "person", sortable: true },
   { key: "hours", label: "Hours", type: "hours", sortable: true },
@@ -121,6 +129,7 @@ export default {
     { name: "density", type: '"comfortable" | "compact"', default: '"comfortable"', doc: "48px rows, or 40px. One density per table, never tighter than compact." },
     { name: "maxHeight", type: "number | string", doc: "The rows scroll under a head that sticks. px, or any CSS length." },
     { name: "footer", type: "ReactNode", doc: "Under the rows, on the subtle surface: put Pagination here." },
+    { name: "totals", type: "Record<string, unknown>", doc: "A totals row under the rows, in their columns: plain data, like a row, with the naming column saying what it totals (Total, 6 invoices). It stays last whatever the sort, is never selected, and a cell it leaves out stays blank. On a phone it closes the list, each figure named." },
     { name: "toolbar", type: "{ label: string; bulkActions?: Array<{ label: string; icon?: IconName; variant?: \"secondary\" | \"primary\" | \"danger\"; disabled?: boolean; onSelect?: (keys: string[]) => void }>; children?: ReactNode; summary?: ReactNode; sticky?: boolean }", doc: "A Toolbar above the table. Selecting rows hands it the count, and its bulk actions get the keys of the selected rows on screen. With no filters (children) it shows how many rows there are, in the table's noun, until rows are selected; summary replaces that, for a table showing one page of many." },
     { name: "loading", type: "boolean", default: "false", doc: "The head stays; the rows wait as skeletons, and the table says it is loading." },
     { name: "loadingRows", type: "number", default: "5", doc: "How many skeleton rows stand in." },
@@ -183,6 +192,7 @@ export default {
       "One density per table, never tighter than compact. Keep the phone list's meta line short.",
       "Selecting rows swaps the toolbar's filters for bulk actions. Those act only on rows on screen, with a count that says how many.",
       "With bulk actions and no filters the toolbar still keeps its row, saying how many rows there are in the table's noun (6 invoices, or 6 rows), where the selected count will stand: never blank, and selecting never moves the table.",
+      "A report's totals go in totals, never in rows or a loose line under the table: a row in the body reads as one more record, and its empty cells say Not set.",
     ],
     Review: [
       "Selecting a row opened it, rows could not be reached by keyboard, and some data crashed it (round 1): checks select with Space and with a press, open with Enter, and tab through every row.",
@@ -191,6 +201,7 @@ export default {
       "On a touch tablet the sort buttons were 16px and the row's name 20px, the only control that opens the row for a screen reader (a pilot's round 1): each now takes its whole cell as the tap area, and a check taps the top and the foot of the cell.",
       "A search that emptied the table said nothing, because the count in the footer unmounted with the rows (a pilot's round 1): the footer stays mounted under the empty state, out of sight.",
       "A selectable table with bulk actions and no filters had a blank band above it at 390 (a proof run, rounds 1 to 3): the band now holds the count, and a check selects a row and finds the table where it was.",
+      "A report's totals were a sixth row with Not set in an empty cell, read as one more record (a pilot's round 4): totals is a row of its own in the table's foot, blank where it has no figure, and checks read it at 960 and at 390.",
     ],
     Accepted: [
       "The actions column's menu stands in for Menu until it lands in the kit: the same props and behaviour on the same primitive. Swapping it is one import.",
@@ -301,6 +312,20 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
       width: 720,
       markup: `<x-import component-from-global-scope="NS.DataTable" caption="Subscriptions" columns="{{wideColumns}}" rows="{{wide}}"></x-import>`,
       vals: { wideColumns, wide },
+    },
+    {
+      id: "totals",
+      title: "A totals row, in the table's own columns",
+      layout: "block",
+      markup: `<div class="max-w-2xl"><x-import component-from-global-scope="NS.DataTable" caption="Invoices this month" columns="{{totalColumns}}" rows="{{invoices}}" totals="{{invoiceTotals}}"></x-import></div>`,
+      vals: { totalColumns, invoiceTotals },
+    },
+    {
+      id: "totals-phone",
+      title: "At 390px the totals close the list",
+      layout: "block",
+      width: 390,
+      markup: `<x-import component-from-global-scope="NS.DataTable" caption="Invoices this month on a phone" columns="{{totalColumns}}" rows="{{invoices}}" totals="{{invoiceTotals}}"></x-import>`,
     },
     {
       id: "loading",
@@ -478,6 +503,33 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
         const sam = scope.locator('tr[data-key="sam"]')
         expect.equal((await sam.locator('[data-type="hours"]').innerText()).trim(), "Not set", "missing hours")
         expect.equal((await sam.locator('[data-type="delta"]').innerText()).trim(), "Not set", "a missing change")
+      },
+    },
+    {
+      name: "A totals row sits under the rows in their columns, stays last after a sort, and a cell it leaves out is blank",
+      example: "totals",
+      async run({ page, scope, expect }) {
+        const foot = scope.locator('table > tfoot[data-slot="data-table-totals"] > tr')
+        expect.equal(await foot.count(), 1, "one totals row, in the table's foot")
+        const cells = foot.locator("td")
+        expect.equal(await cells.count(), 3, "a cell for every column")
+        expect.equal((await cells.nth(0).innerText()).trim(), "Total, 6 invoices", "the naming cell")
+        expect.equal((await cells.nth(1).innerText()).trim(), "", "Due has no total, so it is blank, never its missing-value word")
+        expect.equal((await cells.nth(2).innerText()).trim(), await fmt(page, 22529.45, "currency"), "the total, through the formatter")
+        expect.equal(await style(cells.nth(2), "textAlign"), "right", "under its column, right-aligned")
+        await scope.getByRole("button", { name: "Amount" }).click()
+        expect.equal(await scope.locator("tbody tr").count(), 6, "the six rows, without the totals")
+        expect.equal((await foot.locator("td").nth(0).innerText()).trim(), "Total, 6 invoices", "still last after sorting")
+      },
+    },
+    {
+      name: "At 390px the totals close the list, each figure named",
+      example: "totals-phone",
+      async run({ page, scope, expect }) {
+        const sums = scope.locator('[data-slot="data-table-list"] [data-slot="data-table-totals"]')
+        expect(await sums.isVisible(), "the totals show under the list")
+        expect.equal((await sums.locator("p").nth(0).innerText()).trim(), "Total, 6 invoices", "what it totals")
+        expect.equal((await sums.locator("p").nth(1).innerText()).trim(), `Amount ${await fmt(page, 22529.45, "currency")}`, "each figure named, and nothing for Due")
       },
     },
     {

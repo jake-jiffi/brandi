@@ -37,8 +37,13 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 **A role is one colour or two.** Each of the seven roles takes the forms a direction's role takes: a
 hex, one of the brand's colours by name (`acme-green` or `brand-acme-green`), or `{ "light", "dark" }`
 of those with either left out. One colour is both themes, and it is audited in both. That suits a
-rail or a highlight, which mean the same at night. It rarely suits a canvas, an ink or a primary,
-which a dark theme needs its own of: the audit fails the theme the value cannot serve, and
+highlight, which means the same at night, and a black rail, which already sits back. A rail in a
+colour needs a dark value of its own, in its hue at the dark surfaces' lightness: decided once, it
+stays put while the dark primary steps lighter, and becomes the brightest large surface on the dark
+canvas (Westhaven's WH Blue on #111111). A step darker is not enough: Westhaven's #002E4D still stood
+1.26:1 above the surface and read as unchanged; #051F33, at 1.05:1, read as dark mode. The audit warns
+at 1.2:1 or more. One colour rarely suits a canvas, an ink or a
+primary, which a dark theme needs its own of: the audit fails the theme the value cannot serve, and
 `$A product tokens` exits 1. Any other key under `roles` is refused by name, and so is a value in any
 other form. A run wrote `"rail": "#1B5D40"` before roles took one colour, and the rail stayed the
 surface with no word said.
@@ -146,7 +151,9 @@ pairs; the engine's default set checks more.
 title, a greeting or full-page headline, and the sign-in hero. One display moment per screen. Set
 `font-synthesis: none` so the browser never fakes a bold or italic the face does not have, and never
 use a face with old-style figures for numbers. If the display face cannot sit at 26px in a page
-header, set `displayForTitles: false` and titles use the body face, bold. Numerals stay out of a
+header, set `displayForTitles: false` and titles use the body face, bold. A brand with one family
+needs neither: its display face is its body face, so titles take the headings' 700 rather than a
+display face's 400 (at 400 a one-family brand's every title read Regular). Numerals stay out of a
 display face the brand never sets them in: a generated board's part number sits under its heading,
 in the body face.
 
@@ -154,6 +161,13 @@ in the body face.
 phones, body-lg 16/24 for reading (answers, notes, help), labels at 500, headings at 700, tabular
 figures for every number (`kpi` and `kpi-sm`). Record the 14px body on phones as a deviation, with
 the reason: interface text is labels and values, and 16px pushes a third of a list below the fold.
+
+**A surface people read in takes the reading floor.** A participant portal, a customer's own pages
+or an email is read, not worked in, and its readers may have low vision or read slowly. There
+nothing is under 16/24: Root's `reading` on a board, `data-reading` on the product's own layout,
+and every interface style below body-lg (heading-sm, body, label, meta, caption, eyebrow) reads at
+16/24, components included, and a list row's lines wrap rather than cut off. Westhaven's portal set its own text at 16px and every component's meta and
+labels stayed at 13 to 14px, which the craft review found on every portal board.
 
 **Tracking:** tight on display and headings, zero at 13px and below so small text stays open, wider
 (+6%) on uppercase labels. A brand's "tight everywhere" rule smudges small text.

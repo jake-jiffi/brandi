@@ -115,7 +115,9 @@ export const ListRow = React.forwardRef<HTMLElement, ListRowProps>(function List
   const hasTrailing = trailing !== undefined && trailing !== null && trailing !== false && trailing !== ""
   const quiet = selected ? "text-text-muted" : "text-text-subtle"
   // Cut on a wide list, wrapped under 480px of list: on a phone the whole line is always there.
-  const fit = interactive ? "truncate @max-[479px]:whitespace-normal @max-[479px]:wrap-anywhere" : "wrap-anywhere"
+  // A row that opens something keeps to one line on a wide screen, except where people read (Root's reading, or
+  // data-reading on the layout): there a cut line hides what the row says, so it wraps as it does under 480px.
+  const fit = interactive ? "truncate @max-[479px]:whitespace-normal @max-[479px]:wrap-anywhere [[data-reading]_&]:whitespace-normal [[data-reading]_&]:wrap-anywhere" : "wrap-anywhere"
 
   // When the row wraps, the lead stays beside the title rather than floating in the middle of the text.
   const lead = person ? (

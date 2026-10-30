@@ -75,7 +75,7 @@ export function stateView(
 
 /** A column of ListRows: records on phones, inboxes, queues, and the left pane of list and detail. */
 export const List = React.forwardRef<HTMLElement, ListProps>(function List(
-  { items, boxed = true, divided = true, loading = false, loadingRows = 3, loadingLeading, empty, error, onRetry, headingLevel = 3, className, children, ...rest },
+  { items, boxed = true, divided = true, loading = false, loadingRows = 3, loadingLeading, empty, error, onRetry, headingLevel = 3, className, children, onKeyDown, ...rest },
   ref
 ) {
   const nested = React.useContext(cardNesting)
@@ -125,6 +125,22 @@ export const List = React.forwardRef<HTMLElement, ListProps>(function List(
     )
   }
 
+  // Up and Down move between the rows that open something, Home and End to the first and last, so a queue is worked
+  // from the keyboard row by row; Tab still leaves the list. Queues and Help promised the keys and the list had none.
+  const moveBetweenRows = (event: React.KeyboardEvent<HTMLUListElement>) => {
+    onKeyDown?.(event)
+    if (event.defaultPrevented || !["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return
+    const list = event.currentTarget
+    const from = (event.target as HTMLElement).closest('[data-slot="list-row-action"]')
+    const actions = [...list.querySelectorAll<HTMLElement>('[data-slot="list-row-action"]')].filter((el) => el.closest('[data-slot="list"]') === list)
+    const at = from ? actions.indexOf(from as HTMLElement) : -1
+    if (at < 0) return
+    const to = event.key === "Home" ? 0 : event.key === "End" ? actions.length - 1 : at + (event.key === "ArrowDown" ? 1 : -1)
+    if (to < 0 || to >= actions.length || to === at) return
+    event.preventDefault()
+    actions[to].focus()
+  }
+
   return (
     <ul
       ref={ref as React.Ref<HTMLUListElement>}
@@ -133,6 +149,7 @@ export const List = React.forwardRef<HTMLElement, ListProps>(function List(
       data-slot="list"
       data-boxed={box || undefined}
       className={frame}
+      onKeyDown={moveBetweenRows}
       {...rest}
     >
       <listRowContext.Provider value={context}>

@@ -13,12 +13,17 @@ import { drawerContext } from "./app-shell"
 import { Avatar } from "./avatar"
 import { Icon } from "./icon"
 import { Kbd } from "./kbd"
-import { Logo } from "./logo"
+import { Logo, logoWidth } from "./logo"
 import { NavGroup, type NavGroupProps } from "./nav-group"
 import { railContext, type NavItemProps } from "./nav-item"
 import { lockupLabel, ProductLockup } from "./product-lockup"
 import { Tooltip } from "./tooltip"
 import { accountButton as AccountButton, type AccountUser } from "./workspace-switcher"
+
+// The rail's lockup is the mark, then the product's name. Inside the 240px rail's padding there are 208px: the logo,
+// a 25px rule and gaps, and about 64px of name. A logo too wide for that at the height it takes there (Westhaven's,
+// tagline and all, held at its 200px minimum) truncated the name to nothing, so the lockup stacks, name under mark.
+const RAIL_LOCKUP: "inline" | "stacked" = (logoWidth(Math.max(20, BRAND.logo.minHeight)) ?? 0) > 208 - 25 - 64 ? "stacked" : "inline"
 
 export interface SidebarProps {
   /** The product's name for the lockup at the top. Defaults to the name in lib/product.ts. */
@@ -210,7 +215,7 @@ export const Sidebar = React.forwardRef<HTMLElement, SidebarProps>(function Side
               <Icon name="X" size={20} />
             </ButtonBase>
           ) : null}
-          <ProductLockup tone="rail" color="rail" product={name} href={home} height={20} className="@max-[160px]/rail:hidden" />
+          <ProductLockup tone="rail" color="rail" product={name} href={home} height={20} layout={RAIL_LOCKUP} className="@max-[160px]/rail:hidden" />
           {/* Icons only, the rail is 72px: the brand's symbol in the rail's rendition. A brand with no symbol has a full
               logo too wide for it at its minimum, so its home is a plain Home control rather than a logo cut by the edge,
               and none at all when the navigation already has the same destination. Like every icon there, it has a tooltip. */}

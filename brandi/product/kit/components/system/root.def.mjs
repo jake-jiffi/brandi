@@ -10,6 +10,7 @@ export default {
     { name: "background", type: '"canvas" | "surface" | "none"', default: '"canvas"', doc: "The page colour behind the board, set with the theme." },
     { name: "shortcuts", type: "boolean", default: "true", doc: "False turns single-key shortcuts off inside, for speech-input and switch users." },
     { name: "touch", type: "boolean", default: "false", doc: "Draws everything inside at the touch sizes, a portal's dialog or menu included. Set it on every board under 640px: the canvas is viewed with a mouse." },
+    { name: "reading", type: "boolean", default: "false", doc: "A surface people read rather than work in (a participant portal, an email): nothing inside under 16/24, every component's meta, label and caption included. A product sets data-reading on its own layout for the same floor." },
   ],
   notes: {
     Behaviour: [
@@ -32,6 +33,13 @@ export default {
       vals: { yes: true },
     },
     {
+      id: "reading",
+      title: "A region people read in",
+      markup: `<p class="type-meta">Meta in a working screen</p>
+<x-import component-from-global-scope="NS.Root" reading="{{yes}}" background="none"><p class="type-meta">Meta where people read</p></x-import>`,
+      vals: { yes: true },
+    },
+    {
       id: "region",
       title: "A dark region inside a light board",
       markup: `<x-import component-from-global-scope="NS.Button">From the page</x-import>
@@ -46,6 +54,15 @@ export default {
         const height = async (name) => Math.round((await scope.getByRole("button", { name }).boundingBox()).height)
         expect.equal(await height("With a mouse"), 36, "outside, the mouse size")
         expect.equal(await height("As on a phone"), 44, "inside, the phone's size")
+      },
+    },
+    {
+      name: "reading sets no text inside under 16/24, components' meta included, and leaves the working screen around it alone",
+      example: "reading",
+      async run({ scope, expect }) {
+        const size = (text) => scope.getByText(text).evaluate((el) => getComputedStyle(el).fontSize + " " + getComputedStyle(el).lineHeight)
+        expect.equal(await size("Meta in a working screen"), "13px 18px", "outside, meta keeps its working size")
+        expect.equal(await size("Meta where people read"), "16px 24px", "inside, the reading floor")
       },
     },
     {

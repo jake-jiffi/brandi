@@ -48,6 +48,24 @@ describe('paletteOf', () => {
     const p = G.paletteOf(system);
     assert.ok(p.has('#FFFFFF') && p.has('#000000'));
   });
+
+  test('sanctions every colour the brand declares, a service colour past its two accents included', async () => {
+    const declared = structuredClone(brand);
+    declared.identity.colour.print = { ...declared.identity.colour.print, swatches: [{ role: 'service.coral', hex: '#F15C6A' }] };
+    assert.equal(G.paletteOf(system, declared).get('#F15C6A'), 'service.coral (declared)');
+    // A swatch in a family the system builds follows the system, so a stale one sanctions nothing.
+    const stale = structuredClone(declared);
+    stale.identity.colour.print.swatches.push({ role: 'brand.solid', hex: '#B31E3C' });
+    assert.equal(G.paletteOf(system, stale).has('#B31E3C'), false, 'a brand.solid swatch the palette has moved away from');
+    await write('service.css', '.marker { color: #F15C6A; }');
+    const offPalette = (r) => r.findings.filter((f) => f.rule === 'off-palette' || f.rule === 'near-palette');
+    assert.equal(offPalette(await check(['service.css'])).length, 1, 'undeclared, it is off the palette');
+    assert.deepEqual(offPalette(await G.checkFiles({ brand: declared, system, targets: ['service.css'], root: dir })), [], 'declared, it is the brand\'s own');
+    await write('service-drift.css', '.marker { color: #F15D6A; }');
+    const drift = offPalette(await G.checkFiles({ brand: declared, system, targets: ['service-drift.css'], root: dir }))[0];
+    assert.equal(drift?.rule, 'near-palette');
+    assert.equal(drift.fix, 'Use #F15C6A exactly, the service.coral swatch the brand declares.', 'no custom property it does not have');
+  });
 });
 
 describe('colour checking', () => {

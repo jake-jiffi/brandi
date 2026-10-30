@@ -31,7 +31,7 @@ const Switch = React.forwardRef(function Switch({
     >
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
-        className="pointer-events-none block rounded-action bg-on-primary shadow-xs motion-safe:transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 group-data-[size=sm]/switch:data-[state=checked]:translate-x-3"
+        className="pointer-events-none block rounded-action bg-surface-raised data-[state=checked]:bg-on-primary shadow-xs motion-safe:transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 group-data-[size=sm]/switch:data-[state=checked]:translate-x-3"
       />
     </SwitchPrimitive.Root>
   )

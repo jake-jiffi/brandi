@@ -408,6 +408,15 @@ describe('a detector finding accepted as a recorded deviation', () => {
     const shadowed = judgeRound(found(), { accepted: [accepted[0], { ...accepted[0], page: 'AcmeRail1440Dark', reason: 'The dark twin too' }] }).verdicts.find((v) => v.gate === 'Detector');
     assert.match(shadowed.detail, /1 acceptance unused: gray-on-color on AcmeRail1440Dark accepts nothing an earlier entry has not/);
   });
+
+  test('a page of "*" accepts its rule on every page, once, and still needs a reason', () => {
+    const everywhere = [{ rule: 'gray-on-color', page: '*', reason: 'The rail tint is the brand decision pd5, on every board' }];
+    const det = judgeRound(found(), { accepted: everywhere }).verdicts.find((v) => v.gate === 'Detector');
+    assert.match(det.detail, /2 accepted as recorded deviations/);
+    assert.doesNotMatch(det.detail, /unused/);
+    const noReason = judgeRound(found(), { accepted: [{ rule: 'gray-on-color', page: '*' }] }).verdicts.find((v) => v.gate === 'Detector');
+    assert.match(noReason.detail, /gray-on-color on \* needs a rule, a page and a reason/);
+  });
 });
 
 describe('the round record, rewritten', () => {
@@ -507,13 +516,21 @@ describe('reflow at 320px', () => {
     const judged = judgeRound(g, { critique: critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3]), rules: rules([]) });
     const verdict = judged.verdicts.find((v) => v.gate === 'Accessibility');
     assert.equal(verdict.pass, false);
-    assert.match(verdict.detail, /at 320px 1 of 3 pages scroll sideways/);
+    assert.match(verdict.detail, /at 320px 1 of 3 pages scroll sideways or cut content off/);
     const md = roundMarkdown(g, judged);
     assert.match(md, /## Reflow at 320px/);
     assert.match(md, /WebHome1440: 347px wide in a 320px window, furthest out button\.menu at 347px/);
     const passing = clean();
     passing.reflow = { width: 320, pages: 3, overflow: [], errors: [] };
     assert.equal(judgeRound(passing, { critique: critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3]), rules: rules([]) }).verdicts.find((v) => v.gate === 'Accessibility').pass, true, 'nothing overflowing passes');
+  });
+
+  test('content cut off at 320 fails the round though the page never scrolls, and the record says it was cut', () => {
+    const g = clean();
+    g.reflow = { width: 320, pages: 3, overflow: [{ page: 'PortalHome1440', kind: 'board', scrollWidth: 320, clientWidth: 320, worst: { what: 'card', right: 416 }, cut: { what: 'card', right: 416 } }], errors: [] };
+    const judged = judgeRound(g, { critique: critique([4, 4, 4, 4, 4, 4, 4, 3, 3, 3]), rules: rules([]) });
+    assert.equal(judged.verdicts.find((v) => v.gate === 'Accessibility').pass, false);
+    assert.match(roundMarkdown(g, judged), /PortalHome1440: content cut off in a 320px window, furthest out card at 416px/);
   });
 
   test('a fluid board carries its fluid mark, so reflow can find it', async () => {

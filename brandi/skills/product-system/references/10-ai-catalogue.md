@@ -1067,6 +1067,7 @@ the person who asked for it.
 | Checking | "Drafted with AI by [name], checking the brand" |
 | Not checked | "Drafted with AI by [name], brand check not run" |
 | Edited | "Drafted with AI by [name], edited by [name]". The check runs again |
+| No brand check applies | "Drafted with AI by [name]" (`check="none"`): a note or summary of a person's own words, where the check that matters is their read |
 
 An auto-draft (4.5) has no one who asked, so what started it takes the name's place: "Drafted
 with AI when [trigger], brand check passed".

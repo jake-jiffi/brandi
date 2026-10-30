@@ -8,14 +8,14 @@ import { cn } from "@/lib/utils"
 import { Icon } from "./icon"
 import { TextLink } from "./text-link"
 
-export type BrandCheck = "passed" | "issues" | "checking" | "not-run"
+export type BrandCheck = "passed" | "issues" | "checking" | "not-run" | "none"
 
 export interface AIDraftedMarkerProps extends Omit<React.ComponentPropsWithoutRef<"p">, "children"> {
   /** The person who asked for the draft. */
   name?: string
   /** An auto-draft has no one who asked: what started it takes the name's place, "a new enquiry arrived". */
   trigger?: React.ReactNode
-  /** How the brand check went: passed, issues, checking or not-run. */
+  /** How the brand check went: passed, issues, checking or not-run; none where no brand check applies (a shift note, an incident summary). */
   check?: BrandCheck
   /** How many issues the check found. */
   issues?: number
@@ -67,6 +67,9 @@ export const AIDraftedMarker = React.forwardRef<HTMLParagraphElement, AIDraftedM
       <>, {issuesHref ? <TextLink href={issuesHref}>{found}</TextLink> : found}</>
     ) : check === "checking" ? (
       ", checking the brand"
+    ) : check === "none" ? (
+      // A note or a summary of a person's own words: the check that matters is the person's read, not the brand's.
+      null
     ) : (
       ", brand check not run"
     )

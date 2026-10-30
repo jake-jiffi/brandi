@@ -115,6 +115,7 @@ Eight phases. Three of them stop for you. Everything else runs on its own.
 | Command | What it does |
 | --- | --- |
 | `/brandi:brand` | Start or continue the journey |
+| `/brandi:brand-full` | The brand, then the product system on it, in one run: one batch of questions, no stop between |
 | `/brandi:brand-status` | Where it is up to, and what is blocking |
 | `/brandi:brand-check [paths]` | Hold real work against the brand |
 | `/brandi:brand-canvas` | Rebuild and republish the canvas |
@@ -320,7 +321,7 @@ cd brandi
 node --test "tests/*.test.mjs"
 ```
 
-2,344 tests. They include property tests over the colour and type engines against hundreds of random
+2,351 tests. They include property tests over the colour and type engines against hundreds of random
 seeds, a full end-to-end run of the real command line against the worked example brand in
 `tests/fixtures/muddy-paws.json`, and a robustness suite covering corrupt brand files, missing
 directories, symlink loops, hostile content and paths with spaces in them.

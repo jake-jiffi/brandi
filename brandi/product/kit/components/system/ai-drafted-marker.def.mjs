@@ -36,7 +36,7 @@ export default {
   props: [
     { name: "name", type: "string", doc: "The person who asked for the draft." },
     { name: "trigger", type: "ReactNode", doc: 'An auto-draft has no one who asked: what started it takes the name\'s place, "a new enquiry arrived".' },
-    { name: "check", type: '"passed" | "issues" | "checking" | "not-run"', default: '"not-run"', doc: "How the brand check went." },
+    { name: "check", type: '"passed" | "issues" | "checking" | "not-run" | "none"', default: '"not-run"', doc: "How the brand check went. none where no brand check applies, such as a shift note or an incident summary: the line then says only who drafted it." },
     { name: "issues", type: "number", doc: "How many issues the check found." },
     { name: "issuesHref", type: "string", doc: "Where the issues are listed. The line links to them, and the link names what it opens." },
     { name: "editedBy", type: "string", doc: "Who edited the draft since. The product runs the check again." },
@@ -92,6 +92,7 @@ ${marker('name="[Jo Ellis]" check="passed"')}
 ${marker('name="[Jo Ellis]" check="issues" issues="{{two}}" issues-href="#brand-issues"')}
 ${marker('name="[Jo Ellis]" check="checking"')}
 ${marker('name="[Jo Ellis]"')}
+${marker('name="[Jo Ellis]" check="none"')}
 </div>`,
       vals: { two: 2 },
     },
@@ -118,6 +119,7 @@ ${marker('trigger="a new enquiry arrived" check="passed"')}
             "Drafted with AI by [Jo Ellis], brand check found 2 issues",
             "Drafted with AI by [Jo Ellis], checking the brand",
             "Drafted with AI by [Jo Ellis], brand check not run",
+            "Drafted with AI by [Jo Ellis]",
             "Drafted with AI by [Jo Ellis], edited by [Sam Lee], checking the brand",
             "Drafted with AI when a new enquiry arrived, brand check passed",
           ].join(" | "),

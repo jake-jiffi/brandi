@@ -12,7 +12,7 @@ reviewers are briefed, and what goes in the record.
 | Detector | No findings at 1440, 820 and 390 wide, in light and dark: every component preview, every starter route and state, every canvas board |
 | Craft (Impeccable critique) | 34/40 or better on Nielsen's ten heuristics, none under 3, each under 4 with a note on what cost the point, no P0, P1 or P2 open |
 | Rules (ui-ux-pro-max) | No Critical, High or Medium open |
-| Accessibility | axe clean on every page, none left unscanned, every image loaded; nothing scrolls sideways at 320px wide on a fluid board or route; every scripted behaviour check passing |
+| Accessibility | axe clean on every page, none left unscanned, every image loaded; nothing scrolls sideways or is cut off at 320px wide on a fluid board or route; every scripted behaviour check passing |
 | Tokens | `$A product audit` reports no fails |
 | Drift | Canvas, system and code agree (`09-operate.md`) |
 | Canvas runtime | Every board renders without an error under the Design canvas's own runtime, in a cross-origin frame (`06-canvas.md` step 3) |
@@ -63,8 +63,11 @@ more, and do not lower the bar to finish.
    fails again fails the gate. A run's Board check, pressing keys before a menu took focus on a loaded
    machine, failed its gates and passed alone. Every fluid board and
    route is also opened at 320px wide (WCAG 1.4.10: 1280 at 400% zoom, and a small phone) and fails
-   when the page scrolls sideways; no detector or axe there, just the overflow, with what sticks out
-   named in the record. Both wait for a board to say it is ready (`data-dc-ready` on `html`), not
+   when the page scrolls sideways, or when content runs past the window's edge inside a box that clips
+   it or a region that scrolls both ways; no detector or axe there, just the overflow, with what sticks
+   out named in the record. A portal's home cut its cards 96px off a phone's edge, and the page itself
+   never scrolled, so the check that read only the page passed it. What is meant to scroll sideways is
+   left out: a table, code, tabs, and a Board, whose columns snap one at a time on a phone. Both wait for a board to say it is ready (`data-dc-ready` on `html`), not
    for it to be visible: a dialog drawn over its page (`06-canvas.md`) has no height of its own, so
    it never counts as visible, and that board went unscanned at every width for two rounds. Only a
    board drawn through the runtime shim says it is ready, or that it failed (`data-dc-error`, which
@@ -328,7 +331,9 @@ product's side except giving up a brand decision:
 
 - `rule` is the detector's rule, as the record prints it.
 - `page` is a board or route name, or the start of one: `ConsoleRail` takes `ConsoleRail1440` and
-  `ConsoleRail1440Dark`.
+  `ConsoleRail1440Dark`. `*` takes every page, for a rule the brand decided against everywhere: a
+  brand set in one family meets the detector's overused-font on every render, and one run listed 69
+  entries, a board family or component page each, before `*` said it once.
 - `selector`, optional, is part of the selector the record prints; leave it out to accept the rule
   everywhere on those pages.
 - `reason` says why, with a measurement where there is one. An entry without a rule, a page or a

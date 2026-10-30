@@ -10,8 +10,10 @@ import { Slot } from "radix-ui"
 // Patched (07-starter.md, badge): gentle corners, never the pressable shape, because a badge is read and
 // not pressed. The system's status tones, two sizes, the type style, and an optional dot (BadgeDot). The
 // stock variants stay so code written against shadcn still renders.
+// Where people read (Root's reading), the caption takes the 16px floor, so the badge grows to hold it rather than
+// keeping its 24px height with the words touching its edges.
 const badgeVariants = cva(
-  "group/badge inline-flex w-fit max-w-full min-w-0 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border border-transparent type-caption whitespace-nowrap transition-colors has-[>[data-slot=badge-dot]:first-child]:pl-1.5 has-[>[data-slot=icon]:first-child]:pl-1.5 aria-invalid:border-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
+  "group/badge inline-flex w-fit max-w-full min-w-0 shrink-0 items-center justify-center gap-1 overflow-hidden rounded-sm border border-transparent type-caption whitespace-nowrap transition-colors [[data-reading]_&]:h-auto [[data-reading]_&]:py-1 [[data-reading]_&]:leading-5 has-[>[data-slot=badge-dot]:first-child]:pl-1.5 has-[>[data-slot=icon]:first-child]:pl-1.5 aria-invalid:border-destructive [&>svg]:pointer-events-none [&>svg]:size-3!",
   {
     variants: {
       variant: {

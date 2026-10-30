@@ -117,6 +117,25 @@ retriedLine: self.state.retried ? "Tried again " + self.state.retried + (self.st
   ],
   checks: [
     {
+      name: "Up and Down move between the rows that open something, Home and End to the ends, and Tab leaves the list",
+      example: "boxed",
+      async run({ page, scope, expect }) {
+        const rows = scope.locator('[data-slot="list-row-action"]')
+        await rows.first().focus()
+        const focused = () => page.evaluate(() => document.activeElement?.getAttribute("aria-labelledby") ?? "")
+        const first = await focused()
+        await page.keyboard.press("ArrowDown")
+        const second = await focused()
+        expect(second !== first && second !== "", "Down moves to the next row")
+        await page.keyboard.press("ArrowUp")
+        expect.equal(await focused(), first, "Up moves back")
+        await page.keyboard.press("End")
+        expect.equal(await focused(), await rows.last().getAttribute("aria-labelledby"), "End goes to the last row")
+        await page.keyboard.press("Home")
+        expect.equal(await focused(), first, "Home goes to the first row")
+      },
+    },
+    {
       name: "Rows are list items, direct children of one list, as many as there are rows",
       example: "boxed",
       async run({ scope, expect }) {

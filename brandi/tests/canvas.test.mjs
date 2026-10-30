@@ -1153,6 +1153,17 @@ describe('brandi canvas: the folder a Design canvas is published from', async ()
     await rm(dir, { recursive: true, force: true });
   });
 
+  test('a republish with the system installed sends no null for the ds folder, only for a board that went', async () => {
+    const dir = await productFolder();
+    const args = ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7'];
+    assert.equal((await canvas(dir, args)).code, 0);
+    const { code, out } = await canvas(dir, [...args.slice(0, -1), 'v8']);
+    assert.equal(code, 0, String(out));
+    assert.deepEqual(out.removed, [], 'the staged ds folder is the install, not a board that went');
+    assert.equal(Object.keys(out.calls.at(-1).files).some((k) => k === 'project/ds'), false, 'no removal sent for a folder');
+    await rm(dir, { recursive: true, force: true });
+  });
+
   test('--system fills the record and installs everything a board loads: tokens, the bundle and the fonts the system ships', async () => {
     const dir = await productFolder();
     const { code, out } = await canvas(dir, ['--dir', 'product/canvas', '--title', 'Acme product canvas', '--system', 'https://claude.ai/artifact/Sys1', '--system-version', 'v7']);

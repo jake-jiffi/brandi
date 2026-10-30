@@ -159,6 +159,8 @@ export interface DataTableProps extends Omit<React.HTMLAttributes<HTMLDivElement
   maxHeight?: number | string
   /** Under the rows, on the subtle surface: put Pagination here. Under the empty state it stays mounted, out of sight, so keep controls that must stay usable there out of it. */
   footer?: React.ReactNode
+  /** A totals row under the rows, in their columns: plain data, like a row. Never sorted or selected, and a cell it leaves out stays blank. */
+  totals?: DataTableRow
   /** A Toolbar above the table, told how many rows are selected. */
   toolbar?: DataTableToolbar
   /** The head stays; the rows wait as skeletons. */
@@ -286,6 +288,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
     density = "comfortable",
     maxHeight,
     footer,
+    totals,
     toolbar,
     loading = false,
     loadingRows = 5,
@@ -566,6 +569,11 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
     actions: cols.find((c) => typeOf(c) === "actions" && c.phone !== "hidden"),
   }
 
+  // The totals read as the phone list reads a value: plain words, and nothing where a total has none, since
+  // "Not set" on a total says data is missing when nothing is (a pilot's round 4).
+  const sums = isObject(totals) && view === "rows" ? totals : null
+  const sumOf = (col: DataTableColumn) => (sums && typeOf(col) !== "actions" ? phoneWords(col, sums) : "")
+
   const rowHeight = density === "compact" ? "h-(--row-compact)" : undefined
   // Inside a card, the first and last cells line up with the card's own 24px inset.
   const edge = nested ? "first:pl-6 last:pr-6" : undefined
@@ -753,6 +761,23 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
               </TableRow>
             )}
       </TableBody>
+      {sums ? (
+        // Its own foot, after the rows whatever the sort, with the hairline on its cells as the rows have theirs.
+        <tfoot data-slot="data-table-totals">
+          <TableRow className={cn(rowHeight, "hover:[--row-wash:transparent]")}>
+            {selectable ? <TableCell className={cn("border-t border-b-0", edge)} /> : null}
+            {cols.map((col) => (
+              <TableCell
+                key={col.key}
+                data-type={typeOf(col)}
+                className={cn("border-t border-b-0 type-label text-text-strong", edge, alignOf(col) === "end" && "text-right")}
+              >
+                {sumOf(col)}
+              </TableCell>
+            ))}
+          </TableRow>
+        </tfoot>
+      ) : null}
     </Table>
   )
 
@@ -772,7 +797,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
         // The rows' washes round to the box's corners where they meet them, so nothing needs clipping.
         className={cn(
           box && !selectable && "[&>li:first-child]:rounded-t-[calc(var(--radius-md)-1px)]",
-          box && !footed && "[&>li:last-child]:rounded-b-[calc(var(--radius-md)-1px)]"
+          box && !footed && !sums && "[&>li:last-child]:rounded-b-[calc(var(--radius-md)-1px)]"
         )}
       >
         {view === "rows"
@@ -814,6 +839,17 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps>(functi
             })
           : null}
       </List>
+      {sums ? (
+        <div data-slot="data-table-totals" className={cn("border-t border-line py-3", nested ? "px-6" : "px-4")}>
+          <p className="type-label text-text-strong">{nameCol ? sumOf(nameCol) : null}</p>
+          <p className="type-meta text-text-muted">
+            {cols
+              .filter((c) => c.key !== nameKey && c.phone !== "hidden" && sumOf(c))
+              .map((c) => `${c.label} ${sumOf(c)}`)
+              .join(" · ")}
+          </p>
+        </div>
+      ) : null}
     </>
   )
 

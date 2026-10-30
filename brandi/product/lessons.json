@@ -2859,6 +2859,235 @@
     "file": "skills/product-system/references/08-quality-gates.md",
     "heading": "Board sizes"
    }
+  },
+  {
+   "id": "L154",
+   "broke": "A logo with a tagline held at its minimum (Westhaven's, 200px wide at 49px tall) filled the 240px rail's header, and the product's name beside it truncated to nothing, so the AppShell check found no name and no rail ever said which product it was. The rail's lockup now stacks, name under mark, when the logo at its rail height leaves the name under about 64px.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "AppShell",
+     "name": "Four layouts by the shell's own width: the full rail at 1440, icons at 1100, a drawer behind a top bar at 820, the phone at 390 (round 1)"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Shape, space and marks"
+   }
+  },
+  {
+   "id": "L155",
+   "broke": "The Switch thumb was on-primary in both states. A navy primary lifts to a pale blue in dark, its on-primary goes near-black, and that thumb measured 2.72:1 on the grey off track (Westhaven). The off thumb is now surface-raised, which line-control already clears at 3:1.",
+   "trait": "navy-primary",
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Switch",
+     "name": "Both tracks hold 3:1 against the surface, and focus shows the outline, in both themes"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Switch"
+   }
+  },
+  {
+   "id": "L156",
+   "broke": "A participant portal set its own running text at 16px, but every component's meta, labels and captions stayed at 13 to 14px, so the reading surface's 16px floor held only for text the boards wrote (Westhaven, pd6). Root's reading (data-reading on a product's layout) now floors every interface style at 16/24. Under the floor a badge kept its 24px height while its caption rose to 16/24, so the words touched its edges (the detector's cramped-padding, 177 times); it now grows.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Root",
+     "name": "reading sets no text inside under 16/24, components' meta included, and leaves the working screen around it alone"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Type"
+   }
+  },
+  {
+   "id": "L157",
+   "broke": "Queues and Help promised that Up and Down move between rows, and List had no key handling: a broken promise to keyboard users, found by Westhaven's rules review. List now moves focus between the rows that open something with Up, Down, Home and End.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "List",
+     "name": "Up and Down move between the rows that open something, Home and End to the ends, and Tab leaves the list"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "List"
+   }
+  },
+  {
+   "id": "L158",
+   "broke": "AIDraftedMarker always spoke of a brand check, so a support worker's shift note and a manager's incident summary read 'brand check passed' or 'not run', as if the content had been checked (Westhaven's craft review, C20). check=\"none\" now says only who drafted it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "AIDraftedMarker",
+     "name": "Each state reads as a full sentence, in the catalogue's words"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/10-ai-catalogue.md",
+    "heading": "4.3 · AI-drafted marker"
+   }
+  },
+  {
+   "id": "L159",
+   "broke": "A brand set in one family (Westhaven, Plus Jakarta Sans everywhere) met the detector's overused-font on all 540 renders, and accepting it as the brand decision took 67 product.json entries, one per board family and component page. A page of \"*\" now accepts a rule on every page in one entry, still with its reason.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a page of \"*\" accepts its rule on every page, once, and still needs a reason"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Accepted deviations"
+   }
+  },
+  {
+   "id": "L160",
+   "broke": "Reflow at 320px read only whether the document scrolled sideways, so Westhaven's portal home, its cards 96px past a phone's edge inside a main that scrolls, passed the gate while the craft review found it (C35, C37). Content cut off or left in a two-way scroll region now fails too.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "content cut off at 320 fails the round though the page never scrolls, and the record says it was cut"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "How a round runs"
+   }
+  },
+  {
+   "id": "L161",
+   "broke": "MetricCard printed its own 'Unavailable' above the brand's words, so a brand whose status word is 'Not synced' (Westhaven) said two words for one state. unavailableLabel now carries the brand's word.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "MetricCard",
+     "name": "Unavailable says which source is down and when it last answered, with no figure"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "MetricCard"
+   }
+  },
+  {
+   "id": "L162",
+   "broke": "ButtonGroup align=\"end\" justified its own buttons but, in a Card footer's flex row, was only as wide as them, so Westhaven's setup card had its primary 576px short of the card's edge in every round (R50 open in round 4). The group now pushes itself to the far edge.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "ButtonGroup",
+     "name": "Aligned to the end in a flex row, the primary sits at the row's right edge"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "ButtonGroup"
+   }
+  },
+  {
+   "id": "L163",
+   "broke": "DataTable had no totals row, so Westhaven's vacancy report put its totals first as a loose line under the table, then as a sixth row whose empty Town cell said 'Not set' and which a screen reader heard as one more home (round 4). totals is now a row of its own in the table's foot, blank where it has no figure, and it closes the phone list.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "DataTable",
+     "name": "A totals row sits under the rows in their columns, stays last after a sort, and a cell it leaves out is blank"
+    },
+    {
+     "kind": "check",
+     "component": "DataTable",
+     "name": "At 390px the totals close the list, each figure named"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "DataTable"
+   }
+  },
+  {
+   "id": "L164",
+   "broke": "Email's footer ran the full 600px, so Westhaven's Acknowledgement of Country, set verbatim in small type, read about 100 characters a line and the detector's line-length rule was accepted rather than fixed (round 4). The footer's lines now stop at 480px.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Email",
+     "name": "The footer's lines stop at 480px, so long small print keeps a measure"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Email kit · to build, not yet proven"
+   }
+  },
+  {
+   "id": "L165",
+   "broke": "With displayForTitles on, the hero, display and title styles took weight 400, a separate display face's weight, so a brand with one family (Westhaven, Plus Jakarta Sans throughout) had every product title in Regular against its own headings at 700, and the run had to turn the display styles off to get them back. A brand whose display face is its body face now sets them at 700.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a brand with one family sets its titles at the headings' weight, never a display face's 400"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Type"
+   }
+  },
+  {
+   "id": "L166",
+   "broke": "Westhaven's rail was decided as one colour, WH Blue, as the reference said a rail could be, so the dark theme kept it on a #111111 canvas while the primary stepped to #87BAE6, and the rail was the brightest large surface on every dark screen with no word from the audit. Its first fix, #002E4D, was a step darker but still 1.26:1 above the dark surface, and on the canvas it read as unchanged. The audit now warns when a coloured dark rail stands 1.2:1 or more above the dark surface.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "a coloured rail that stands above the dark surfaces is called out in dark, and one at their lightness or a black rail is not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Where the decisions live"
+   }
+  },
+  {
+   "id": "L167",
+   "broke": "A canvas republish with the system installed listed the staged ds/ folder among the files that had gone and sent project/ds as null, and nothing taught how to republish a change: Westhaven's dark rail took three tries, reported from the token values before anyone looked at the live canvas. The restage now counts only files, and 06-canvas.md step 11 sets out a change after publish, ending with a render of the live files.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/canvas.test.mjs",
+     "name": "a republish with the system installed sends no null for the ds folder, only for a board that went"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/06-canvas.md",
+    "heading": "8. Publishing"
+   }
   }
  ]
 }

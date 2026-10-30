@@ -53,8 +53,13 @@ function distance(a, b) {
   return Math.hypot(A.L - B.L, A.a - B.a, A.b - B.b);
 }
 
-/** Every colour the system actually sanctions. */
-export function paletteOf(system) {
+/**
+ * Every colour the system actually sanctions, and every swatch the brand declares in a family the system does not
+ * build (Westhaven's three service colours, past its two accents), which is the brand's own, never off-palette. A
+ * swatch in a family the system builds (brand.solid, accent1.solid) follows the system: when the palette moves its
+ * recorded value is stale, and sanctioning it would hide the stale artwork the logo check exists to find.
+ */
+export function paletteOf(system, brand = null) {
   const out = new Map();
   for (const [family, pal] of Object.entries({ ...system.palettes, ...system.status })) {
     for (const mode of ['light', 'dark']) {
@@ -66,6 +71,12 @@ export function paletteOf(system) {
       const hex = resolveToken(value, system, mode);
       if (/^#/.test(hex)) out.set(hex.toUpperCase(), key);
     }
+  }
+  const built = new Set(Object.keys({ ...system.palettes, ...system.status }));
+  for (const s of brand?.identity?.colour?.print?.swatches ?? []) {
+    const hex = typeof s?.hex === 'string' && /^#[0-9a-f]{6}$/i.test(s.hex) ? s.hex.toUpperCase() : null;
+    const family = typeof s?.role === 'string' ? s.role.split('.')[0] : '';
+    if (hex && family && !built.has(family) && !out.has(hex)) out.set(hex, `${s.role} (declared)`);
   }
   out.set('#FFFFFF', 'white');
   out.set('#000000', 'black');
@@ -89,7 +100,7 @@ export function paletteOf(system) {
  * and it has to be one the brand chose.
  */
 export async function checkLogoColour({ brand, system, root = process.cwd(), tolerance = 0.03 }) {
-  const palette = paletteOf(system);
+  const palette = paletteOf(system, brand);
   const paletteHexes = [...palette.keys()];
   const logo = brand.identity?.logo ?? {};
   const named = new Map();
@@ -184,7 +195,7 @@ async function collect(root, targets) {
 export async function checkFiles({ brand, system, targets, root = process.cwd(), tolerance = 0.03 }) {
   const files = await collect(root, targets);
   const contract = await loadContract();
-  const palette = paletteOf(system);
+  const palette = paletteOf(system, brand);
   const paletteHexes = [...palette.keys()];
   const findings = [];
 
@@ -224,7 +235,10 @@ export async function checkFiles({ brand, system, targets, root = process.cwd(),
         findings.push({
           level: 'warn', file: rel, line: lineOf(m.index), rule: 'near-palette',
           message: `${found.raw} is almost, but not exactly, ${nearest.hex} (${nearest.name}).`,
-          fix: `Use var(--${nearest.name.split(' ')[0].replace(/\./g, '-')}) so it stays right when the palette moves.`,
+          // A declared swatch has no custom property of its own, so the fix is its exact value.
+          fix: nearest.name.endsWith('(declared)')
+            ? `Use ${nearest.hex} exactly, the ${nearest.name.replace(' (declared)', '')} swatch the brand declares.`
+            : `Use var(--${nearest.name.split(' ')[0].replace(/\./g, '-')}) so it stays right when the palette moves.`,
         });
       } else {
         findings.push({
@@ -609,7 +623,7 @@ export async function emitGuardianSkill({ brand, system, dir, brandFile }) {
     brand: brand.meta?.name ?? null,
     version: brand.meta?.version ?? null,
     generated: new Date().toISOString(),
-    palette: Object.fromEntries(paletteOf(system)),
+    palette: Object.fromEntries(paletteOf(system, brand)),
     fonts: system.type.fonts,
     bannedFonts: BANNED_FONTS,
     bannedWords: (brand.voice?.vocabulary?.avoid ?? []).map((w) => (typeof w === 'string' ? w : w.word)).filter(Boolean),

@@ -490,7 +490,10 @@ An underlined inline link in the `link` colour.
 #### ButtonGroup
 
 Related buttons with an 8px gap, wrapping on narrow screens. Secondary first, the primary last, and
-Cancel immediately left of the primary.
+Cancel immediately left of the primary. With `align="end"` the group pushes itself to the far edge
+of whatever holds it, a Card footer's flex row included, so a footer needs no wrapper. Justifying
+its own contents was not enough: in a flex row the group is only as wide as its buttons, and a
+pilot's setup card had its primary 576px short of the card's edge for four rounds.
 
 #### SegmentedControl
 
@@ -850,7 +853,7 @@ definition.
   - Selection: `selectable`, `selectedKeys` or `defaultSelected`, `onSelectionChange`.
   - Sorting: `sort` with `onSortChange` (server side), or `defaultSort`.
   - Display: `density` (`comfortable` 48px rows, `compact` 40px), `caption`, `maxHeight` (the head
-    sticks), `footer` (put Pagination here).
+    sticks), `footer` (put Pagination here), `totals` (a totals row: plain data, like a row).
   - States: `loading`, `error`, `empty`.
   - Opening: `onRowClick` or `rowHref`.
 - **Column types.** `text`, `strong`, `stack` (a title and a sub-line), `person`, `badge`, `tags`,
@@ -878,6 +881,10 @@ definition.
     keeps its row, saying how many rows there are in the table's noun ("6 invoices", else "6
     rows"), so it is never blank and selecting never moves the table. A table showing one page of
     many gives its total as `toolbar.summary`.
+  - A report's totals go in `totals`, never in `rows` or a loose line under the table. A row in the
+    body is read as one more record and its empty cells say "Not set"; `totals` sits in the
+    table's foot, stays last whatever the sort, is never selected, and leaves blank any column it
+    has no figure for. On a phone it closes the list, each figure named.
 - **Review.** Selecting a row opened it, rows could not be reached by keyboard, and some data
   crashed it (round 1). Bulk approve acted on rows that were not on screen (round 3). Tables kept
   their desktop layout at phone width (round 4). On a touch tablet the sort buttons and the row's
@@ -885,7 +892,8 @@ definition.
   nothing, because the count in the footer unmounted; the footer stays mounted, out of sight. A
   selectable table with bulk actions and no filters had a blank band above it at 390 (a proof run,
   rounds 1 to 3): the band now holds the count. Order lines went label over price at 358px: a
-  receipt is a DescriptionList in `lines`, never a table.
+  receipt is a DescriptionList in `lines`, never a table. A report's totals were a sixth row with
+  "Not set" in its empty cell (a pilot's round 4): `totals` is a row of its own in the foot.
 - **Open.** No shift-click range selection. Up and Down between a list and its detail, which
   `03-fundamentals-first.md` §5 requires, was left to each product.
 
@@ -899,6 +907,8 @@ search to deep paging. Keep the page size the person chose, and keep the page in
 
 A column of ListRows: records on phones, inboxes, queues, and the left pane of list and detail.
 `boxed` (on by default), `divided`, and `items`, the rows as data, which a canvas needs.
+Up and Down move between the rows that open something, Home and End to the first and last, and Tab
+leaves the list: a queue is worked row by row from the keyboard, as Screen patterns promises.
 
 #### ListRow
 
@@ -1703,6 +1713,9 @@ The product's transactional emails: lockup, heading, body, button and footer. Ev
   stylesheet, the brand export's included.
 - *(practice)* Inline styles and table layout for mail clients, a plain-text part, and a check in
   light and dark mail apps.
+- The footer's lines stop at 480px, about 70 characters at meta. Small print that must be set in
+  full, such as a sender's address or an Acknowledgement of Country, ran about 100 characters a
+  line across the 600px email (a pilot's round 4), and the words cannot be shortened.
 
 ### 4.2 On demand · to build, not yet proven
 

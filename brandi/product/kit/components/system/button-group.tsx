@@ -21,7 +21,8 @@ export const ButtonGroup = React.forwardRef<HTMLDivElement, ButtonGroupProps>(fu
       aria-label={label}
       data-slot="button-group"
       data-align={align}
-      className={cn("flex flex-wrap items-center gap-2", align === "end" && "justify-end", className)}
+      // ml-auto as well: in a flex row (a Card footer) the group is only as wide as its buttons, so justify-end alone moves nothing.
+      className={cn("flex flex-wrap items-center gap-2", align === "end" && "ml-auto justify-end", className)}
       {...rest}
     >
       {children}

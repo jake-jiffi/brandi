@@ -1227,8 +1227,12 @@ async function cmdCanvas(flags) {
   const before = new Map();
   try {
     lastIndex = JSON.parse(await readFile(indexPath, 'utf8'));
-    previous = (await readdir(project)).filter((f) => f !== 'canvas.json');
-    for (const f of previous) if ((await stat(path.join(project, f))).isFile()) before.set(f, sha(await readFile(path.join(project, f))));
+    // Files only: the staged ds/ folder is the system's install, and read as a board that went it was sent as null.
+    for (const f of (await readdir(project)).filter((f) => f !== 'canvas.json')) {
+      if (!(await stat(path.join(project, f))).isFile()) continue;
+      previous.push(f);
+      before.set(f, sha(await readFile(path.join(project, f))));
+    }
   } catch { /* a first publish from this folder */ }
   // Boards that load a system from ds/<namespace>/ need it installed on the canvas: by this publish, or already, as the
   // live index records. The last local staging does not count, since staged is not published.
@@ -1855,7 +1859,9 @@ async function cmdMockup(flags, rest) {
 
   if (sub !== 'build') return fail(`Unknown subcommand "${sub}". Use grid or build.`);
 
-  const { file, brand } = await resolveSystem(flags);
+  // Here --dir names the canvas, never the brand folder, so the brand is --file or where it always is: read as
+  // the brand folder, --dir sent the lookup to <canvas>/brand.json and the build failed.
+  const { file, brand } = await resolveSystem({ ...flags, dir: flags.file ? path.dirname(path.resolve(flags.file)) : undefined });
   const mockups = brand.identity?.mockups ?? [];
   if (!mockups.length) {
     return fail(

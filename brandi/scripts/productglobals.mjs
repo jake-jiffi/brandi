@@ -134,8 +134,14 @@ function styleUtility(s, fam) {
   if (s.name === 'eyebrow' || s.textTransform === 'uppercase') lines.push('  text-transform: uppercase;');
   if (s.name.startsWith('kpi')) lines.push('  font-variant-numeric: tabular-nums;');
   if (fam === 'display') lines.push('  font-synthesis: none;');
+  // A reading surface (Root's reading, or data-reading on a product's own layout) sets nothing under body-lg's 16/24:
+  // a product for readers with low vision or an intellectual disability set its running text at 16px and left every
+  // component's meta, label and caption at 13 to 14px. Staff tools keep the density.
+  if (READING_FLOOR.has(s.name)) lines.push('  &:where([data-reading], [data-reading] *) {\n    font-size: 16px;\n    line-height: 24px;\n  }');
   return `@utility type-${s.name} {\n${lines.join('\n')}\n}`;
 }
+// heading-sm too: a list row's 14px bold title read smaller than its own meta once the meta rose to 16px.
+const READING_FLOOR = new Set(['heading-sm', 'body', 'label', 'meta', 'caption', 'eyebrow']);
 
 /**
  * The brand's texture move as a class: a layer behind the words, multiplied over the element's own colour at the

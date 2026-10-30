@@ -48,6 +48,17 @@ export default {
 </x-import>`,
     },
     {
+      id: "row",
+      title: "In a flex row, such as a card footer, aligned to the end",
+      layout: "block",
+      markup: `<div data-row style="display: flex; align-items: center;">
+<x-import component-from-global-scope="NS.ButtonGroup" label="[Setup] actions" align="end">
+<x-import component-from-global-scope="NS.Button" variant="ghost">Do this later</x-import>
+<x-import component-from-global-scope="NS.Button" variant="primary">Connect [system]</x-import>
+</x-import>
+</div>`,
+    },
+    {
       id: "narrow",
       title: "In a narrow space it wraps",
       layout: "block",
@@ -77,6 +88,15 @@ export default {
         const last = (await boxes(scope.getByRole("button"))).at(-1)
         expect.equal(Math.round(last.x + last.width), Math.round(group.x + group.width), "the primary's right edge")
         expect.equal(await scope.getByRole("button").last().innerText(), "Send invoice", "the primary is last")
+      },
+    },
+    {
+      name: "Aligned to the end in a flex row, the primary sits at the row's right edge",
+      example: "row",
+      async run({ scope, expect }) {
+        const row = await scope.locator("[data-row]").boundingBox()
+        const last = (await boxes(scope.getByRole("button"))).at(-1)
+        expect.equal(Math.round(last.x + last.width), Math.round(row.x + row.width), "the primary's right edge")
       },
     },
     {

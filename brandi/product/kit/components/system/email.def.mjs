@@ -11,7 +11,7 @@ const email = {
   footer: [
     "You are getting this because you approve timesheets for [Kestrel Maintenance].",
     { label: "Manage email settings", href: "https://app.example.com/settings/email" },
-    "[12 Example Street, Sydney NSW 2000]",
+    "[Kestrel Maintenance Pty Ltd], ABN [12 345 678 901], [Level 4, 12 Example Street, Sydney NSW 2000]. Sent on behalf of [Kestrel Maintenance] by [Product].",
   ],
 }
 
@@ -58,6 +58,7 @@ export default {
     Layout: [
       "Up to 600px wide and fluid below it: the lockup, then a card holding the heading, the body and the action, then the footer under it. Reading order matches the layout.",
       "Reading sizes: the body at body-lg (16px on 24px), the heading at heading-lg, the footer at meta. The button is the action's pill, 16px, 48px tall.",
+      "The footer's lines stop at 480px, about 70 characters at meta: small print that must be set in full, such as a sender's address or an acknowledgement, still reads at a measure.",
     ],
     States: ["Light and dark. With or without an action. An email has no state of its own: it is static."],
     Copy: [
@@ -191,6 +192,15 @@ export default {
           return [...el.querySelectorAll("h3, p, .em-strong, .em-link")].map((n) => [n.textContent.trim().slice(0, 24), getComputedStyle(n).color, ground(n)])
         })
         for (const [what, colour, ground] of pairs) expect.atLeast(Math.round(contrast(colour, ground) * 100) / 100, 4.5, `${theme} "${what}"`)
+      },
+    },
+    {
+      name: "The footer's lines stop at 480px, so long small print keeps a measure",
+      example: "timesheets",
+      async run({ scope, expect }) {
+        const widths = await scope.locator('[data-slot="email"] p.em-muted').evaluateAll((ps) => ps.map((p) => p.getBoundingClientRect().width))
+        expect.atLeast(widths.length, 3, "footer lines")
+        for (const w of widths) expect(w <= 480.5, `a footer line ${Math.round(w)}px wide, over 480`)
       },
     },
     {

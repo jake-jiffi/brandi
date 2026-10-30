@@ -16,7 +16,7 @@ review round (`skills/product-system/references/09-operate.md`, After every roun
 | `black-rail` | A pure black rail in both themes: rail text, focus, the current item, the rail's edge and anything drawn on the rail | L7, L8, L10, L11, L12, L13, L60 | L10, L11, L13 |
 | `charts-avoid` | The fixture's orange accent kept off dark grounds (`charts.avoid`): chart series and the tints a name's hash hands out | L17, L18 | not yet |
 | `condensed-caps` | A condensed display face set only in capitals (`displayCase: "upper"`): fallbacks, long titles, the detector's all-caps rule | L3, L4, L5 | not yet |
-| `navy-primary` | A dark navy primary decided for light: which way hover, pressed and selected move | L9 | not yet |
+| `navy-primary` | A dark navy primary decided for light: which way hover, pressed and selected move | L9, L155 | not yet |
 | `own-name` | A product with its own name, an ampersand in it: checks and lockups that assumed the kit's names | L20 | not yet |
 | `pale-primary` | A pale brand colour with a pale yellow accent: fills on light tracks, the highlight beside a warning tint | L14, L15 | L14 |
 | `same-name` | A product named for the brand, in another case: a lockup or email that shows the name twice | L19 | not yet |

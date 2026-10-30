@@ -454,6 +454,17 @@ describe('the audit warns where a pair list cannot', () => {
     const distinct = P.auditProductTokens(P.buildProductTokens(system, { roles: { highlight: { light: '#7FD1F4', dark: '#7FD1F4' } } }));
     assert.equal(distinct.warnings.some((w) => w.area === 'highlight'), false);
   });
+
+  test('a coloured rail that stands above the dark surfaces is called out in dark, and one at their lightness or a black rail is not', () => {
+    const rail = (r) => P.auditProductTokens(P.buildProductTokens(system, { roles: { rail: r } })).warnings.filter((w) => w.area === 'rail');
+    const once = rail('#004976');
+    assert.equal(once.length, 1, 'the same blue on the dark canvas went unremarked');
+    assert.equal(once[0].theme, 'dark');
+    // Westhaven's first fix: a step darker, still 1.26:1 above the dark surface, and it read as unchanged.
+    assert.equal(rail({ light: '#004976', dark: '#002E4D' }).length, 1, 'a dark value that still stands above the page');
+    assert.deepEqual(rail({ light: '#004976', dark: '#051F33' }), [], 'a navy at the dark surfaces\' lightness');
+    assert.deepEqual(rail('#0B0B0C'), [], 'a black rail already sits back in dark');
+  });
 });
 
 describe('directions: a role a concept board moves, solved and carried as a class', () => {
@@ -748,6 +759,13 @@ describe('toProductCss and the shape the generators read', () => {
     const plain = P.buildProductTokens(system, { displayForTitles: false });
     assert.equal(plain.type.groups[0].family, 'sans');
     assert.equal(plain.type.groups[0].styles[0].fontWeight, 700);
+  });
+
+  test("a brand with one family sets its titles at the headings' weight, never a display face's 400", () => {
+    const one = P.buildProductTokens(buildSystem({ primary: '#1F6F4A', type: { display: 'Karla', body: 'Karla' } }), {});
+    assert.deepEqual(one.type.groups[0].styles.map((s) => s.fontWeight), [700, 700, 700], 'hero, display and title');
+    const two = P.buildProductTokens(buildSystem({ primary: '#1F6F4A', type: { display: 'Bitter', body: 'Karla' } }), {});
+    assert.equal(two.type.groups[0].styles[0].fontWeight, 400, 'a separate display face keeps its own weight');
   });
 });
 

@@ -234,7 +234,9 @@ drift check's by-eye row then compares the canvas with that product, not with th
 install` fails on a cache permission, run it with `--cache <work folder>/notes/tmp/npm-cache`.
 
 **What a run costs.** One `$A product gates --serve` renders about 500 pages: give the first run up
-to 90 minutes and each later one about 30. The trait loop takes about 8 minutes a trait. Plan rounds
+to 90 minutes and each later one about 30. The starter's install and the gates' renders need about
+2GB of free disk: check with `df -h .` before the install, since a run that fills the disk mid-way
+stops every command, and a brand run before it may already hold large scene originals and caches. The trait loop takes about 8 minutes a trait. Plan rounds
 around that, and run nothing else Chrome-heavy beside the gates: under load, browser checks time out
 and read as failures.
 
@@ -281,7 +283,9 @@ publish beside it as experimental, never over it (see the last section). Then pu
 System artifact (`references/12-design-system-artifact.md`), the canvas with the system installed
 (`references/06-canvas.md`), and the starter with PRODUCT.md, DESIGN.md, the brand guardian, and CI
 running the detector and axe (`references/07-starter.md`). Read the Artifact type's current
-instructions at publish time: they change between releases.
+instructions at publish time: they change between releases. A change after publish follows
+`references/06-canvas.md` step 11: the system first, the canvas pinned to it, and a render of the
+live files before you say it is done.
 
 If there is no `Artifact` tool (Codex, or any session without it), stop before publishing and hand
 over the board files with the system beside them. `node <brandi>/scripts/preview.mjs --dir product/canvas --out <dir>`

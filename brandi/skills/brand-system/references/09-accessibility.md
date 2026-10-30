@@ -762,7 +762,10 @@ $A check src --json
 as-is. What it catches that matters here: `outline: none` without a `:focus-visible` replacement is
 an **error**; a file with `@keyframes` and no `prefers-reduced-motion` is an **info**; a colour that
 is not on the palette is an **error**, which is how a low-contrast one-off gets caught before a
-human sees it.
+human sees it. The palette is the system's scales and roles plus every swatch the brand declares in
+`identity.colour.print.swatches`, so a service colour past the two accents is the brand's own and
+never reads as off-palette: record such a colour as a swatch with its role, rather than accepting
+the finding.
 
 **What these commands do not check**, stated plainly so nobody mistakes a green build for
 conformance: keyboard order, focus obscuring by sticky chrome, target size in your markup, reflow at

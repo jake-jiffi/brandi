@@ -56,6 +56,12 @@ function Rendition({ name, className }: { name: MarkRendition; className: string
   )
 }
 
+/** A logo's width at a height, from its master artwork's proportions (the viewBox), or null when it has none. */
+export function logoWidth(height: number, mark: MarkRendition = "full"): number | null {
+  const box = /viewBox="[-\d.]+[ ,]+[-\d.]+[ ,]+([\d.]+)[ ,]+([\d.]+)"/.exec(BRAND.marks[mark] ?? "")
+  return box ? (height * Number(box[1])) / Number(box[2]) : null
+}
+
 // The symbol's own size, for a square place: the icons rail's home control, a 40px square, holds it at 24px. It
 // never takes BRAND.logo.height, which the starter raises to the full logo's minimum: a wide logo's 45px drew a
 // signature used as the symbol 107px wide in that square.
