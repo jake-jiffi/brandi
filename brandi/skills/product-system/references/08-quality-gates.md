@@ -175,7 +175,7 @@ whole height (`06-canvas.md`, Sizes). The gate fails on:
 | --- | --- | --- |
 | A frame clipped | The content runs more than 8px past the frame's height | `$A product boards --heights` |
 | A frame blank | The frame is more than a tenth, and 64px, taller than its content | `$A product boards --heights` |
-| A box hiding content | Inside the board, a box that clips (`overflow` hidden or clip) holds content more than 4px taller than itself | The board's markup (A phone frame, `06-canvas.md`) or the component |
+| A box hiding content | Inside the board, a box that clips (`overflow` hidden or clip) holds content more than 4px taller or wider than itself (the record says "across" for wider) | The board's markup (A phone frame, `06-canvas.md`) or the component |
 | A hole never given | The board names `{{noop}}` and neither its props nor `renderVals()` give `noop` | Return it from `renderVals()` (`06-canvas.md`, The mount) |
 | Not measured | The board did not render, or gave no height | The board, from the error the record prints |
 
@@ -189,8 +189,15 @@ and owner lines each kept the top 8px of an 18px line, and an ellipsis line was 
 purpose. An ellipsis only cuts across, so a line squeezed below its own height is listed, and so
 is any positioned box in the page's own layout, such as an event placed on its hours. The round
 folder gets `heights.json`, each board's wanted height, for a script that writes the boards. A
-starter whose `tools/measure-boards.mjs` predates the gate, or its hole check, reports it not run,
-and the round is not met until `brandi product starter --kit` refreshes it.
+starter whose `tools/measure-boards.mjs` predates the gate, its hole check or its check across,
+reports it not run, and the round is not met until `brandi product starter --kit` refreshes it.
+
+Across, the same boxes are left out, and an ellipsis is the cut made on purpose. A run's board drew
+three cards 240px wide at 820: one card's header action ran 13px past its edge, the card's clip cut
+it off, and the check, comparing heights only, listed nothing. How far the content runs is read
+from where it ends, not from `scrollWidth` alone: an `overflow: hidden` box is a scroll container,
+which counts its end padding as content, so a child that only reached into that padding, in full
+view, read as hidden.
 
 Holes are checked as the board renders through the runtime shim, which names on the page each hole
 whose first name the board's props and `renderVals()` never give (a loop's own variables count

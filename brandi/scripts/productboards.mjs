@@ -514,7 +514,7 @@ export async function writeBoards({ productDir, starter, measure = true, heights
     writeFileSync(path.join(pagesDir, 'pages.json'), JSON.stringify(pages));
     const run = spawnSync(process.execPath, [path.join('tools', 'measure-boards.mjs'), '--pages', path.join(pagesDir, 'pages.json')], { cwd: starter, encoding: 'utf8', timeout: 600000 });
     try {
-      const { __sections = {}, __clipped, __unfilled = {}, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
+      const { __sections = {}, __clipped, __clippedAcross, __unfilled = {}, ...measured } = JSON.parse(run.stdout.trim().split('\n').pop());
       // A tool from before __clipped measures a shell page as its window, whatever it holds.
       if (__clipped === undefined) measuresPages = false;
       Object.assign(heights, measured);

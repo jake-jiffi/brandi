@@ -799,13 +799,19 @@ The container on the canvas: a title, an optional description and actions, a bod
   line, the cue that the whole card opens something, as ListRow has).
 - **Layout.** In a column that scrolls, as a flex or a grid item, a card keeps its content's height
   and the column scrolls. It clips its corners with `overflow: clip`, never `hidden` (section 2.4).
+- **Header actions drop below a narrow card's title.** They sit on the title's first line while the
+  title keeps 8rem beside them. In a card too narrow for both they drop below the title and its
+  description, never past the card's edge, where the clip would cut them off. The header is a row
+  that wraps, so the card's own content decides, not a breakpoint.
 - **A stretched card ends at its footer.** In a grid row the cards stretch to the tallest, and the
   body takes the extra height, so every card's footer sits on one line. A run stretched its bay
   cards by hand and the footers stayed mid-card until the body grew.
 - **Rules.** Never a card inside a card. The title says what the card shows, in sentence case, with
   no small uppercase label above it. One idea per card: a card that needs tabs is a page.
 - **Review.** An uppercase kicker sat above card titles, which the craft gate bans (round 1). Cards
-  shrank inside a phone's scrolling main and hid the checkout's total (a proof run, round 2).
+  shrank inside a phone's scrolling main and hid the checkout's total (a proof run, round 2). Three
+  cards came to 240px each at 820: a header action ran 13px past its card and was cut off, and the
+  title beside it broke one word to a line (a proof run, round 3).
 
 #### MetricCard
 

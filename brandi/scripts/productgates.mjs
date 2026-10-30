@@ -245,7 +245,7 @@ export function sizePages(pages) {
  * script never gives, with the names.
  */
 export function sizeGate({ measured, boards }) {
-  if (!measured || !('__clipped' in measured) || !('__unfilled' in measured)) return { skipped: "the starter's tools/measure-boards.mjs cannot check sizes: refresh its kit with brandi product starter --kit" };
+  if (!measured || !('__clipped' in measured) || !('__clippedAcross' in measured) || !('__unfilled' in measured)) return { skipped: "the starter's tools/measure-boards.mjs cannot check sizes: refresh its kit with brandi product starter --kit" };
   const off = [];
   const errors = [];
   const heights = {};
@@ -257,7 +257,11 @@ export function sizeGate({ measured, boards }) {
     const fit = frameFit(b.declared, want);
     if (fit !== 'fits') off.push({ board: b.label, declared: b.declared, want, fit });
   }
-  const clipped = Object.entries(measured.__clipped ?? {}).flatMap(([board, boxes]) => boxes.map((box) => ({ board, ...box })));
+  // A box cut across counts as one cut down does: a narrow card's header action ran past its edge and was cut off.
+  const clipped = [
+    ...Object.entries(measured.__clipped ?? {}).flatMap(([board, boxes]) => boxes.map((box) => ({ board, ...box }))),
+    ...Object.entries(measured.__clippedAcross).flatMap(([board, boxes]) => boxes.map((box) => ({ board, ...box, across: true }))),
+  ];
   const unfilled = Object.entries(measured.__unfilled).map(([board, names]) => ({ board, names }));
   return { boards: boards.length, off, clipped, unfilled, errors, heights };
 }
@@ -643,7 +647,7 @@ export function roundMarkdown(gates, judged, { system = {}, critique = null, rul
   else if (gates.sizes && (gates.sizes.off.length || gates.sizes.clipped.length || gates.sizes.unfilled?.length || gates.sizes.errors.length)) {
     lines.push('', '## Board sizes', '', "Each board measured at its width in its device's window, a page at its whole height. Write the heights with `brandi product boards --heights` (06-canvas.md, Sizes); fix a box that hides content in the board or the component, and a hole its script never gives in the board's renderVals().", '');
     for (const o of gates.sizes.off) lines.push(`- ${o.board}: frame ${o.declared}px, content ${o.want}px (${o.fit})`);
-    for (const c of gates.sizes.clipped) lines.push(`- ${c.board}: ${c.what}${c.text ? ` "${c.text}"` : ''} shows ${c.shown}px of ${c.content}px`);
+    for (const c of gates.sizes.clipped) lines.push(`- ${c.board}: ${c.what}${c.text ? ` "${c.text}"` : ''} shows ${c.shown}px of ${c.content}px${c.across ? ' across' : ''}`);
     for (const u of gates.sizes.unfilled ?? []) lines.push(`- ${u.board}: names ${u.names.map((n) => `{{${n}}}`).join(', ')}, which its script never gives`);
     for (const e of gates.sizes.errors) lines.push(`- ${e.board}: not measured (${e.error})`);
   }

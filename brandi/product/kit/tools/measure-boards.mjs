@@ -15,10 +15,12 @@
  *
  * `frame` is the board's declared { w, h }. Given one, the board is first drawn at that size, as the canvas draws it,
  * and every box that clips content taller than itself is listed under "__clipped": a Card squeezed inside a phone
- * frame hid a checkout's total, and nothing said so. Text cut short on purpose (an ellipsis across, a line clamp
- * after a whole line), a box that scrolls, a visually hidden one, an overlay drawn open (a positioned menu, listbox,
- * picker panel, popover, dialog or tooltip) and a page under a dialog's scrim (inert or aria-hidden) are left out.
- * An ellipsis line squeezed below its own height and a positioned box in the page's layout are not.
+ * frame hid a checkout's total, and nothing said so. Under "__clippedAcross" is every box that clips content wider
+ * than itself, its content's width read to where it ends: a narrow Card cut off its header action at its right edge.
+ * Text cut short on purpose (an ellipsis across, a line clamp after a whole line), a box that scrolls, a visually
+ * hidden one, an overlay drawn open (a positioned menu, listbox, picker panel, popover, dialog or tooltip) and a page
+ * under a dialog's scrim (inert or aria-hidden) are left out. An ellipsis line squeezed below its own height and a
+ * positioned box in the page's layout are not.
  *
  * Under "__unfilled" are the holes each board names that its script never gives, as the runtime shim found them: a
  * proposal's on-edit named a noop its renderVals() never returned, and it quietly drew no Edit.
@@ -33,7 +35,7 @@ const pages = JSON.parse(readFileSync(path.resolve(arg("--pages")), "utf8"))
 // A few pixels over is rounding, not a hidden line: the smallest line of text is twice this.
 const CLIP_TOLERANCE = 4
 
-/** Every box on the page that clips content taller than itself (run in the page). */
+/** Every box on the page that clips content taller or wider than itself (run in the page). */
 function clippedBoxes(tolerance) {
   const replaced = new Set(["INPUT", "TEXTAREA", "SELECT", "IMG", "VIDEO", "CANVAS", "IFRAME", "OBJECT", "EMBED", "PICTURE"])
   // An overlay drawn open sits over the page: a menu, a listbox, a picker's panel, a popover, a dialog or sheet, a
@@ -43,12 +45,58 @@ function clippedBoxes(tolerance) {
     ...["menu", "listbox", "dialog", "alertdialog", "tooltip"].map((r) => `[role='${r}']`),
     ...["tooltip-content", "chart-tooltip", "popover-content", "hover-card-content", "combobox-panel", "select-content", "dropdown-menu-content", "dropdown-menu-sub-content", "date-picker-panel", "date-range-picker-panel", "dialog-content", "sheet-content"].map((n) => `[data-slot='${n}']`),
   ].join(", ")
+  // How far a box's content runs past its padding edge, where the clip cuts it: a scroll container's scrollWidth also
+  // counts its end padding, so a child that only reached into the padding, in full view, read as hidden. A box inside
+  // that clips or scrolls across holds its own content, so only its own edge counts. A flex column that wraps puts a
+  // line with no room in a column of its own, and a line that starts past the edge is hidden whole, as a clamp hides
+  // whole lines below: a schedule's short event drops its owner's line that way, on purpose.
+  const runsPast = (box) => {
+    const edge = box.getBoundingClientRect().right - parseFloat(getComputedStyle(box).borderRightWidth)
+    const far = (node) => {
+      const s = getComputedStyle(node)
+      const wrapsOut = s.display.endsWith("flex") && s.flexDirection.startsWith("column") && s.flexWrap !== "nowrap"
+      let right = -Infinity
+      for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const range = document.createRange()
+          range.selectNodeContents(child)
+          for (const r of range.getClientRects()) if (!(wrapsOut && r.left >= edge)) right = Math.max(right, r.right)
+        } else if (child instanceof Element && getComputedStyle(child).display !== "none") {
+          const r = child.getBoundingClientRect()
+          if (wrapsOut && r.left >= edge) continue
+          right = Math.max(right, r.right)
+          if (getComputedStyle(child).overflowX === "visible") right = Math.max(right, far(child))
+        }
+      }
+      return right
+    }
+    return far(box) - edge
+  }
+  const listed = (el, shown, content) => ({
+    el,
+    what: el.getAttribute("data-slot") ?? `${el.tagName.toLowerCase()}${el.classList.length ? `.${[...el.classList].slice(0, 2).join(".")}` : ""}`,
+    shown,
+    content,
+    text: el.textContent.replace(/\s+/g, " ").trim().slice(0, 40),
+  })
   const found = []
+  const across = []
   for (const el of document.querySelectorAll("body *")) {
     if (!(el instanceof HTMLElement) || replaced.has(el.tagName)) continue
     const s = getComputedStyle(el)
-    if (s.overflowY !== "hidden" && s.overflowY !== "clip") continue
+    const down = s.overflowY === "hidden" || s.overflowY === "clip"
+    // Across, an ellipsis is the cut made on purpose.
+    const sideways = (s.overflowX === "hidden" || s.overflowX === "clip") && s.textOverflow !== "ellipsis"
+    if (!down && !sideways) continue
     if (el.clientHeight <= 1 || el.clientWidth <= 1) continue
+    if ((s.position === "absolute" || s.position === "fixed") && el.closest(overlay)) continue
+    if (el.closest("[inert], [aria-hidden='true']")) continue
+    // A box that clips content wider than itself: a card's header action ran past its right edge and was cut off.
+    if (sideways && el.scrollWidth - el.clientWidth > tolerance && !across.some((f) => f.el.contains(el))) {
+      const past = Math.ceil(runsPast(el))
+      if (past > tolerance) across.push(listed(el, el.clientWidth, el.clientWidth + past))
+    }
+    if (!down) continue
     // Text cut short on purpose is cut one way. An ellipsis cuts across, so it is still held to its own line's
     // height below: squeezed in a column, a one-hour booking's time and owner each showed part of a line and passed
     // as cut on purpose. A clamp cuts after a whole line, so it is left out when it shows whole lines.
@@ -57,14 +105,13 @@ function clippedBoxes(tolerance) {
       const rest = lh ? (el.clientHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) % lh : 0
       if (rest <= tolerance || lh - rest <= tolerance) continue
     }
-    if ((s.position === "absolute" || s.position === "fixed") && el.closest(overlay)) continue
-    if (el.closest("[inert], [aria-hidden='true']")) continue
     if (el.scrollHeight - el.clientHeight <= tolerance) continue
     // The outermost box is enough: whatever it holds is hidden with it.
     if (found.some((f) => f.el.contains(el))) continue
-    found.push({ el, what: el.getAttribute("data-slot") ?? `${el.tagName.toLowerCase()}${el.classList.length ? `.${[...el.classList].slice(0, 2).join(".")}` : ""}`, shown: el.clientHeight, content: el.scrollHeight, text: el.textContent.replace(/\s+/g, " ").trim().slice(0, 40) })
+    found.push(listed(el, el.clientHeight, el.scrollHeight))
   }
-  return found.map(({ el, ...f }) => f)
+  const plain = ({ el, ...f }) => f
+  return { down: found.map(plain), across: across.map(plain) }
 }
 
 /** How much more a shell's main holds than it shows, for a shell as tall as the window (run in the page). */
@@ -81,6 +128,7 @@ try { browser = await chromium.launch({ channel: "chrome", args: ["--allow-file-
 const heights = {}
 const sections = {}
 const clipped = {}
+const clippedAcross = {}
 const unfilled = {}
 for (const p of pages) {
   const window = p.height ?? 900
@@ -104,7 +152,8 @@ for (const p of pages) {
     if (p.frame) {
       await settle(page)
       const boxes = await page.evaluate(clippedBoxes, CLIP_TOLERANCE)
-      if (boxes.length) clipped[p.label] = boxes
+      if (boxes.down.length) clipped[p.label] = boxes.down
+      if (boxes.across.length) clippedAcross[p.label] = boxes.across
       if (p.frame.h !== window) {
         await page.setViewportSize({ width: p.width, height: window })
         await settle(page)
@@ -133,4 +182,4 @@ for (const p of pages) {
   }
 }
 await browser.close()
-process.stdout.write(`${JSON.stringify({ ...heights, __sections: sections, __clipped: clipped, __unfilled: unfilled })}\n`)
+process.stdout.write(`${JSON.stringify({ ...heights, __sections: sections, __clipped: clipped, __clippedAcross: clippedAcross, __unfilled: unfilled })}\n`)
