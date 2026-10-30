@@ -2785,6 +2785,80 @@
     "file": "skills/product-system/references/05-components.md",
     "heading": "LoadingState"
    }
+  },
+  {
+   "id": "L150",
+   "broke": "Each theme picked its own chart series, so a series changed hue by theme, ochre in light and teal in dark, and one could sit on the assistant's violet.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/producttokens.test.mjs",
+     "name": "each series keeps its hue in both themes, and none sits on the assistant's violet"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/02-brand-to-product.md",
+    "heading": "Colour"
+   }
+  },
+  {
+   "id": "L151",
+   "broke": "Under 1024px the rail's needs-you counts vanished behind a bare menu button.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "PhoneTopBar",
+     "name": "Work behind the menu that needs you shows on the menu button, on a highlight chip, and is read in its name"
+    },
+    {
+     "kind": "check",
+     "component": "AppShell",
+     "name": "At 390 the menu button carries the rail's needs-you counts, summed, and the open drawer does not count them twice"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Phone top bar · to build, not yet proven"
+   }
+  },
+  {
+   "id": "L152",
+   "broke": "A narrow card's header action ran past its edge and was clipped, with a one-word-per-line title beside it.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "check",
+     "component": "Card",
+     "name": "A header action sits on the title's line while there is room, and drops below the title, inside the card, when there is not"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/05-components.md",
+    "heading": "Card"
+   }
+  },
+  {
+   "id": "L153",
+   "broke": "Board sizes compared heights only, so content cut off at a card's right edge passed.",
+   "trait": null,
+   "guards": [
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a box that clips content wider than itself is named under __clippedAcross, with how far its content runs"
+    },
+    {
+     "kind": "test",
+     "file": "tests/productgates.test.mjs",
+     "name": "a box that cuts its content off across fails Board sizes too, and the record says across"
+    }
+   ],
+   "teaches": {
+    "file": "skills/product-system/references/08-quality-gates.md",
+    "heading": "Board sizes"
+   }
   }
  ]
 }
