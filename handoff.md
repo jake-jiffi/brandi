@@ -1076,6 +1076,44 @@ reviewer, which 08 already asks for.
 - Kit sample copy never names a fixture brand. A test fails if it does.
 - The types at the top of a starter's `lib/brand.ts` are the kit's, rewritten on every run.
 
+## v1.23.0: what the first client run fixed, and brand-full
+
+Westhaven, an NDIS provider in regional NSW, was the first client brand taken through
+`product-system` to a published system. It met the bar in round 4. Each fix below has a check or
+test that fails without it.
+
+- `/brandi:brand-full` runs the brand and the product system as one job: one batch of questions,
+  no stop between the halves, and a disk check before the product half.
+- Kit:
+  - The rail's lockup stacks when a wide logo would cut off the product's name (L154).
+  - Switch's off thumb clears its track in dark (L155).
+  - Root's `reading` sets a 16px floor for a reading surface. Badges and list rows grow into it (L156).
+  - List moves between rows with Up, Down, Home and End (L157).
+  - AIDraftedMarker takes `check="none"` where no brand check applies (L158).
+  - MetricCard's `unavailableLabel` carries the brand's own word (L161).
+  - ButtonGroup `align="end"` reaches a card footer's edge (L162).
+  - DataTable takes a `totals` row in its foot, blank where it has no figure (L163).
+  - Email footer lines stop at 480px (L164).
+- Gates and tokens:
+  - A detector acceptance can name `page: "*"` (L159).
+  - Reflow at 320px also fails content cut off inside a box that scrolls (L160).
+  - A one-family brand sets its titles at 700, not a display face's 400 (L165).
+  - The audit warns when a coloured dark rail stands 1.2:1 or more above the dark surface (L166).
+- Publishing:
+  - A canvas restage no longer sends the installed `ds/` folder as a removal (L167).
+  - `06-canvas.md` step 11 sets out a change after publish, ending with a render of the live files.
+- Brand side:
+  - The guardian accepts swatches a brand declares outside the families the system builds, such as
+    service colours.
+  - `mockup build --dir` names the canvas only, so the brand file is still found.
+
+### Status
+
+The full suite ran 2,351 tests: 2,327 passed, 23 were skipped and 1 failed. The failure is
+logocolour's palette-move test, at its 120-second timeout. Alone it takes 43 to 120 seconds on both
+this release and 1.22.0, nearly all of it in `brandi assets`, so under a parallel suite it can run
+out of time. It passes on its own, and so does its whole file, 68 of 68.
+
 ## If more work is wanted
 
 Nothing is outstanding. Ideas, not obligations:
