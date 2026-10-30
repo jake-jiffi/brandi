@@ -296,7 +296,7 @@ const hexOf = (c) => (typeof c === 'string' ? c : c?.hex);
  * for primary, brand, highlight, canvas, focus and rail. Anything not decided is
  * derived, and derived values are solved to pass.
  */
-function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
+function themeValues(system, mode, roles, ai, brandInk) {
   const light = mode === 'light';
   const N = steps(system.palettes.neutral[mode]);
   const B = steps(system.palettes.brand[mode]);
@@ -437,56 +437,9 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
   if (dangerLabel.ratio < FLOORS.text + MARGIN) v['danger-solid'] = solve('danger-solid', v['danger-solid'], [dangerLabel.hex], FLOORS.text);
   v['on-danger'] = labelOn(v['danger-solid']).hex;
 
-  // Charts. The brand's own colours take the first slots (the brand colour,
-  // then its accents), so a chart reads as the brand's; Brandi's colour-vision-
-  // checked palette fills the rest, skipping hues already taken. Each is then
-  // lifted or dropped until it clears 3:1 on a card (a pale accent darkens into
-  // a usable series), and neighbours that collapse under a colour-vision
-  // deficiency are reported by the audit.
-  const seed = hexOf(system.palettes.brand.light.steps[8]);
-  // More candidates than slots, so a palette short of distinct hues never wraps around. In dark,
-  // the colour-vision-safe generator finds as few as four, and series-6 came out in series-1's
-  // colour; the brand's categorical palette, solved for the dark card, fills the rest.
-  const categorical = (system.dataViz?.categorical ?? []).map(hexOf);
-  const extra = dataVizPalette(seed, { count: SERIES_COUNT * 2, mode }).map(hexOf);
-  const generated = [...new Set([...(light ? categorical : []), ...extra, ...categorical])];
-  const accentSeeds = Object.keys(system.palettes).filter((k) => /^accent\d+$/.test(k))
-    .map((k) => hexOf(system.palettes[k].light.steps[8]));
-  // A colour the brand bars from this theme's grounds never becomes a series here, nor does its hue.
-  const barred = (c) => avoid.some((a) => hueGap(safeHue(toOklch(a).h), safeHue(toOklch(c).h)) < 25);
-  const palette = [];
-  for (const c of [generated[0], ...accentSeeds, ...generated.slice(1)]) {
-    const h = safeHue(toOklch(c).h);
-    if (!barred(c) && palette.length < SERIES_COUNT && palette.every((p) => hueGap(safeHue(toOklch(p).h), h) >= 25)) palette.push(c);
-  }
-  for (const c of generated) if (!barred(c) && palette.length < SERIES_COUNT && !palette.includes(c)) palette.push(c);
-  // Two candidates can solve to one colour; the next candidate takes the slot instead. Last come
-  // spares a twelfth of the circle apart, past the colour-vision-safe set: the audit reports any
-  // neighbours they leave hard to tell apart, which beats a chart with two series in one colour.
-  const baseHue = safeHue(toOklch(seed).h);
-  const spares = Array.from({ length: 12 }, (_, k) => oklchToHex(gamutMapOklch({ L: light ? 0.56 : 0.74, C: 0.13, h: (baseHue + 15 + k * 30) % 360 })));
-  const candidates = [...new Set([...palette, ...generated, ...spares])].filter((c) => !barred(c));
-  const taken = new Set();
-  let next = 0;
-  for (let i = 0; i < SERIES_COUNT; i += 1) {
-    let value = null;
-    while (next < candidates.length) {
-      value = solve(`series-${i + 1}`, candidates[next++], [v.surface, v['surface-subtle']], FLOORS['non-text']);
-      if (!taken.has(value.toUpperCase())) break;
-    }
-    value ??= solve(`series-${i + 1}`, candidates[i % candidates.length], [v.surface, v['surface-subtle']], FLOORS['non-text']);
-    taken.add(value.toUpperCase());
-    v[`series-${i + 1}`] = value;
-  }
+  // Charts. The series and their tags are chosen once for both themes, by chartSeries below.
   v['chart-grid'] = ink ? toward(0.07) : (light ? N[3] : N[2]);
   v['chart-compare'] = solve('chart-compare', ink ? toward(0.45) : N[8], [v.surface], FLOORS['non-text'], 'floor');
-
-  // Tags: pale fills on the series hues, so a category's tag and its line in a
-  // chart are recognisably the same thing.
-  for (let i = 0; i < SERIES_COUNT; i += 1) {
-    const h = safeHue(toOklch(v[`series-${i + 1}`]).h);
-    v[`tag-${i + 1}`] = oklchToHex(gamutMapOklch(light ? { L: 0.94, C: 0.035, h } : { L: 0.3, C: 0.05, h }));
-  }
   v['tag-grey'] = ink ? toward(0.08) : N[3];
 
   // The rail. A decided rail is the brand's signature navigation surface; with
@@ -548,6 +501,79 @@ function themeValues(system, mode, roles, ai, brandInk, avoid = []) {
   }
 
   return { values: v, notes };
+}
+
+/**
+ * The six chart series and their tags, chosen once for both themes and written into each theme's values.
+ *
+ * A series is one hue in both themes; only its lightness moves, until it clears 3:1 on that theme's card. Chosen
+ * per theme, each theme ran its own palette in its own order: series-3 came out an ochre in light and a teal in
+ * dark, so a chart's legend meant a different colour at night. The brand's own colours take the first slots (the
+ * brand colour, then its accents), so a chart reads as the brand's; Brandi's colour-vision-checked palette fills
+ * the rest, skipping hues already taken. Two hues never become a series: one the brand bars from either theme's
+ * grounds (`avoid`), since a series barred from one theme would have to change colour in it, and one within 25
+ * degrees of the assistant's violet, the gap the series keep from each other, where a chart line read as
+ * something the assistant made. The audit reports neighbours that collapse under a colour-vision deficiency.
+ */
+function chartSeries(system, themes, avoid) {
+  const modes = Object.keys(themes);
+  const seed = hexOf(system.palettes.brand.light.steps[8]);
+  // More candidates than slots, so a palette short of distinct hues never wraps around.
+  const categorical = (system.dataViz?.categorical ?? []).map(hexOf);
+  const generated = [...new Set([...categorical, ...dataVizPalette(seed, { count: SERIES_COUNT * 2 }).map(hexOf)])];
+  const accentSeeds = Object.keys(system.palettes).filter((k) => /^accent\d+$/.test(k))
+    .map((k) => hexOf(system.palettes[k].light.steps[8]));
+  const aiColours = modes.flatMap((m) => [themes[m].values.ai, themes[m].values['ai-solid']]);
+  const keptOff = [...avoid, ...aiColours].map((c) => safeHue(toOklch(c).h));
+  const barred = (c) => keptOff.some((h) => hueGap(h, safeHue(toOklch(c).h)) < 25);
+  const palette = [];
+  for (const c of [generated[0], ...accentSeeds, ...generated.slice(1)]) {
+    const h = safeHue(toOklch(c).h);
+    if (!barred(c) && palette.length < SERIES_COUNT && palette.every((p) => hueGap(safeHue(toOklch(p).h), h) >= 25)) palette.push(c);
+  }
+  for (const c of generated) if (!barred(c) && palette.length < SERIES_COUNT && !palette.includes(c)) palette.push(c);
+  // Two candidates can solve to one colour in either theme; the next candidate takes the slot in both instead. Last
+  // come spares a twelfth of the circle apart, past the colour-vision-safe set: the audit reports any neighbours they
+  // leave hard to tell apart, which beats a chart with two series in one colour. Those 25 degrees clear of the hues
+  // taken go first: walked round from the brand's hue, the first spare sat 5 degrees from a teal already a series.
+  const baseHue = safeHue(toOklch(seed).h);
+  const spares = Array.from({ length: 12 }, (_, k) => oklchToHex(gamutMapOklch({ L: 0.56, C: 0.13, h: (baseHue + 15 + k * 30) % 360 })));
+  const spaced = (c) => palette.every((p) => hueGap(safeHue(toOklch(p).h), safeHue(toOklch(c).h)) >= 25);
+  const candidates = [...new Set([...palette, ...generated, ...spares.filter(spaced), ...spares])].filter((c) => !barred(c));
+  const solveIn = (m, role, c) => {
+    const { values: v, notes } = themes[m];
+    const r = solveForContrast(c, [v.surface, v['surface-subtle']], FLOORS['non-text']);
+    if (r.short) notes.push(`${role} (${m}) cannot reach ${FLOORS['non-text']}:1 against all of its backgrounds; best is ${r.ratio.toFixed(2)}:1.`);
+    return r.hex;
+  };
+  const solveAll = (role, c) => Object.fromEntries(modes.map((m) => [m, solveIn(m, role, c)]));
+  const taken = Object.fromEntries(modes.map((m) => [m, new Set()]));
+  let next = 0;
+  for (let i = 0; i < SERIES_COUNT; i += 1) {
+    const role = `series-${i + 1}`;
+    let value = null;
+    // The bar holds on what ships: solving can turn a hue a degree or two, which took one series to 24.9 degrees
+    // from the assistant's violet.
+    while (!value && next < candidates.length) {
+      const solved = solveAll(role, candidates[next++]);
+      if (modes.every((m) => !taken[m].has(solved[m].toUpperCase()) && !barred(solved[m]))) value = solved;
+    }
+    value ??= solveAll(role, candidates[i % candidates.length]);
+    for (const m of modes) {
+      taken[m].add(value[m].toUpperCase());
+      themes[m].values[role] = value[m];
+    }
+  }
+
+  // Tags: pale fills on the series hues, so a category's tag and its line in a
+  // chart are recognisably the same thing.
+  for (const m of modes) {
+    const v = themes[m].values;
+    for (let i = 0; i < SERIES_COUNT; i += 1) {
+      const h = safeHue(toOklch(v[`series-${i + 1}`]).h);
+      v[`tag-${i + 1}`] = oklchToHex(gamutMapOklch(m === 'light' ? { L: 0.94, C: 0.035, h } : { L: 0.3, C: 0.05, h }));
+    }
+  }
 }
 
 const USAGE = {
@@ -1073,8 +1099,9 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
   const brandInk = darkCandidates.filter((h) => toOklch(h).L < 0.3).sort((a, b) => toOklch(a).L - toOklch(b).L)[0] ?? null;
   // charts.avoid: colours the brand keeps off one theme's grounds (a pink barred from dark, say).
   const avoid = (m) => (charts?.avoid?.[m] ?? []).map(expand).filter(Boolean);
-  const light = themeValues(system, 'light', roles, ai, brandInk, avoid('light'));
-  const dark = themeValues(system, 'dark', roles, ai, brandInk, avoid('dark'));
+  const light = themeValues(system, 'light', roles, ai, brandInk);
+  const dark = themeValues(system, 'dark', roles, ai, brandInk);
+  chartSeries(system, { light, dark }, [...avoid('light'), ...avoid('dark')]);
   const railDecided = Boolean(roles.rail?.light || roles.rail?.dark);
   // A tag on a hue the brand keeps off either theme's grounds is never handed out by a name's hash (an avatar's
   // tint): a person cannot choose their name, so a tint the brand bars anywhere is left out of the draw everywhere.

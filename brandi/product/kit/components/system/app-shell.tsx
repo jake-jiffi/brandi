@@ -7,6 +7,7 @@ import { useMergedRef } from "@/lib/refs"
 import { cn } from "@/lib/utils"
 
 import { useOverlayOpener } from "./dialog"
+import { railCountReport, railNeedsYou } from "./nav-item"
 import { PhoneTopBar } from "./phone-top-bar"
 
 /**
@@ -124,6 +125,20 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
     setOpen(false)
   }
 
+  // The rail's needs-you counts, by NavItem, summed for the menu button: under 1024px the rail is behind it. Only
+  // the rail reports; the drawer draws the same items again, and they would count twice.
+  const [counts, setCounts] = React.useState<Record<string, number>>({})
+  const reportCount = React.useCallback((id: string, count: number) => {
+    setCounts((all) => {
+      if ((all[id] ?? 0) === count) return all
+      const next = { ...all }
+      if (count) next[id] = count
+      else delete next[id]
+      return next
+    })
+  }, [])
+  const needsYou = Object.values(counts).reduce((sum, n) => sum + n, 0)
+
   const [actionBar, setActionBar] = React.useState<HTMLDivElement | null>(null)
   const hasTabBar = Boolean(tabBar)
   const state = React.useMemo<ShellState>(() => ({ layout, actionBar: phone && !hasTabBar ? actionBar : null }), [layout, phone, hasTabBar, actionBar])
@@ -153,7 +168,8 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
             // edge when it does not. 72px of icons from 1024px, the full rail from 1280px.
             className="hidden w-[calc(var(--rail-collapsed)+var(--shell-inset,0px))] shrink-0 py-[var(--shell-inset,0px)] pl-[var(--shell-inset,0px)] @min-[1024px]/shell:flex @min-[1280px]/shell:w-[calc(var(--rail-width)+var(--shell-inset,0px))]"
           >
-            {sidebar}
+            {/* Mounted at every width, hidden under 1024px, so it reports the counts the drawer would show. */}
+            <railCountReport.Provider value={reportCount}>{sidebar}</railCountReport.Provider>
           </div>
         ) : null}
 
@@ -162,15 +178,18 @@ export const AppShell = React.forwardRef<HTMLDivElement, AppShellProps>(function
             layer. Hidden rather than invisible, because invisible text still sits on the page at rest. */}
         <div data-slot="app-shell-column" className={cn("flex min-h-0 min-w-0 flex-1 flex-col", navInline && "@max-[1024px]/shell:hidden")}>
           <div data-slot="app-shell-top" className="shrink-0 @min-[1024px]/shell:hidden">
-            {topBar ?? (
-              <PhoneTopBar
-                product={product}
-                home={home}
-                onMenu={sidebar ? () => setOpen(true) : undefined}
-                menuExpanded={open || navInline}
-                menuRef={menuRef}
-              />
-            )}
+            {/* The menu button carries the rail's sum, in AppShell's own bar or one a product passes as topBar. */}
+            <railNeedsYou.Provider value={needsYou}>
+              {topBar ?? (
+                <PhoneTopBar
+                  product={product}
+                  home={home}
+                  onMenu={sidebar ? () => setOpen(true) : undefined}
+                  menuExpanded={open || navInline}
+                  menuRef={menuRef}
+                />
+              )}
+            </railNeedsYou.Provider>
           </div>
           {/* The column scrolls and the rail stays put. The bars sit outside the scroll, so neither can hide what has focus. */}
           <main

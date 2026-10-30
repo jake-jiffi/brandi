@@ -25,6 +25,14 @@ export function useRail() {
   return React.useContext(railContext)
 }
 
+/**
+ * The rail's counts that need the reader, gathered for the phone top bar: under 1024px the rail sits behind the
+ * menu button, and its needs-you counts vanished with it. AppShell provides both. NavItems on its rail report
+ * their counts to the first, and a PhoneTopBar anywhere in the shell reads the sum from the second.
+ */
+export const railCountReport = React.createContext<((id: string, count: number) => void) | null>(null)
+export const railNeedsYou = React.createContext(0)
+
 /** A count in words: "3 need you" waits on the reader, "12 waiting on others" on someone else. */
 export function countWords(count: number, attention: boolean) {
   const n = formatNumber(count, "number")
@@ -64,6 +72,15 @@ export const NavItem = React.forwardRef<HTMLAnchorElement, NavItemProps>(functio
   const { collapsed } = useRail()
   const n = toCount(count)
   const words = n ? countWords(n, attention) : ""
+  // Before paint, so the menu button never draws without the count a moment after the rail has it.
+  const report = React.useContext(railCountReport)
+  const id = React.useId()
+  const needsYou = n && attention ? n : 0
+  React.useLayoutEffect(() => {
+    if (!report) return
+    report(id, needsYou)
+    return () => report(id, 0)
+  }, [report, id, needsYou])
 
   const link = (
     <Link

@@ -26,7 +26,7 @@ The roles go in `product/product.json`, which `$A product tokens` reads:
 | `displayForTitles` | Whether the display face sets page titles | `true` |
 | `displayCase` | `"upper"` when the brand only ever sets its display face in capitals: the hero, display and title styles take capitals, tracked open a little | Unset: the face's own case |
 | `time` | How the brand writes a time, `{ "minutes": ":" or ".", "onTheHour": "keep" or "drop", "space": true or false }`. "11am to 10.30pm" is `{ ".", "drop", false }`. Every time the system writes follows it | 9:30 am: minutes kept, a space before am or pm |
-| `charts.avoid` | Colours the brand keeps off one theme's grounds, `{ "light": [...], "dark": [...] }`: no chart series takes them or their hue there | None |
+| `charts.avoid` | Colours the brand keeps off one theme's grounds, `{ "light": [...], "dark": [...] }`: no chart series takes them or their hue, in either theme, since a series keeps its hue in both | None |
 | `brandColours` | The brand book's named colours, emitted as `brand-*`: a list, `[{ "name": "green", "hex": "#2E7D32" }]`, or a map, `{ "green": "#2E7D32" }`. Names are lower case words joined by hyphens, since each becomes a CSS variable | The primary and accents |
 | `shape.families` | Each family's radius, measured from the brand's own work, with its source: `press`, `control`, `card`, `pane`, `frame` (Shape, below) | Derived from the brand's scale, never rounder than the largest radius measured, and listed as the kit's |
 | `shape.action` | Whatever a person can press, when `press` is not measured: `"pill"`, `"control"` (buttons match the inputs) or a value | The pill, listed as the kit's |
@@ -90,6 +90,16 @@ or dropped until it clears 3:1 in both themes, which turns a pale accent (a yell
 darker series. No two slots share a colour: in dark the colour-vision-safe set can come to four
 hues, and a sixth slot once wrapped round to the first. The audit reports neighbours that collapse
 under a colour-vision deficiency: label those lines directly, or reorder.
+
+**A series is one hue in both themes.** The hues are chosen once, and only each series' lightness
+moves to clear 3:1 on each theme's card, so a legend means the same colour at night. Chosen per
+theme, a seventh build's series-3 was an ochre in light and a teal in dark. Two hues never become a
+series: one the brand bars from either theme's grounds (`charts.avoid`), since a series barred from
+one theme would have to change colour there, and one within 25 degrees of the assistant's violet
+(the gap the series keep from each other), where a chart line read as something the assistant
+made. A brand whose own colour sits on that violet keeps it out of the chart for the same reason.
+Losing the violets costs some colour-vision separation from greens and teals, so more neighbours
+get the audit's warning: label those lines directly.
 
 **Two full themes.** Light is the default. Dark is a theme of its own, not an inversion and not a
 per-screen choice: in the last system's first build, dark mode lost its hierarchy (the rail sat at

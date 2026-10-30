@@ -313,7 +313,9 @@ describe('brand rules the tokens keep', () => {
     assert.ok(series(free, 'dark').some(near), 'without the rule the accent is a dark series');
     const kept = P.buildProductTokens(accented, { charts: { avoid: { dark: ['#D63384'] } } });
     assert.equal(series(kept, 'dark').some(near), false, `no dark series in its hue: ${series(kept, 'dark').join(', ')}`);
-    assert.ok(series(kept, 'light').some(near), 'light keeps it');
+    // A series keeps its hue in both themes, so a hue barred from one theme's grounds leaves the chart in both:
+    // kept in light, its slot would have to change colour at night.
+    assert.equal(series(kept, 'light').some(near), false, `nor a light one: ${series(kept, 'light').join(', ')}`);
     assert.equal(new Set(series(kept, 'dark').map((h) => h.toUpperCase())).size, 6, 'six distinct series still');
     assert.equal(P.auditProductTokens(kept).fails.length, 0);
   });
@@ -322,9 +324,11 @@ describe('brand rules the tokens keep', () => {
     const accented = buildSystem({ primary: '#1F6F4A', accents: ['#D63384'], type: { display: 'Bitter', body: 'Karla', mono: 'JetBrains Mono' } });
     const gap = (a, b) => { const d = Math.abs(toOklch(a).h - toOklch(b).h); return Math.min(d, 360 - d); };
     const kept = P.buildProductTokens(accented, { charts: { avoid: { dark: ['#D63384'] } } });
-    const lightNear = Array.from({ length: 6 }, (_, i) => i + 1).filter((n) => gap(P.resolveColour(kept, `series-${n}`, 'light'), '#D63384') < 25).map((n) => `tag-${n}`);
-    assert.ok(lightNear.length > 0, 'light keeps a series on the barred hue');
-    assert.deepEqual(kept.meta.avoidTags, lightNear, 'its tag is left out of the draw, though only dark bars the hue');
+    // Barred from dark only, the hue leaves the series in both themes, so no tag either theme draws sits on it.
+    const tags = (m) => Array.from({ length: 6 }, (_, i) => P.resolveColour(kept, `tag-${i + 1}`, m));
+    for (const m of ['light', 'dark']) assert.equal(tags(m).some((t) => gap(t, '#D63384') < 25), false, `no ${m} tag on the barred hue: ${tags(m).join(', ')}`);
+    const onIt = Array.from({ length: 6 }, (_, i) => i + 1).filter((n) => ['light', 'dark'].some((m) => gap(P.resolveColour(kept, `series-${n}`, m), '#D63384') < 25)).map((n) => `tag-${n}`);
+    assert.deepEqual(kept.meta.avoidTags, onIt, 'any tag whose series still sits on the hue is left out of the draw');
     assert.deepEqual(P.buildProductTokens(accented, {}).meta.avoidTags, [], 'with nothing barred, every tag is in the draw');
   });
 
@@ -390,6 +394,32 @@ describe('chart series', () => {
           assert.equal(new Set(series).size, 6, `${primary} ${theme}: ${series.join(' ')}`);
         }
       }
+    }
+  });
+
+  test("each series keeps its hue in both themes, and none sits on the assistant's violet", () => {
+    // Each theme once chose its own hues: series-3 was an ochre in light and a teal in dark, so a legend meant a
+    // different colour at night, and a series sat on the ai violet, where a chart line read as the assistant's.
+    const gap = (a, b) => { const d = Math.abs(toOklch(a).h - toOklch(b).h); return Math.min(d, 360 - d); };
+    const cases = [
+      ['the fixture', system, {}],
+      ['the fixture, its accent barred from both themes', system, { charts: { avoid: { light: ['#D4823A'], dark: ['#D4823A'] } } }],
+      ['a blue', buildSystem({ primary: '#2563EB', accentCount: 1 }), {}],
+      ['a red', buildSystem({ primary: '#C2410C', accentCount: 1 }), {}],
+      ['a violet, on the assistant\'s own hue', buildSystem({ primary: '#7C3AED', accentCount: 1 }), {}],
+    ];
+    for (const [label, sys, opts] of cases) {
+      const tokens = P.buildProductTokens(sys, opts);
+      const at = (n, m) => P.resolveColour(tokens, n, m);
+      const row = (m) => Array.from({ length: 6 }, (_, i) => at(`series-${i + 1}`, m)).join(' ');
+      for (let n = 1; n <= 6; n += 1) {
+        const s = `series-${n}`;
+        assert.ok(gap(at(s, 'light'), at(s, 'dark')) < 10, `${label}: ${s} is ${at(s, 'light')} in light and ${at(s, 'dark')} in dark\n light ${row('light')}\n dark  ${row('dark')}`);
+        for (const m of ['light', 'dark']) {
+          for (const ai of ['ai', 'ai-solid']) assert.ok(gap(at(s, m), at(ai, m)) >= 25, `${label}: ${m} ${s} ${at(s, m)} sits on ${ai} ${at(ai, m)}`);
+        }
+      }
+      assert.equal(P.auditProductTokens(tokens).fails.length, 0, label);
     }
   });
 });

@@ -67,6 +67,7 @@ export default {
     { name: "onMenu", type: "() => void", doc: "Shows the menu button, which opens the navigation drawer. AppShell passes it." },
     { name: "menuExpanded", type: "boolean", default: "false", doc: "Whether the drawer the menu button opens is open." },
     { name: "menuRef", type: "Ref<HTMLButtonElement>", doc: "The menu button, so focus can come back to it when the drawer closes." },
+    { name: "menuCount", type: "number", default: "inside AppShell, the rail's needs-you counts, summed", doc: "Work behind the menu that needs the reader, shown on the menu button and read in its name. Zero shows nothing." },
     { name: "product", type: "string", default: "the name in lib/product.ts", doc: "The product's name for the lockup, shown when there is no title." },
     { name: "home", type: "string", doc: "Where the lockup links. Without it the lockup is not a link." },
     { name: "actions", type: "ReactNode", doc: "Icon buttons at the far end, one or two. Built in the board's script on a canvas." },
@@ -74,6 +75,7 @@ export default {
   notes: {
     Behaviour: [
       'The menu button is named Open navigation, says it opens a dialog (aria-haspopup="dialog") and whether it is open (aria-expanded). It has no tooltip: one left open as the drawer takes focus would hold the drawer\'s first Escape.',
+      "The rail's needs-you counts ride on the menu button, because under 1024px the rail is behind it: inside AppShell the button shows their sum on a highlight chip at its corner and is named Open navigation, 5 need you. Counts that wait on others stay in the drawer. On a phone those counts once vanished, and the menu showed nothing.",
       "Back is a link named Back to [the screen above], through the system's link. From the focus model: after it navigates, focus moves to the new screen's main.",
     ],
     Layout: [
@@ -114,6 +116,13 @@ export default {
       title: "A long title is cut on one line",
       markup: phone(`<x-import component-from-global-scope="NS.PhoneTopBar" title="${LONG}" back="{{back}}"></x-import>`),
       layout: "block",
+    },
+    {
+      id: "needs",
+      title: "Work behind the menu that needs you",
+      markup: phone(`<x-import component-from-global-scope="NS.PhoneTopBar" product="[Front desk]" home="#home" on-menu="{{openMenu}}" menu-expanded="{{menuOpen}}" menu-count="{{four}}"></x-import>`),
+      layout: "block",
+      vals: { four: 4 },
     },
   ],
   state: { menuOpen: false },
@@ -161,6 +170,27 @@ export default {
         await page.keyboard.press("Enter")
         expect.equal(await button.getAttribute("aria-expanded"), "true", "onMenu ran, and it says it is open")
         expect.equal(await page.locator('[data-slot="tooltip-content"]').count(), 0, "no tooltip")
+      },
+    },
+    {
+      name: "Work behind the menu that needs you shows on the menu button, on a highlight chip, and is read in its name",
+      example: "needs",
+      async run({ page, scope, expect }) {
+        // Under 1024px the rail is behind this button, and the rail's needs-you counts once vanished with it.
+        const button = scope.getByRole("button", { name: "Open navigation, 4 need you", exact: true })
+        expect.equal(await button.count(), 1, "named Open navigation, 4 need you")
+        const chip = button.locator('[data-slot="phone-top-bar-menu-count"]')
+        expect(await chip.isVisible(), "the figure shows")
+        expect.equal((await chip.textContent()).trim(), "4", "the sum")
+        expect.equal(await chip.getAttribute("aria-hidden"), "true", "and is read once, in the name")
+        const [bg, ink, wantBg, wantInk] = await chip.evaluate((el, p) => {
+          const f = new Function(`return (${p})`)()
+          const s = getComputedStyle(el)
+          return [s.backgroundColor, s.color, f(el, "backgroundColor", "var(--highlight)"), f(el, "color", "var(--on-highlight)")]
+        }, probe.toString())
+        expect.equal(bg, wantBg, "on the highlight, the colour of needs you")
+        expect.equal(ink, wantInk, "its figure in on-highlight")
+        expect.equal(await page.locator('[data-example="menu"] [data-slot="phone-top-bar-menu-count"]').count(), 0, "with nothing waiting, nothing shows")
       },
     },
     {

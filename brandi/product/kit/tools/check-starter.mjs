@@ -141,8 +141,9 @@ const drawerCheck = (viewport, band) => ({
     const drawer = page.getByRole("dialog", { name: "Navigation" })
     await until(() => drawer.isVisible(), "the drawer never opened")
     await until(() => drawer.evaluate((el) => el.contains(document.activeElement)), "focus did not move into the drawer")
-    // Behind the open drawer the page is hidden from screen readers, so the button is found by its label, not its role.
-    expect.equal(await page.locator('button[aria-label="Open navigation"]').getAttribute("aria-expanded"), "true", "the menu button says the drawer is open")
+    // Behind the open drawer the page is hidden from screen readers, so the button is found by its slot, not its role.
+    // Its name carries the rail's needs-you counts ("Open navigation, 2 need you"), so it is not matched whole.
+    expect.equal(await page.locator('button[data-slot="phone-top-bar-menu"]').getAttribute("aria-expanded"), "true", "the menu button says the drawer is open")
     expect.equal(await page.getByRole("heading", { level: 1 }).count(), 0, "the page behind the drawer is hidden from screen readers")
     for (const key of [...Array(24).fill("Tab"), ...Array(6).fill("Shift+Tab")]) {
       await page.keyboard.press(key)
@@ -151,7 +152,7 @@ const drawerCheck = (viewport, band) => ({
     await page.keyboard.press("Escape")
     await until(async () => !(await drawer.isVisible()), "Escape did not close the drawer")
     const f = await expectFocusOff(page, expect, "closing the drawer")
-    expect.equal(f.name, "Open navigation", "focus went back to the menu button")
+    expect(f.slot === "phone-top-bar-menu", `focus went back to the menu button, not ${f.text}`)
   },
 })
 
