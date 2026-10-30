@@ -124,6 +124,7 @@ export default {
       "Skip to content comes first and takes focus to main.",
       "The drawer is a dialog named Navigation. It takes focus as it opens, on its Close navigation button, and keeps it: Tab and Shift Tab stay inside, and the page behind is hidden from screen readers. Escape, the close button and a tap on the scrim close it at once, and focus is back on the menu button the moment it closes.",
       "Choosing a destination in the drawer closes it, and focus lands on main, where a route change puts it: never on the menu button or the page body. In the product, RouteFocus moves focus to main after every client navigation, so main keeps its id and takes focus from script only.",
+      "Under 1024px the rail's needs-you counts ride on the menu button, summed on a highlight chip and read in its name (Open navigation, 5 need you), in AppShell's own top bar or a PhoneTopBar passed as topBar. Only the rail reports them, so the open drawer does not count them twice. On a phone they once vanished behind the menu.",
       "On a phone, PageHeader's primary moves to a bar at the foot, unless a tab bar has that place. The bars sit outside the scrolling column, so neither can hide whatever has focus.",
       "The drawer serves every width under 1024px, so moving between the phone layout and the one above it leaves it open. Widening the shell to 1024px or more closes it, and focus goes to main, since the menu button goes with the top bar. The open drawer takes the theme of the shell it opened from.",
     ],
@@ -373,6 +374,23 @@ export default {
         const now = await active(page)
         expect.equal(now.name, "Close navigation", "focus is on Close navigation")
         expect(await drawer.getByRole("navigation", { name: "Main" }).isVisible(), "the rail's navigation is inside")
+      },
+    },
+    {
+      name: "At 390 the menu button carries the rail's needs-you counts, summed, and the open drawer does not count them twice",
+      example: "phone",
+      async run({ page, scope, expect }) {
+        // On a phone the rail is behind the menu button, and its needs-you counts once vanished with it.
+        const menu = shell(scope, "live").locator('[data-slot="phone-top-bar-menu"]')
+        const named = "Open navigation, 5 need you"
+        expect.equal(await menu.getAttribute("aria-label"), named, "Inbox's 2 and Approvals' 3; the 12 invoices wait on others and stay in the drawer")
+        const chip = menu.locator('[data-slot="phone-top-bar-menu-count"]')
+        expect(await chip.isVisible(), "the figure shows on the button")
+        expect.equal((await chip.textContent()).trim(), "5", "the sum")
+        // Found by its slot, not its role: behind the open drawer it is hidden from the accessibility tree.
+        await openDrawer(page, scope)
+        expect.equal(await menu.getAttribute("aria-label"), named, "the drawer draws the rail's items again, and they are not counted again")
+        expect.equal(await shell(scope, "open").locator('[data-slot="phone-top-bar-menu"]').getAttribute("aria-label"), named, "nor in the drawer drawn for a design")
       },
     },
     {

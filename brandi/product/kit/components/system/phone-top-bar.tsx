@@ -3,10 +3,12 @@
 import * as React from "react"
 
 import { Button as ButtonBase } from "@/components/ui/button"
+import { formatNumber } from "@/lib/format"
 import { useLink } from "@/lib/link"
 import { cn } from "@/lib/utils"
 
 import { Icon } from "./icon"
+import { countWords, railNeedsYou, toCount } from "./nav-item"
 import { ProductLockup } from "./product-lockup"
 
 export interface PhoneTopBarProps {
@@ -22,6 +24,8 @@ export interface PhoneTopBarProps {
   menuExpanded?: boolean
   /** The menu button, so focus can come back to it when the drawer closes. */
   menuRef?: React.Ref<HTMLButtonElement>
+  /** Work behind the menu that needs the reader, shown on the menu button. Inside AppShell it is the rail's needs-you counts, summed. Zero shows nothing. */
+  menuCount?: number
   /** The product's name for the lockup, shown when there is no title. */
   product?: string
   /** Where the lockup links. Without it the lockup is not a link. */
@@ -33,10 +37,12 @@ export interface PhoneTopBarProps {
 
 /** The top bar under 1024px of shell: the menu button and the lockup, or Back and the screen's title. */
 export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(function PhoneTopBar(
-  { title, headingLevel, back, onMenu, menuExpanded = false, menuRef, product, home, actions, className },
+  { title, headingLevel, back, onMenu, menuExpanded = false, menuRef, menuCount, product, home, actions, className },
   ref
 ) {
   const Link = useLink()
+  const shellNeeds = React.useContext(railNeedsYou)
+  const needs = toCount(menuCount ?? shellNeeds)
   // On the rail's own colours: under 1024px of shell this bar does the rail's job.
   const control = "text-rail-text-strong hover:bg-rail-hover focus-visible:outline-rail-focus"
   return (
@@ -59,7 +65,8 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
           ref={menuRef}
           variant="ghost"
           size="icon"
-          aria-label="Open navigation"
+          // The counts behind it are read as words after its name, as the rail reads them: "Open navigation, 5 need you".
+          aria-label={needs ? `Open navigation, ${countWords(needs, true)}` : "Open navigation"}
           aria-haspopup="dialog"
           aria-expanded={menuExpanded}
           data-slot="phone-top-bar-menu"
@@ -67,6 +74,17 @@ export const PhoneTopBar = React.forwardRef<HTMLElement, PhoneTopBarProps>(funct
           onClick={onMenu}
         >
           <Icon name="Menu" size={20} />
+          {needs ? (
+            // The chip the icons-only rail puts at an icon's corner: a dot alone would sit at under 3:1 on a light
+            // rail, and the figure keeps the on-highlight contrast.
+            <span
+              aria-hidden="true"
+              data-slot="phone-top-bar-menu-count"
+              className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-highlight px-1 type-caption tabular-nums text-on-highlight"
+            >
+              {formatNumber(needs, "number")}
+            </span>
+          ) : null}
         </ButtonBase>
       ) : null}
       <div className={cn("flex min-w-0 flex-1 items-center", back || onMenu ? "px-1" : "px-2")}>

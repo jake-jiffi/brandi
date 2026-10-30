@@ -1213,6 +1213,7 @@ The frame of every product: a skip link, the canvas, the rail and the main colum
   page behind it is inert, a Close navigation button sits at its top, Escape and the scrim close it,
   and focus returns to the menu button. Scroll padding keeps focus clear of the phone action bar.
   The bar is a region named "Page actions", so a primary moved into it is never outside a landmark.
+  Under 1024px the menu button carries the rail's needs-you counts, summed (Phone top bar, below).
 - **Review.** There was no working phone layout, the only P0 in round 1. The drawer dropped focus
   and let it escape behind (round 2). An invisible tooltip swallowed Escape in the drawer, and the
   action bar could hide focus (round 3).
@@ -1654,6 +1655,12 @@ A detail screen's top bar, with Back and the screen's title. Every surface, on p
 - From the focus model: after navigating, focus moves to the new screen's `main`.
 - Its actions and its focus take the rail's colours (the on-rail scope), so an icon reads on a dark
   rail. In the page's ink one read at 1.6:1, and axe, which reads no icon, passed it.
+- The menu button carries the rail's needs-you counts, because the rail is behind it. Inside
+  AppShell it shows their sum on a highlight chip at its corner, as the icons-only rail does, and is
+  named "Open navigation, 5 need you". AppShell gathers the counts from the rail's NavItems, so its
+  own bar and a PhoneTopBar passed as `topBar` both get them; `menuCount` sets it outside a shell.
+  Counts that wait on others stay in the drawer. On a phone the counts once vanished behind a bare
+  menu button.
 
 #### Workspace switcher · to build, not yet proven
 
