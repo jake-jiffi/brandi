@@ -180,7 +180,7 @@ describe('a round held against the bar', () => {
   test("every board's frame is held to its content, and a box that hides content fails the round, each named in the record", () => {
     const measured = {
       ConsoleHome1440: 1460, ConsoleSignIn1440: 700, MessagingReady600: 497, AppCheckout390: 844, ConsoleStates1440: 1878, Broken1440: { error: 'the board did not render: boom' },
-      __sections: {}, __clipped: { AppCheckout390: [{ what: 'card', shown: 327, content: 371, text: '[Northside], pick-up' }] }, __unfilled: {},
+      __sections: {}, __clipped: { AppCheckout390: [{ what: 'card', shown: 327, content: 371, text: '[Northside], pick-up' }] }, __clippedAcross: {}, __unfilled: {},
     };
     const boards = [
       { label: 'ConsoleHome1440', width: 1440, declared: 900, fluid: true },
@@ -209,12 +209,28 @@ describe('a round held against the bar', () => {
     assert.match(md, /- AppCheckout390: card "\[Northside\], pick-up" shows 327px of 371px/);
     assert.match(md, /- Broken1440: not measured \(the board did not render: boom\)/);
     assert.match(md, /brandi product boards --heights/);
-    g.sizes = sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {}, __unfilled: {} }, boards: boards.filter((b) => b.label === 'ConsoleStates1440') });
+    g.sizes = sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {}, __clippedAcross: {}, __unfilled: {} }, boards: boards.filter((b) => b.label === 'ConsoleStates1440') });
     assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').pass, true);
     assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').detail, 'every frame fits its content on 1 board, nothing on a board hides its own content, and every hole is filled');
     assert.match(sizeGate({ measured: { ConsoleStates1440: 1878, __sections: {} }, boards }).skipped, /measure-boards\.mjs.*--kit/, "a starter's older tool says to refresh the kit");
     assert.match(sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {} }, boards }).skipped, /measure-boards\.mjs.*--kit/, 'and so does one from before holes were checked');
+    assert.match(sizeGate({ measured: { ConsoleStates1440: 1878, __clipped: {}, __unfilled: {} }, boards }).skipped, /measure-boards\.mjs.*--kit/, 'and one from before boxes cut across were checked');
     assert.equal(judgeRound(clean()).verdicts.some((v) => v.gate === 'Board sizes'), false, 'a round from before the gate has no line for it');
+  });
+
+  // At 820 a board's three cards came to 240px each, a header action ran past one card's edge and was cut off, and
+  // the gate, comparing heights only, said "clipped []".
+  test('a box that cuts its content off across fails Board sizes too, and the record says across', () => {
+    const boards = [{ label: 'ConsoleBays820', width: 820, declared: 1180, fluid: true }];
+    const sizes = sizeGate({ measured: { ConsoleBays820: 1180, __clipped: {}, __clippedAcross: { ConsoleBays820: [{ what: 'card', shown: 238, content: 251, text: 'Groom room Add 15 minutes' }] }, __unfilled: {} }, boards });
+    assert.deepEqual(sizes.clipped, [{ board: 'ConsoleBays820', what: 'card', shown: 238, content: 251, text: 'Groom room Add 15 minutes', across: true }]);
+    const g = clean();
+    g.sizes = sizes;
+    const judged = judgeRound(g);
+    const verdict = judged.verdicts.find((v) => v.gate === 'Board sizes');
+    assert.equal(verdict.pass, false);
+    assert.equal(verdict.detail, '1 board hides content in a box that clips it');
+    assert.match(roundMarkdown(g, judged), /- ConsoleBays820: card "Groom room Add 15 minutes" shows 238px of 251px across\n/);
   });
 
   // A proposal's on-edit and on-dismiss named a noop its board's renderVals() never returned, so it drew no Edit and
@@ -224,7 +240,7 @@ describe('a round held against the bar', () => {
       { label: 'AppProposal390', width: 390, declared: 844, fluid: false },
       { label: 'AppHome390', width: 390, declared: 844, fluid: false },
     ];
-    const sizes = sizeGate({ measured: { AppProposal390: 844, AppHome390: 844, __clipped: {}, __unfilled: { AppProposal390: ['noop', 'row.pick'] } }, boards });
+    const sizes = sizeGate({ measured: { AppProposal390: 844, AppHome390: 844, __clipped: {}, __clippedAcross: {}, __unfilled: { AppProposal390: ['noop', 'row.pick'] } }, boards });
     assert.deepEqual(sizes.unfilled, [{ board: 'AppProposal390', names: ['noop', 'row.pick'] }]);
     const g = clean();
     g.sizes = sizes;
@@ -233,7 +249,7 @@ describe('a round held against the bar', () => {
     assert.equal(verdict.pass, false);
     assert.equal(verdict.detail, '1 board names a value its script never gives (AppProposal390: noop, row.pick)');
     assert.match(roundMarkdown(g, judged), /## Board sizes\n[\s\S]*- AppProposal390: names \{\{noop\}\}, \{\{row\.pick\}\}, which its script never gives\n/);
-    g.sizes = sizeGate({ measured: { AppProposal390: 844, AppHome390: 844, __clipped: {}, __unfilled: { AppProposal390: ['noop'], AppHome390: ['tabs'] } }, boards });
+    g.sizes = sizeGate({ measured: { AppProposal390: 844, AppHome390: 844, __clipped: {}, __clippedAcross: {}, __unfilled: { AppProposal390: ['noop'], AppHome390: ['tabs'] } }, boards });
     assert.equal(judgeRound(g).verdicts.find((v) => v.gate === 'Board sizes').detail, '2 boards name values their scripts never give (AppProposal390: noop; AppHome390: tabs)');
   });
 
@@ -775,6 +791,24 @@ describe('a board that hides its own content', () => {
       `<p style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 0;">An ellipsis line with room around it</p>`,
       `<div style="position: relative; height: 200px;"><div aria-hidden="true" inert style="position: relative; height: 100px; overflow: hidden;"><div style="height: 100px; overflow: hidden;">${lines(10)}</div></div></div>`,
     ].join(''),
+    // A narrow card's header action ran past the card's right edge and was cut off, and the check, comparing heights
+    // only, passed it.
+    '/across': `<section data-slot="card" style="width: 240px; overflow: clip; border: 1px solid;"><div style="display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 16px;"><h2 style="margin: 0;">Groom room</h2><button style="width: 200px; white-space: nowrap;">Add 15 minutes</button></div></section>`,
+    '/across-text': `<div style="width: 120px; overflow: hidden;"><p style="white-space: nowrap;">${'A very long name '.repeat(3)}</p></div>`,
+    // A line that wraps out of a flex column but starts inside the edge shows part of itself.
+    '/across-wrap': `<div style="width: 120px; height: 40px; overflow: hidden;"><div style="height: 100%; display: flex; flex-direction: column; flex-wrap: wrap; column-gap: 8px;"><p style="white-space: nowrap;">A first line</p><p style="white-space: nowrap;">9 to 10 am</p><p style="white-space: nowrap;">[Lee household]</p></div></div>`,
+    '/allowed-across': [
+      // An overflow: hidden box is a scroll container, whose scrollWidth counts its end padding: a child that only
+      // reaches into the padding is in full view.
+      `<div style="box-sizing: border-box; width: 200px; height: 40px; padding: 0 16px; overflow: hidden;"><div style="width: 180px;">In full view</div></div>`,
+      `<div style="width: 120px; overflow-x: auto;"><p style="white-space: nowrap;">${'A long row that scrolls '.repeat(3)}</p></div>`,
+      `<div style="width: 200px; overflow: hidden;"><div style="overflow-x: auto;"><p style="white-space: nowrap;">${'A long row that scrolls '.repeat(4)}</p></div></div>`,
+      `<div style="position: relative; height: 60px;"><div role="listbox" style="position: absolute; top: 0; width: 100px; overflow: hidden;"><p style="white-space: nowrap;">An option far wider than its panel</p></div></div>`,
+      `<div aria-hidden="true" style="width: 100px; overflow: hidden;"><p style="white-space: nowrap;">A page under a scrim, wider than its box</p></div>`,
+      `<span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;">Visually hidden, and far wider than one pixel</span>`,
+      // A schedule's short event: a line with no room starts a column a whole width out, and is hidden whole.
+      `<div style="width: 120px; height: 40px; overflow: hidden;"><div style="height: 100%; display: flex; flex-direction: column; flex-wrap: wrap; column-gap: 100%;"><p style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">[Service the boiler]</p><p>9 to 10 am</p><p>[Lee household]</p></div></div>`,
+    ].join(''),
   };
   let out;
   before(async () => {
@@ -802,6 +836,22 @@ describe('a board that hides its own content', () => {
   test('the phone frame with a plain block in its main holds its cards at their height, and truncation, scrolling, the visually hidden, an overlay drawn open and a page under a scrim are left alone', needsKit, () => {
     assert.equal(out.__clipped['/block'], undefined, JSON.stringify(out.__clipped['/block']));
     assert.equal(out.__clipped['/allowed'], undefined, JSON.stringify(out.__clipped['/allowed']));
+  });
+
+  test('a box that clips content wider than itself is named under __clippedAcross, with how far its content runs', needsKit, () => {
+    const across = out.__clippedAcross['/across'];
+    assert.equal(across?.length, 1, JSON.stringify(out.__clippedAcross));
+    assert.equal(across[0].what, 'card');
+    assert.equal(across[0].shown, 240, "the card's width inside its border");
+    assert.ok(across[0].content > across[0].shown + 4, `its content runs past its edge: ${JSON.stringify(across[0])}`);
+    assert.match(across[0].text, /^Groom room/);
+    assert.equal(out.__clipped['/across'], undefined, 'nothing is cut down');
+    assert.equal(out.__clippedAcross['/across-text']?.length, 1, 'a line cut across with no ellipsis');
+    assert.equal(out.__clippedAcross['/across-wrap']?.length, 1, `a line wrapped out of a column, partly in view: ${JSON.stringify(out.__clippedAcross)}`);
+  });
+
+  test('across, an ellipsis, a child in the padding, a scroller, an overlay drawn open, a page under a scrim, the visually hidden and a line wrapped out whole are left alone', needsKit, () => {
+    for (const p of ['/allowed', '/allowed-across', '/squeezed', '/squeezed-lines', '/block']) assert.equal(out.__clippedAcross[p], undefined, `${p}: ${JSON.stringify(out.__clippedAcross[p])}`);
   });
 });
 

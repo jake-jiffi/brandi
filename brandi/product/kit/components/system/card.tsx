@@ -50,6 +50,8 @@ export interface CardProps extends Omit<React.HTMLAttributes<HTMLElement>, "titl
 const INSET_X = "px-6 @max-[359px]:px-4"
 const INSET_TOP = "pt-6 @max-[359px]:pt-4"
 const INSET_BOTTOM = "pb-6 @max-[359px]:pb-4"
+// The title's type at each level, as CardTitle sets it: the actions take its line's height from it.
+const TITLE_TYPE = { 2: "type-heading-lg", 3: "type-heading", 4: "type-heading-sm" } as const
 
 /** The container on the canvas: a title, an optional description and actions, a body and a footer. */
 export const Card = React.forwardRef<HTMLElement, CardProps>(function Card(
@@ -102,31 +104,46 @@ export const Card = React.forwardRef<HTMLElement, CardProps>(function Card(
       <cardNesting.Provider value={true}>
         {hasHeader ? (
           <CardHeader
-            className={cn(box && INSET_X, box && INSET_TOP, box && !hasBody && !footer && INSET_BOTTOM, nested && "px-0")}
+            className={cn(
+              // A row that wraps: the actions sit beside the title while it keeps 8rem, and drop below it in a card
+              // too narrow for both, never past the card's edge.
+              "flex flex-wrap gap-x-4 gap-y-3",
+              box && INSET_X,
+              box && INSET_TOP,
+              box && !hasBody && !footer && INSET_BOTTOM,
+              nested && "px-0"
+            )}
           >
-            {title != null ? (
-              <CardTitle as={`h${level}`} className={cn((icon || chevron) && "flex items-center gap-2")}>
-                {icon ? <Icon name={icon} size={18} className="text-text-muted" /> : null}
-                {href ? (
-                  <Link href={href} data-slot="card-link" className="rounded-xs after:absolute after:inset-0">
-                    {/* The underline sits on the text, so a canvas's own link styles cannot restyle it. */}
-                    <span className="underline-offset-4 group-hover/card:underline">{title}</span>
-                  </Link>
-                ) : (
-                  title
-                )}
-                {chevron ? (
-                  <span aria-hidden="true" data-slot="card-chevron" className="ms-auto flex shrink-0 text-text-subtle">
-                    <Icon name="ChevronRight" />
-                  </span>
+            {title != null || description != null ? (
+              <div data-slot="card-heading" className="flex min-w-0 grow basis-32 flex-col gap-1">
+                {title != null ? (
+                  <CardTitle as={`h${level}`} className={cn((icon || chevron) && "flex items-center gap-2")}>
+                    {icon ? <Icon name={icon} size={18} className="text-text-muted" /> : null}
+                    {href ? (
+                      <Link href={href} data-slot="card-link" className="rounded-xs after:absolute after:inset-0">
+                        {/* The underline sits on the text, so a canvas's own link styles cannot restyle it. */}
+                        <span className="underline-offset-4 group-hover/card:underline">{title}</span>
+                      </Link>
+                    ) : (
+                      title
+                    )}
+                    {chevron ? (
+                      <span aria-hidden="true" data-slot="card-chevron" className="ms-auto flex shrink-0 text-text-subtle">
+                        <Icon name="ChevronRight" />
+                      </span>
+                    ) : null}
+                  </CardTitle>
                 ) : null}
-              </CardTitle>
+                {description != null ? <CardDescription className="max-w-measure">{description}</CardDescription> : null}
+              </div>
             ) : null}
-            {description != null ? <CardDescription className="max-w-measure">{description}</CardDescription> : null}
             {actions != null ? (
-              // Centred on the title's line: the negative margin lets a 32 to 44px button sit there
-              // without making the header taller.
-              <CardAction className="relative z-10 row-span-1 -my-2 flex items-center gap-2 self-center">{actions}</CardAction>
+              // One title line tall, the buttons centred on it: a 32 to 44px button sits on the title's line without
+              // making the header taller, and dropped below the title it still clears it. Its own text takes the body
+              // style, not the title's.
+              <CardAction className={cn("relative z-10 flex h-lh shrink-0 items-center gap-2", TITLE_TYPE[level])}>
+                <div className="contents type-body">{actions}</div>
+              </CardAction>
             ) : null}
           </CardHeader>
         ) : null}

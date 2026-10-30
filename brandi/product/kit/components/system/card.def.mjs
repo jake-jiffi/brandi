@@ -39,7 +39,7 @@ export default {
     ],
     Layout: [
       "The title's size follows its level, so the outline shows on screen too: heading-lg for a card that is a section of the page (h2), heading for a card under a section heading (h3), heading-sm below that (h4).",
-      "Header actions centre on the title's line. The inset steps from 24px to 16px when the card itself is under 360px wide.",
+      "Header actions centre on the title's first line while the title keeps 8rem beside them. In a card too narrow for both they drop below the title and its description, never past the card's edge. The inset steps from 24px to 16px when the card itself is under 360px wide.",
       "In a column that scrolls, as a flex or a grid item, a card keeps its content's height and the column scrolls. It clips its corners with overflow: clip: an overflow: hidden box is a scroll container, whose automatic minimum size is 0.",
     ],
     States: [
@@ -52,6 +52,7 @@ export default {
     Review: [
       "An uppercase kicker sat above card titles, which the craft gate bans (round 1).",
       "Cards shrank inside a phone's scrolling main and hid the checkout's total (a proof run, round 2).",
+      "Three cards came to 240px each at 820: a header action ran past its card and was cut off, and the title beside it broke one word to a line (a proof run, round 3).",
     ],
   },
   frame: { width: 960, height: 1800 },
@@ -59,6 +60,9 @@ export default {
   logic: `els: {
   exportAction: window.React.createElement(NS.Button, { size: "sm", variant: "ghost", icon: "Download" }, "Export"),
   menuAction: window.React.createElement(NS.Button, { size: "sm", variant: "ghost", icon: "Pencil" }, "Edit"),
+  addTen: window.React.createElement(NS.Button, { size: "sm", icon: "Plus" }, "Add 10 minutes"),
+  closeBay: window.React.createElement(NS.Button, { size: "sm", icon: "Ban" }, "Close the bay"),
+  addFifteen: window.React.createElement(NS.Button, { size: "sm", icon: "Clock" }, "Add 15 minutes"),
 }`,
   examples: [
     {
@@ -140,6 +144,17 @@ ${["flex", "grid"].map((kind) => `<div data-frame="${kind}" style="width: 300px;
       title: "A narrow card",
       markup: `<div class="w-72"><x-import component-from-global-scope="NS.Card" title="Overtime" description="This week.">${body("[12.5] hours across [4] people.")}</x-import></div>`,
     },
+    {
+      // A board's three cards came to 240px each at 820: a header action ran 13px past its card, where the clip cut
+      // it off, and the title beside it broke one word to a line.
+      id: "narrow-actions",
+      title: "Narrow cards, their actions below the title",
+      markup: `<div style="display: grid; grid-template-columns: repeat(3, 240px); gap: 24px; align-items: start;">
+<x-import component-from-global-scope="NS.Card" title="Bay 1, the big bay" icon="Timer" actions="{{els.addTen}}">${body("[Pepper], a wash, 12 of 20 minutes.")}</x-import>
+<x-import component-from-global-scope="NS.Card" title="Bay 2" icon="Timer" actions="{{els.closeBay}}">${body("Out of order since 3:52pm.")}</x-import>
+<x-import component-from-global-scope="NS.Card" title="Groom room" icon="Scissors" description="Wash and dry with [Jess]." actions="{{els.addFifteen}}">${body("[Rex] is next, a nail trim at 5pm.")}</x-import>
+</div>`,
+    },
   ],
   checks: [
     {
@@ -180,7 +195,7 @@ ${["flex", "grid"].map((kind) => `<div data-frame="${kind}" style="width: 300px;
       example: "anatomy",
       async run({ scope, expect }) {
         const header = scope.locator('[data-slot="card-header"]')
-        expect.equal(await header.evaluate((el) => el.firstElementChild?.dataset.slot), "card-title", "the header's first element")
+        expect.equal(await header.evaluate((el) => el.querySelector(":scope > :first-child > :first-child")?.dataset.slot), "card-title", "the first element in the header's first block")
         expect(await style(scope.locator('[data-slot="card-title"]'), "textTransform") !== "uppercase", "the title is not uppercase")
       },
     },
@@ -243,6 +258,42 @@ ${["flex", "grid"].map((kind) => `<div data-frame="${kind}" style="width: 300px;
         const inset = (ex) => page.locator(`[data-example="${ex}"] [data-slot="card-content"]`).evaluate((el) => getComputedStyle(el).paddingLeft)
         expect.equal(await inset("anatomy"), "24px", "a wide card's inset")
         expect.equal(await inset("narrow"), "16px", "a 288px card's inset")
+      },
+    },
+    {
+      name: "A header action sits on the title's line while there is room, and drops below the title, inside the card, when there is not",
+      async run({ page, expect }) {
+        const headers = (ex) => page.locator(`[data-example="${ex}"] [data-slot="card"]`).evaluateAll((cards) => cards.map((card) => {
+          const header = card.querySelector('[data-slot="card-header"]')
+          const title = header.querySelector('[data-slot="card-title"]')
+          const box = title.getBoundingClientRect()
+          const buttons = [...header.querySelectorAll('[data-slot="card-action"] button')].map((b) => b.getBoundingClientRect())
+          // The title's lines, read off its text alone: the icon beside it is no line of its own.
+          const tops = []
+          const walk = document.createTreeWalker(title, NodeFilter.SHOW_TEXT)
+          for (let node = walk.nextNode(); node; node = walk.nextNode()) {
+            const range = document.createRange()
+            range.selectNodeContents(node)
+            for (const r of range.getClientRects()) if (r.width > 0 && !tops.some((t) => Math.abs(t - r.top) < 4)) tops.push(r.top)
+          }
+          return {
+            title: title.textContent.trim(),
+            words: title.textContent.trim().split(/\s+/).length,
+            lines: tops.length,
+            // Past the header's inset is past where the card's own content may go.
+            overrun: Math.max(...buttons.map((b) => b.right)) - (header.getBoundingClientRect().right - parseFloat(getComputedStyle(header).paddingRight)),
+            below: Math.min(...buttons.map((b) => b.top)) >= box.bottom,
+            offLine: Math.abs((buttons[0].top + buttons[0].bottom) / 2 - (box.top + parseFloat(getComputedStyle(title).lineHeight) / 2)),
+          }
+        }))
+        for (const c of await headers("narrow-actions")) {
+          expect(c.overrun <= 0.5, `${c.title}: its action runs ${Math.round(c.overrun)}px past the card's inset, where the card clips it`)
+          expect(c.lines <= Math.max(1, Math.floor(c.words / 2)), `${c.title}: ${c.words} words on ${c.lines} lines, under two to a line`)
+          expect(c.below, `${c.title}: the action drops below the title`)
+        }
+        for (const c of [...(await headers("anatomy")), ...(await headers("link"))]) {
+          expect(c.offLine <= 2, `${c.title}: with room, the action centres on the title's line (${Math.round(c.offLine)}px off)`)
+        }
       },
     },
     {

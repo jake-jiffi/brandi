@@ -133,11 +133,12 @@ export default {
     {
       // Two TimePickers and a badge in a row with a fixed label column, in a Card 200px wide: the badge's auto
       // column has about 10px. Wrapping the cut badge in its tooltip once made that column wide enough to uncut it,
-      // which unwrapped it, which cut it again: React stopped the loop with error 185 and the board never drew.
+      // which unwrapped it, which cut it again: React stopped the loop with error 185 and the board never drew. The rows
+      // scroll across: cut off at the card's edge, the time pickers' buttons were content Board sizes lists as hidden.
       id: "squeezed",
       title: "A row too narrow for what it holds: the badge is cut and the board still draws",
       markup: `<div style="width: 200px;"><x-import component-from-global-scope="NS.Card" title="Regular week">
-<div class="flex flex-col gap-3">
+<div class="flex flex-col gap-3" style="overflow-x: auto;">
 <div data-row style="display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center;"><span class="type-label text-text-strong">Monday</span><x-import component-from-global-scope="NS.TimePicker" default-value="10:00" aria-label="Monday opens"></x-import><x-import component-from-global-scope="NS.TimePicker" default-value="23:00" aria-label="Monday closes"></x-import><span aria-hidden="true"></span></div>
 <div data-row style="display: grid; grid-template-columns: 120px minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center;"><span class="type-label text-text-strong">Thursday</span><x-import component-from-global-scope="NS.TimePicker" default-value="10:00" aria-label="Thursday opens"></x-import><x-import component-from-global-scope="NS.TimePicker" default-value="22:00" aria-label="Thursday closes"></x-import><x-import component-from-global-scope="NS.Badge" tone="info">Syncing</x-import></div>
 </div>
