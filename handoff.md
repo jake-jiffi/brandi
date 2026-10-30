@@ -1001,9 +1001,11 @@ installed.
 
 ### Status
 
-Not merged into main. Branch `product-system`, pull request 1. The last proof run met the bar on
-its own review, and an independent review then found two P2 findings still open. The merge waits
-for a person to accept that or for one more round.
+Merged into main from pull request 1, by Jake's decision on 30 October, after the kit fixes the last
+independent review raised. The last proof run passed every machine gate. Its own craft review gave 38
+of 40; an independent review gave 32 of 40, with four P2 findings open. Three were the run's own
+boards (opening hours as free text, one bookable day, help pointing to a number Settings never
+shows). The fourth, a card header action clipped at 820, was the kit's and is fixed.
 
 ### How to run it
 
@@ -1044,32 +1046,26 @@ round` exits 1 until all of that holds, and `brandi product gates` exits 1 when 
 
 ### How it was proven
 
-Six proof runs. Each was a fresh agent following only the committed skill, on a brand the skill
+Seven proof runs. Each was a fresh agent following only the committed skill, on a brand the skill
 was not tuned on, logging every place the skill or the tool let it down. Each gap came back as a
 fix with a test or a component check, and a lesson in `brandi/product/lessons.json` naming what
-broke, the guard and the reference heading that teaches it. There are 137 lessons.
+broke, the guard and the reference heading that teaches it. There are 153 lessons.
 
-A run that had to work round a kit bug was stopped, and the next started on the fixed code. The
-first run of the night opened with 14 detector findings and 17 axe violations. The last passed every
-machine gate in round 2 and round 3. Its own craft review gave 37 of 40. An independent reviewer
-gave 34 of 40 and found two P2 findings it had missed:
-- The generated component boards show the kit's sample business (invoices, a dental client) inside
-  a dog-wash product. The kit's sample copy is a trades business, and a builder copying a preview
-  takes that copy with it.
-- The run's own Settings board could set only one of its three groom prices. That one is the run's
-  board, not the skill.
-
-The last run used one workaround, keeping a concept's look after a direction was picked. That is
-fixed: a direction may name a role `null`.
+A run that had to work round a kit bug was stopped or finished and the next started on the fixed
+code. Across the runs, first rounds went from 41 detector findings and 24 axe violations to every
+machine gate passing by round 2. Self-reviews ran 4 to 6 points above independent ones (37 against
+34, then 38 against 32), so a real run should always have its craft review done by a separate
+reviewer, which 08 already asks for.
 
 ### Still open
 
-- The component boards' sample copy (above). The fix is a design call: draw component boards in
-  the product's own nouns, or label them as the kit's specimens.
-- A surface without modules is never held to error states, so a booking page drew none.
-- A brand that names a colour in words with no value ("sand neutrals") is not flagged.
-- Help scored 3 in every run. No board shows what Help opens.
-- Nothing scans a route that answers 404.
+- An event with less than a line of room in a Schedule shows no text, only its tooltip. Laying
+  events side by side when they start within a line of each other is the better fix.
+- No reference shows how to script a whole page board. Runs write their own generator.
+- No gate checks that sample data agrees between boards.
+- Help's starter route has no search and no "what is down" banner yet.
+- Every existing starter needs `brandi product starter --kit` before its next gates run, or Board
+  sizes reports "not run".
 
 ### Before changing anything
 
