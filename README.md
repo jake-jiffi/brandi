@@ -1,3 +1,15 @@
+<p align="center">
+  <img src="assets/banner.png" alt="The brand comes first. Brandi, a Claude Code plugin. Builds your brand, then keeps every later build on it." width="100%">
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img alt="Licence: MIT" src="https://img.shields.io/badge/licence-MIT-0f063c"></a>
+  <img alt="Works with Claude Code" src="https://img.shields.io/badge/works%20with-Claude%20Code-599cff">
+  <img alt="Also runs on Codex" src="https://img.shields.io/badge/also%20runs%20on-Codex-599cff">
+  <a href="https://github.com/jake-jiffi/builder-kit-lean"><img alt="Pairs with builder-kit" src="https://img.shields.io/badge/pairs%20with-builder--kit-d5e6ff"></a>
+  <a href="https://clarityclub.jiffi.co"><img alt="From Jiffi Clarity Club" src="https://img.shields.io/badge/from-Jiffi%20Clarity%20Club-fff58a"></a>
+</p>
+
 # Brandi
 
 An agency-grade brand and design system builder for Claude Code, which also runs on Codex.
@@ -270,10 +282,11 @@ references. The commands are the parts that can be deterministic.
 
 ## What makes it different
 
-**Nothing is invented.** Every statement carries its provenance: supplied, extracted, published,
+**It shows its sources.** Brandi records where each claim came from: supplied, extracted, published,
 decided, assumed or open. Assumptions are labelled as assumptions. Gaps are bracketed placeholders,
 never plausible-looking fabrications. A brand book with an honest empty section is worth more than
-one with an invented full one.
+one with an invented full one. The check covers the claims that were recorded. It can't see one that
+wasn't, so read the strategy pages before you publish.
 
 **The maths is real.** Colour ramps are built in OKLCH, because HSL lightness is not perceptual and
 ramps built in it are not comparable across hues. Contrast is reported in both WCAG 2.2 and APCA
@@ -335,3 +348,7 @@ strongest ideas came from Rampstack's brand pipeline, shaharsha's token taxonomy
 Radix Colors' twelve-step scale semantics. The logo forge is built on Rampstack's logo method,
 distilled to machine-usable data in `research/findings/08-rampstack-logo-method.md`, which cites a
 source line for every number in it. The analysis of each is in `research/findings/`.
+
+## Licence
+
+[MIT](LICENSE). Use it, change it, share it.

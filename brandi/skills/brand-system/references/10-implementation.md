@@ -138,19 +138,21 @@ The Design Tokens Community Group is a **W3C Community Group**, not a Working Gr
 Community Group Report, explicitly **not a W3C Standard and not on the W3C Standards Track**.
 
 - Community group: <https://www.w3.org/community/design-tokens/>
-- Current draft, *Design Tokens Format Module 2025.10*: <https://www.designtokens.org/TR/drafts/format/>
-- Companion Color module: <https://www.designtokens.org/TR/drafts/color/>
+- First stable version, *Design Tokens Format Module 2025.10* (28 October 2025):
+  <https://www.designtokens.org/tr/2025.10/format/>
+- Companion Color module: <https://www.designtokens.org/tr/2025.10/color/>
 - Third Editors' Draft (20 July 2025), the version most tools actually implemented against:
   <https://www.designtokens.org/tr/third-editors-draft/format/>
 
-Both drafts carry explicit warnings. The 2025.10 draft says: *"This is a preview. Do not attempt to
-implement this version of the specification. Do not reference this version as authoritative in any
-way."* The Third Editors' Draft says it is *"unstable, and should not be implemented."*
+2025.10 is marked stable and is meant to be implemented. The working draft that follows it, under
+`/TR/drafts/`, still says *"Do not attempt to implement this version of the specification."* The
+Third Editors' Draft says it is *"unstable, and should not be implemented."*
 
 **"The DTCG format is a W3C standard" is false.** Do not write it in a brand book.
 
 The position this skill takes: treat DTCG as the interchange target because the tooling ecosystem
-has converged on it, say plainly that it is a moving draft, and expect churn.
+has converged on it, say plainly that it is a stable Community Group Report and not a W3C standard,
+and expect tools to take time to catch up with 2025.10.
 
 ### 2.2 What Brandi emits, and where it diverges
 
@@ -158,11 +160,11 @@ has converged on it, say plainly that it is a moving draft, and expect churn.
 and the divergences are deliberate. They are listed here so that nobody is surprised by a strict
 validator, and so that nobody "fixes" one of them without understanding the trade.
 
-| Area | 2025.10 draft | What Brandi emits | Why |
+| Area | 2025.10 | What Brandi emits | Why |
 |---|---|---|---|
 | `$schema` | `https://www.designtokens.org/schemas/2025.10/format.json` | `https://tr.designtokens.org/format/` | A stable pointer at the spec rather than a version-pinned JSON Schema. Pin the version when the schema URL stabilises |
-| `color` `$value` | An object: `{ colorSpace, components, alpha, hex }` | A hex string: `"#0b64d4"` | The colour object is the biggest breaking change in the draft and almost nothing in the wild reads it yet. The OKLCH values are not lost: they are in `system.json` and in `tokens.css` when `colorFormat: 'oklch'` is used |
-| `dimension` `$value` | An object: `{ value, unit }`, units `px` or `rem` only | Object in `tokens.json`, **string** (`"16px"`) in `tokens.style-dictionary.json` | This is the single biggest shape divergence between the spec drafts and the installed tooling. `dimensionStyle` exists for exactly this. See §2.3 |
+| `color` `$value` | An object: `{ colorSpace, components, alpha, hex }` | A hex string: `"#0b64d4"` | The colour object is the biggest breaking change in 2025.10 and almost nothing in the wild reads it yet. The OKLCH values are not lost: they are in `system.json` and in `tokens.css` when `colorFormat: 'oklch'` is used |
+| `dimension` `$value` | An object: `{ value, unit }`, units `px` or `rem` only | Object in `tokens.json`, **string** (`"16px"`) in `tokens.style-dictionary.json` | This is the single biggest shape divergence between the spec and the installed tooling. `dimensionStyle` exists for exactly this. See §2.3 |
 | `letterSpacing` unit | `px` or `rem` | `em` | Letter spacing must scale with font size or it is wrong at every step of the type scale. `em` is the correct typographic unit and the spec's restriction is the thing that is wrong here. A strict validator will flag it |
 | `shadow` | A structured object, or an array of them | `$type: "string"` with a CSS shadow string | The shadows are multi-layer and hue-tinted. `"string"` is **not a DTCG type**. It is an explicit escape hatch so that tooling does not silently mis-parse a composite it cannot represent |
 | `typography` composite | `fontFamily`, `fontSize`, `fontWeight`, `letterSpacing`, `lineHeight` | Same, minus `fontWeight` | Weight is a per-use decision in this system rather than a property of a scale step. Add it in your own layer if your pipeline requires the complete composite |
@@ -177,7 +179,7 @@ and `$description` on groups and tokens.
 This is worth understanding because it is the thing that breaks a pipeline silently.
 
 Early DTCG drafts expressed a dimension as a string: `"$value": "16px"`. The 2024 revision changed
-it to an object: `"$value": { "value": 16, "unit": "px" }`. The current 2025.10 draft keeps the
+it to an object: `"$value": { "value": 16, "unit": "px" }`. The stable 2025.10 version keeps the
 object form and restricts units to `px` and `rem`.
 
 Style Dictionary, which is where most token JSON actually gets consumed, still reads the string form

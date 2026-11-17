@@ -802,7 +802,7 @@ ${Object.entries(system.palettes).map(([f, pal]) => rampBlock(system, f, pal, 'd
   <div class="stack" style="gap:18px">
     <p>Everything in this book is generated from <span class="mono">brand/brand.json</span>. The token files are generated from the same source, so the book and the code cannot disagree.</p>
     <table><thead><tr><th>File</th><th>What it is for</th></tr></thead><tbody>
-      <tr><td class="mono">brand/tokens/tokens.json</td><td>Design Tokens Community Group format. Feed this to a build pipeline, checking first that it reads the current draft: the format is a Community Group Report, not a W3C standard, and it is still changing.</td></tr>
+      <tr><td class="mono">brand/tokens/tokens.json</td><td>Design Tokens Community Group format. Feed this to a build pipeline, checking first which version it reads: the format is a Community Group Report, not a W3C standard, and tools are still catching up with the stable 2025.10 version.</td></tr>
       <tr><td class="mono">brand/tokens/tokens.css</td><td>Custom properties, both themes. This is what most work imports.</td></tr>
       <tr><td class="mono">brand/tokens/tailwind.css</td><td>A Tailwind v4 theme block.</td></tr>
       <tr><td class="mono">brand/tokens/tokens.ts</td><td>Typed values, for anything that needs them in JavaScript.</td></tr>

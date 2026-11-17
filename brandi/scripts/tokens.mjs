@@ -8,9 +8,9 @@
  *   tokens.ts      a typed TypeScript module
  *
  * DTCG is a Design Tokens Community Group Report, NOT a W3C standard and not on
- * the W3C Standards Track. The current draft (Format Module 2025.10) carries the
- * line "Do not attempt to implement this version." So this emitter targets the
- * shape the ecosystem actually reads, states every divergence in
+ * the W3C Standards Track. Its first stable version is Format Module 2025.10
+ * (October 2025), and most tooling still reads the earlier shapes. So this emitter
+ * targets the shape the ecosystem actually reads, states every divergence in
  * references/10-implementation.md, and calls the output DTCG rather than
  * implying a standard that does not exist.
  * https://tr.designtokens.org/format/
@@ -29,7 +29,7 @@ import { fontStack } from './type.mjs';
 const DTCG_SCHEMA = 'https://tr.designtokens.org/format/';
 const DTCG_STATUS =
   'Design Tokens Community Group Report format. This is a Community Group Report, ' +
-  'not a W3C standard, and the draft is still changing. Check what your build tool ' +
+  'not a W3C standard. Version 2025.10 is stable and tools are still catching up. Check what your build tool ' +
   'actually reads before wiring this in.';
 
 function dim(px, style) {
