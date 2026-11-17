@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://brandi.design/brand.schema.json",
-  "title": "Brandi brand file",
+  "title": "brandi brand file",
   "description": "The durable source of truth for a brand system. The brand book, the design tokens and the enforcement skill are all generated views of this file. Edit this; never edit what it generates.",
   "type": "object",
   "required": [

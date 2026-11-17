@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the starter a product is built from, and the bundle the canvas mounts.
+ * brandi product layer: the starter a product is built from, and the bundle the canvas mounts.
  *
  * `brandi product starter` copies the kit (brandi/product/kit) into product/starter, then writes the
  * files the system owns: its tokens, its identity, globals.css, the market's locale, the product's
@@ -412,7 +412,7 @@ export async function buildBundle({ starter, productDir }) {
     writeFileSync(path.join(previews, `${def.name}Preview.dc.html`), previewBoard(def, system));
   }
   // The previews a product repo's CI runs the component checks on: rendered into the starter beside one
-  // copy of the runtime and of the system, so they need neither Brandi nor the network. The checks
+  // copy of the runtime and of the system, so they need neither brandi nor the network. The checks
   // compare definitions.json with the definitions, so a stale set fails rather than passing.
   const starterPreviews = path.join(starter, 'canvas', 'previews');
   rmSync(starterPreviews, { recursive: true, force: true });

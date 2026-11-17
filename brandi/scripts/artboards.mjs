@@ -1178,7 +1178,7 @@ export default {
 /**
  * A logo construction sheet built from a typeset wordmark.
  *
- * This is the honest answer to "there is no logo yet". Brandi cannot draw a
+ * This is the honest answer to "there is no logo yet". brandi cannot draw a
  * mark, and a generated one would be worse than none. What it can do is what an
  * agency does first: set the name properly in the brand's display face, fix the
  * tracking, and specify the construction, so there is something correct to use

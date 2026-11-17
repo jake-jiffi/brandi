@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: measure a brand's own live work for its shape families.
+ * brandi product layer: measure a brand's own live work for its shape families.
  *
  * The guidelines come first (02-brand-to-product.md, Shape). Where they say nothing, the brand's own website is
  * the next evidence, and reading its computed styles by hand in a browser is how one brand's shapes were found:

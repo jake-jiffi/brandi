@@ -81,7 +81,7 @@ describe('a mark, made safe to inline', () => {
       '<svg fill="currentColor" viewBox="0 0 1 1"><style>.a{fill:currentColor}.b{fill:currentColor;stroke:currentColor}</style></svg>');
   });
 
-  test("Brandi's clear-space sentence becomes the share of the logo's height", () => {
+  test("brandi's clear-space sentence becomes the share of the logo's height", () => {
     assert.equal(clearSpaceRatio('Leave clear space on every side equal to half the height of the mark. Nothing enters it.'), 0.5);
     assert.equal(clearSpaceRatio('equal to 0.75 the height of the mark'), 0.75);
     assert.equal(clearSpaceRatio('Keep it clear.'), null);

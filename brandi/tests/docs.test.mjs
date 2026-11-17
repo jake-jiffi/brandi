@@ -123,7 +123,7 @@ describe('the commands the docs name all exist', () => {
     assert.match(stdout, /brandi guardian \[--out <dir>\]/, 'guardian takes --out, and the help should say so');
     // The printer once dropped the comment opener and printed `/**` first.
     const firstLine = stdout.split('\n').find((l) => l.trim());
-    assert.match(firstLine, /^The Brandi command line/, `--help starts with ${JSON.stringify(firstLine)}`);
+    assert.match(firstLine, /^The brandi command line/, `--help starts with ${JSON.stringify(firstLine)}`);
     assert.match(stdout, /brandi book \[--pdf\] \[--print\]/, 'the print flag is documented');
     assert.match(stdout, /brandi sheets \[--out <dir>\]/, 'sheets runs bare, so --out is optional');
   });
@@ -131,7 +131,7 @@ describe('the commands the docs name all exist', () => {
   test('`brandi logo --help` prints the forge usage, not the main help', async () => {
     const { stdout } = await run(process.execPath, [path.join(ROOT, 'scripts', 'brandi.mjs'), 'logo', '--help']);
     assert.match(stdout, /^brandi logo: generate, measure and choose a mark/);
-    assert.equal(/The Brandi command line/.test(stdout), false);
+    assert.equal(/The brandi command line/.test(stdout), false);
   });
 
   test('the `brandi logo` line and the forge usage name every subcommand', () => {
@@ -474,7 +474,7 @@ describe('the references agree with the code they describe', () => {
     for (const ghost of ['og.png', 'icon-maskable-512.png', 'manifest.webmanifest', 'icon.svg`']) {
       assert.equal(doc.includes(ghost), false, `08 names ${ghost}, which the pack never writes`);
     }
-    assert.equal(/Brandi does not draw logos|never generate a logo/i.test(doc), false);
+    assert.equal(/brandi does not draw logos|never generate a logo/i.test(doc), false);
   });
 
   test('06 describes the deck the generator writes', async () => {
@@ -579,13 +579,13 @@ describe('the references agree with the code they describe', () => {
     assert.equal(/names three/.test(doc), false, '04 still shrinks the list it quotes');
     assert.match(doc, /^> All traits are legitimate for some briefs, but they are defaults rather than choices/m);
     assert.equal(/All three are legitimate/.test(doc), false, 'that sentence is not in the source');
-    // The quoted list runs 1 to 5, and Brandi's own additions come after it.
+    // The quoted list runs 1 to 5, and brandi's own additions come after it.
     for (const n of [1, 2, 3, 4, 5]) {
       assert.match(doc, new RegExp(`^> ${n}\\. `, 'm'), `the quotation is missing trait ${n}`);
     }
     assert.match(doc, /^6\. \*\*The violet SaaS look/m);
     assert.match(doc, /^7\. \*\*The pastel humanist look/m);
-    assert.equal(/^4\. \*\*The violet SaaS look/m.test(doc), false, 'Brandi’s additions still overwrite two of the five');
+    assert.equal(/^4\. \*\*The violet SaaS look/m.test(doc), false, 'brandi’s additions still overwrite two of the five');
   });
 
   // Settled by the foundry's own site and by Fonts In Use: Anybody is Etcetera

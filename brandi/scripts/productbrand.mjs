@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: lib/brand.ts, the brand's marks and character as the product uses them.
+ * brandi product layer: lib/brand.ts, the brand's marks and character as the product uses them.
  *
  * The kit's file holds the types, the kit's stand-in mark and its own placeholder brand. `brandi product
  * starter` replaces the placeholder with the brand's own files: the ones product.json's `brand` block names
@@ -307,7 +307,7 @@ i.decode().then(() => {
   }
 }
 
-// Brandi's own brand file writes a logo's role as free text ("secondary: black logo outline reversed to white"),
+// brandi's own brand file writes a logo's role as free text ("secondary: black logo outline reversed to white"),
 // and the logo forge writes primary, mono-white and mono-black. So a role is read by its words, lower-cased, once
 // any ground it names ("on black", "for dark backgrounds") is taken out, since a ground is not an ink: white,
 // reversed or knocked out is the file for dark grounds; black, mono or one colour is the one ink; primary is the
@@ -509,7 +509,7 @@ export function brandConstant(src, { stills = new Map() } = {}) {
   for (const key of standIn ? [] : Object.keys(LOGO_DEFAULTS)) {
     if (typeof src.logo?.[key] === 'number') logo[key] = src.logo[key];
   }
-  // Brandi records the smallest size along the long side; the product sizes a logo by its height.
+  // brandi records the smallest size along the long side; the product sizes a logo by its height.
   const aspect = aspectOf(marks.full);
   if (logo.minHeight == null && src.logo?.minLongSide && aspect) logo.minHeight = Math.max(1, Math.ceil(src.logo.minLongSide * Math.min(aspect, 1)));
   const symbolShape = marks.symbol ? aspectOf(marks.symbol) : null;

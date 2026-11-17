@@ -1,5 +1,5 @@
 /**
- * Brandi colour engine. Zero dependencies, Node stdlib only.
+ * brandi colour engine. Zero dependencies, Node stdlib only.
  *
  * Everything a brand needs to make colour decisions defensibly:
  *   - sRGB <-> linear <-> OKLab <-> OKLCH   (Ottosson, https://bottosson.github.io/posts/oklab/)

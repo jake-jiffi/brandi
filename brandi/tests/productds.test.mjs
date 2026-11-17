@@ -174,7 +174,7 @@ describe('the Design System artifact, assembled', () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  test('a live index keeps its marker, title and every key Brandi does not own', () => {
+  test('a live index keeps its marker, title and every key brandi does not own', () => {
     const live = { v: 3, layout: 'files', createdOnFiles: { v: 1, at: '2026-01-01T00:00:00Z' }, title: 'Their name', namespace: 'Old', libraries: [], sections: { x: 'y' }, groups: ['Icons'], assetGroups: { Icons: { name: 'Icons', tile: 's', order: ['a.svg'], files: { 'a.svg': { name: 'a.svg', blob: 'q' } } } }, blobs: {}, docs: { readme: 'project/README.md', sections: [] }, custom: 1 };
     const index = designSystemIndex({ live, system, title: 'New name', now: new Date('2026-10-28T00:00:00Z') });
     assert.deepEqual(index.createdOnFiles, live.createdOnFiles);

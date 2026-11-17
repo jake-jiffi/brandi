@@ -1,5 +1,5 @@
 /**
- * Brandi design-system builder.
+ * brandi design-system builder.
  *
  * Takes the handful of decisions a brand actually makes (a primary colour, a
  * couple of accents, a type pairing, a ratio, a shape stance, a motion stance)

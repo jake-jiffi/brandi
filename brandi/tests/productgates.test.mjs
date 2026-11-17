@@ -586,7 +586,7 @@ describe('a route the detector cannot scan as it stands', () => {
 });
 
 
-// axe-pages.mjs runs on the kit's own node_modules (Playwright and axe-core), which Brandi does not carry. Point
+// axe-pages.mjs runs on the kit's own node_modules (Playwright and axe-core), which brandi does not carry. Point
 // BRANDI_KIT_MODULES at an installed starter's node_modules to run these; without one they are skipped out loud.
 const KIT_MODULES = process.env.BRANDI_KIT_MODULES && path.resolve(process.env.BRANDI_KIT_MODULES);
 const needsKit = { skip: !KIT_MODULES || !existsSync(path.join(KIT_MODULES, 'playwright')) ? 'needs the kit\'s node_modules: set BRANDI_KIT_MODULES' : findChrome() ? false : 'no headless browser on this machine' };

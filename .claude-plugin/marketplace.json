@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "brandi",
   "metadata": {
-    "description": "Brandi: an agency-grade brand and design system builder for Claude Code."
+    "description": "brandi: an agency-grade brand and design system builder for Claude Code."
   },
   "owner": {
     "name": "Jake Shelley",

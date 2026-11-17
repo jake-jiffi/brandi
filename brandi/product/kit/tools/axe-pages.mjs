@@ -5,7 +5,7 @@
  *   node tools/axe-pages.mjs --pages pages.json [--json results.json]
  *   node tools/axe-pages.mjs --routes tools/routes.json --base http://localhost:3000 [--json results.json]
  *
- * pages.json is a list of { url, width, height, theme, label, kind }. A board rendered through Brandi's
+ * pages.json is a list of { url, width, height, theme, label, kind }. A board rendered through brandi's
  * runtime shim is scanned once it says it is ready. --routes scans a running app instead: every route at
  * 1440, 820 and 390, light and dark, a dark render asking for it in the address (?theme=dark), each once the
  * page has settled. Every violation is reported with its impact; the gate counts any violation as a

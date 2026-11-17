@@ -115,7 +115,7 @@ describe('the deck is a 16:9 presentation, in the order the brief lists', () => 
   test('the closing page is a colophon that calls the deck a living document', () => {
     assert.match(deck.html, /Thank you for using the brand correctly/);
     assert.match(deck.html, /living document/);
-    assert.match(deck.html, /Built with Brandi/);
+    assert.match(deck.html, /Built with brandi/);
   });
 });
 

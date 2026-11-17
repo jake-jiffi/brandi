@@ -37,7 +37,7 @@
  *
  * The idea, the crop arithmetic and the reviewed/unreviewed mechanism are taken
  * from Palate's `palate-assets.mjs`, which solved this first. What is different
- * here: no dependency, because Brandi has none; slots that are brand surfaces
+ * here: no dependency, because brandi has none; slots that are brand surfaces
  * rather than website sections; print resolution, because a brand meets paper;
  * and a summary that survives a folder of five hundred files, because a
  * per-file report of five hundred images is a report nobody reads.

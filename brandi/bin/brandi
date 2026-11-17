@@ -1,5 +1,5 @@
 #!/bin/sh
-# Brandi command line.
+# brandi command line.
 #
 # Claude Code puts every installed plugin's bin directory on PATH, so once the
 # plugin is installed this is simply `brandi <command>`. Running from a clone

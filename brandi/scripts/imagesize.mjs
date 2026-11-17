@@ -2,7 +2,7 @@
  * Image dimensions from the file header, with no dependencies.
  *
  * Palate solves this with `sharp`, which is the right answer for a project that
- * already has a node_modules. Brandi has none and is not starting now: a brand
+ * already has a node_modules. brandi has none and is not starting now: a brand
  * tool that cannot measure a photograph until somebody runs npm is a brand tool
  * that does not measure photographs.
  *

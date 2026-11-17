@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the Design System artifact, assembled for publishing.
+ * brandi product layer: the Design System artifact, assembled for publishing.
  *
  * Writes the folder an Artifact publish sends (project/...) and prints the calls, the way
  * `brandi canvas` does for a canvas: the written system, tokens.json, every component card, the
@@ -99,7 +99,7 @@ export function coverPage(tokens, system, { tagline } = {}) {
   ].join('\n');
 }
 
-/** design-system.json: a new index, or the live one with only Brandi's keys changed. */
+/** design-system.json: a new index, or the live one with only brandi's keys changed. */
 export function designSystemIndex({ live = null, system, title, by = 'Claude', note, now = new Date(), assetGroups = {} }) {
   const prev = live && typeof live === 'object' ? structuredClone(live) : null;
   const index = prev ?? {

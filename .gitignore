@@ -1,6 +1,6 @@
 # Twenty-seven third-party repositories, cloned as reading material during the
 # build. They are 712MB, they are somebody else's work under somebody else's
-# licence, and nothing in Brandi depends on them at runtime. What was learned
+# licence, and nothing in brandi depends on them at runtime. What was learned
 # from them lives in research/findings/, which IS tracked.
 research/benchmarks/
 

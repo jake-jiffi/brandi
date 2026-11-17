@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the drift check, canvas against system against code.
+ * brandi product layer: the drift check, canvas against system against code.
  *
  * Run every round, before the reviewers start. Each difference is reported with both values and where
  * each lives, so it is fixed at the source (the tokens, the component definition, the pattern) and

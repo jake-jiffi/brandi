@@ -63,7 +63,7 @@ const findings = []
 const skipped = []
 const errors = []
 
-/** One render, exactly as Brandi's gates run it: `<engine> detect --json --no-config --viewport WxH <url>`. */
+/** One render, exactly as brandi's gates run it: `<engine> detect --json --no-config --viewport WxH <url>`. */
 const detect = (render) =>
   new Promise((resolve) => {
     const child = spawn(engine, ["detect", "--json", "--no-config", "--viewport", `${render.width}x${HEIGHT}`, render.url])

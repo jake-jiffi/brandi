@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the canvas boards a system generates for itself.
+ * brandi product layer: the canvas boards a system generates for itself.
  *
  * Foundations (colour, type, shape, icons) come from the tokens; one board per component group comes
  * from the definitions' own examples, so the canvas and the cards cannot show different things. Each

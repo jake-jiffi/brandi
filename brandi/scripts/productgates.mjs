@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the quality gates, run as a round, and the record a round leaves.
+ * brandi product layer: the quality gates, run as a round, and the record a round leaves.
  *
  * `brandi product gates` renders every component preview and canvas board through the runtime shim
  * (and the starter's routes, when a running starter is given), then runs the machine gates:

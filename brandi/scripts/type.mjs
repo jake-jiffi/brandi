@@ -1,5 +1,5 @@
 /**
- * Brandi typography engine. Zero dependencies.
+ * brandi typography engine. Zero dependencies.
  *
  * Turns two decisions (a base size and a ratio) into a complete, accessible
  * type system: a named scale, fluid clamp() values that survive browser zoom,

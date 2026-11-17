@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the brand's faces as files, fetched from Google Fonts where it hosts them.
+ * brandi product layer: the brand's faces as files, fetched from Google Fonts where it hosts them.
  *
  * The system ships its faces as files (02-brand-to-product.md, Type), so previews and the canvas never depend on a
  * CDN. A brand whose faces Google hosts has no files to hand over, and one run fetched the latin subsets by hand out

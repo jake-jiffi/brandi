@@ -879,7 +879,7 @@ describe('the Design canvas', () => {
     const index = K.designIndex({ manifest, title: 'A new name', base: live(), removed: ['Old.dc.html'] });
     assert.equal(index.title, 'Acme product canvas', 'the canvas keeps its own title');
     assert.deepEqual(index.createdOnFiles, live().createdOnFiles);
-    assert.deepEqual(index.editorOnly, { keep: true }, 'a key Brandi never heard of survives');
+    assert.deepEqual(index.editorOnly, { keep: true }, 'a key brandi never heard of survives');
     assert.deepEqual(index.boards['TheirSketch.dc.html'], { x: 4000, y: 0, w: 600, h: 400 });
     assert.equal(index.boards['Old.dc.html'], undefined, 'a board this folder stopped sending is dropped');
     assert.equal(index.boards['Main.dc.html'].frameless, true);
@@ -918,7 +918,7 @@ describe('the Design canvas', () => {
     assert.equal(K.designIndex({ manifest: grown, title: 'T', base: live }).boards['Icons1440.dc.html'].x, grown.artboards[2].x, 'without the last publish, the layout wins, as before');
   });
 
-  test('a key Brandi used to write and no longer does is cleared from its own board', () => {
+  test('a key brandi used to write and no longer does is cleared from its own board', () => {
     const base = live();
     base.boards['Main.dc.html'].page = 'mine';
     base.boards['Main.dc.html'].is_interactive = true;

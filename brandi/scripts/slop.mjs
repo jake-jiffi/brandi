@@ -254,7 +254,7 @@ let cached = null;
  */
 function contractMissing(file, cause) {
   const message = `The anti-slop contract is missing: ${file}\n`
-    + 'Brandi reads every banned typeface and every banned phrase from that file, so no command can run without it.\n'
+    + 'brandi reads every banned typeface and every banned phrase from that file, so no command can run without it.\n'
     + 'Reinstall the plugin, or restore skills/brand-system/references/anti-slop.contract.md from the repository.';
   if (file !== CONTRACT_PATH) return new Error(message, { cause });
   writeSync(2, `${message}\n`);
@@ -392,7 +392,7 @@ export function slopFindings(contract, text, { file = '', mode = 'any', brandFon
   for (const m of families) {
     // Only the FIRST family in the stack is a choice. Everything after it is a
     // fallback, and a stack has to degrade: `'Karla', system-ui, sans-serif` is
-    // correct practice, and reading it as three violations flagged Brandi's own
+    // correct practice, and reading it as three violations flagged brandi's own
     // sheets sixteen times over. A ban on a fallback is a ban on graceful
     // degradation, which is not what any of these rules are about.
     const declared = m[1].split(',')[0].replace(/["']/g, '').trim();

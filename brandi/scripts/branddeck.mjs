@@ -2539,7 +2539,7 @@ export function renderBrandDeck({ brand, system, assets = {}, artboards = [], me
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:64px">
       <div class="mono" style="line-height:1.8;opacity:.9;max-width:60ch">
         ${esc(name)} brand guidelines, version ${esc(ctx.version)}${date ? `, ${esc(date)}` : ''}.<br>
-        ${brand.governance?.colophon?.madeBy ? esc(brand.governance.colophon.madeBy) : 'Built with Brandi'}, generated from brand/brand.json.<br>
+        ${brand.governance?.colophon?.madeBy ? esc(brand.governance.colophon.madeBy) : 'Built with brandi'}, generated from brand/brand.json.<br>
         ${brand.meta?.owner ? `Held by ${esc(brand.meta.owner)}. ` : ''}${brand.governance?.colophon?.contact ? `Ask ${esc(brand.governance.colophon.contact)}.` : ''}<br>
         This is a living document. Edit the source, bump the version, regenerate.
       </div>

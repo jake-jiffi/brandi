@@ -4,7 +4,7 @@
  * The canvas gives every artboard React 18.3.1 and ReactDOM, and a product system's bundle uses
  * that copy rather than its own. A local preview, a component preview page and the quality gates
  * need the same two files, so they are fetched once from cdnjs into a cache, checked against the
- * hashes below, and reused. Nothing is installed and nothing joins Brandi's dependencies.
+ * hashes below, and reused. Nothing is installed and nothing joins brandi's dependencies.
  *
  * The cache lives in $BRANDI_CACHE, else $XDG_CACHE_HOME/brandi, else ~/.cache/brandi.
  */

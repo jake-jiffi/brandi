@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: platform specs and the monthly standards check.
+ * brandi product layer: platform specs and the monthly standards check.
  *
  * Every component gets one spec per platform it can ship on (web, iOS and iPadOS, macOS, Android,
  * Windows), written against that platform's own guidance and stamped with the markers it was checked

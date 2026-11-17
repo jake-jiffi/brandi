@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: sync, pulling a shipped product back into the system.
+ * brandi product layer: sync, pulling a shipped product back into the system.
  *
  * Once a product ships it is the reference build. This compares its tokens and components with the
  * system's: roles added, removed and changed, components new, removed and changed (by their props).

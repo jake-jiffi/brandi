@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: does the canvas cover every surface the product ships on?
+ * brandi product layer: does the canvas cover every surface the product ships on?
  *
  * A round can stop at one surface and look finished. One run drew the console in depth and almost nothing of the
  * website, the app or the messages, and every gate passed, because every gate checks what was drawn and none

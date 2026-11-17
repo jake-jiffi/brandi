@@ -629,7 +629,7 @@ export function status(brand) {
 
 /**
  * The block that holds the file's own version and phase used to be called
- * `atelier`, and the tool was renamed to Brandi. A brand file written before
+ * `atelier`, and the tool was renamed to brandi. A brand file written before
  * that rename is not a broken file, it is an older file, and refusing to open
  * it would throw away the one artefact the whole system exists to accumulate.
  * It is migrated on read and rewritten on the next save.

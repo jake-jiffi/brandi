@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: every output a component's one definition feeds.
+ * brandi product layer: every output a component's one definition feeds.
  *
  * Each component in the kit has a definition beside it (components/system/<name>.def.mjs): its job,
  * props, behaviour rules, examples and scripted checks. From that one file this writes the README

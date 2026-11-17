@@ -1,17 +1,17 @@
 /**
- * Brandi product layer: product tokens.
+ * brandi product layer: product tokens.
  *
- * Brandi resolves a brand into a system built for the brand's own surfaces: the
+ * brandi resolves a brand into a system built for the brand's own surfaces: the
  * book, the site, a hero, a card. A product someone works in all day asks for
  * more, and asks for it more strictly.
  *
  *   More roles. A working screen needs a canvas, three surfaces, a sunken track,
  *   a raised layer, a rail, hover and pressed washes, selection, a highlight that
  *   means "this needs you", five status families with four roles each, six chart
- *   series, tags and a scrim. Brandi's semantic tier holds the brand's share of
+ *   series, tags and a scrim. brandi's semantic tier holds the brand's share of
  *   those; this file adds the rest.
  *
- *   Every pair checked. Brandi audits six pairs a theme, the ones a brand book
+ *   Every pair checked. brandi audits six pairs a theme, the ones a brand book
  *   can fail. A product fails on the pair nobody listed: quiet text on a sunken
  *   track, a control edge on a hovered row, a status word on its own tint. So
  *   every token here says what it sits on, as data, and the audit measures every
@@ -20,7 +20,7 @@
  *   it were solid.
  *
  *   Values that pass by construction. Text, line and focus roles are solved for
- *   contrast rather than picked from a ramp step and hoped for. Brandi's ramps
+ *   contrast rather than picked from a ramp step and hoped for. brandi's ramps
  *   are not monotonic in lightness (step 11 can be lighter than step 9, on
  *   purpose), so "use step 11" is not a guarantee of anything. The brand's hue
  *   and chroma are kept and only lightness moves, and only as far as it must.
@@ -143,7 +143,7 @@ export function visibleShift(base, dL, min) {
  *   floor    the quietest value that still passes, wherever the seed was. For
  *            the hierarchy: muted and subtle text, control edges, the chart
  *            comparison. A ramp step that happens to be darker than it needs to
- *            be would flatten the hierarchy into one grey, and Brandi's ramps
+ *            be would flatten the hierarchy into one grey, and brandi's ramps
  *            are not monotonic, so "step 10" can be darker than "step 11".
  */
 export function solveForContrast(seed, against, min, { margin = MARGIN, mode = 'nearest' } = {}) {
@@ -509,7 +509,7 @@ function themeValues(system, mode, roles, ai, brandInk) {
  * A series is one hue in both themes; only its lightness moves, until it clears 3:1 on that theme's card. Chosen
  * per theme, each theme ran its own palette in its own order: series-3 came out an ochre in light and a teal in
  * dark, so a chart's legend meant a different colour at night. The brand's own colours take the first slots (the
- * brand colour, then its accents), so a chart reads as the brand's; Brandi's colour-vision-checked palette fills
+ * brand colour, then its accents), so a chart reads as the brand's; brandi's colour-vision-checked palette fills
  * the rest, skipping hues already taken. Two hues never become a series: one the brand bars from either theme's
  * grounds (`avoid`), since a series barred from one theme would have to change colour in it, and one within 25
  * degrees of the assistant's violet, the gap the series keep from each other, where a chart line read as
@@ -856,7 +856,7 @@ export function shapeKitDefaults(tokens) {
 }
 
 /**
- * Build the product token set from a resolved Brandi system.
+ * Build the product token set from a resolved brandi system.
  *
  * @param {object} system  the output of buildSystem
  * @param {object} opts
@@ -1038,7 +1038,7 @@ export function checkDirections(directions, brandHex) {
 }
 
 export function buildProductTokens(system, { name = 'Product system', brandColours: brandColoursIn = null, roles: rolesIn = {}, displayForTitles = true, displayCase = null, charts = {}, source = null, fonts: fontFiles = [], shape = {}, directions = [], motion = null } = {}) {
-  if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved Brandi system');
+  if (!system?.palettes?.brand || !system?.palettes?.neutral) throw new TypeError('buildProductTokens needs a resolved brandi system');
 
   // Decided values arrive as people write them: "#fff" as often as "#FFFFFF",
   // and sometimes for one theme only. Expand the short form here so every
@@ -1090,7 +1090,7 @@ export function buildProductTokens(system, { name = 'Product system', brandColou
     roles[role] = bothThemes(val, decidedColour(role), `roles.${role}`);
   }
 
-  // The assistant's family borrows the brand's saturation, like Brandi's status colours do.
+  // The assistant's family borrows the brand's saturation, like brandi's status colours do.
   const base = toOklch(hexOf(system.palettes.brand.light.steps[8]));
   const aiSeed = oklchToHex(gamutMapOklch({ L: 0.55, C: Math.min(Math.max(base.C, 0.09), 0.19), h: AI_HUE }));
   const ai = { light: tonalRamp(aiSeed, { mode: 'light', name: 'ai' }), dark: tonalRamp(aiSeed, { mode: 'dark', name: 'ai' }) };

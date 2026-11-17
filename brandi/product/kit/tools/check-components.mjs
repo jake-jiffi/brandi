@@ -6,7 +6,7 @@
  *
  *   node tools/check-components.mjs [--previews <dir>] [--only Button,Dialog] [--json results.json]
  *
- * <dir> holds each component's rendered preview (<Name>Preview.preview.html, written by Brandi's
+ * <dir> holds each component's rendered preview (<Name>Preview.preview.html, written by brandi's
  * preview.mjs). A check receives { page, scope, expect, theme, brand, format }: scope is the example's
  * section, brand is { name, product, symbol, standIn }, the names the bundle was built with, whether it has a symbol mark and
  * whether it carries the kit's stand-in for a logo nobody has drawn, and format is lib/format.js
@@ -19,7 +19,7 @@
  * fails at once: a stale preview would test components that no longer exist. When canvas/dist holds
  * this starter's own build (`npm run canvas`), its bundle replaces the copy the previews mount, so
  * the checks run on the code as it is. A folder named with --previews is one its caller has just
- * rendered (Brandi's try loop and its gates), checked against its definitions.json when it has one.
+ * rendered (brandi's try loop and its gates), checked against its definitions.json when it has one.
  */
 
 import { chromium } from "playwright"

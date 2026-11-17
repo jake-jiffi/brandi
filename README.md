@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="The brand comes first. Brandi, a Claude Code plugin. Builds your brand, then keeps every later build on it." width="100%">
+  <img src="assets/banner.png" alt="The brand comes first. brandi, a Claude Code plugin. Builds your brand, then keeps every later build on it." width="100%">
 </p>
 
 <p align="center">
@@ -10,7 +10,7 @@
   <a href="https://clarityclub.jiffi.co"><img alt="From Jiffi Clarity Club" src="https://img.shields.io/badge/from-Jiffi%20Clarity%20Club-fff58a"></a>
 </p>
 
-# Brandi
+# brandi
 
 An agency-grade brand and design system builder for Claude Code, which also runs on Codex.
 
@@ -21,10 +21,10 @@ a brand book, DTCG design tokens, and a companion skill that keeps every future 
 
 ## Install
 
-You need [Claude Code](https://claude.com/claude-code) or Codex. Everything else is built in: Brandi
+You need [Claude Code](https://claude.com/claude-code) or Codex. Everything else is built in: brandi
 has no npm dependencies at all. The two hosts are not equal. Claude Code gets all of it, including
 the Design canvas, an Artifact you can open, comment on and edit by hand. Codex gets the skills,
-the command line and every file Brandi writes. Its visual rounds arrive as PNG previews rather than
+the command line and every file brandi writes. Its visual rounds arrive as PNG previews rather than
 a canvas.
 
 **1. Clone it,** in a terminal:
@@ -70,7 +70,7 @@ Codex (after `codex plugin marketplace upgrade` if you added the marketplace fro
 ### Optional
 
 A Chromium-family browser (Chrome, Chromium, Edge, Brave) is used for the PDF, the asset pack and
-artboard previews. Everything else works without one, and Brandi says plainly which outputs it could
+artboard previews. Everything else works without one, and brandi says plainly which outputs it could
 not produce rather than reporting a complete set. Set `CHROME_PATH` if yours lives somewhere unusual.
 
 Claude Code puts a plugin's `bin` on PATH from the next session, so `brandi` is not a shell command
@@ -198,7 +198,7 @@ node brandi/scripts/brandi.mjs --help
 ## What the book ends on
 
 The two things people remember a brand book by are the drawings they loved and the brand on real
-things. Brandi used to make both and print neither, so both are now part of the record.
+things. brandi used to make both and print neither, so both are now part of the record.
 
 **The illustration library.** `brandi illustration add <files...> --set "Christmas"` records the
 finished drawings. The book prints them straight after the Illustration page, two rows of four to
@@ -208,7 +208,7 @@ next session where they are, so new work reuses them instead of drawing a new se
 **Brand in use.** The chapter prints exactly the artboards `applications` names, from `brand/proof`
 or `brand/canvas`, and every mockup. Territory sketches and round boards stay out, and `brandi
 book` names each artboard it left out. Every brand is put on three real things whatever its
-channel: a billboard or poster, a piece of merch, and a card. With Higgsfield, Brandi generates a
+channel: a billboard or poster, a piece of merch, and a card. With Higgsfield, brandi generates a
 blank scene for each (the bus shelter, the tote, the card on a table) and composites the real
 artwork onto it through the corners someone read off it. `brandi validate` reports a brand with no
 real thing and a style with no recorded drawings, before the book is built.
@@ -216,8 +216,8 @@ real thing and a style with no recorded drawings, before the book is built.
 ## Generated media, with Higgsfield
 
 Optional. If the [Higgsfield CLI](https://www.npmjs.com/package/@higgsfield/cli) is installed and
-signed in, Brandi says so once in Recon and the pack gains what a language model cannot draw.
-If it is not, Brandi says in one line what it would add, and never mentions it again.
+signed in, brandi says so once in Recon and the pack gains what a language model cannot draw.
+If it is not, brandi says in one line what it would add, and never mentions it again.
 
 **What it makes.** Photography in the art direction, one shot per surface that carries one. Blank
 real-world scenes (the shopfront, the van, the sign) that `brandi mockup` then composites the real
@@ -236,7 +236,7 @@ worth pursuing, and says whether they want the drawing or its idea. The drawing 
 is redrawn under its brief. The generation manifest records where either came from. A spark can be
 picked. It can never be approved into the brand.
 
-**Models are chosen live.** Brandi reads Higgsfield's catalogue and matches models to jobs by what
+**Models are chosen live.** brandi reads Higgsfield's catalogue and matches models to jobs by what
 they take, not what they are called: a sting needs start and end frames, illustration needs hard
 palette colours. A newer version of the chosen family is picked up without a code change, and new
 models are named the day they appear. `brandi media trial` runs one prompt on the best of every
@@ -254,7 +254,7 @@ it. No generated person is ever presented as a customer or a member of staff.
 ## Product systems
 
 A fourth skill, `product-system`, takes the brand into the products built on it: the layer below the
-brand book that most systems skip. It works from a Brandi brand, from an existing brand and its
+brand book that most systems skip. It works from a brandi brand, from an existing brand and its
 website, or from a product that has already shipped, and it produces the system those products are
 built from. That means product tokens in both themes, a component library with previews and
 behaviour rules, the written system, a Design canvas carrying the whole product family with options
@@ -282,7 +282,7 @@ references. The commands are the parts that can be deterministic.
 
 ## What makes it different
 
-**It shows its sources.** Brandi records where each claim came from: supplied, extracted, published,
+**It shows its sources.** brandi records where each claim came from: supplied, extracted, published,
 decided, assumed or open. Assumptions are labelled as assumptions. Gaps are bracketed placeholders,
 never plausible-looking fabrications. A brand book with an honest empty section is worth more than
 one with an invented full one. The check covers the claims that were recorded. It can't see one that

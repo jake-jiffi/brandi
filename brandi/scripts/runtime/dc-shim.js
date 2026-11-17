@@ -1,5 +1,5 @@
 /*
- * Brandi's Design Component runtime shim.
+ * brandi's Design Component runtime shim.
  *
  * Renders a .dc.html artboard outside the Design canvas: for local previews, for the Design
  * System's component previews, and for the quality gates, which need the mounted components drawn

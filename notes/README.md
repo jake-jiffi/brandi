@@ -1,6 +1,6 @@
 # Working notes
 
-Notes from building Brandi. You don't need any of them to use it.
+Notes from building brandi. You don't need any of them to use it.
 
 | File | What it is |
 | --- | --- |

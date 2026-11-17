@@ -5,7 +5,7 @@
  *
  *   node tools/canvas-runtime.mjs --boards <canvas folder> --runtime <dc-runtime.js> [--json results.json]
  *
- * Brandi's previews draw a board as the top page with a shim, so a board can pass every other gate and still
+ * brandi's previews draw a board as the top page with a shim, so a board can pass every other gate and still
  * break on the canvas: one that walked window's properties read the cross-origin parent and threw there only.
  * The runtime posts each board's render errors to its parent, which is what the canvas lists; this reports
  * those, any page error, and a board that never boots. The runtime is the canvas type's own file: read

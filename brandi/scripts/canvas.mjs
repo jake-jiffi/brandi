@@ -1,5 +1,5 @@
 /**
- * Brandi canvas layer: emit and validate Design Component artboards for
+ * brandi canvas layer: emit and validate Design Component artboards for
  * Claude's Design canvas, an Artifact type.
  *
  * The division of labour here is deliberate.
@@ -427,9 +427,9 @@ export function forDesignCanvas(source) {
 }
 
 /**
- * A design system record as Brandi's canvas.json carries it. `artifact` is the
+ * A design system record as brandi's canvas.json carries it. `artifact` is the
  * system's address cut after its id, on the hosts the Design type accepts;
- * `files` is Brandi's own extension, the files to copy on this publish, and
+ * `files` is brandi's own extension, the files to copy on this publish, and
  * never reaches the canvas's index. A record without `artifact` only declares
  * a namespace, so a board's head lines validate before the system is installed.
  */
@@ -457,7 +457,7 @@ export function checkSystemRecord(rec) {
 
 const artifactId = (url) => String(url).split('/').pop();
 
-// The keys Brandi writes on its own boards. Anything else on an entry (the
+// The keys brandi writes on its own boards. Anything else on an entry (the
 // editor's `frameless`, `guides`, `radius`, `paper`) belongs to the canvas.
 const BOARD_KEYS = ['x', 'y', 'w', 'h', 'title', 'page', 'expand', 'print', 'is_interactive'];
 
@@ -475,15 +475,15 @@ export function boardIsInteractive(source) {
 }
 
 /**
- * Brandi's canvas.json, written as the Design canvas's own index (version 3).
+ * brandi's canvas.json, written as the Design canvas's own index (version 3).
  *
- * Brandi keeps its own manifest shape because the validator, the preview and
+ * brandi keeps its own manifest shape because the validator, the preview and
  * the logo boards all read it. This is the translation at the edge: `boards`
  * keyed by file, `order` back to front with Main first, annotations as notes.
  *
  * With `base`, the index merges into an index that exists: the live one read
  * from the canvas right before the write, or the last local publish. Only
- * Brandi's own keys change. Boards a person added on the canvas, their notes,
+ * brandi's own keys change. Boards a person added on the canvas, their notes,
  * keys the editor set and the installed systems all survive, because a publish
  * that rebuilt the index from scratch dropped every one of them. `removed`
  * names boards an earlier publish from this folder sent and this one does not. With `previous`, the index that
@@ -916,7 +916,7 @@ export function validateArtboard(source, { name = 'artboard', allowFonts = true,
     }
   }
 
-  // A handler or noValidate in a case the canvas may not read. Brandi's shim takes any case, because the HTML parser
+  // A handler or noValidate in a case the canvas may not read. brandi's shim takes any case, because the HTML parser
   // lowercases names before it sees them, so no preview shows this; only the source does.
   for (const m of miscasedAttributes(source)) {
     err(
@@ -1021,7 +1021,7 @@ const JSX_EVENTS = {
 
 /**
  * Each handler attribute, and each novalidate, written in a case the Design canvas may not read, from the source
- * text: the HTML parser lowercases every name, so the DOM cannot tell onClick from onclick, and Brandi's own shim
+ * text: the HTML parser lowercases every name, so the DOM cannot tell onClick from onclick, and brandi's own shim
  * accepts both. On an element a handler is JSX camelCase (onClick="{{ item.pick }}"); on an x-import or a
  * dc-import, a prop is kebab-case (on-row-click). A handler is a whole {{hole}}: a literal never runs, so a prop
  * that only starts with "on" is left alone. Scripts, styles and comments are not markup.

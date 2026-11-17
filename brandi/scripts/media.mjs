@@ -1,7 +1,7 @@
 /**
  * Generated media, through the Higgsfield command line, when it is installed.
  *
- * Optional by construction. Brandi builds a complete brand without it, and the
+ * Optional by construction. brandi builds a complete brand without it, and the
  * only commands that stop without it are the ones whose whole job is to call it.
  * When it is there, it does the parts of an agency pack that a language model
  * cannot draw: photography in the art direction, the real-world surfaces a
@@ -161,14 +161,14 @@ export function statusText(p) {
       `Higgsfield is ready: ${p.plan ?? 'unknown'} plan, ${p.credits == null ? 'credits unknown' : `${Math.floor(p.credits).toLocaleString('en-AU')} credits`}.`,
       p.version ? `  ${p.version}` : null,
       '',
-      'Brandi can generate the photography, the scenes for mockups, motion, sound, a 3D mark',
+      'brandi can generate the photography, the scenes for mockups, motion, sound, a 3D mark',
       'and a wall of logo sparks, in the brand\'s own direction. Start with: brandi media plan',
     ].filter((l) => l !== null).join('\n');
   }
   return [
     p.reason,
     '',
-    'Brandi works completely without it. With it, the pack also gets photography in the art',
+    'brandi works completely without it. With it, the pack also gets photography in the art',
     'direction, real scenes for the mockups, a logo sting, sound, and logo sparks from several',
     'image models. To add it:',
     ...p.suggest.map((s) => `  ${s}`),
@@ -1049,7 +1049,7 @@ export function pinModel(plan, needName, model, { why = null, catalogue = null, 
   if (!text(why)) throw new Error('A pin needs its reason: --why "what made this the one". Dictation without a reason is a default nobody can argue with.');
   const m = catalogue?.models?.find((x) => x.job_type === model);
   if (catalogue && !m && !force) throw new Error(`${model} is not in the catalogue. See: brandi media models --refresh`);
-  if (m && !meets(m, needName) && !force) throw new Error(`${model} cannot do the ${needName} job as Brandi defines it (see brandi media models). Pass --force to pin it anyway.`);
+  if (m && !meets(m, needName) && !force) throw new Error(`${model} cannot do the ${needName} job as brandi defines it (see brandi media models). Pass --force to pin it anyway.`);
   plan.models ??= {};
   plan.models[needName] = { model, why: why.trim(), pinnedOn: localDate(now) };
   return plan.models[needName];
@@ -1866,7 +1866,7 @@ export async function writeBoards(plan, { brandDir, projectRoot, brandName, appr
 
 export const USAGE = `brandi media: photography, scenes, motion, sound and logo sparks, through Higgsfield
 
-Optional. Brandi builds the whole brand without it; these commands exist for when it is there.
+Optional. brandi builds the whole brand without it; these commands exist for when it is there.
 
   status                      is Higgsfield installed, signed in, and how many credits
   models [--refresh] [--need J]

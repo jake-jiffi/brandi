@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: PRODUCT.md and DESIGN.md, Impeccable's context files, written from the system.
+ * brandi product layer: PRODUCT.md and DESIGN.md, Impeccable's context files, written from the system.
  *
  * PRODUCT.md carries the intake in product/product.json: who uses each surface and for what, the
  * systems each reads and writes and how they fail, what the assistant may do, the market and the

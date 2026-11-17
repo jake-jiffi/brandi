@@ -1,5 +1,5 @@
 /**
- * Brandi product layer: the starter's globals.css.
+ * brandi product layer: the starter's globals.css.
  *
  * The production starter (Next.js, Tailwind CSS 4, shadcn/ui) takes its every
  * value from the system's tokens.json, through this one generator. The skill

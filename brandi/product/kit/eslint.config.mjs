@@ -33,7 +33,7 @@ export default defineConfig([
     rules: { "@typescript-eslint/no-unused-vars": ["warn", { ignoreRestSiblings: true }] },
   },
   {
-    // The system's code, copied in by `brandi product starter --kit` and checked in Brandi's own loop. It departs
+    // The system's code, copied in by `brandi product starter --kit` and checked in brandi's own loop. It departs
     // from three of Next's defaults on purpose, so the product's lint does not hold it to them.
     files: ["components/system/**", "components/ui/**", "canvas/**", "lib/refs.ts"],
     rules: off(COMPILER_RULES.map((name) => `react-hooks/${name}`)),
@@ -53,7 +53,7 @@ export default defineConfig([
     files: ["components/system/**/*.def.mjs"],
     rules: { "import/no-anonymous-default-export": "off", "@typescript-eslint/no-unused-vars": ["warn", { args: "none", caughtErrors: "none", ignoreRestSiblings: true }] },
   },
-  // Build output, generated files and the previews Brandi renders: none of it is written by hand.
+  // Build output, generated files and the previews brandi renders: none of it is written by hand.
   globalIgnores([
     ".next/**",
     "out/**",

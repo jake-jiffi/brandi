@@ -5,7 +5,7 @@
  * stands in for it, answering the way the real one was observed to answer on
  * 2026-09-26 (a list of jobs from `generate create --json --wait`, `Error:` and
  * `Hint:` lines and exit 4 on a refusal), and a local server stands in for the
- * CDN the results come from. What is tested is Brandi's side of the contract:
+ * CDN the results come from. What is tested is brandi's side of the contract:
  * that it asks for the right things, refuses to spend past a budget, never
  * uploads a file from outside the project, keeps what it paid for, and never
  * lets a raster logo spark into the brand.

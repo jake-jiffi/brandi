@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * The Brandi command line. Everything the brand-system skill does that can be
+ * The brandi command line. Everything the brand-system skill does that can be
  * deterministic happens here, so the skill spends its turns on judgement rather
  * than on arithmetic it would get subtly wrong.
  *
@@ -2957,7 +2957,7 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
       Every role a working screen needs, in both themes, solved for contrast,
       then audited. Reads brand/brand.json, or --input: a brand file, or a
       plain system input ({ "primary": "#...", "accents": [...], "type": {...} })
-      for a brand Brandi has never built. Decided roles come from
+      for a brand brandi has never built. Decided roles come from
       product/product.json ("roles": { "primary": { "light", "dark" }, ... }).
       Directions ("directions": [{ "name", "roles", "note" }]) are solved as
       the system with their roles over the decided ones, audited under their
@@ -3084,7 +3084,7 @@ const PRODUCT_USAGE = `brandi product: the product layer, for the product-system
 /**
  * The system the product layer builds on, and the brand's motion signature with where it was read. The signature lives
  * only in the brand record (identity.motionSignature); the system and the brand's own tokens carry its stance's
- * durations and Brandi's curves, never the signature. Route B's input file holds it as motionSignature, in the same form.
+ * durations and brandi's curves, never the signature. Route B's input file holds it as motionSignature, in the same form.
  */
 async function productSource(flags) {
   // Anything but an object goes on as it is, for the tokens to refuse with what it was.

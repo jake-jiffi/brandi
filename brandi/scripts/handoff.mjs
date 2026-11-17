@@ -1,7 +1,7 @@
 /**
  * The handover: one directory, and a front page that says who takes what.
  *
- * Everything Brandi produces already existed in pieces, scattered across
+ * Everything brandi produces already existed in pieces, scattered across
  * `brand/`, and a client who is handed a folder of files works out what to do
  * with roughly none of them. An agency does not hand over a directory listing;
  * it hands over a package with a contents page, and the contents page is

@@ -12,7 +12,7 @@ import { artboard, validateCanvas } from '../scripts/canvas.mjs';
 import { KIT } from '../scripts/productstarter.mjs';
 import { findChrome } from '../scripts/preview.mjs';
 
-// Measuring runs the kit's measure-boards.mjs on its own node_modules (Playwright), which Brandi does not carry. Point
+// Measuring runs the kit's measure-boards.mjs on its own node_modules (Playwright), which brandi does not carry. Point
 // BRANDI_KIT_MODULES at an installed starter's node_modules to run it; without one it is skipped out loud.
 const KIT_MODULES = process.env.BRANDI_KIT_MODULES && path.resolve(process.env.BRANDI_KIT_MODULES);
 const needsKit = { skip: !KIT_MODULES || !existsSync(path.join(KIT_MODULES, 'playwright')) ? 'needs the kit\'s node_modules: set BRANDI_KIT_MODULES' : findChrome() ? false : 'no headless browser on this machine' };

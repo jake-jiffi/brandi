@@ -205,7 +205,7 @@ describe('the punctuation tell', () => {
   const rules = (text) => slopFindings(contract, text).map((f) => f.rule);
 
   test('a dash used as a sentence break is caught, in generated copy and authored alike', () => {
-    // The house rule used to live only in a test over Brandi's own documents,
+    // The house rule used to live only in a test over brandi's own documents,
     // so nothing stopped an authored artboard or a client's page carrying them.
     assert.ok(rules('<p>The system is honest \u2014 and it says so.</p>').includes('ai-punctuation'));
     assert.ok(rules('<p>It ran fast \u2013 faster than before.</p>').includes('ai-punctuation'));
